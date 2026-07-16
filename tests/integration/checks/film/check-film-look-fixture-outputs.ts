@@ -11,7 +11,6 @@ import {
 import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 
 const fixtureUrl = new URL('../../../../fixtures/film-simulation/film-look-fixture-outputs.json', import.meta.url);
-const browserSourceUrl = new URL('../../../../src/components/adjustments/FilmLookBrowser.tsx', import.meta.url);
 const registrySourceUrl = new URL('../../../../src/utils/film-look/filmLookRegistry.ts', import.meta.url);
 const utilsSourceUrl = new URL('../../../../src/utils/film-look/filmLookBrowser.ts', import.meta.url);
 const updateFixture = process.argv.includes('--update');
@@ -75,49 +74,6 @@ if (currentFixture !== expectedFixture) {
   throw new Error('Film look fixture outputs are stale. Run bun run check:film-fixtures:update and review the diff.');
 }
 
-const browserSource = await readFile(browserSourceUrl, 'utf8');
-for (const marker of [
-  'showFavoritesOnly',
-  'favoriteLookCount',
-  'visibleGroups',
-  'totalLookCount',
-  'adjustments.effects.filmLookBrowser.resultCount',
-  'film-look-result-count',
-  'FILM_LOOK_FAVORITES_STORAGE_KEY',
-  'FilmLookNativeThumbnail',
-  'searchQuery',
-  'adjustments.effects.filmLookBrowser.search',
-  'adjustments.effects.filmLookBrowser.searchClear',
-  'film-look-search-clear',
-  'activeCategory',
-  'categoryTabs',
-  'adjustments.effects.filmLookBrowser.categoryFilter',
-  'getFilmLookSearchText',
-  'look.provenance.legalNote',
-  'handleClearComparisonLooks',
-  'adjustments.effects.filmLookBrowser.compareClearAll',
-  'film-look-compare-clear-all',
-  'handleSwapComparisonLooks',
-  'adjustments.effects.filmLookBrowser.compareSwap',
-  'film-look-provenance-inspector',
-  'film-look-provenance-fields',
-  'film-look-adjustment-summary',
-  'adjustments.effects.filmLookBrowser.provenanceTitle',
-  'formatFilmLookToken',
-]) {
-  if (!browserSource.includes(marker)) {
-    throw new Error(`Film look browser is missing UI marker: ${marker}`);
-  }
-}
-
-const visualSmokeSourceUrl = new URL('../../../../src/validation/visual/VisualSmokeApp.tsx', import.meta.url);
-const visualSmokeSource = await readFile(visualSmokeSourceUrl, 'utf8');
-for (const marker of ['FilmLookVisualSmoke', 'film-look-browser', 'film-look-adjustment-proof']) {
-  if (!visualSmokeSource.includes(marker)) {
-    throw new Error(`Visual smoke app is missing film look marker: ${marker}`);
-  }
-}
-
 const registrySource = await readFile(registrySourceUrl, 'utf8');
 const utilsSource = await readFile(utilsSourceUrl, 'utf8');
 const prohibitedClaims =
@@ -169,20 +125,6 @@ for (const marker of [
 ]) {
   if (!utilsSource.includes(marker)) {
     throw new Error(`Film look utilities are missing preset parity marker: ${marker}`);
-  }
-}
-
-const effectsSourceUrl = new URL('../../../../src/components/adjustments/Effects.tsx', import.meta.url);
-const effectsSource = await readFile(effectsSourceUrl, 'utf8');
-for (const marker of [
-  'buildFilmLookPresetDraft',
-  'Invokes.SaveCommunityPreset',
-  'Invokes.HandleExportPresetsToFile',
-  'filmLookPresetStatus',
-  'film-look-preset-status',
-]) {
-  if (!effectsSource.includes(marker)) {
-    throw new Error(`Effects panel is missing film preset export marker: ${marker}`);
   }
 }
 

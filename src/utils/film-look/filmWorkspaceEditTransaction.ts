@@ -9,14 +9,15 @@ export interface FilmWorkspaceEditState {
   imageSession?: { id: string } | null;
 }
 
+export type FilmWorkspacePatch = Partial<Pick<Adjustments, 'filmEmulation'>>;
+
 /**
  * Converts one Film workspace intent into the canonical revision-checked editor
- * transaction. The compatibility patch remains node-scoped and carries any
- * provenance cleanup that the requested Film fields invalidate.
+ * transaction. Film state is represented only by the pinned current node.
  */
 export const buildFilmWorkspaceEditTransactionRequest = (
   state: FilmWorkspaceEditState,
-  patch: Partial<Adjustments>,
+  patch: FilmWorkspacePatch,
   transactionId: string,
   history: EditTransactionHistory = 'single-entry',
 ): EditTransactionRequest => {
@@ -29,14 +30,6 @@ export const buildFilmWorkspaceEditTransactionRequest = (
       ? {}
       : { referenceMatchApplicationReceipt: next.referenceMatchApplicationReceipt };
   const ownsFilmEmulation = Object.hasOwn(patch, 'filmEmulation');
-  const ownsFilmLookId = Object.hasOwn(patch, 'filmLookId');
-  const ownsFilmLookStrength = Object.hasOwn(patch, 'filmLookStrength');
-  const { filmEmulation: _filmEmulation, filmLookId, filmLookStrength, ...legacyPatch } = structuredClone(patch);
-  const filmLookPatch = {
-    ...(ownsFilmLookId ? { filmLookId: filmLookId ?? null } : {}),
-    ...(ownsFilmLookStrength ? { filmLookStrength: filmLookStrength ?? 100 } : {}),
-  };
-  const compatibilityPatch = { ...legacyPatch, ...provenancePatch };
 
   return {
     transactionId,
@@ -53,17 +46,8 @@ export const buildFilmWorkspaceEditTransactionRequest = (
             },
           ]
         : []),
-      ...(ownsFilmLookId || ownsFilmLookStrength
-        ? [
-            {
-              nodeType: 'film_look' as const,
-              patch: filmLookPatch,
-              type: 'patch-edit-document-node' as const,
-            },
-          ]
-        : []),
-      ...(Object.keys(compatibilityPatch).length > 0
-        ? [{ patch: compatibilityPatch, type: 'patch-adjustments' as const }]
+      ...(Object.keys(provenancePatch).length > 0
+        ? [{ patch: provenancePatch, type: 'patch-adjustments' as const }]
         : []),
     ],
     history,

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -17,6 +17,7 @@ const reset = () => {
   });
 };
 
+beforeEach(reset);
 afterEach(reset);
 
 describe('editor render-authority boundary', () => {

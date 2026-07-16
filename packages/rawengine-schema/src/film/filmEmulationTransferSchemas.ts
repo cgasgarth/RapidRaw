@@ -40,13 +40,3 @@ export const filmEmulationTransferV1Schema = z
   .strict();
 
 export type FilmEmulationTransferV1 = z.infer<typeof filmEmulationTransferV1Schema>;
-
-export const filmLegacyMigrationStatusV1Schema = z.enum([
-  'migrated_to_film_node',
-  'legacy_adjustments_preserved',
-  'legacy_mapping_unavailable',
-  'legacy_controlled_fields_modified',
-  'legacy_profile_withdrawn',
-]);
-
-export type FilmLegacyMigrationStatusV1 = z.infer<typeof filmLegacyMigrationStatusV1Schema>;

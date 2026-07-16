@@ -22,7 +22,6 @@ import {
   VISUAL_SMOKE_SCENARIO_IDS,
 } from '../../../../src/validation/visual/visualSmokeScenarios.ts';
 import {
-  assertFilmLookExportProof,
   assertNegativeLabBaseFogPreviewExportProof,
   assertNegativeLabBatchColorInvokeProof,
   assertNegativeLabInvokeProof,
@@ -2563,55 +2562,6 @@ export async function prepareScenario(page, mode) {
     return;
   }
 
-  if (mode === 'film-look-browser') {
-    await page.getByTestId('film-look-rendered-proof').getByText('Rendered parity proof', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('film-look-rendered-proof').getByText('Mono Silver', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('film-look-rendered-proof').getByText('7e4b525fd7be754b', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByLabel('Warm Print', { exact: true }).click();
-    await page.getByTestId('film-look-adjustment-proof').getByText('Temp 5').waitFor({ timeout: 10_000 });
-    await page.getByRole('slider', { name: 'Strength' }).fill('100');
-    await page.getByTestId('film-look-adjustment-proof').getByText('Temp 8', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByLabel('Compare A: Warm Print').click();
-    await page.getByLabel('Save Warm Print as preset').click();
-    await page.getByTestId('film-look-preset-status').getByText('Saved Warm Print 100%', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByLabel('Share Warm Print preset').click();
-    await page.getByTestId('film-look-preset-status').getByText('Exported Warm Print 100%', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByLabel('Mono Silver', { exact: true }).click();
-    await page.getByTestId('film-look-adjustment-proof').getByText('Temp 0', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByTestId('film-look-adjustment-proof').getByText('Grain 17', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByRole('slider', { name: 'Strength' }).fill('100');
-    await page.getByTestId('film-look-adjustment-proof').getByText('Grain 22', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByLabel('Compare A: Mono Silver').click();
-    await page.getByLabel('Save Mono Silver as preset').click();
-    await page.getByTestId('film-look-preset-status').getByText('Saved Mono Silver 100%', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await page.getByLabel('Share Mono Silver preset').click();
-    await page.getByTestId('film-look-preset-status').getByText('Exported Mono Silver 100%', { exact: true }).waitFor({
-      timeout: 10_000,
-    });
-    await assertFilmLookExportProof(page);
-    return;
-  }
-
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.FilmEmulationWorkspace) {
     const proof = page.getByTestId('film-workspace-transaction-proof');
     await page.getByRole('button', { name: 'Enable film emulation' }).click();
@@ -2630,7 +2580,7 @@ export async function prepareScenario(page, mode) {
     await mix.dispatchEvent('pointerup');
     await expectDatasetValue(proof, 'adjustmentRevision', '3');
     await expectDatasetValue(proof, 'historyIndex', '2');
-    await expectDatasetValue(proof, 'changedKeys', 'filmLookStrength');
+    await expectDatasetValue(proof, 'changedKeys', 'filmEmulation');
     await page.getByRole('button', { name: 'Reset film emulation' }).click();
     await expectDatasetValue(proof, 'adjustmentRevision', '4');
     await expectDatasetValue(proof, 'historyIndex', '3');

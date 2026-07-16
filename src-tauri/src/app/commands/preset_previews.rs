@@ -21,7 +21,6 @@ use crate::io::cache_utils::calculate_transform_hash;
 use crate::io::formats::is_raw_file;
 use crate::io::image_codecs::encode_jpeg_bytes;
 use crate::library::file_management::parse_virtual_path;
-use crate::render::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::render::image_processing::{
     downscale_f32_image, process_and_get_dynamic_image, resolve_tonemapper_override_from_handle,
 };
@@ -161,11 +160,11 @@ pub(crate) fn render_preset_preview_bytes(
     checkpoint()?;
 
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
-    let render_adjustments = normalize_film_look_adjustments_for_render(&js_adjustments);
+    let render_adjustments = &js_adjustments;
     let lut_path = render_adjustments["lutPath"].as_str();
     let lut = lut_path.and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
     let render_plan = compile_consumer_render_plan(
-        render_adjustments.as_ref(),
+        render_adjustments,
         &loaded_image.path,
         is_raw,
         tm_override,
@@ -173,8 +172,8 @@ pub(crate) fn render_preset_preview_bytes(
     )?;
     let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
         &preview_image,
-        calculate_transform_hash(render_adjustments.as_ref()),
-        render_adjustments.as_ref(),
+        calculate_transform_hash(render_adjustments),
+        render_adjustments,
         is_raw,
     );
     let mut gpu_adjustments = render_plan.adjustments;
@@ -347,13 +346,12 @@ pub(crate) async fn generate_all_community_previews(
                 .collect();
 
             let tm_override = resolve_tonemapper_override_from_handle(&app_handle, *is_raw);
-            let render_adjustments =
-                normalize_film_look_adjustments_for_render(&scaled_adjustments);
+            let render_adjustments = &scaled_adjustments;
             let lut_path = render_adjustments["lutPath"].as_str();
             let lut =
                 lut_path.and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
             let render_plan = compile_consumer_render_plan(
-                render_adjustments.as_ref(),
+                render_adjustments,
                 &preset.name,
                 *is_raw,
                 tm_override,

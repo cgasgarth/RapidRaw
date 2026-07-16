@@ -2,7 +2,6 @@ import type { z } from 'zod';
 import {
   EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS,
   EDIT_DOCUMENT_FILM_EMULATION_FIELDS,
-  EDIT_DOCUMENT_FILM_LOOK_FIELDS,
   EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
   EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
   EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
@@ -23,7 +22,6 @@ import {
   editDocumentDetailDenoiseDehazeV2Schema,
   editDocumentDisplayCreativeV2Schema,
   editDocumentFilmEmulationV2Schema,
-  editDocumentFilmLookV2Schema,
   editDocumentGeometryV2Schema,
   editDocumentLayersV2Schema,
   editDocumentLensCorrectionV2Schema,
@@ -56,7 +54,6 @@ const LUMA_LEVELS_FIELDS = new Set<string>(EDIT_DOCUMENT_LUMA_LEVELS_FIELDS);
 const COLOR_PRESENCE_FIELDS = new Set<string>(EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS);
 const SHARPNESS_THRESHOLD_FIELDS = new Set<string>(EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS);
 const FILM_EMULATION_FIELDS = new Set<string>(EDIT_DOCUMENT_FILM_EMULATION_FIELDS);
-const FILM_LOOK_FIELDS = new Set<string>(EDIT_DOCUMENT_FILM_LOOK_FIELDS);
 const SOURCE_DECODE_FIELDS = new Set<string>(EDIT_DOCUMENT_SOURCE_DECODE_FIELDS);
 const SKIN_TONE_UNIFORMITY_FIELDS = new Set<string>(EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_FIELDS);
 
@@ -65,9 +62,6 @@ const migratedOwnedFieldSchema = (key: string): z.ZodType | undefined => {
     return editDocumentColorPresenceV2Schema.shape[key as (typeof EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS)[number]];
   }
   if (FILM_EMULATION_FIELDS.has(key)) return editDocumentFilmEmulationV2Schema.shape.filmEmulation;
-  if (FILM_LOOK_FIELDS.has(key)) {
-    return editDocumentFilmLookV2Schema.shape[key as (typeof EDIT_DOCUMENT_FILM_LOOK_FIELDS)[number]];
-  }
   if (SOURCE_DECODE_FIELDS.has(key)) return editDocumentSourceDecodeV2Schema.shape.rawProcessingModeOverride;
   if (SKIN_TONE_UNIFORMITY_FIELDS.has(key)) {
     return editDocumentSkinToneUniformityV2Schema.shape.skinToneUniformity;
@@ -155,7 +149,6 @@ const STRICT_LEGACY_NODE_PARAM_SCHEMAS: Partial<Record<EditDocumentNodeTypeV2, z
   detail_denoise_dehaze: editDocumentDetailDenoiseDehazeV2Schema,
   display_creative: editDocumentDisplayCreativeV2Schema,
   film_emulation: editDocumentFilmEmulationV2Schema,
-  film_look: editDocumentFilmLookV2Schema,
   lens_correction: editDocumentLensCorrectionV2Schema,
   luma_levels: editDocumentLumaLevelsV2Schema,
   perceptual_grading: editDocumentPerceptualGradingV2Schema,
@@ -185,6 +178,11 @@ const normalizeMappedNodeParams = (
 };
 
 export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<string, unknown>>): EditDocumentV2 => {
+  for (const field of ['filmLookId', 'filmLookStrength']) {
+    if (Object.hasOwn(adjustments, field)) {
+      throw new Error(`EditDocumentV2 rejects retired pre-node Film field '${field}'.`);
+    }
+  }
   const entries = Object.entries(adjustments);
   const quarantinedOwnedEntries = entries.filter(([key, value]) => {
     const schema = migratedOwnedFieldSchema(key);
@@ -242,7 +240,6 @@ export const legacyAdjustmentsToEditDocumentV2 = (adjustments: Readonly<Record<s
       'color_calibration',
       'detail_denoise_dehaze',
       'display_creative',
-      'film_look',
       'geometry',
       'lens_correction',
       'luma_levels',

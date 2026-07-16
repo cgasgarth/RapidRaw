@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { Adjustments } from '../adjustments';
 import {
   buildFilmLookAppliedAdjustmentPatch,
   clampFilmLookStrength,
@@ -277,24 +276,4 @@ export function buildFilmLookAbCommand(options: BuildFilmLookAbCommandOptions): 
       kind: 'image',
     },
   });
-}
-
-export function applyFilmLookAbCommandToAdjustments(
-  baseAdjustments: Adjustments,
-  command: unknown,
-  looksById: ReadonlyMap<string, FilmLookBrowserItem>,
-): Adjustments {
-  const parsedCommand = filmLookAbCommandSchema.parse(command);
-  const acceptedCandidate = parsedCommand.parameters.candidates[parsedCommand.parameters.acceptedSlot];
-  const acceptedLook = looksById.get(acceptedCandidate.lookId);
-  if (acceptedLook === undefined) {
-    throw new Error(`Accepted film look is missing from registry: ${acceptedCandidate.lookId}`);
-  }
-
-  return {
-    ...baseAdjustments,
-    ...buildFilmLookAppliedAdjustmentPatch(acceptedLook, acceptedCandidate.strength),
-    filmLookId: acceptedLook.id,
-    filmLookStrength: acceptedCandidate.strength,
-  };
 }

@@ -7,7 +7,6 @@ use tauri::{Emitter, Manager};
 
 use crate::app_settings::load_settings_or_default;
 use crate::cache_utils::calculate_transform_hash;
-use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::image_codecs::encode_jpeg_data_url;
 use crate::image_loader::composite_patches_on_image;
 use crate::image_processing::{
@@ -112,12 +111,12 @@ pub(crate) fn generate_uncropped_preview(
             .collect();
 
         let tonemapper_override = resolve_tonemapper_override_from_handle(&app_handle, is_raw);
-        let render_adjustments = normalize_film_look_adjustments_for_render(&adjustments_clone);
+        let render_adjustments = &adjustments_clone;
         let lut = render_adjustments["lutPath"]
             .as_str()
             .and_then(|path| state.render().native_caches().get_or_load_lut(path).ok());
         let render_plan = match compile_consumer_render_plan(
-            render_adjustments.as_ref(),
+            render_adjustments,
             &loaded_image.path,
             is_raw,
             tonemapper_override,
@@ -131,8 +130,8 @@ pub(crate) fn generate_uncropped_preview(
         };
         let detail_stage = render_pipeline::apply_pre_gpu_detail_stages(
             &processing_base,
-            calculate_transform_hash(render_adjustments.as_ref()),
-            render_adjustments.as_ref(),
+            calculate_transform_hash(render_adjustments),
+            render_adjustments,
             is_raw,
         );
         let mut gpu_adjustments = render_plan.adjustments;

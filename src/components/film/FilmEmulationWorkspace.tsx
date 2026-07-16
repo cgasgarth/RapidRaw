@@ -1,20 +1,14 @@
 import { RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { FilmEmulationOperationV1 } from '../../../packages/rawengine-schema/src/index.js';
+import type { FilmEmulationOperationV1, FilmProfileManifestV1 } from '../../../packages/rawengine-schema/src/index.js';
 import { useEditorStore } from '../../store/useEditorStore';
-import { INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { getFilmBaselineProfileCatalog } from '../../utils/film-look/filmBaselineProfiles';
 import {
   applyFilmEmulationOperation,
   hydrateFilmEmulationTargetState,
   REFERENCE_FILM_PROFILE_REF,
 } from '../../utils/film-look/filmEmulationOperation';
-import {
-  buildFilmLookAppliedAdjustmentPatch,
-  type FilmLookBrowserItem,
-  resetFilmLookControlledAdjustments,
-} from '../../utils/film-look/filmLookBrowser';
-import { getFilmLookBrowserGroups } from '../../utils/film-look/filmLookRegistry';
 import {
   buildFilmStageOperation,
   FILM_REFERENCE_STAGE_DEFAULT_P,
@@ -44,13 +38,18 @@ export function FilmEmulationWorkspace() {
   const operationCounterRef = useRef(0);
   const mixInteractionIdRef = useRef<string | null>(null);
   const ownsSliderDragRef = useRef(false);
-  const activeProfile = useMemo(
-    () =>
-      getFilmLookBrowserGroups()
-        .flatMap((group) => group.looks)
-        .find((look) => look.id === adjustments.filmLookId) ?? null,
-    [adjustments.filmLookId],
-  );
+  const activeProfile = useMemo(() => {
+    const activeRef = adjustments.filmEmulation?.profileRef;
+    if (!activeRef) return null;
+    return (
+      getFilmBaselineProfileCatalog().find(
+        (profile) =>
+          profile.model.profileRef.id === activeRef.id &&
+          profile.model.profileRef.version === activeRef.version &&
+          profile.model.profileRef.contentSha256 === activeRef.contentSha256,
+      ) ?? null
+    );
+  }, [adjustments.filmEmulation?.profileRef]);
   const commitFilmPatch = (
     patch: Parameters<typeof buildFilmWorkspaceEditTransactionRequest>[1],
     history: Parameters<typeof buildFilmWorkspaceEditTransactionRequest>[3] = 'single-entry',
@@ -80,10 +79,6 @@ export function FilmEmulationWorkspace() {
     },
     [],
   );
-  const commitFilmMix = (filmLookStrength: number) => {
-    const activeTransactionId = mixInteractionIdRef.current;
-    commitFilmPatch({ filmLookStrength }, 'coalesced-interaction', activeTransactionId ?? crypto.randomUUID());
-  };
   const applyFilmOperation = (operation: FilmEmulationOperationV1) => {
     operationCounterRef.current += 1;
     const state = useEditorStore.getState();
@@ -105,7 +100,11 @@ export function FilmEmulationWorkspace() {
       target: source.target,
     };
     const applied = applyFilmEmulationOperation(command, source);
-    commitFilmPatch({ filmEmulation: applied.state.node });
+    commitFilmPatch(
+      { filmEmulation: applied.state.node },
+      operation.kind === 'set_mix' ? 'coalesced-interaction' : 'single-entry',
+      operation.kind === 'set_mix' ? (mixInteractionIdRef.current ?? crypto.randomUUID()) : crypto.randomUUID(),
+    );
   };
   const nativeFilmEnabled = adjustments.filmEmulation !== null;
   const stageDescriptors = nativeFilmEnabled
@@ -113,26 +112,10 @@ export function FilmEmulationWorkspace() {
         adjustments.filmEmulation?.stageParams?.referenceLuminanceShaperP ?? FILM_REFERENCE_STAGE_DEFAULT_P,
       )
     : [];
-  const applyProfile = (look: FilmLookBrowserItem) => {
-    const current = useEditorStore.getState().adjustments;
-    commitFilmPatch({
-      ...buildFilmLookAppliedAdjustmentPatch(
-        look,
-        current.filmLookId === look.id ? current.filmLookStrength : look.strengthDefault,
-      ),
-      filmEmulation: null,
-      filmLookId: look.id,
-      filmLookStrength: current.filmLookId === look.id ? current.filmLookStrength : look.strengthDefault,
-    });
-  };
-  const resetFilm = () => {
-    commitFilmPatch({
-      ...resetFilmLookControlledAdjustments(),
-      filmEmulation: null,
-      filmLookId: null,
-      filmLookStrength: INITIAL_ADJUSTMENTS.filmLookStrength,
-    });
-  };
+  const applyProfile = (profile: FilmProfileManifestV1) =>
+    applyFilmOperation({ kind: 'set_profile', profileRef: profile.model.profileRef });
+  const resetFilm = () => applyFilmOperation({ kind: 'remove_node' });
+  const mixPercent = Math.round((adjustments.filmEmulation?.mix ?? 1) * 100);
   const toggleFavorite = (id: string) =>
     setFavorites((previous) => {
       const next = new Set(previous);
@@ -178,7 +161,8 @@ export function FilmEmulationWorkspace() {
         </div>
         <div className="mt-2 flex items-center gap-2 text-[10px] text-text-secondary">
           <span className="truncate">
-            {activeProfile?.displayName ?? t('film.workspace.noProfile', { defaultValue: 'No profile selected' })}
+            {activeProfile?.presentation.displayName ??
+              t('film.workspace.noProfile', { defaultValue: 'No profile selected' })}
           </span>
           <span aria-live="polite" className="ml-auto">
             {compare
@@ -194,9 +178,7 @@ export function FilmEmulationWorkspace() {
         >
           <div className="mb-1 flex items-center justify-between text-[11px] font-medium">
             <span>{t('film.workspace.mix', { defaultValue: 'Mix' })}</span>
-            <output aria-label={t('film.workspace.mixValue', { defaultValue: 'Film mix value' })}>
-              {adjustments.filmLookStrength}%
-            </output>
+            <output aria-label={t('film.workspace.mixValue', { defaultValue: 'Film mix value' })}>{mixPercent}%</output>
           </div>
           <input
             aria-label={t('film.workspace.mixLabel', { defaultValue: 'Film mix' })}
@@ -204,7 +186,7 @@ export function FilmEmulationWorkspace() {
             max={100}
             min={0}
             onBlur={endMixInteraction}
-            onChange={(event) => commitFilmMix(Number(event.target.value))}
+            onChange={(event) => applyFilmOperation({ kind: 'set_mix', mix: Number(event.target.value) / 100 })}
             onKeyDown={beginMixInteraction}
             onKeyUp={endMixInteraction}
             onLostPointerCapture={endMixInteraction}
@@ -213,7 +195,7 @@ export function FilmEmulationWorkspace() {
             onPointerUp={endMixInteraction}
             step={1}
             type="range"
-            value={adjustments.filmLookStrength}
+            value={mixPercent}
           />
           <div className="mt-2 flex items-center gap-1">
             <button
@@ -257,7 +239,7 @@ export function FilmEmulationWorkspace() {
             <SlidersHorizontal size={13} /> {t('film.workspace.provenance', { defaultValue: 'Profile provenance' })}
           </div>
           <p className="mt-1">
-            {activeProfile?.provenance.claimLevel ??
+            {activeProfile?.claim.class ??
               t('film.workspace.noVerifiedProfile', { defaultValue: 'No verified profile selected' })}{' '}
             · {t('film.workspace.rendererBacked', { defaultValue: 'renderer-backed selection' })} ·{' '}
             {t('film.workspace.separateBoundary', { defaultValue: 'Film remains separate from Negative Lab.' })}
@@ -270,7 +252,7 @@ export function FilmEmulationWorkspace() {
           </p>
         </section>
         <FilmProfileBrowser
-          activeProfileId={adjustments.filmLookId}
+          activeProfileId={adjustments.filmEmulation?.profileRef.id ?? null}
           favorites={favorites}
           onApply={applyProfile}
           onToggleFavorite={toggleFavorite}
