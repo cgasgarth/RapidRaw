@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import { editDocumentToneEqualizerV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -60,11 +61,13 @@ describe('tone equalizer edit transaction', () => {
       },
     ]);
     expect(result).toMatchObject({ changedKeys: ['toneEqualizer'], nextAdjustmentRevision: 1, noOp: false });
-    expect(result.afterEditDocumentV2.nodes.tone_equalizer.params.toneEqualizer).toEqual({
+    expect(
+      editDocumentToneEqualizerV2Schema.parse(result.afterEditDocumentV2.nodes['tone_equalizer']?.params).toneEqualizer,
+    ).toEqual({
       ...INITIAL_ADJUSTMENTS.toneEqualizer,
       enabled: true,
     });
-    expect(result.afterEditDocumentV2.nodes.scene_curve).toBe(result.beforeEditDocumentV2.nodes.scene_curve);
+    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();

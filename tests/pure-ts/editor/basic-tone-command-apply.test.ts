@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import { sceneGlobalColorToneParamsV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -48,16 +49,28 @@ const seedEditor = () => {
     },
     finalPreviewUrl: 'blob:basic-tone-before-final',
     gamutWarningOverlay: {
-      activeProfile: 'Display P3',
-      clippedPixelCount: 12,
-      clippedPixelPercent: 0.4,
-      generatedAt: '2026-07-02T12:00:00.000Z',
-      imagePath,
-      policyStatus: 'active',
-      recipeId: 'recipe-before-basic-tone',
-      renderingIntent: 'relative_colorimetric',
-      transformFingerprint: 'fingerprint-before-basic-tone',
-      warningCodes: [],
+      black_point_compensation: 'enabled',
+      color_managed_transform: 'display-p3-preview',
+      coverage_ratio: 0.4,
+      effective_color_profile: 'Display P3',
+      effective_rendering_intent: 'relative_colorimetric',
+      export_soft_proof_recipe_id: 'recipe-before-basic-tone',
+      gamut_compressed_pixel_count: 0,
+      gamut_hard_clipped_pixel_count: 12,
+      height: 80,
+      mask_data_url: 'data:image/png;base64,AAAA',
+      max_channel_value: 255,
+      min_channel_value: 0,
+      pixel_count: 30,
+      policy_status: 'active',
+      policy_version: 'test-policy',
+      preview_basis: 'export_preview',
+      source_image_path: imagePath,
+      source_precision_path: 'preview',
+      transform_applied: true,
+      transform_policy_fingerprint: 'fingerprint-before-basic-tone',
+      warning_pixel_count: 12,
+      width: 120,
     },
     historyCheckpoints: [],
     historyIndex: 0,
@@ -67,7 +80,7 @@ const seedEditor = () => {
       basePreviewUrl: 'blob:basic-tone-before',
       fullHeight: 400,
       fullWidth: 600,
-      geometryIdentity: '{}',
+      geometryIdentity: 0,
       normH: 0.2,
       normW: 0.2,
       normX: 0.1,
@@ -126,7 +139,14 @@ const buildCommand = (
       operationId,
       sessionId: 'basic-tone-command-apply-test',
     }),
-    options,
+    {
+      ...(options.acceptedDryRunPlanHash === undefined
+        ? {}
+        : { acceptedDryRunPlanHash: options.acceptedDryRunPlanHash }),
+      ...(options.acceptedDryRunPlanId === undefined ? {} : { acceptedDryRunPlanId: options.acceptedDryRunPlanId }),
+      dryRun: options.dryRun,
+      ...(options.expectedGraphRevision === undefined ? {} : { expectedGraphRevision: options.expectedGraphRevision }),
+    },
   );
 
 describe('basic tone command apply path', () => {
@@ -151,6 +171,9 @@ describe('basic tone command apply path', () => {
 
   test('approved apply updates adjustments, records command, pushes history, and supports undo redo', async () => {
     const dryRun = await dryRunBasicToneCommandInLiveEditor(buildCommand('approved_apply', { dryRun: true }));
+    if (dryRun.dryRunPlanHash === undefined || dryRun.dryRunPlanId === undefined) {
+      throw new Error('Expected dry-run approval identity.');
+    }
     const applyCommand = buildCommand('approved_apply', {
       acceptedDryRunPlanHash: dryRun.dryRunPlanHash,
       acceptedDryRunPlanId: dryRun.dryRunPlanId,
@@ -179,7 +202,9 @@ describe('basic tone command apply path', () => {
       source: 'agent-command',
       transactionId: applyCommand.commandId,
     });
-    expect(applied.editDocumentV2.nodes.scene_global_color_tone?.params).toMatchObject({
+    expect(
+      sceneGlobalColorToneParamsV2Schema.parse(applied.editDocumentV2.nodes['scene_global_color_tone']?.params),
+    ).toMatchObject({
       exposure: 0.65,
       highlights: -31,
       whites: 27,
@@ -233,7 +258,9 @@ describe('basic tone command apply path', () => {
     );
 
     const state = useEditorStore.getState();
-    expect(state.adjustmentSnapshot.editDocumentV2).toEqual(state.history[0]);
+    const initialDocument = state.history[0];
+    if (initialDocument === undefined) throw new Error('Expected initial history document.');
+    expect(state.adjustmentSnapshot.editDocumentV2).toEqual(initialDocument);
     expect(state.history).toEqual([state.editDocumentV2]);
     expect(state.lastBasicToneCommand).toBeNull();
   });
