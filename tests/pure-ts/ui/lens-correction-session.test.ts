@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   buildLensCorrectionDraft,
   createLensSessionRequestGate,
+  type LensSessionRequestKind,
 } from '../../../src/components/modals/editing/LensCorrectionModal.tsx';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
@@ -67,9 +68,15 @@ describe('lens correction session ownership', () => {
 
   test('rejects every late response after close and starts a clean keyed session', () => {
     const oldSession = createLensSessionRequestGate();
-    const oldRequests = ['resources', 'models', 'distortion', 'detection', 'compare', 'preview'].map(
-      (kind) => [kind, oldSession.begin(kind)] as const,
-    );
+    const requestKinds: LensSessionRequestKind[] = [
+      'resources',
+      'models',
+      'distortion',
+      'detection',
+      'compare',
+      'preview',
+    ];
+    const oldRequests = requestKinds.map((kind) => [kind, oldSession.begin(kind)] as const);
     oldSession.close();
     for (const [kind, requestId] of oldRequests) expect(oldSession.isCurrent(kind, requestId)).toBe(false);
 

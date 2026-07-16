@@ -8,7 +8,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import AdjustmentSlider from '../../../src/components/adjustments/AdjustmentSlider.tsx';
 import { getSliderEventNumber } from '../../../src/components/adjustments/adjustmentSliderValue.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true, writable: true });
 
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
@@ -126,8 +126,8 @@ test('compact adjustment slider supports shift wheel edits and label reset hooks
   });
 
   const root = getRequiredElement<HTMLDivElement>(container, '[data-testid="precision-slider"]');
-  expect(root.dataset.density).toBe('compact');
-  expect(root.dataset.modified).toBe('true');
+  expect(root.dataset['density']).toBe('compact');
+  expect(root.dataset['modified']).toBe('true');
   expect(root.querySelector('[data-slider-track="true"]')).not.toBeNull();
   expect(root.querySelector('[data-slider-value-slot="true"]')?.className).toContain('w-[3.5rem]');
   expect(root.className).toContain('inspector-slider-row');
@@ -145,7 +145,7 @@ test('compact adjustment slider supports shift wheel edits and label reset hooks
     await flushPromises();
   });
   expect(changes).toEqual([1.1, 0]);
-  expect(root.dataset.modified).toBe('false');
+  expect(root.dataset['modified']).toBe('false');
 });
 
 function AdjustmentSliderHarness({
@@ -173,7 +173,7 @@ function AdjustmentSliderHarness({
     createElement(AdjustmentSlider, {
       label: 'Exposure',
       defaultValue,
-      density,
+      ...(density === undefined ? {} : { density }),
       max,
       min,
       onValueChange: (nextValue) => {
@@ -225,10 +225,7 @@ function createWheelEvent(type: string, init: WheelEventInit): Event {
 }
 
 function createInputEvent(): Event {
-  if ('InputEvent' in window) {
-    return new window.InputEvent('input', { bubbles: true });
-  }
-  return new window.Event('input', { bubbles: true });
+  return new window.InputEvent('input', { bubbles: true });
 }
 
 function installDom() {

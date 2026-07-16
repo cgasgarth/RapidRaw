@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { act, fireEvent, render as testingRender } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import i18next from 'i18next';
+import i18next, { type i18n } from 'i18next';
 import { createElement } from 'react';
-import { I18nextProvider, type i18n, initReactI18next } from 'react-i18next';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import Slider, { type SliderChangeEvent } from '../../../src/components/ui/primitives/Slider.tsx';
 
