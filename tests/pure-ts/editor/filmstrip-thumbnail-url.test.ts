@@ -17,7 +17,7 @@ import en from '../../../src/i18n/locales/en.json';
 import { useSettingsStore } from '../../../src/store/useSettingsStore.ts';
 import { thumbnailCache } from '../../../src/thumbnails/thumbnailCacheInstance.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
@@ -265,7 +265,7 @@ test('keeps virtual cells settled across unchanged parent renders and applies se
   const visibleThumbnails = Array.from(
     rendered.container.querySelectorAll<HTMLDivElement>('[data-testid="filmstrip-thumbnail"]'),
   );
-  expect(visibleThumbnails.slice(0, 3).map((thumbnail) => thumbnail.dataset.imagePath)).toEqual(
+  expect(visibleThumbnails.slice(0, 3).map((thumbnail) => thumbnail.dataset['imagePath'])).toEqual(
     images.slice(0, 3).map((imageFile) => imageFile.path),
   );
   expect(visibleThumbnails.slice(0, 3).map((thumbnail) => thumbnail.getAttribute('aria-selected'))).toEqual([
@@ -474,7 +474,7 @@ function recordFilmstripAnchor(container: Element) {
 
       const offset = pixelValue(cell.style.left) + translateX(cell.style.transform);
       return {
-        path: thumbnail.dataset.imagePath ?? '',
+        path: thumbnail.dataset['imagePath'] ?? '',
         offset,
         width: pixelValue(cell.style.width),
       };
