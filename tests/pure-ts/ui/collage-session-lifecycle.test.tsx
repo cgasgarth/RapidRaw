@@ -1,13 +1,14 @@
-import { afterEach, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { createRoot } from 'react-dom/client';
+import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
+import { act, fireEvent, render as testingRender, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createElement } from 'react';
 
 const calls: Array<{ args: Record<string, unknown>; command: string }> = [];
-const invoke = mock(async (command: string, args: Record<string, unknown> = {}) => {
+const defaultInvoke = async (command: string, args: Record<string, unknown> = {}) => {
   calls.push({ args, command });
   return command === 'load_metadata' ? { adjustments: null } : [1, 2, 3];
-});
+};
+const invoke = mock(defaultInvoke);
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 
 const { CollageSession, default: CollageModal } = await import('../../../src/components/modals/editing/CollageModal');
@@ -15,12 +16,15 @@ type ImageFile = import('../../../src/components/ui/AppProperties').ImageFile;
 
 let cleanup: (() => Promise<void>) | null = null;
 
+beforeEach(() => {
+  invoke.mockImplementation(defaultInvoke);
+});
+
 afterEach(async () => {
   await cleanup?.();
   cleanup = null;
   calls.length = 0;
   invoke.mockClear();
-  document?.body.replaceChildren();
 });
 
 test('keyed reopen starts clean, owns its URLs, and saves the current session exactly once', async () => {
@@ -36,10 +40,7 @@ test('keyed reopen starts clean, owns its URLs, and saves the current session ex
 
   const spacing = runtime.container.querySelector<HTMLInputElement>('input[type="range"]');
   if (!spacing) throw new Error('Missing spacing control');
-  await act(async () => {
-    spacing.value = '41';
-    spacing.dispatchEvent(new runtime.window.Event('input', { bubbles: true }));
-  });
+  fireEvent.input(spacing, { target: { value: '41' } });
 
   await runtime.render('epoch-2', first, save);
   const reopenedSpacing = runtime.container.querySelector<HTMLInputElement>('input[type="range"]');
@@ -49,8 +50,8 @@ test('keyed reopen starts clean, owns its URLs, and saves the current session ex
   const buttons = [...runtime.container.querySelectorAll('button')];
   const saveButton = buttons.find((button) => button.textContent?.includes('modals.collage.saveButton'));
   if (!saveButton) throw new Error('Missing Save button');
-  await act(async () => saveButton.click());
-  await act(async () => saveButton.click());
+  await runtime.user.click(saveButton);
+  await runtime.user.click(saveButton);
   expect(save).toHaveBeenCalledTimes(1);
   expect(save.mock.calls[0]?.[1]).toBe('/opaque/set/a.ARW');
 });
@@ -87,10 +88,7 @@ test('the transition shell replaces a same-selection reopen before its first vis
   await runtime.renderModal(true, images, save);
   const spacing = runtime.container.querySelector<HTMLInputElement>('input[type="range"]');
   if (!spacing) throw new Error('Missing spacing control');
-  await act(async () => {
-    spacing.value = '44';
-    spacing.dispatchEvent(new runtime.window.Event('input', { bubbles: true }));
-  });
+  fireEvent.input(spacing, { target: { value: '44' } });
 
   await runtime.renderModal(false, [], save, false);
   await runtime.renderModal(true, images, save);
@@ -102,7 +100,6 @@ function image(path: string): ImageFile {
 }
 
 function installRuntime() {
-  const window = new Window({ url: 'http://localhost' });
   const revoked: string[] = [];
   let objectUrl = 0;
   class TestImage {
@@ -122,46 +119,34 @@ function installRuntime() {
       queueMicrotask(() => this.onload?.());
     },
   });
-  class TestResizeObserver {
-    disconnect() {}
-    observe() {}
-  }
-  Object.assign(globalThis, {
-    Blob: window.Blob,
-    document: window.document,
-    HTMLElement: window.HTMLElement,
-    Image: TestImage,
-    IS_REACT_ACT_ENVIRONMENT: true,
-    navigator: window.navigator,
-    Node: window.Node,
-    ResizeObserver: TestResizeObserver,
-    window,
-  });
-  Object.assign(URL, {
-    createObjectURL: (blob: Blob) => {
-      if (blob.size === 0) throw new Error('Preview Blob must contain native bytes');
-      return `blob:${++objectUrl}`;
-    },
-    revokeObjectURL: (url: string) => revoked.push(url),
-  });
-  Object.assign(window.HTMLCanvasElement.prototype, {
-    getContext: () => ({
-      beginPath() {},
-      clearRect() {},
-      clip() {},
-      drawImage() {},
-      fillRect() {},
-      restore() {},
-      roundRect() {},
-      save() {},
-      scale() {},
-      fillStyle: '',
-    }),
-    toDataURL: () => 'data:image/png;base64,current-session',
-  });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  const imageDescriptor = Object.getOwnPropertyDescriptor(window, 'Image');
+  const originalCreateObjectUrl = URL.createObjectURL;
+  const originalRevokeObjectUrl = URL.revokeObjectURL;
+  const originalGetContext = HTMLCanvasElement.prototype.getContext;
+  const originalToDataUrl = HTMLCanvasElement.prototype.toDataURL;
+  Object.defineProperty(window, 'Image', { configurable: true, value: TestImage });
+  URL.createObjectURL = (blob: Blob) => {
+    if (blob.size === 0) throw new Error('Preview Blob must contain native bytes');
+    return `blob:${++objectUrl}`;
+  };
+  URL.revokeObjectURL = (url: string) => revoked.push(url);
+  HTMLCanvasElement.prototype.getContext = (() => ({
+    beginPath() {},
+    clearRect() {},
+    clip() {},
+    drawImage() {},
+    fillRect() {},
+    restore() {},
+    roundRect() {},
+    save() {},
+    scale() {},
+    fillStyle: '',
+  })) as typeof HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,current-session';
+  const rendered = testingRender(
+    createElement(CollageModal, { isOpen: false, onClose: () => {}, onSave: async () => '', sourceImages: [] }),
+  );
+  const user = userEvent.setup();
   let mounted = true;
   const renderElement = (
     sessionId: string,
@@ -177,19 +162,26 @@ function installRuntime() {
       sourceImages: images,
     });
   return {
-    container,
+    container: rendered.container,
     revoked,
-    window,
+    user,
     render: async (sessionId: string, images: ImageFile[], onSave: (data: string, path: string) => Promise<string>) => {
-      await act(async () => root.render(renderElement(sessionId, images, onSave)));
-      await act(async () => Promise.resolve());
+      rendered.rerender(renderElement(sessionId, images, onSave));
+      const firstName = images[0]?.path.split(/[\\/]/u).at(-1);
+      if (firstName !== undefined) {
+        await waitFor(() => {
+          if (rendered.container.querySelector(`button[aria-label="${firstName}"]`) === null) {
+            throw new Error(`Waiting for collage source ${firstName}.`);
+          }
+        });
+      }
     },
     renderWithoutSettling: async (
       sessionId: string,
       images: ImageFile[],
       onSave: (data: string, path: string) => Promise<string>,
     ) => {
-      await act(async () => root.render(renderElement(sessionId, images, onSave)));
+      rendered.rerender(renderElement(sessionId, images, onSave));
     },
     renderModal: async (
       isOpen: boolean,
@@ -197,21 +189,26 @@ function installRuntime() {
       onSave: (data: string, path: string) => Promise<string>,
       settle = true,
     ) => {
-      await act(async () =>
-        root.render(createElement(CollageModal, { isOpen, onClose: () => {}, onSave, sourceImages: images })),
-      );
+      rendered.rerender(createElement(CollageModal, { isOpen, onClose: () => {}, onSave, sourceImages: images }));
       if (settle) {
-        for (let attempt = 0; attempt < 25; attempt += 1) {
-          await act(async () => new Promise((resolve) => window.setTimeout(resolve, 2)));
-          if (container.querySelector('input[type="range"]') !== null) return;
-        }
-        throw new Error('Collage modal did not reach its visible frame.');
+        await waitFor(() => {
+          if (rendered.container.querySelector('input[type="range"]') === null) {
+            throw new Error('Collage modal did not reach its visible frame.');
+          }
+        });
       }
     },
     unmount: async () => {
       if (!mounted) return;
       mounted = false;
-      await act(async () => root.unmount());
+      rendered.unmount();
+      if (imageDescriptor === undefined) delete window.Image;
+      else Object.defineProperty(window, 'Image', imageDescriptor);
+      URL.createObjectURL = originalCreateObjectUrl;
+      URL.revokeObjectURL = originalRevokeObjectUrl;
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+      HTMLCanvasElement.prototype.toDataURL = originalToDataUrl;
+      await Promise.resolve();
     },
   };
 }

@@ -1,8 +1,8 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { expect, test } from 'bun:test';
+import { act, render as testingRender, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { HdrModal } from '../../../src/components/modals/computational-merge/HdrModal.tsx';
@@ -15,18 +15,6 @@ import {
   isMergeOperationActive,
   orderedMergeSourcesMatch,
 } from '../../../src/utils/computational-merge/mergeOperationIdentity.ts';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-let mounted: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (mounted !== null) {
-    act(() => mounted?.root.unmount());
-    mounted.container.remove();
-    mounted = null;
-  }
-});
 
 test('merge operation identities preserve ordered opaque paths and active-session guards', () => {
   const paths = ['/fixtures/Ålesund/frame 01.ARW', 'C:\\fixtures\\frame 02.ARW'];
@@ -104,10 +92,8 @@ test('Panorama source changes and same-source reopen each replace the result ses
   await view.render(true, firstPaths);
   expect(operationId(view.container)).not.toBe(firstId);
   const start = requiredButton(view.container);
-  await act(async () => {
-    start.click();
-    start.click();
-  });
+  await view.user.click(start);
+  await view.user.click(start);
   expect(starts).toHaveLength(1);
 });
 
@@ -141,7 +127,7 @@ test('a save completing after HDR reopen cannot publish its old output path into
   const buttons = [...view.container.querySelectorAll('button')];
   const saveButton = buttons.at(-1);
   if (saveButton === undefined) throw new Error('Expected HDR save button.');
-  await act(async () => saveButton.click());
+  await view.user.click(saveButton);
   await view.render(false, paths);
   await view.render(true, paths);
   await act(async () => {
@@ -154,20 +140,20 @@ test('a save completing after HDR reopen cannot publish its old output path into
 });
 
 async function renderMerge(factory: (isOpen: boolean, paths: string[]) => React.ReactElement) {
-  installDom();
   const translations = i18next.createInstance();
   await translations.use(initReactI18next).init({ lng: 'en', resources: {}, react: { useSuspense: false } });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  const rendered = testingRender(createElement(I18nextProvider, { i18n: translations }, factory(false, [])));
   const render = async (isOpen: boolean, paths: string[]) => {
-    await act(async () => {
-      root.render(createElement(I18nextProvider, { i18n: translations }, factory(isOpen, paths)));
-      await Promise.resolve();
-    });
+    rendered.rerender(createElement(I18nextProvider, { i18n: translations }, factory(isOpen, paths)));
+    if (isOpen) {
+      await waitFor(() => {
+        if (rendered.container.querySelector('[data-merge-operation-id]') === null) {
+          throw new Error('Waiting for keyed merge session.');
+        }
+      });
+    }
   };
-  mounted = { container, root };
-  return { container, render };
+  return { container: rendered.container, render, user: userEvent.setup() };
 }
 
 function operationId(container: Element) {
@@ -180,12 +166,4 @@ function requiredButton(container: Element) {
   const button = container.querySelector<HTMLButtonElement>('[data-testid="merge-start-action"]');
   if (button === null) throw new Error('Expected merge start action.');
   return button;
-}
-
-function installDom() {
-  const testWindow = new Window({ url: 'http://localhost/merge-session-test' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: testWindow });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: testWindow.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: testWindow.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: testWindow.HTMLElement });
 }
