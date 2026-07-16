@@ -1294,6 +1294,29 @@ impl CompiledEditGraph {
         bound
     }
 
+    /// Binds the deterministic, image-derived dehaze analysis into the final
+    /// immutable shader ABI. No other adjustment may change after graph
+    /// admission; rejecting it here prevents validate-then-mutate execution.
+    pub fn bind_runtime_dehaze_execution_abi(
+        &self,
+        adjustments: &AllAdjustments,
+        has_lut: bool,
+    ) -> Result<Self, &'static str> {
+        let mut allowed = self.shader_abi();
+        allowed.global.dehaze_atmosphere_r = adjustments.global.dehaze_atmosphere_r;
+        allowed.global.dehaze_atmosphere_g = adjustments.global.dehaze_atmosphere_g;
+        allowed.global.dehaze_atmosphere_b = adjustments.global.dehaze_atmosphere_b;
+        allowed.global.dehaze_atmosphere_confidence =
+            adjustments.global.dehaze_atmosphere_confidence;
+        if bytes_of(&allowed) != bytes_of(adjustments) {
+            return Err("edit_graph.unbound_runtime_gpu_execution_abi");
+        }
+        let mut bound = self.clone();
+        bound.compiled_shader_abi = allowed;
+        bound.execution_abi_fingerprint = gpu_execution_fingerprint(&allowed, has_lut);
+        Ok(bound)
+    }
+
     pub fn scene_curve(&self) -> Option<&CompiledCurvePlanV1> {
         self.nodes.iter().find_map(|node| match &node.payload {
             CompiledNodePayload::SceneCurve(curve) => Some(curve),

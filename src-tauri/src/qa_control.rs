@@ -272,6 +272,8 @@ fn gpu_execution_receipt(app_state: &AppState) -> Value {
                     "height": identity.height,
                 })),
                 "compiledEditGraphFingerprint": receipt.compiled_edit_graph_fingerprint,
+                "shaderAbiFingerprint": receipt.shader_abi_fingerprint,
+                "executionResourceFingerprint": receipt.execution_resource_fingerprint,
                 "executionAbiFingerprint": receipt.execution_abi_fingerprint,
                 "graphFingerprint": receipt.graph_fingerprint,
                 "wgpuExecutionFingerprint": receipt.wgpu_execution_fingerprint,

@@ -311,6 +311,25 @@ mod tests {
             graph.validate_gpu_execution(&plan.adjustments, false, 1),
             Err("edit_graph.stale_gpu_execution_abi")
         );
+        let mut analyzed_dehaze = adjustments;
+        analyzed_dehaze.global.dehaze_atmosphere_r = 0.72;
+        analyzed_dehaze.global.dehaze_atmosphere_g = 0.68;
+        analyzed_dehaze.global.dehaze_atmosphere_b = 0.61;
+        analyzed_dehaze.global.dehaze_atmosphere_confidence = 0.84;
+        let runtime_bound = graph
+            .bind_runtime_dehaze_execution_abi(&analyzed_dehaze, false)
+            .expect("deterministic dehaze analysis binds into the final ABI");
+        assert!(
+            runtime_bound
+                .validate_gpu_execution(&analyzed_dehaze, false, 1)
+                .is_ok()
+        );
+        let mut forbidden_mutation = analyzed_dehaze;
+        forbidden_mutation.global.exposure += 0.25;
+        assert!(matches!(
+            graph.bind_runtime_dehaze_execution_abi(&forbidden_mutation, false),
+            Err("edit_graph.unbound_runtime_gpu_execution_abi")
+        ));
         let lut_bound = plan.edit_graph.bind_pre_gpu_execution_abi(true, true);
         assert_ne!(
             graph.execution_abi_fingerprint, lut_bound.execution_abi_fingerprint,
@@ -327,5 +346,229 @@ mod tests {
         )
         .expect("bound current graph remains valid for CPU fallback");
         assert_eq!((cpu.width(), cpu.height()), (8, 8));
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
+    fn bound_runtime_receipts_cover_raw_rgb_masks_lut_and_cpu_fallback() {
+        use crate::gpu_processing::{
+            EditGraphExecutionAuthority, PreGpuImageIdentity, RenderRequest, acquire_gpu_test_lock,
+            get_or_init_compute_gpu_context_for_tests, process_and_get_unclamped_dynamic_image,
+        };
+        use crate::lut_processing::Lut;
+        use image::Luma;
+        use tauri::Manager;
+
+        struct Case {
+            label: &'static str,
+            is_raw: bool,
+            has_mask: bool,
+            has_lut: bool,
+        }
+
+        let _gpu_test_guard = acquire_gpu_test_lock();
+        let app = tauri::test::mock_builder()
+            .manage(crate::AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("mock Tauri app builds");
+        let state = app.state::<crate::AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state)
+            .expect("compute-only GPU context initializes");
+        let source = test_image();
+        let identity_lut = Arc::new(Lut::compile(
+            2,
+            vec![
+                0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 1.0,
+                0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+            ],
+        ));
+
+        for case in [
+            Case {
+                label: "encoded-rgb",
+                is_raw: false,
+                has_mask: false,
+                has_lut: false,
+            },
+            Case {
+                label: "raw-with-mask",
+                is_raw: true,
+                has_mask: true,
+                has_lut: false,
+            },
+            Case {
+                label: "encoded-mask-and-lut",
+                is_raw: false,
+                has_mask: true,
+                has_lut: true,
+            },
+        ] {
+            let masks = case.has_mask.then(|| {
+                json!([{
+                    "id": "local-detail",
+                    "name": "Local detail",
+                    "visible": true,
+                    "invert": false,
+                    "opacity": 100,
+                    "blendMode": "normal",
+                    "adjustments": {
+                        "sharpness": 30,
+                        "clarity": 20,
+                        "lumaNoiseReduction": 40,
+                        "colorNoiseReduction": 25
+                    },
+                    "subMasks": []
+                }])
+            });
+            let raw = crate::render_plan::current_render_adjustments(json!({
+                "sharpness": 70,
+                "clarity": 45,
+                "structure": 30,
+                "lumaNoiseReduction": 60,
+                "colorNoiseReduction": 50,
+                "masks": masks.unwrap_or_else(|| json!([]))
+            }));
+            let lut = case.has_lut.then(|| Arc::clone(&identity_lut));
+            let plan = crate::render_plan::compile_render_plan(
+                &raw,
+                crate::render_plan::CompileRenderPlanContext {
+                    revision: crate::render_plan::content_revision(
+                        &raw,
+                        u64::from(case.is_raw),
+                        u64::from(case.has_mask),
+                        u64::from(case.has_lut),
+                    ),
+                    is_raw: case.is_raw,
+                    tonemapper_override: Some(0),
+                },
+                lut.clone(),
+            )
+            .expect("current plan compiles");
+            let detail_stage = apply_pre_gpu_detail_stages(&source, 41, &raw, case.is_raw);
+            let (adjustments, graph) = bind_pre_gpu_execution(
+                &plan.edit_graph,
+                detail_stage.owns_legacy_global_detail,
+                case.has_lut,
+            );
+            let mask_bitmaps = case
+                .has_mask
+                .then(|| ImageBuffer::from_pixel(8, 8, Luma([255])))
+                .into_iter()
+                .collect::<Vec<_>>();
+            let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+                detail_stage.image.as_ref(),
+                &adjustments,
+                &mask_bitmaps,
+                lut.as_deref(),
+                &graph,
+            )
+            .expect("bound CPU fallback executes");
+            let gpu = process_and_get_unclamped_dynamic_image(
+                &context,
+                &state,
+                detail_stage.image.as_ref(),
+                PreGpuImageIdentity::for_source(detail_stage.image.as_ref(), case.label),
+                RenderRequest {
+                    adjustments,
+                    mask_bitmaps: &mask_bitmaps,
+                    lut,
+                    roi: None,
+                    edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&graph)),
+                },
+                case.label,
+            )
+            .expect("bound WGPU execution succeeds");
+            let receipt = state
+                .gpu()
+                .processing()
+                .current_processor_snapshot()
+                .and_then(|processor| processor.processor.last_execution_receipt())
+                .expect("WGPU publishes an execution receipt");
+
+            assert_eq!(
+                receipt.compiled_edit_graph_fingerprint, plan.edit_graph.fingerprint,
+                "{} semantic graph identity",
+                case.label
+            );
+            assert_ne!(
+                receipt.execution_abi_fingerprint, plan.edit_graph.execution_abi_fingerprint,
+                "{} resource-bound execution identity",
+                case.label
+            );
+            if case.has_mask && case.has_lut {
+                let baseline_fingerprint = receipt.execution_abi_fingerprint;
+                let render_variant = |masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+                                      lut: Arc<Lut>,
+                                      caller: &str| {
+                    process_and_get_unclamped_dynamic_image(
+                        &context,
+                        &state,
+                        detail_stage.image.as_ref(),
+                        PreGpuImageIdentity::for_source(detail_stage.image.as_ref(), caller),
+                        RenderRequest {
+                            adjustments,
+                            mask_bitmaps: masks,
+                            lut: Some(lut),
+                            roi: None,
+                            edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&graph)),
+                        },
+                        caller,
+                    )
+                    .expect("resource variant executes");
+                    state
+                        .gpu()
+                        .processing()
+                        .current_processor_snapshot()
+                        .and_then(|processor| processor.processor.last_execution_receipt())
+                        .expect("resource variant publishes a receipt")
+                        .execution_abi_fingerprint
+                };
+
+                assert_eq!(
+                    render_variant(
+                        &mask_bitmaps,
+                        Arc::clone(&identity_lut),
+                        "same-mask-and-lut"
+                    ),
+                    baseline_fingerprint,
+                    "identical resources keep one execution identity"
+                );
+                let mut changed_masks = mask_bitmaps.clone();
+                changed_masks[0].put_pixel(0, 0, Luma([0]));
+                assert_ne!(
+                    render_variant(
+                        &changed_masks,
+                        Arc::clone(&identity_lut),
+                        "changed-mask-pixels"
+                    ),
+                    baseline_fingerprint,
+                    "same mask presence with different pixels changes execution identity"
+                );
+                let mut changed_lut_data = identity_lut.data.to_vec();
+                changed_lut_data[3] = 0.75;
+                assert_ne!(
+                    render_variant(
+                        &mask_bitmaps,
+                        Arc::new(Lut::compile(2, changed_lut_data)),
+                        "changed-lut-content"
+                    ),
+                    baseline_fingerprint,
+                    "same LUT presence with different content changes execution identity"
+                );
+            }
+            for (index, (cpu, gpu)) in cpu
+                .to_rgba32f()
+                .into_raw()
+                .iter()
+                .zip(gpu.to_rgba32f().into_raw())
+                .enumerate()
+            {
+                assert!(
+                    (*cpu - gpu).abs() <= 0.015,
+                    "{} CPU/WGPU pixel {index}: cpu={cpu} gpu={gpu}",
+                    case.label
+                );
+            }
+        }
     }
 }

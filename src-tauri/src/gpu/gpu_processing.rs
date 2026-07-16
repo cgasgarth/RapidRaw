@@ -404,6 +404,8 @@ pub struct GpuExecutionReceipt {
     pub frame_identity: Option<GpuFrameIdentity>,
     pub execution_sequence: u64,
     pub compiled_edit_graph_fingerprint: u64,
+    pub shader_abi_fingerprint: u64,
+    pub execution_resource_fingerprint: u64,
     pub execution_abi_fingerprint: u64,
     pub graph_fingerprint: u64,
     pub stages: GpuStageFlags,
@@ -440,7 +442,7 @@ pub struct GpuDeviceGeneration(pub u64);
 struct MaskTextureKey {
     device_generation: GpuDeviceGeneration,
     geometry_fingerprint: u64,
-    mask_fingerprint: u64,
+    mask_fingerprint: [u8; 32],
     width: u32,
     height: u32,
     layer_count: u16,
@@ -462,7 +464,7 @@ struct ResidentMaskTexture {
     key: MaskTextureKey,
     _texture: wgpu::Texture,
     view: wgpu::TextureView,
-    layer_fingerprints: Vec<Option<u64>>,
+    layer_fingerprints: Vec<Option<[u8; 32]>>,
     estimated_bytes: u64,
 }
 
@@ -574,12 +576,6 @@ impl GpuResourceCache {
     }
 }
 
-fn hash_value(value: &impl Hash) -> u64 {
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    value.hash(&mut hasher);
-    hasher.finish()
-}
-
 #[cfg(test)]
 fn mask_texture_key(
     generation: GpuDeviceGeneration,
@@ -595,15 +591,25 @@ fn mask_texture_key_and_layers(
     width: u32,
     height: u32,
     masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
-) -> (MaskTextureKey, Vec<Option<u64>>) {
+) -> (MaskTextureKey, Vec<Option<[u8; 32]>>) {
     let layer_count = masks.len().clamp(2, MAX_MASKS) as u16;
-    let geometry_fingerprint = hash_value(&(width, height, layer_count));
     let layer_fingerprints = mask_layer_fingerprints(layer_count, masks);
+    let mask_fingerprint = mask_resource_fingerprint(&layer_fingerprints);
+    let mut geometry_hasher = blake3::Hasher::new();
+    geometry_hasher.update(b"rapidraw.gpu-mask-geometry.v1\0");
+    geometry_hasher.update(&width.to_le_bytes());
+    geometry_hasher.update(&height.to_le_bytes());
+    geometry_hasher.update(&layer_count.to_le_bytes());
+    let geometry_fingerprint = u64::from_le_bytes(
+        geometry_hasher.finalize().as_bytes()[..8]
+            .try_into()
+            .unwrap(),
+    );
     (
         MaskTextureKey {
             device_generation: generation,
             geometry_fingerprint,
-            mask_fingerprint: hash_value(&layer_fingerprints),
+            mask_fingerprint,
             width,
             height,
             layer_count,
@@ -616,14 +622,39 @@ fn mask_texture_key_and_layers(
 fn mask_layer_fingerprints(
     layer_count: u16,
     masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
-) -> Vec<Option<u64>> {
+) -> Vec<Option<[u8; 32]>> {
     let mut fingerprints = masks
         .iter()
         .take(MAX_MASKS)
-        .map(|mask| Some(hash_value(&(mask.width(), mask.height(), mask.as_raw()))))
+        .map(|mask| {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(b"rapidraw.gpu-mask-layer.v1\0");
+            hasher.update(&mask.width().to_le_bytes());
+            hasher.update(&mask.height().to_le_bytes());
+            hasher.update(mask.as_raw());
+            Some(*hasher.finalize().as_bytes())
+        })
         .collect::<Vec<_>>();
     fingerprints.resize(usize::from(layer_count), None);
     fingerprints
+}
+
+fn mask_resource_fingerprint(layers: &[Option<[u8; 32]>]) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"rapidraw.gpu-mask-resource.v1\0");
+    hasher.update(&(layers.len() as u64).to_le_bytes());
+    for layer in layers {
+        match layer {
+            Some(fingerprint) => {
+                hasher.update(&[1]);
+                hasher.update(fingerprint);
+            }
+            None => {
+                hasher.update(&[0]);
+            }
+        }
+    }
+    *hasher.finalize().as_bytes()
 }
 
 fn lut_texture_key(generation: GpuDeviceGeneration, lut: &Lut) -> LutTextureKey {
@@ -635,6 +666,64 @@ fn lut_texture_key(generation: GpuDeviceGeneration, lut: &Lut) -> LutTextureKey 
         creative_lut_abi_version: lut.abi_version,
         texture_format_version: LUT_TEXTURE_ABI_VERSION,
     }
+}
+
+fn gpu_execution_resource_identity(
+    generation: GpuDeviceGeneration,
+    width: u32,
+    height: u32,
+    masks: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+    lut: Option<&Lut>,
+) -> Result<GpuExecutionResourceIdentity, String> {
+    for mask in masks.iter().take(MAX_MASKS) {
+        if mask.dimensions() != (width, height) {
+            return Err(format!(
+                "mask dimensions {}x{} do not match render {}x{}",
+                mask.width(),
+                mask.height(),
+                width,
+                height
+            ));
+        }
+    }
+    let (mask_key, mask_layer_fingerprints) =
+        mask_texture_key_and_layers(generation, width, height, masks);
+    let lut_key = lut.map(|lut| lut_texture_key(generation, lut));
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"rapidraw.gpu-execution-resources.v1\0");
+    hasher.update(&mask_key.mask_fingerprint);
+    hasher.update(&(masks.len() as u64).to_le_bytes());
+    match lut_key {
+        Some(key) => {
+            hasher.update(&[1]);
+            hasher.update(&key.content_hash);
+            hasher.update(&key.edge_size.to_le_bytes());
+            hasher.update(&key.interpolation_version.to_le_bytes());
+            hasher.update(&key.creative_lut_abi_version.to_le_bytes());
+            hasher.update(&key.texture_format_version.to_le_bytes());
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
+    let fingerprint = u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap());
+    Ok(GpuExecutionResourceIdentity {
+        mask_key,
+        mask_layer_fingerprints,
+        lut_key,
+        fingerprint,
+    })
+}
+
+fn resource_bound_execution_fingerprint(
+    shader_abi_fingerprint: u64,
+    resource_fingerprint: u64,
+) -> u64 {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"rapidraw.gpu-resource-bound-execution.v1\0");
+    hasher.update(&shader_abi_fingerprint.to_le_bytes());
+    hasher.update(&resource_fingerprint.to_le_bytes());
+    u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -1039,6 +1128,22 @@ pub struct RenderRequest<'a> {
     pub edit_graph: EditGraphExecutionAuthority,
 }
 
+struct AdmittedRenderRequest<'a> {
+    request: RenderRequest<'a>,
+}
+
+struct ValidatedRenderRequest<'a> {
+    adjustments: AllAdjustments,
+    mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
+    lut: Option<Arc<Lut>>,
+    roi: Option<Roi>,
+    edit_graph: EditGraphExecutionAuthority,
+    compiled_edit_graph_fingerprint: u64,
+    shader_abi_fingerprint: u64,
+    execution_abi_fingerprint: u64,
+    resource_identity: GpuExecutionResourceIdentity,
+}
+
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GpuPostFilmTapReceiptV1 {
@@ -1062,12 +1167,18 @@ struct GpuPostFilmTapIdentityV1 {
     execution_abi_fingerprint: u64,
 }
 
+#[derive(Clone, Debug)]
+struct GpuExecutionResourceIdentity {
+    mask_key: MaskTextureKey,
+    mask_layer_fingerprints: Vec<Option<[u8; 32]>>,
+    lut_key: Option<LutTextureKey>,
+    fingerprint: u64,
+}
+
 struct GpuRunOptions {
     skip_cpu_readback: bool,
     output_to_display: bool,
     post_film_tap: Option<GpuPostFilmTapIdentityV1>,
-    compiled_edit_graph_fingerprint: u64,
-    execution_abi_fingerprint: u64,
 }
 
 struct GpuRunOutput {
@@ -1371,6 +1482,91 @@ fn create_flare_resources(
         ghosts_view,
         final_view,
         sampler,
+    }
+}
+
+impl<'a> AdmittedRenderRequest<'a> {
+    fn admit(request: RenderRequest<'a>) -> Result<Self, String> {
+        validate_edit_graph_request(&request)?;
+        Ok(Self { request })
+    }
+
+    fn into_validated(
+        self,
+        generation: GpuDeviceGeneration,
+        width: u32,
+        height: u32,
+    ) -> Result<ValidatedRenderRequest<'a>, String> {
+        let RenderRequest {
+            adjustments,
+            mask_bitmaps,
+            lut,
+            roi,
+            edit_graph,
+        } = self.request;
+        let resource_identity = gpu_execution_resource_identity(
+            generation,
+            width,
+            height,
+            mask_bitmaps,
+            lut.as_deref(),
+        )?;
+        let (edit_graph, adjustments, compiled_edit_graph_fingerprint, shader_abi_fingerprint) =
+            match edit_graph {
+                EditGraphExecutionAuthority::Compiled(graph) => {
+                    let mut final_adjustments = graph.shader_abi();
+                    final_adjustments.global.dehaze_atmosphere_r =
+                        adjustments.global.dehaze_atmosphere_r;
+                    final_adjustments.global.dehaze_atmosphere_g =
+                        adjustments.global.dehaze_atmosphere_g;
+                    final_adjustments.global.dehaze_atmosphere_b =
+                        adjustments.global.dehaze_atmosphere_b;
+                    final_adjustments.global.dehaze_atmosphere_confidence =
+                        adjustments.global.dehaze_atmosphere_confidence;
+                    let graph = Arc::new(
+                        graph
+                            .bind_runtime_dehaze_execution_abi(&final_adjustments, lut.is_some())
+                            .map_err(str::to_owned)?,
+                    );
+                    graph
+                        .validate_gpu_execution(
+                            &final_adjustments,
+                            lut.is_some(),
+                            mask_bitmaps.len(),
+                        )
+                        .map_err(str::to_owned)?;
+                    let compiled_edit_graph_fingerprint = graph.fingerprint;
+                    let shader_abi_fingerprint = graph.execution_abi_fingerprint;
+                    (
+                        EditGraphExecutionAuthority::Compiled(graph),
+                        final_adjustments,
+                        compiled_edit_graph_fingerprint,
+                        shader_abi_fingerprint,
+                    )
+                }
+                #[cfg(all(test, feature = "tauri-test"))]
+                EditGraphExecutionAuthority::TestOnlyLegacy => (
+                    EditGraphExecutionAuthority::TestOnlyLegacy,
+                    adjustments,
+                    0,
+                    crate::edit_graph::gpu_execution_fingerprint(&adjustments, lut.is_some()),
+                ),
+            };
+        let execution_abi_fingerprint = resource_bound_execution_fingerprint(
+            shader_abi_fingerprint,
+            resource_identity.fingerprint,
+        );
+        Ok(ValidatedRenderRequest {
+            adjustments,
+            mask_bitmaps,
+            lut,
+            roi,
+            edit_graph,
+            compiled_edit_graph_fingerprint,
+            shader_abi_fingerprint,
+            execution_abi_fingerprint,
+            resource_identity,
+        })
     }
 }
 
@@ -1871,16 +2067,19 @@ impl GpuProcessor {
         input: InputTextureRef<'_>,
         width: u32,
         height: u32,
-        request: RenderRequest,
+        request: ValidatedRenderRequest,
         options: GpuRunOptions,
     ) -> Result<GpuRunOutput, String> {
         let GpuRunOptions {
             skip_cpu_readback,
             output_to_display,
             post_film_tap: capture_post_film,
-            compiled_edit_graph_fingerprint,
-            execution_abi_fingerprint,
         } = options;
+        let compiled_edit_graph_fingerprint = request.compiled_edit_graph_fingerprint;
+        let shader_abi_fingerprint = request.shader_abi_fingerprint;
+        let execution_resource_fingerprint = request.resource_identity.fingerprint;
+        let execution_abi_fingerprint = request.execution_abi_fingerprint;
+        let resource_identity = request.resource_identity.clone();
         let execution_started = Instant::now();
         let frame_identity = GpuFrameIdentity {
             source_revision: input.identity.pixels.source_revision,
@@ -1910,19 +2109,14 @@ impl GpuProcessor {
         let out_height = bounds.height;
         let device_generation = GpuDeviceGeneration(self.context.generation);
         debug_assert_eq!(input.device_generation, self.context.generation);
-        for mask in request.mask_bitmaps.iter().take(MAX_MASKS) {
-            if mask.dimensions() != (width, height) {
-                return Err(format!(
-                    "mask dimensions {}x{} do not match render {}x{}",
-                    mask.width(),
-                    mask.height(),
-                    width,
-                    height
-                ));
-            }
-        }
-        let (mask_key, layer_fingerprints) =
-            mask_texture_key_and_layers(device_generation, width, height, request.mask_bitmaps);
+        debug_assert_eq!(
+            resource_identity.mask_key.device_generation,
+            device_generation
+        );
+        debug_assert_eq!(resource_identity.mask_key.width, width);
+        debug_assert_eq!(resource_identity.mask_key.height, height);
+        let mask_key = resource_identity.mask_key;
+        let layer_fingerprints = resource_identity.mask_layer_fingerprints;
         let mask_hit = {
             let mut resources = self.resources.lock().unwrap();
             resources.resource_cache.mask(mask_key)
@@ -2044,10 +2238,7 @@ impl GpuProcessor {
             entry
         };
 
-        let lut_key = request
-            .lut
-            .as_deref()
-            .map(|lut| lut_texture_key(device_generation, lut));
+        let lut_key = resource_identity.lut_key;
         let resident_lut = if let (Some(lut_arc), Some(key)) = (&request.lut, lut_key) {
             if let Some(hit) = self.resources.lock().unwrap().resource_cache.lut(key) {
                 Some(hit)
@@ -2093,20 +2284,7 @@ impl GpuProcessor {
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
         let mut adjustments = match &request.edit_graph {
-            EditGraphExecutionAuthority::Compiled(edit_graph) => {
-                let mut authoritative = edit_graph.shader_abi();
-                // Source analysis is render-ephemeral: the graph owns all user edits while
-                // these four fields carry the source-bound compiled Dehaze artifact.
-                authoritative.global.dehaze_atmosphere_r =
-                    request.adjustments.global.dehaze_atmosphere_r;
-                authoritative.global.dehaze_atmosphere_g =
-                    request.adjustments.global.dehaze_atmosphere_g;
-                authoritative.global.dehaze_atmosphere_b =
-                    request.adjustments.global.dehaze_atmosphere_b;
-                authoritative.global.dehaze_atmosphere_confidence =
-                    request.adjustments.global.dehaze_atmosphere_confidence;
-                authoritative
-            }
+            EditGraphExecutionAuthority::Compiled(edit_graph) => edit_graph.shader_abi(),
             #[cfg(all(test, feature = "tauri-test"))]
             EditGraphExecutionAuthority::TestOnlyLegacy => request.adjustments,
         };
@@ -2922,6 +3100,8 @@ impl GpuProcessor {
             frame_identity: Some(input.execution_lease.frame()),
             execution_sequence,
             compiled_edit_graph_fingerprint,
+            shader_abi_fingerprint,
+            execution_resource_fingerprint,
             execution_abi_fingerprint,
             graph_fingerprint: graph.fingerprint,
             stages: graph.flags,
@@ -5747,7 +5927,7 @@ fn process_and_get_dynamic_image_inner(
     state: &tauri::State<AppState>,
     base_image: &DynamicImage,
     pre_gpu_identity: PreGpuImageIdentity,
-    mut request: RenderRequest,
+    request: RenderRequest,
     caller_id: &str,
     output_to_display: bool,
     presentation_identity: Option<crate::gpu_display::NativeFrameIdentity>,
@@ -5769,14 +5949,7 @@ fn process_and_get_dynamic_image_inner(
     let device_generation = context.generation;
 
     let max_dim = context.limits.max_texture_dimension_2d;
-    validate_edit_graph_request(&request)?;
-    let (compiled_edit_graph_fingerprint, execution_abi_fingerprint) = match &request.edit_graph {
-        EditGraphExecutionAuthority::Compiled(graph) => {
-            (graph.fingerprint, graph.execution_abi_fingerprint)
-        }
-        #[cfg(all(test, feature = "tauri-test"))]
-        EditGraphExecutionAuthority::TestOnlyLegacy => (0, 0),
-    };
+    let mut request = AdmittedRenderRequest::admit(request)?;
     if width > max_dim || height > max_dim {
         if capture_post_film.is_some() {
             return Err("film_runtime_proof_gpu_dimensions_unsupported".to_string());
@@ -5787,6 +5960,8 @@ fn process_and_get_dynamic_image_inner(
             height,
             max_dim
         );
+        let request =
+            request.into_validated(GpuDeviceGeneration(device_generation), width, height)?;
         #[cfg(not(all(test, feature = "tauri-test")))]
         let EditGraphExecutionAuthority::Compiled(edit_graph) = &request.edit_graph;
         #[cfg(all(test, feature = "tauri-test"))]
@@ -5889,7 +6064,16 @@ fn process_and_get_dynamic_image_inner(
             });
         }
     }
-    processor.prepare_dehaze_plan(base_image, pre_gpu_identity, &mut request.adjustments);
+    processor.prepare_dehaze_plan(
+        base_image,
+        pre_gpu_identity,
+        &mut request.request.adjustments,
+    );
+    let request = request.into_validated(GpuDeviceGeneration(device_generation), width, height)?;
+    let capture_post_film = capture_post_film.map(|mut identity| {
+        identity.execution_abi_fingerprint = request.execution_abi_fingerprint;
+        identity
+    });
 
     let cache_matches = |cache: &GpuImageCache| {
         cache.pre_gpu_identity == pre_gpu_identity
@@ -5997,8 +6181,6 @@ fn process_and_get_dynamic_image_inner(
             skip_cpu_readback: skip_readback,
             output_to_display,
             post_film_tap: capture_post_film,
-            compiled_edit_graph_fingerprint,
-            execution_abi_fingerprint,
         },
     )?;
     let GpuRunOutput {

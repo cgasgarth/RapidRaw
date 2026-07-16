@@ -610,10 +610,12 @@ const nativeDiagnosticsSchema = z.object({
       cpuEncodeMicros: z.number().nonnegative(),
       estimatedPeakResourceBytes: z.number().nonnegative(),
       executionAbiFingerprint: z.number().int().positive(),
+      executionResourceFingerprint: z.number().int().positive(),
       executionSequence: z.number().int().nonnegative(),
       graphFingerprint: z.number().nonnegative(),
       queueSubmitCount: z.number().nonnegative(),
       renderPassCount: z.number().nonnegative(),
+      shaderAbiFingerprint: z.number().int().positive(),
       stageBits: z.number().nonnegative(),
       wgpuExecutionFingerprint: z.number().int().positive(),
       dehaze: z
