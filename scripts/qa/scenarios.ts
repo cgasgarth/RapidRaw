@@ -1,3 +1,4 @@
+import type {} from '../../src/validation/browserTauriHarnessContract';
 import { openCommandPalette, openEditorFixture, openLibraryFixture } from './fixtures';
 import type { QaScenario } from './model';
 
@@ -237,7 +238,7 @@ export const qaScenarios: readonly QaScenario[] = [
         (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [])
           .filter(({ command }) => command === 'begin_image_open')
           .map(({ args }) => {
-            const request = args?.request;
+            const request = args?.['request'];
             return typeof request === 'object' && request !== null && 'path' in request
               ? Reflect.get(request, 'path')
               : undefined;
@@ -518,7 +519,11 @@ export const qaScenarios: readonly QaScenario[] = [
           );
           return URL.createObjectURL(blob);
         };
-        const urls = await Promise.all(['#17364d', '#7d2648', '#355b32'].map(createPreviewUrl));
+        const urls = await Promise.all([
+          createPreviewUrl('#17364d'),
+          createPreviewUrl('#7d2648'),
+          createPreviewUrl('#355b32'),
+        ]);
         const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
         URL.revokeObjectURL = (url) => {
           harness.revokedObjectUrls.push(url);
@@ -869,7 +874,7 @@ export const qaScenarios: readonly QaScenario[] = [
           ({ command }) => command === 'export_images',
         ),
       );
-      const paths = exportCall?.args?.paths;
+      const paths = exportCall?.args?.['paths'];
       if (!Array.isArray(paths) || paths.length !== 3)
         throw new Error('Mixed export command did not carry the three selected source identities.');
     },
@@ -901,7 +906,7 @@ export const qaScenarios: readonly QaScenario[] = [
       const importCall = await page.evaluate(() =>
         (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).findLast(({ command }) => command === 'import_files'),
       );
-      const sourcePaths = importCall?.args?.sourcePaths;
+      const sourcePaths = importCall?.args?.['sourcePaths'];
       if (!Array.isArray(sourcePaths) || sourcePaths.length !== 6)
         throw new Error('Import terminal receipt did not account for the six-source bounded batch.');
       const receiptCurrent = Number(await terminalReceipt.getAttribute('data-import-receipt-current'));
