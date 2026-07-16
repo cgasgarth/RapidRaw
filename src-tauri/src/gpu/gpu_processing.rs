@@ -3827,7 +3827,10 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let adjustments = json!({"rawEngineEditGraphVersion": 1, "exposure": 35});
+        let adjustments = crate::render_plan::current_render_adjustments(json!({
+            "rawEngineEditGraphVersion": 1,
+            "exposure": 35
+        }));
         let revision = crate::render_plan::content_revision(&adjustments, 1, 2, 3);
         let input_identity = PreGpuImageIdentity::for_source(&source, "compiled_edit_graph_gpu");
         let plan = crate::render_plan::compile_render_plan(
@@ -3912,7 +3915,7 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let adjustments = json!({
+        let adjustments = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 2,
             "sceneCurveV1": {
                 "middleGrey": 0.18,
@@ -3934,7 +3937,7 @@ mod blur_pass_tests {
                     {"input": 2, "output": 2}
                 ]
             }
-        });
+        }));
         let plan = crate::render_plan::compile_render_plan(
             &adjustments,
             crate::render_plan::CompileRenderPlanContext {
@@ -4006,7 +4009,7 @@ mod blur_pass_tests {
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
         let recipe = |version| {
-            json!({
+            crate::render_plan::current_render_adjustments(json!({
                 "rawEngineEditGraphVersion": version,
                 "channelMixer": {
                     "enabled": true,
@@ -4022,7 +4025,7 @@ mod blur_pass_tests {
                         { "x": 255, "y": 255 }
                     ]
                 }
-            })
+            }))
         };
         let render = |version| {
             let raw = recipe(version);
@@ -4105,7 +4108,7 @@ mod blur_pass_tests {
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
         let render = |version: u64| {
-            let raw = json!({
+            let raw = crate::render_plan::current_render_adjustments(json!({
                 "rawEngineEditGraphVersion": version,
                 "blackWhiteMixer": {
                     "enabled": true,
@@ -4115,7 +4118,7 @@ mod blur_pass_tests {
                         "aquas": 0, "blues": 0, "purples": 0, "magentas": 0
                     }
                 }
-            });
+            }));
             let plan = crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
@@ -4221,13 +4224,13 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let raw = json!({
+        let raw = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 2,
             "flareAmount": 24,
             "exposure": 30,
             "whites": 18,
             "highlights": -12
-        });
+        }));
         let plan = crate::render_plan::compile_render_plan(
             &raw,
             crate::render_plan::CompileRenderPlanContext {
@@ -4288,12 +4291,11 @@ mod blur_pass_tests {
         let mask = ImageBuffer::<Luma<u8>, Vec<u8>>::from_fn(8, 8, |x, _| {
             Luma([((x as f32 / 7.0) * 255.0).round() as u8])
         });
-        let mut raw = json!({
+        let mut raw = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 2,
             "exposure": 18,
             "brightness": -8,
-            "temperature": 12,
-            "tint": -7,
+            "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
             "contrast": 9,
             "highlights": -12,
             "shadows": 8,
@@ -4321,7 +4323,7 @@ mod blur_pass_tests {
                 },
                 "subMasks":[]
             }]
-        });
+        }));
         raw["toneEqualizer"] = json!({
             "enabled": true,
             "bandEv": [-0.4, -0.3, -0.2, -0.1, 0.2, 0.35, 0.1, -0.1, -0.25],
@@ -4509,35 +4511,37 @@ mod blur_pass_tests {
                 }),
             ),
             (
-                "basic_tone_temperature",
+                "basic_tone_technical_white_balance",
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,
                     "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
-                    "temperature": 12
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, 0.0)
                 }),
             ),
             (
-                "basic_tone_temperature_tint",
+                "basic_tone_technical_white_balance_duv",
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,
                     "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
-                    "temperature": 12, "tint": -7
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003)
                 }),
             ),
             (
-                "basic_tone_temperature_tint_saturation",
+                "basic_tone_technical_white_balance_saturation",
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,
                     "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
-                    "temperature": 12, "tint": -7, "saturation": 11
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
+                    "saturation": 11
                 }),
             ),
             (
-                "basic_tone_temperature_tint_saturation_vibrance",
+                "basic_tone_technical_white_balance_saturation_vibrance",
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,
                     "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
-                    "temperature": 12, "tint": -7, "saturation": 11, "vibrance": 7
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
+                    "saturation": 11, "vibrance": 7
                 }),
             ),
             (
@@ -4545,7 +4549,8 @@ mod blur_pass_tests {
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,
                     "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
-                    "temperature": 12, "tint": -7, "saturation": 11,
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
+                    "saturation": 11,
                     "vibrance": 7, "hue": 5
                 }),
             ),
@@ -4554,11 +4559,7 @@ mod blur_pass_tests {
                 json!({
                     "exposure": 18, "contrast": 9,
                     "saturation": 11, "vibrance": 7,
-                    "whiteBalanceTechnical": {
-                        "mode": "as_shot",
-                        "kelvin": 6500.0,
-                        "duv": 0.0
-                    }
+                    "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
                 }),
             ),
             (
@@ -4566,7 +4567,8 @@ mod blur_pass_tests {
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,
                     "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
-                    "temperature": 12, "tint": -7, "saturation": 11,
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
+                    "saturation": 11,
                     "vibrance": 7, "hue": 5,
                     "levels": {
                         "enabled": true, "inputBlack": 2, "inputWhite": 98,
@@ -4579,7 +4581,8 @@ mod blur_pass_tests {
                 json!({
                     "exposure": 18, "brightness": -8, "contrast": 9,
                     "highlights": -12, "shadows": 8, "whites": 5, "blacks": -4,
-                    "temperature": 12, "tint": -7, "saturation": 11,
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
+                    "saturation": 11,
                     "vibrance": 7, "hue": 5,
                     "levels": {
                         "enabled": true, "inputBlack": 2, "inputWhite": 98,
@@ -4615,8 +4618,9 @@ mod blur_pass_tests {
                 json!({
                     "flareAmount": 24, "exposure": 30, "brightness": -8,
                     "contrast": 9, "highlights": -12, "shadows": 8,
-                    "whites": 18, "blacks": -4, "temperature": 12,
-                    "tint": -7, "saturation": 11, "vibrance": 7, "hue": 5
+                    "whites": 18, "blacks": -4,
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
+                    "saturation": 11, "vibrance": 7, "hue": 5
                 }),
             ),
             (
@@ -4624,8 +4628,9 @@ mod blur_pass_tests {
                 json!({
                     "flareAmount": 24, "exposure": 30, "brightness": -8,
                     "contrast": 9, "highlights": -12, "shadows": 8,
-                    "whites": 18, "blacks": -4, "temperature": 12,
-                    "tint": -7, "saturation": 11, "vibrance": 7, "hue": 5,
+                    "whites": 18, "blacks": -4,
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
+                    "saturation": 11, "vibrance": 7, "hue": 5,
                     "levels": {
                         "enabled": true, "inputBlack": 2, "inputWhite": 98,
                         "gamma": 1.08, "outputBlack": 1, "outputWhite": 99
@@ -4635,8 +4640,9 @@ mod blur_pass_tests {
             (
                 "combined_global_stack",
                 json!({
-                    "exposure": 18, "brightness": -8, "temperature": 12,
-                    "tint": -7, "contrast": 9, "highlights": -12,
+                    "exposure": 18, "brightness": -8,
+                    "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003),
+                    "contrast": 9, "highlights": -12,
                     "shadows": 8, "whites": 5, "blacks": -4,
                     "saturation": 11, "vibrance": 7, "hue": 5,
                     "vignetteAmount": -12, "grainAmount": 4,
@@ -4660,6 +4666,7 @@ mod blur_pass_tests {
                     .unwrap()
                     .insert("rawEngineEditGraphVersion".into(), json!(2));
             }
+            raw = crate::render_plan::current_render_adjustments(raw);
             let plan = crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
@@ -4708,7 +4715,9 @@ mod blur_pass_tests {
                             let rounded = f16::from_f32(extended_scale);
                             let next = f16::from_bits(rounded.to_bits().saturating_add(1));
                             let storage_ulp = (next.to_f32() - rounded.to_f32()).abs();
-                            absolute / (extended_scale * 0.001).max(storage_ulp * 2.0).max(0.035)
+                            // Multi-phase RGBA16F storage may accumulate through three
+                            // independently rounded scene phases; bound it to three ULPs.
+                            absolute / (extended_scale * 0.001).max(storage_ulp * 3.0).max(0.035)
                         })
                         .fold(0.0_f32, f32::max);
                     if normalized_error > maximum.0 {
@@ -4718,7 +4727,7 @@ mod blur_pass_tests {
             }
             assert!(
                 maximum.0 <= 1.0,
-                "stage {label} CPU/GPU exceeded abs=0.035, rel=0.1%, and two-f16-ULP tolerance: {maximum:?}"
+                "stage {label} CPU/GPU exceeded abs=0.035, rel=0.1%, and three-f16-ULP tolerance: {maximum:?}"
             );
         }
     }
@@ -4835,10 +4844,10 @@ mod blur_pass_tests {
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
         let compile_dehaze_plan = |amount: f32| {
-            let raw = serde_json::json!({
+            let raw = crate::render_plan::current_render_adjustments(serde_json::json!({
                 "dehaze": f64::from(amount) * 750.0,
                 "rawEngineEditGraphVersion": 2,
-            });
+            }));
             crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
@@ -5329,7 +5338,7 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn production_wgpu_applies_technical_white_balance() {
+    fn production_wgpu_applies_current_technical_white_balance_once_with_cpu_parity() {
         use image::{ImageBuffer, Rgba};
         use tauri::Manager;
 
@@ -5346,54 +5355,55 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
+        let raw = crate::render_plan::current_render_adjustments(serde_json::json!({
+            "rawEngineEditGraphVersion": 2,
+            "exposure": -8.0,
+            "whiteBalanceTechnical": crate::color::white_balance::test_technical_white_balance_json(5200.0, -0.003)
+        }));
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 5, 2, 1),
+                is_raw: true,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("current technical white-balance plan compiles");
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .expect("CPU render succeeds")
+        .to_rgba32f();
         let identity = PreGpuImageIdentity::for_test_source(&source, "technical_white_balance");
-        let render = |adjustments| {
-            process_and_get_unclamped_dynamic_image(
-                &context,
-                &state,
-                &source,
-                identity,
-                RenderRequest {
-                    adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: EditGraphExecutionAuthority::TestOnlyLegacy,
-                },
-                "technical_white_balance",
-            )
-            .expect("GPU render succeeds")
-            .to_rgba32f()
-            .get_pixel(0, 0)
-            .0
-        };
-        let baseline = render(crate::adjustments::parse::get_all_adjustments_from_json(
-            &serde_json::json!({}),
-            true,
-            Some(1),
-        ));
-        let adjusted = render(crate::adjustments::parse::get_all_adjustments_from_json(
-            &serde_json::json!({
-                "exposure": -8.0,
-                "whiteBalanceTechnical": {
-                    "mode": "kelvin_tint",
-                    "kelvin": 2856.0,
-                    "duv": 0.018
-                }
-            }),
-            true,
-            Some(1),
-        ));
+        let gpu = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            identity,
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            },
+            "technical_white_balance",
+        )
+        .expect("GPU render succeeds")
+        .to_rgba32f();
+        let maximum_delta = cpu
+            .pixels()
+            .zip(gpu.pixels())
+            .flat_map(|(cpu, gpu)| (0..3).map(move |channel| (cpu[channel] - gpu[channel]).abs()))
+            .fold(0.0_f32, f32::max);
         assert!(
-            baseline[..3].iter().any(|channel| *channel < 0.95),
-            "neutral RAW AgX render unexpectedly clipped: {baseline:?}"
-        );
-        assert!(
-            baseline[..3]
-                .iter()
-                .zip(&adjusted[..3])
-                .any(|(before, after)| (before - after).abs() > 0.001),
-            "baseline={baseline:?} adjusted={adjusted:?}"
+            maximum_delta <= 0.004,
+            "current technical white balance must execute once with CPU/WGPU parity: delta={maximum_delta}"
         );
     }
 

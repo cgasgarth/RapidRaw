@@ -520,7 +520,7 @@ mod gpu_runtime_tests {
             let exposure = 2.0_f32.powf((x as f32 - 2.0) * 0.8 + y as f32 * 0.25);
             Rgba([0.42 * exposure, 0.19 * exposure, 0.08 * exposure, 0.76])
         }));
-        let raw = json!({
+        let raw = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 2,
             "perceptualGradingV1": grading_settings(38.0, 0.16, 0.25),
             "masks": [{
@@ -533,7 +533,7 @@ mod gpu_runtime_tests {
                 "adjustments": {"perceptualGradingV1": grading_settings(160.0, 0.22, -0.15)},
                 "subMasks": []
             }]
-        });
+        }));
         let plan = crate::render_plan::compile_render_plan(
             &raw,
             crate::render_plan::CompileRenderPlanContext {

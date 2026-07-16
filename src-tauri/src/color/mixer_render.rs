@@ -605,7 +605,7 @@ mod gpu_runtime_tests {
             let scale = 1.0 + (x + y) as f32 * 0.1;
             Rgba([2.4 * scale, 0.7 * scale, 0.2 * scale, 0.63])
         }));
-        let raw = json!({
+        let raw = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 2,
             "blackWhiteMixer": {
                 "enabled": true,
@@ -615,7 +615,7 @@ mod gpu_runtime_tests {
                     "aquas": 0, "blues": 0, "purples": 0, "magentas": 0
                 }
             }
-        });
+        }));
         let plan = crate::render_plan::compile_render_plan(
             &raw,
             crate::render_plan::CompileRenderPlanContext {
@@ -628,7 +628,7 @@ mod gpu_runtime_tests {
         .expect("neutral monochrome plan compiles");
         assert_eq!(plan.adjustments.global.black_white_mixer.process, 1);
 
-        let legacy_raw = json!({
+        let legacy_raw = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 2,
             "blackWhiteMixer": {
                 "enabled": true,
@@ -638,7 +638,7 @@ mod gpu_runtime_tests {
                     "aquas": 0, "blues": 0, "purples": 0, "magentas": 0
                 }
             }
-        });
+        }));
         let legacy_error = crate::render_plan::compile_render_plan(
             &legacy_raw,
             crate::render_plan::CompileRenderPlanContext {
@@ -716,7 +716,7 @@ mod gpu_runtime_tests {
                 Rgba([0.08 * scale, 0.35 * scale, 8.0 * scale, 0.71])
             }
         }));
-        let raw = json!({
+        let raw = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 2,
             "blackWhiteMixer": {
                 "enabled": true,
@@ -726,7 +726,7 @@ mod gpu_runtime_tests {
                     "aquas": -80, "blues": -100, "purples": -20, "magentas": 60
                 }
             }
-        });
+        }));
         let plan = crate::render_plan::compile_render_plan(
             &raw,
             crate::render_plan::CompileRenderPlanContext {
@@ -798,7 +798,7 @@ mod gpu_runtime_tests {
             let scale = 0.6 + (x + y) as f32 * 0.3;
             Rgba([1.2 * scale, 0.45 * scale, 0.18 * scale, 0.82])
         }));
-        let raw = json!({
+        let raw = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 2,
             "blackWhiteMixer": {
                 "enabled": true,
@@ -816,7 +816,7 @@ mod gpu_runtime_tests {
                 "blending": 50,
                 "balance": 0
             }
-        });
+        }));
         let plan = crate::render_plan::compile_render_plan(
             &raw,
             crate::render_plan::CompileRenderPlanContext {

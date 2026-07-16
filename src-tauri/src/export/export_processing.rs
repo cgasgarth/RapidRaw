@@ -3329,12 +3329,12 @@ mod tests {
         let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 8, |x, y| {
             Rgba([x as f32 / 11.0, y as f32 / 7.0, 0.25, 1.0])
         }));
-        let adjustments = json!({
+        let adjustments = crate::render_plan::current_render_adjustments(json!({
             "rawEngineEditGraphVersion": 1,
             "exposure": 18,
             "contrast": 12,
             "showClipping": false
-        });
+        }));
         let app = tauri::test::mock_builder()
             .manage(crate::AppState::new())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))

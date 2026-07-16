@@ -181,6 +181,9 @@ pub(crate) fn execute_cpu_edit_graph(
         if adjustments.global.is_raw_image == 0 {
             color = srgb_to_linear(color);
         }
+        // Mirror the first scene-linear WGSL color node. The legacy
+        // temperature/tint controls remain a later creative operation.
+        color = mat3(global.technical_white_balance) * color;
         color = apply_noise_reduction(
             color,
             &input,
