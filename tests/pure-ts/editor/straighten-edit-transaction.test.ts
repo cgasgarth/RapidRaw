@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { CropStraightenSessionIdentity } from '../../../src/components/panel/editor/cropStraightenController';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
@@ -56,8 +57,8 @@ describe('straighten edit transaction', () => {
 
   test('commits one source-typed geometry revision with history, persistence, and undo', () => {
     const state = useEditorStore.getState();
-    const beforeGeometry = state.editDocumentV2.nodes.geometry;
-    const beforeTone = state.editDocumentV2.nodes.scene_global_color_tone;
+    const beforeGeometry = state.editDocumentV2.nodes['geometry'];
+    const beforeTone = state.editDocumentV2.nodes['scene_global_color_tone'];
     const request = buildStraightenEditTransaction(transactionState(), identity(), -5.5, 'straighten-commit');
     const result = state.applyEditTransaction(request);
 
@@ -80,14 +81,15 @@ describe('straighten edit transaction', () => {
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().adjustmentSnapshot.value.rotation).toBe(-5.5);
-    expect(result.afterEditDocumentV2.nodes.geometry).not.toBe(beforeGeometry);
-    expect(result.afterEditDocumentV2.nodes.geometry.params).toMatchObject({
+    const geometry = editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params);
+    expect(result.afterEditDocumentV2.nodes['geometry']).not.toBe(beforeGeometry);
+    expect(geometry).toMatchObject({
       crop: { ...result.after.crop, unit: 'px' },
       rotation: -5.5,
     });
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
-    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('crop');
-    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('rotation');
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
+    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('crop');
+    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('rotation');
     const reopened = hydrateImageOpenEditDocumentV2(
       {
         adjustments: structuredClone(result.after),
@@ -95,8 +97,8 @@ describe('straighten edit transaction', () => {
       },
       structuredClone(result.after),
     );
-    expect(reopened.nodes.geometry.params).toEqual(result.afterEditDocumentV2.nodes.geometry.params);
-    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('rotation');
+    expect(editDocumentGeometryV2Schema.parse(reopened.nodes['geometry']?.params)).toEqual(geometry);
+    expect(reopened.extensions['legacyAdjustments']).not.toHaveProperty('rotation');
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       baseAdjustmentRevision: 0,
@@ -106,10 +108,14 @@ describe('straighten edit transaction', () => {
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustmentSnapshot.value.rotation).toBe(0);
-    expect(useEditorStore.getState().editDocumentV2.nodes.geometry.params.rotation).toBe(0);
+    expect(
+      editDocumentGeometryV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['geometry']?.params).rotation,
+    ).toBe(0);
     expect(useEditorStore.getState().historyIndex).toBe(0);
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().editDocumentV2.nodes.geometry.params.rotation).toBe(-5.5);
+    expect(
+      editDocumentGeometryV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['geometry']?.params).rotation,
+    ).toBe(-5.5);
   });
 
   test('preserves exact no-ops and rejects stale source, session, graph, generation, tool, and revision', () => {
@@ -169,13 +175,18 @@ describe('straighten edit transaction', () => {
     });
 
     const state = useEditorStore.getState();
-    expect(state.editDocumentV2.nodes.geometry.params.crop).toEqual({ ...legacyCrop, unit: 'px' });
+    expect(editDocumentGeometryV2Schema.parse(state.editDocumentV2.nodes['geometry']?.params).crop).toEqual({
+      ...legacyCrop,
+      unit: 'px',
+    });
     const result = state.applyEditTransaction(
       buildStraightenEditTransaction(transactionState(), identity(), 0, 'straighten-legacy-crop-no-op'),
     );
     expect(result.noOp).toBeTrue();
     expect(result.nextAdjustmentRevision).toBe(0);
     expect(useEditorStore.getState().adjustmentSnapshot.value.crop).toEqual({ ...legacyCrop, unit: 'px' });
-    expect(useEditorStore.getState().editDocumentV2.nodes.geometry.params.crop).toEqual({ ...legacyCrop, unit: 'px' });
+    expect(
+      editDocumentGeometryV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['geometry']?.params).crop,
+    ).toEqual({ ...legacyCrop, unit: 'px' });
   });
 });
