@@ -10,6 +10,8 @@ import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { getFilmBaselineProfileCatalog } from '../../../src/utils/film-look/filmBaselineProfiles';
+import { REFERENCE_FILM_PROFILE_REF } from '../../../src/utils/film-look/filmEmulationOperation';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -64,7 +66,7 @@ test('Film workspace edits publish one current transaction and reset only Film-o
   expect(useEditorStore.getState().isSliderDragging).toBe(false);
   expect(useEditorStore.getState()).toMatchObject({
     adjustmentRevision: 4,
-    adjustments: { filmLookStrength: 50 },
+    adjustments: { filmEmulation: { mix: 0.5 } },
     historyIndex: 2,
   });
   expect(useEditorStore.getState().history).toHaveLength(3);
@@ -74,39 +76,36 @@ test('Film workspace edits publish one current transaction and reset only Film-o
     transactionId: gestureTransactionIds[0],
   });
 
-  const measuredProfile = container.querySelector<HTMLElement>(
-    '[data-film-profile-id="film_look.measured.monochrome_d65.v1"]',
-  );
-  if (!measuredProfile) throw new Error('Expected measured Film profile card');
-  await click(measuredProfile, 'button:not([aria-pressed])');
+  const currentProfile = container.querySelector<HTMLElement>('[data-film-profile-id="rapidraw.reference_film.v1"]');
+  if (!currentProfile) throw new Error('Expected current Film profile card');
+  await click(currentProfile, 'button:not([aria-pressed])');
   const profiled = useEditorStore.getState();
-  expect(profiled.adjustments).toMatchObject({
-    exposure: 1.25,
-    filmEmulation: null,
-    filmLookId: 'film_look.measured.monochrome_d65.v1',
-    saturation: -75,
-  });
-  expect(profiled.adjustmentRevision).toBe(5);
-  expect(profiled.history).toHaveLength(4);
-  expect(profiled.editDocumentV2.nodes.film_look.params).toEqual({
-    filmLookId: 'film_look.measured.monochrome_d65.v1',
-    filmLookStrength: 75,
-  });
-  expect(profiled.editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('filmLookId');
+  expect(profiled.adjustments.filmEmulation).toMatchObject({ mix: 0.5, profileRef: REFERENCE_FILM_PROFILE_REF });
+  expect(profiled.adjustments.exposure).toBe(1.25);
+  expect(profiled.adjustmentRevision).toBe(4);
+  expect(profiled.history).toHaveLength(3);
+  expect(profiled.editDocumentV2.nodes.film_emulation.params.filmEmulation).toEqual(profiled.adjustments.filmEmulation);
 
-  const historyBeforeReset = profiled.history.length;
+  const baselineProfile = getFilmBaselineProfileCatalog().find(
+    (profile) => profile.profile.id === 'rapidraw.soft_color_negative.v1',
+  );
+  if (!baselineProfile) throw new Error('Expected pinned baseline Film profile');
+  const baselineCard = container.querySelector<HTMLElement>(`[data-film-profile-id="${baselineProfile.profile.id}"]`);
+  if (!baselineCard) throw new Error('Expected baseline Film profile card');
+  await click(baselineCard, 'button:not([aria-pressed])');
+  expect(useEditorStore.getState().adjustments.filmEmulation?.profileRef).toEqual(baselineProfile.model.profileRef);
+  expect(useEditorStore.getState().adjustments).not.toHaveProperty('filmLookId');
+  expect(useEditorStore.getState().adjustments).not.toHaveProperty('filmLookStrength');
+
+  const historyBeforeReset = useEditorStore.getState().history.length;
   await click(container, 'button[aria-label="Reset film emulation"]');
   const reset = useEditorStore.getState();
-  expect(reset.adjustments).toMatchObject({
-    exposure: 1.25,
-    filmEmulation: null,
-    filmLookId: null,
-    filmLookStrength: INITIAL_ADJUSTMENTS.filmLookStrength,
-    saturation: INITIAL_ADJUSTMENTS.saturation,
-  });
+  expect(reset.adjustments.filmEmulation).toBeNull();
+  expect(reset.adjustments.exposure).toBe(1.25);
+  expect(reset.adjustments.saturation).toBe(INITIAL_ADJUSTMENTS.saturation);
   expect(reset.history).toHaveLength(historyBeforeReset + 1);
   expect(reset.adjustmentRevision).toBe(6);
-  expect(reset.editDocumentV2.nodes.film_look.params).toEqual({ filmLookId: null, filmLookStrength: 100 });
+  expect(reset.editDocumentV2.nodes.film_emulation.params).toEqual({ filmEmulation: null });
 
   await click(container, 'button[aria-label="Reset film emulation"]');
   expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 6, historyIndex: 4 });

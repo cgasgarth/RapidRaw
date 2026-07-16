@@ -10,7 +10,6 @@ import { filmEmulationNodeV1Schema } from './film/filmEmulationSchemas.js';
 import { perspectiveCorrectionSettingsSchema } from './geometry/perspective/perspectiveSchemas.js';
 import {
   detailDeblurUiControlsV1Schema,
-  filmLookRecipeIdSchema,
   lensProfileDistortionParamsV1Schema,
   lensProfilePatchV1Schema,
 } from './rawEngineSchemas.js';
@@ -146,16 +145,6 @@ export const editDocumentFilmEmulationV2Schema = z
 
 export const EDIT_DOCUMENT_FILM_EMULATION_DEFAULTS = { filmEmulation: null } as const;
 export const EDIT_DOCUMENT_FILM_EMULATION_FIELDS = ['filmEmulation'] as const;
-
-export const editDocumentFilmLookV2Schema = z
-  .object({
-    filmLookId: filmLookRecipeIdSchema.nullable(),
-    filmLookStrength: z.number().finite().min(0).max(100),
-  })
-  .strict();
-
-export const EDIT_DOCUMENT_FILM_LOOK_DEFAULTS = { filmLookId: null, filmLookStrength: 100 } as const;
-export const EDIT_DOCUMENT_FILM_LOOK_FIELDS = ['filmLookId', 'filmLookStrength'] as const;
 
 export const editDocumentToneEqualizerV2Schema = z.object({ toneEqualizer: toneEqualizerSettingsV1Schema }).strict();
 export const editDocumentPointColorV2Schema = z.object({ pointColor: pointColorPlanV1Schema }).strict();
@@ -705,16 +694,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     nodeType: 'film_emulation',
     process: 'scene_referred_v2',
     renderStage: 'film_emulation',
-    implementationVersion: 1,
-  },
-  {
-    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
-    defaultParams: EDIT_DOCUMENT_FILM_LOOK_DEFAULTS,
-    editorSection: null,
-    legacyFields: EDIT_DOCUMENT_FILM_LOOK_FIELDS,
-    nodeType: 'film_look',
-    process: 'scene_referred_v2',
-    renderStage: 'film_look',
     implementationVersion: 1,
   },
   {
@@ -1461,14 +1440,6 @@ const editDocumentNodesV2Schema = z
           }
         }
       }
-      if (nodeType === 'film_look') {
-        const filmLook = editDocumentFilmLookV2Schema.safeParse(node.params);
-        if (!filmLook.success) {
-          for (const issue of filmLook.error.issues) {
-            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
-          }
-        }
-      }
       if (nodeType === 'tone_equalizer') {
         const toneEqualizer = editDocumentToneEqualizerV2Schema.safeParse(node.params);
         if (!toneEqualizer.success) {
@@ -1815,13 +1786,6 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     schemas: editDocumentFilmEmulationV2Schema.shape,
   });
   document = normalizeLegacyNodeOwnership(document, {
-    createNode: { implementationVersion: 1, process: 'scene_referred_v2' },
-    defaults: EDIT_DOCUMENT_FILM_LOOK_DEFAULTS,
-    fields: EDIT_DOCUMENT_FILM_LOOK_FIELDS,
-    nodeType: 'film_look',
-    schemas: editDocumentFilmLookV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
     defaults: EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS,
     fields: EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
     nodeType: 'detail_denoise_dehaze',
@@ -1918,7 +1882,6 @@ export type EditDocumentSkinToneUniformityV2 = z.infer<typeof editDocumentSkinTo
 export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetailDenoiseDehazeV2Schema>;
 export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCreativeV2Schema>;
 export type EditDocumentFilmEmulationV2 = z.infer<typeof editDocumentFilmEmulationV2Schema>;
-export type EditDocumentFilmLookV2 = z.infer<typeof editDocumentFilmLookV2Schema>;
 export type EditDocumentToneEqualizerV2 = z.infer<typeof editDocumentToneEqualizerV2Schema>;
 export type EditDocumentPointColorV2 = z.infer<typeof editDocumentPointColorV2Schema>;
 export type EditDocumentBlackWhiteMixerV2 = z.infer<typeof editDocumentBlackWhiteMixerV2Schema>;
@@ -1958,7 +1921,6 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
   if (envelope.type === 'detail_denoise_dehaze') editDocumentDetailDenoiseDehazeV2Schema.parse(envelope.params);
   if (envelope.type === 'display_creative') editDocumentDisplayCreativeV2Schema.parse(envelope.params);
   if (envelope.type === 'film_emulation') editDocumentFilmEmulationV2Schema.parse(envelope.params);
-  if (envelope.type === 'film_look') editDocumentFilmLookV2Schema.parse(envelope.params);
   if (envelope.type === 'tone_equalizer') editDocumentToneEqualizerV2Schema.parse(envelope.params);
   if (envelope.type === 'point_color') editDocumentPointColorV2Schema.parse(envelope.params);
   if (envelope.type === 'black_white_mixer') editDocumentBlackWhiteMixerV2Schema.parse(envelope.params);

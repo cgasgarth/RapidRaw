@@ -236,7 +236,6 @@ const executeNativeEditedPreview = async (
           'detail_denoise_dehaze',
           'display_creative',
           'film_emulation',
-          'film_look',
           'geometry',
           'lens_correction',
           'luma_levels',

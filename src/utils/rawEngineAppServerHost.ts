@@ -962,7 +962,7 @@ export const buildRawEngineAppServerRouteCatalog = (): RawEngineAppServerRouteCa
     catalog.push(
       buildRouteCatalogEntry({
         commandName: route.commandName,
-        family: 'film_look',
+        family: 'film_emulation',
         inputSchemaNames: [route.inputSchemaName],
         modes: [RawEngineAppServerRouteMode.HostCommand],
         outputSchemaNames: [route.outputSchemaName],

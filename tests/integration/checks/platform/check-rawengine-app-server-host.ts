@@ -401,7 +401,7 @@ const routeCatalogReplay = rawEngineAppServerRouteCatalogReplaySchema.parse(
 if (routeCatalogReplay.response.routes.length < 20) {
   failures.push('Route catalog replay must expose mapped editing routes.');
 }
-for (const expectedFamily of ['ai', 'computational_merge', 'film_look', 'negative_lab', 'tone_color']) {
+for (const expectedFamily of ['ai', 'computational_merge', 'film_emulation', 'negative_lab', 'tone_color']) {
   if (!routeCatalogReplay.response.routes.some((route) => route.family === expectedFamily)) {
     failures.push(`Route catalog missing ${expectedFamily}.`);
   }
@@ -426,7 +426,7 @@ for (const route of routeCatalogReplay.response.routes.filter((candidate) => can
     }
   }
 }
-for (const route of routeCatalogReplay.response.routes.filter((candidate) => candidate.family === 'film_look')) {
+for (const route of routeCatalogReplay.response.routes.filter((candidate) => candidate.family === 'film_emulation')) {
   if (!route.runtimeCheckScripts.includes('check:film-look-app-server-routes')) {
     failures.push(`${route.commandName}: film route catalog entry must expose check:film-look-app-server-routes.`);
   }

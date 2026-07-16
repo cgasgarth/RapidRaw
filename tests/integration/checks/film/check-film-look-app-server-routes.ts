@@ -1,60 +1,42 @@
 #!/usr/bin/env bun
 
-import { z } from 'zod';
+import {
+  createFilmEmulationTargetState,
+  REFERENCE_FILM_PROFILE_REF,
+} from '../../../../src/utils/film-look/filmEmulationOperation.ts';
 import { FilmLookAppServerCommandName } from '../../../../src/utils/film-look/filmLookAppServerRouteIds.ts';
 import {
-  buildFilmLookAppServerPatchResult,
+  applyFilmEmulationAppServerOperation,
   FILM_LOOK_APP_SERVER_ROUTE_MANIFEST,
 } from '../../../../src/utils/film-look/filmLookAppServerRoutes.ts';
-import {
-  buildFilmLookAppliedAdjustmentPatch,
-  buildFilmLookPresetDraft,
-  getFilmLookControlledAdjustmentKeys,
-} from '../../../../src/utils/film-look/filmLookBrowser.ts';
-import { FILM_LOOK_BROWSER_ITEMS } from '../../../../src/utils/film-look/filmLookRegistry.ts';
 
-const expectedCommandName = FilmLookAppServerCommandName.BuildAdjustmentPatch;
-const route = FILM_LOOK_APP_SERVER_ROUTE_MANIFEST.routes.find(
-  (candidate) => candidate.commandName === expectedCommandName,
+const route = FILM_LOOK_APP_SERVER_ROUTE_MANIFEST.routes.at(0);
+if (
+  FILM_LOOK_APP_SERVER_ROUTE_MANIFEST.routes.length !== 1 ||
+  route?.commandName !== FilmLookAppServerCommandName.ApplyFilmEmulationOperation
+) {
+  throw new Error('Film App Server must expose only the current node operation route.');
+}
+
+const state = createFilmEmulationTargetState({ kind: 'image', variantId: 'app-server-proof' });
+const result = applyFilmEmulationAppServerOperation(
+  {
+    actor: { id: 'app-server', kind: 'agent', sessionId: 'app-server-proof' },
+    approval: { approvalClass: 'edit_apply', reason: 'Current Film profile proof', state: 'approved' },
+    commandId: 'film-app-server-proof',
+    commandType: 'edit.apply_film_emulation_operation',
+    contractVersion: 1,
+    correlationId: 'film-app-server-proof',
+    dryRun: false,
+    expectedGraphRevision: state.graphRevision,
+    operation: { kind: 'set_profile', profileRef: REFERENCE_FILM_PROFILE_REF },
+    schemaVersion: 1,
+    target: state.target,
+  },
+  state,
 );
-
-if (route === undefined) {
-  throw new Error(`Missing film app-server route for ${expectedCommandName}.`);
+if (result.resultingNode?.profileRef.contentSha256 !== REFERENCE_FILM_PROFILE_REF.contentSha256) {
+  throw new Error('Film App Server did not return the exact pinned current profile.');
 }
 
-const resultSchema = z.object({
-  adjustmentPatch: z.record(z.string(), z.number()),
-  commandName: z.literal(expectedCommandName),
-  controlledAdjustmentKeys: z.array(z.string()).min(1),
-  lookId: z.string(),
-  presetDraft: z.object({
-    adjustments: z.record(z.string(), z.number()),
-    includeCropTransform: z.literal(false),
-    includeMasks: z.literal(false),
-    name: z.string(),
-    presetType: z.literal('style'),
-  }),
-  proof: z.object({
-    deterministic: z.literal(true),
-    generatedFrom: z.literal('src/utils/film-look/filmLookBrowser.ts'),
-  }),
-  strength: z.literal(100),
-});
-
-for (const look of FILM_LOOK_BROWSER_ITEMS) {
-  const result = resultSchema.parse(buildFilmLookAppServerPatchResult({ lookId: look.id, strength: 100 }));
-
-  if (JSON.stringify(result.adjustmentPatch) !== JSON.stringify(buildFilmLookAppliedAdjustmentPatch(look, 100))) {
-    throw new Error(`${look.displayName} app-server patch does not match UI apply helper.`);
-  }
-
-  if (JSON.stringify(result.presetDraft) !== JSON.stringify(buildFilmLookPresetDraft(look, 100))) {
-    throw new Error(`${look.displayName} app-server preset draft does not match UI preset helper.`);
-  }
-
-  if (JSON.stringify(result.controlledAdjustmentKeys) !== JSON.stringify(getFilmLookControlledAdjustmentKeys())) {
-    throw new Error(`${look.displayName} app-server controlled keys do not match UI helper.`);
-  }
-}
-
-console.log(`film app-server routes ok (${FILM_LOOK_BROWSER_ITEMS.length} looks)`);
+console.log('film app-server route ok (current node operation only)');

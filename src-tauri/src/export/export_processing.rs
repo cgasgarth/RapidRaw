@@ -47,7 +47,6 @@ pub use crate::export::job_registry::ExportCancellationAck;
 use crate::export::job_registry::ExportJobHandle;
 use crate::export::runtime_services::ExportRuntimeServices;
 use crate::file_management::{parse_virtual_path, read_file_mapped};
-use crate::film_look_render::normalize_film_look_adjustments_for_render;
 use crate::formats::is_raw_file;
 use crate::image_loader::{
     composite_patches_on_image, load_and_composite_with_report, load_base_image_from_bytes,
@@ -1443,7 +1442,7 @@ fn export_masks_for_image(
 
     if !mask_bitmaps.is_empty() {
         let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
-        let render_adjustments = normalize_film_look_adjustments_for_render(js_adjustments);
+        let render_adjustments = js_adjustments;
         let mask_values = render_adjustments["masks"]
             .as_array()
             .cloned()
@@ -1470,7 +1469,7 @@ fn export_masks_for_image(
                 return Ok(ExportMasksResult::Cancelled(committed_paths));
             }
 
-            let mut single_adjustments = render_adjustments.as_ref().clone();
+            let mut single_adjustments = render_adjustments.clone();
             single_adjustments
                 .as_object_mut()
                 .ok_or_else(|| "mask export adjustments must be an object".to_string())?
@@ -1594,8 +1593,7 @@ fn export_adjustments_as_lut(
     let identity_image = generate_identity_lut_image(lut_size);
 
     let tm_override = resolve_tonemapper_override_from_handle(app_handle, false);
-    let render_adjustments = normalize_film_look_adjustments_for_render(js_adjustments);
-    let mut lut_adjustments = render_adjustments.into_owned();
+    let mut lut_adjustments = js_adjustments.clone();
     let object = lut_adjustments
         .as_object_mut()
         .ok_or_else(|| "LUT export adjustments must be an object".to_string())?;

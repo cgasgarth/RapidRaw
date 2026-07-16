@@ -1,14 +1,14 @@
 import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { FilmLookBrowserItem } from '../../utils/film-look/filmLookBrowser';
-import { getFilmLookBrowserGroups } from '../../utils/film-look/filmLookRegistry';
+import type { FilmProfileManifestV1 } from '../../../packages/rawengine-schema/src/film/filmProfileRegistrySchemas';
+import { getFilmBaselineProfileCatalog } from '../../utils/film-look/filmBaselineProfiles';
 import { FilmProfileCard } from './FilmProfileCard';
 
 interface FilmProfileBrowserProps {
   activeProfileId: string | null;
   favorites: ReadonlySet<string>;
-  onApply: (look: FilmLookBrowserItem) => void;
+  onApply: (profile: FilmProfileManifestV1) => void;
   onToggleFavorite: (id: string) => void;
 }
 
@@ -17,23 +17,20 @@ export function FilmProfileBrowser({ activeProfileId, favorites, onApply, onTogg
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'favorites' | 'recommended'>('all');
   const normalizedQuery = query.trim().toLocaleLowerCase();
-  const groups = useMemo(
+  const profiles = useMemo(
     () =>
-      getFilmLookBrowserGroups()
-        .map((group) => ({
-          ...group,
-          looks: group.looks.filter((look) => {
-            const matchesQuery =
-              normalizedQuery.length === 0 ||
-              `${look.displayName} ${look.description} ${look.category}`.toLocaleLowerCase().includes(normalizedQuery);
-            const matchesFilter =
-              filter === 'all' ||
-              (filter === 'favorites' && favorites.has(look.id)) ||
-              (filter === 'recommended' && look.strengthDefault >= 70);
-            return matchesQuery && matchesFilter;
-          }),
-        }))
-        .filter((group) => group.looks.length > 0),
+      getFilmBaselineProfileCatalog().filter((profile) => {
+        const matchesQuery =
+          normalizedQuery.length === 0 ||
+          `${profile.presentation.displayName} ${profile.presentation.description} ${profile.presentation.family}`
+            .toLocaleLowerCase()
+            .includes(normalizedQuery);
+        const matchesFilter =
+          filter === 'all' ||
+          (filter === 'favorites' && favorites.has(profile.profile.id)) ||
+          (filter === 'recommended' && profile.profile.lifecycle === 'active');
+        return matchesQuery && matchesFilter;
+      }),
     [favorites, filter, normalizedQuery],
   );
 
@@ -73,33 +70,33 @@ export function FilmProfileBrowser({ activeProfileId, favorites, onApply, onTogg
         ))}
       </div>
       <div className="space-y-3">
-        {groups.length === 0 ? (
+        {profiles.length === 0 ? (
           <p className="py-4 text-center text-[11px] text-text-secondary">
             {t('film.workspace.noProfiles', { defaultValue: 'No profiles match.' })}
           </p>
         ) : null}
-        {groups.map((group) => (
-          <section aria-labelledby={`film-family-${group.category}`} key={group.category}>
+        {profiles.length > 0 ? (
+          <section aria-labelledby="film-family-current">
             <h2
               className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-tertiary"
-              id={`film-family-${group.category}`}
+              id="film-family-current"
             >
-              {group.displayName}
+              {t('film.workspace.currentProfiles', { defaultValue: 'Current profiles' })}
             </h2>
             <div className="space-y-1.5">
-              {group.looks.map((look) => (
+              {profiles.map((profile) => (
                 <FilmProfileCard
-                  favorite={favorites.has(look.id)}
-                  key={look.id}
-                  look={look}
+                  favorite={favorites.has(profile.profile.id)}
+                  key={profile.profile.id}
+                  profile={profile}
                   onApply={onApply}
                   onToggleFavorite={onToggleFavorite}
-                  selected={activeProfileId === look.id}
+                  selected={activeProfileId === profile.profile.id}
                 />
               ))}
             </div>
           </section>
-        ))}
+        ) : null}
       </div>
     </section>
   );
