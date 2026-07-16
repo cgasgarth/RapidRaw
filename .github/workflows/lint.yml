@@ -231,8 +231,11 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: src-tauri
-          # Reuse the maintained main Rust-test cache; this lane adds only the
-          # validation-harness feature surface to the already-built library graph.
+          # Use the main workflow's `rust-test` job identity instead of this
+          # job id so the generated restore key is byte-for-byte compatible.
+          shared-key: rust-test
+          # This matches the maintained main Rust-test cache; the PR lane adds
+          # only the validation-harness feature surface to that compiled graph.
           key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-main-long
           cache-on-failure: false
       - name: Compile the optimized app validation feature surface
