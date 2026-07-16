@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::adjustments::edit_document_v2::validate_edit_document_v2_copy_payload;
 use crate::color::white_balance::{WHITE_BALANCE_CONTRACT, cct_duv_to_coordinates};
-use crate::presets::Preset;
+use crate::presets::{Preset, PresetType};
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -851,14 +851,15 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<ConvertedExternalPrese
     Ok(ConvertedExternalPreset {
         diagnostics,
         preset: Preset {
+            format: "rapidraw.preset".to_string(),
+            schema_version: 1,
             id: Uuid::new_v4().to_string(),
             name: preset_name,
-            adjustments: json!({}),
-            edit_document_v2: Some(current_payload),
+            edit_document_v2: current_payload,
             color_style_provenance: None,
-            include_masks: Some(false),
-            include_crop_transform: Some(touched_lens),
-            preset_type: Some("style".to_string()),
+            include_masks: false,
+            include_crop_transform: touched_lens,
+            preset_type: PresetType::Style,
         },
     })
 }
@@ -866,8 +867,6 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<ConvertedExternalPrese
 #[cfg(test)]
 mod tests {
     use super::convert_xmp_to_preset;
-    use serde_json::json;
-
     #[test]
     fn lightroom_white_balance_compiles_directly_to_current_technical_contract() {
         let converted = convert_xmp_to_preset(include_str!(
@@ -878,11 +877,7 @@ mod tests {
         assert_eq!(converted.diagnostics[0].field, "SharpenRadius");
         let preset = converted.preset;
         assert_eq!(preset.name, "Current Nodes Fixture");
-        let current = preset
-            .edit_document_v2
-            .as_ref()
-            .expect("current preset authority");
-        assert_eq!(preset.adjustments, json!({}));
+        let current = &preset.edit_document_v2;
         let white_balance = current["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]
             .as_object()
             .expect("technical white balance");
@@ -912,8 +907,8 @@ mod tests {
         )
         .expect("Lightroom/XMP preset converts")
         .preset;
-        let white_balance = &preset.edit_document_v2.as_ref().expect("current authority")["nodes"]
-            ["camera_input"]["params"]["whiteBalanceTechnical"];
+        let white_balance =
+            &preset.edit_document_v2["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"];
         assert_eq!(white_balance["kelvin"], 5200.0);
         assert_eq!(white_balance["duv"], -0.005);
     }
@@ -925,8 +920,8 @@ mod tests {
         )
         .expect("XMP preset converts")
         .preset;
-        let mixer = &preset.edit_document_v2.as_ref().expect("current authority")["nodes"]["black_white_mixer"]
-            ["params"]["blackWhiteMixer"];
+        let mixer =
+            &preset.edit_document_v2["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"];
 
         assert_eq!(mixer["enabled"], true);
         assert_eq!(mixer["process"], "continuous_sensitivity_v1");
@@ -940,7 +935,7 @@ mod tests {
         )
         .expect("monochrome Treatment preset converts")
         .preset;
-        let treatment = treatment.edit_document_v2.expect("current authority");
+        let treatment = treatment.edit_document_v2;
         assert_eq!(
             treatment["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["process"],
             "continuous_sensitivity_v1"
@@ -960,7 +955,7 @@ mod tests {
         .preset;
 
         assert!(
-            preset.edit_document_v2.expect("current authority")["nodes"]
+            preset.edit_document_v2["nodes"]
                 .get("black_white_mixer")
                 .is_none()
         );
@@ -981,10 +976,7 @@ mod tests {
             ["SharpenRadius", "Texture", "UnknownFutureField"]
         );
         assert_eq!(converted.diagnostics[1].code, "invalid_external_value");
-        let current = converted
-            .preset
-            .edit_document_v2
-            .expect("current authority");
+        let current = converted.preset.edit_document_v2;
         assert_eq!(
             current["nodes"]["scene_global_color_tone"]["params"]["exposure"],
             0.75
@@ -1008,10 +1000,7 @@ mod tests {
             "#,
         )
         .expect("all mapped node families validate natively");
-        let nodes = &converted
-            .preset
-            .edit_document_v2
-            .expect("current authority")["nodes"];
+        let nodes = &converted.preset.edit_document_v2["nodes"];
         for node in [
             "scene_global_color_tone",
             "color_presence",

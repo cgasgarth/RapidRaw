@@ -36,6 +36,9 @@ export const createEditDocumentPresetPayload = (
     presetType === 'tool',
   );
 
+export const RAPIDRAW_PRESET_FORMAT = 'rapidraw.preset' as const;
+export const RAPIDRAW_PRESET_SCHEMA_VERSION = 1 as const;
+
 const sanitizePresetPayload = (
   value: unknown,
   destination: EditDocumentV2,
@@ -62,57 +65,21 @@ const sanitizePresetPayload = (
   return Object.keys(nodes).length === 0 ? null : { nodes, schemaVersion: 2 };
 };
 
-const legacyPresetPayload = (
-  adjustments: Partial<Adjustments>,
-  destination: EditDocumentV2,
-  includeCropTransform: boolean,
-): EditDocumentV2CopyPayload | null => {
-  const allowed = new Set(presetNodeTypes(includeCropTransform));
-  const nodes: EditDocumentV2CopyPayload['nodes'] = {};
-  for (const descriptor of EDIT_DOCUMENT_NODE_DESCRIPTORS) {
-    if (!allowed.has(descriptor.nodeType)) continue;
-    const fields = descriptor.legacyFields.filter((field) => Object.hasOwn(adjustments, field));
-    if (fields.length === 0 && !(descriptor.nodeType === 'display_creative' && 'effectsEnabled' in adjustments)) {
-      continue;
-    }
-    const current = destination.nodes[descriptor.nodeType];
-    if (current === undefined) continue;
-    nodes[descriptor.nodeType] = {
-      ...current,
-      enabled:
-        descriptor.nodeType === 'display_creative' && typeof adjustments.effectsEnabled === 'boolean'
-          ? adjustments.effectsEnabled
-          : current.enabled,
-      params: {
-        ...current.params,
-        ...Object.fromEntries(fields.map((field) => [field, structuredClone(adjustments[field])])),
-      },
-    };
-  }
-  return Object.keys(nodes).length === 0
-    ? null
-    : sanitizePresetPayload({ nodes, schemaVersion: 2 }, destination, includeCropTransform);
-};
-
-/** Resolve strict V2 presets first; legacy bags are promoted against current node authority at this boundary only. */
+/** Resolve the only supported RapidRaw preset authority. Invalid payloads fail closed. */
 export const resolveEditDocumentPresetPayload = (
-  preset: Pick<Preset, 'adjustments' | 'editDocumentV2' | 'includeCropTransform'>,
+  preset: Pick<Preset, 'editDocumentV2' | 'includeCropTransform'>,
   destination: EditDocumentV2,
-): EditDocumentV2CopyPayload | null => {
-  const includeCropTransform = preset.includeCropTransform === true;
-  return preset.editDocumentV2 === undefined
-    ? legacyPresetPayload(preset.adjustments, destination, includeCropTransform)
-    : sanitizePresetPayload(preset.editDocumentV2, destination, includeCropTransform);
-};
+): EditDocumentV2CopyPayload | null =>
+  sanitizePresetPayload(preset.editDocumentV2, destination, preset.includeCropTransform);
 
 export const configureEditDocumentPresetPayload = (
-  preset: Pick<Preset, 'adjustments' | 'editDocumentV2' | 'includeCropTransform'>,
+  preset: Pick<Preset, 'editDocumentV2' | 'includeCropTransform'>,
   includeCropTransform: boolean,
   presetType: 'style' | 'tool',
 ): EditDocumentV2CopyPayload | null => {
   const defaults = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
   const existing = resolveEditDocumentPresetPayload(preset, defaults);
-  if (preset.editDocumentV2 !== undefined && existing === null) return null;
+  if (existing === null) return null;
   const complete = createEditDocumentPresetPayload(defaults, includeCropTransform, 'style');
   const merged: EditDocumentV2CopyPayload = {
     nodes: { ...complete.nodes, ...(existing?.nodes ?? {}) },
@@ -121,7 +88,6 @@ export const configureEditDocumentPresetPayload = (
   return selectEditDocumentV2CopyPayload(merged, presetNodeTypes(includeCropTransform), presetType === 'tool');
 };
 
-const adjustmentsSchema = z.record(z.string(), z.unknown()).transform((value) => value as Partial<Adjustments>);
 const colorStyleProvenanceSchema = z
   .object({
     createdAt: z.string(),
@@ -133,16 +99,36 @@ const colorStyleProvenanceSchema = z
   .strict();
 const persistedPresetSchema = z
   .object({
-    adjustments: adjustmentsSchema,
     colorStyleProvenance: colorStyleProvenanceSchema.optional(),
-    editDocumentV2: editDocumentV2CopyPayloadSchema.optional(),
+    editDocumentV2: editDocumentV2CopyPayloadSchema,
+    format: z.literal(RAPIDRAW_PRESET_FORMAT),
     id: z.string().min(1),
-    includeCropTransform: z.boolean().optional(),
-    includeMasks: z.boolean().optional(),
+    includeCropTransform: z.boolean(),
+    includeMasks: z.literal(false),
     name: z.string().min(1),
-    presetType: z.enum(['style', 'tool']).optional(),
+    presetType: z.enum(['style', 'tool']),
+    schemaVersion: z.literal(RAPIDRAW_PRESET_SCHEMA_VERSION),
   })
-  .strict();
+  .strict()
+  .superRefine((preset, context) => {
+    const allowed = new Set(presetNodeTypes(preset.includeCropTransform));
+    const nodeTypes = Object.keys(preset.editDocumentV2.nodes) as EditDocumentNodeTypeV2[];
+    if (nodeTypes.length === 0) {
+      context.addIssue({ code: 'custom', message: 'RapidRaw presets require at least one current node.' });
+    }
+    for (const nodeType of nodeTypes) {
+      if (!allowed.has(nodeType)) {
+        context.addIssue({
+          code: 'custom',
+          message: `RapidRaw preset node '${nodeType}' is not allowed by preset policy.`,
+          path: ['editDocumentV2', 'nodes', nodeType],
+        });
+      }
+    }
+    if (preset.colorStyleProvenance !== undefined && preset.presetType !== 'style') {
+      context.addIssue({ code: 'custom', message: 'Only style presets can contain color-style provenance.' });
+    }
+  });
 const presetItemSchema = z.object({ preset: persistedPresetSchema }).strict();
 const folderHeaderSchema = z
   .object({
@@ -225,12 +211,9 @@ export const parseExternalPresetImportResult = (
   return { diagnostics: result.diagnostics, library: parsePresetLibrary(result.presets) };
 };
 
-export const lowerEditDocumentPresetPayload = (payload: EditDocumentV2CopyPayload): Partial<Adjustments> =>
-  lowerEditDocumentV2CopyPayloadToLegacyAdjustments(payload);
-
-/** Compile preset authority for the native preview renderer; explicit V2 never consults its legacy mirror. */
+/** Compile current preset authority for the native renderer's adjustment request contract. */
 export const buildPresetPreviewAdjustments = (
-  preset: Pick<Preset, 'adjustments' | 'editDocumentV2' | 'includeCropTransform'>,
+  preset: Pick<Preset, 'editDocumentV2' | 'includeCropTransform'>,
 ): Adjustments | null => {
   const defaults = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
   const payload = resolveEditDocumentPresetPayload(preset, defaults);
@@ -238,7 +221,7 @@ export const buildPresetPreviewAdjustments = (
     ? null
     : {
         ...structuredClone(INITIAL_ADJUSTMENTS),
-        ...bindTypedCurveGraphVersion(lowerEditDocumentPresetPayload(payload)),
+        ...bindTypedCurveGraphVersion(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(payload)),
       };
 };
 

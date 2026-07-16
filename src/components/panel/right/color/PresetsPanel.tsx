@@ -59,9 +59,9 @@ import { PresetListType, type UserPreset, usePresets } from '../../../../hooks/e
 import type { ColorStylePreset } from '../../../../schemas/color/colorStylePresetSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
-import type { Adjustments } from '../../../../utils/adjustments';
 import {
   BUILT_IN_COLOR_STYLE_PRESETS,
+  buildBuiltInColorStylePreset,
   COLOR_STYLE_PRESET_CATALOG,
 } from '../../../../utils/color/style/colorStylePresetCatalog';
 import { buildPresetEditTransaction, resolveEditDocumentPresetPayload } from '../../../../utils/editDocumentPreset';
@@ -112,20 +112,12 @@ const isFolderEntry = (item: UserPreset): item is FolderEntry => item.folder !==
 const isPresetValid = (preset: Preset): boolean =>
   preset.id.trim().length > 0 &&
   preset.name.trim().length > 0 &&
-  typeof preset.adjustments === 'object' &&
-  preset.adjustments !== null;
+  preset.format === 'rapidraw.preset' &&
+  preset.schemaVersion === 1 &&
+  Object.keys(preset.editDocumentV2.nodes).length > 0;
 const dragId = (value: DragStartEvent['active']['id']): string => String(value);
 const compareNames = (first: { name: string }, second: { name: string }) =>
   first.name.localeCompare(second.name, undefined, { numeric: true, sensitivity: 'base' });
-
-function areAdjustmentsEqual(first: Adjustments, second: Adjustments): boolean {
-  const firstKeys = Object.keys(first) as Array<keyof Adjustments>;
-  const secondKeys = Object.keys(second) as Array<keyof Adjustments>;
-  return (
-    firstKeys.length === secondKeys.length &&
-    firstKeys.every((key) => JSON.stringify(first[key]) === JSON.stringify(second[key]))
-  );
-}
 
 function collectPresetNames(items: UserPreset[]): string[] {
   return items.flatMap((item) => {
@@ -607,7 +599,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       try {
         const state = useEditorStore.getState();
         const payload = resolveEditDocumentPresetPayload(
-          { adjustments: preset.adjustmentPatch, includeCropTransform: false },
+          buildBuiltInColorStylePreset(preset, state.editDocumentV2),
           state.editDocumentV2,
         );
         if (payload === null) throw new Error('Color style has no descriptor-approved edit nodes.');

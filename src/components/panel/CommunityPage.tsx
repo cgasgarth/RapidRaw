@@ -7,6 +7,12 @@ import { useTranslation } from 'react-i18next';
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import {
+  createEditDocumentPresetPayload,
+  RAPIDRAW_PRESET_FORMAT,
+  RAPIDRAW_PRESET_SCHEMA_VERSION,
+} from '../../utils/editDocumentPreset';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
 import type { ImageFile, SupportedTypes } from '../ui/AppProperties';
 import Button from '../ui/primitives/Button';
 import Dropdown from '../ui/primitives/Dropdown';
@@ -25,13 +31,26 @@ export interface CommunityPreset {
   presetType?: 'tool' | 'style';
 }
 
-export const buildSaveCommunityPresetPayload = (preset: CommunityPreset) => ({
-  name: preset.name,
-  adjustments: preset.adjustments,
-  includeMasks: preset.includeMasks,
-  includeCropTransform: preset.includeCropTransform,
-  presetType: preset.presetType || 'style',
-});
+export const buildSaveCommunityPresetPayload = (preset: CommunityPreset) => {
+  const includeCropTransform = preset.includeCropTransform === true;
+  const presetType = preset.presetType ?? 'style';
+  const document = legacyAdjustmentsToEditDocumentV2({
+    ...structuredClone(INITIAL_ADJUSTMENTS),
+    ...structuredClone(preset.adjustments),
+  });
+  return {
+    preset: {
+      editDocumentV2: createEditDocumentPresetPayload(document, includeCropTransform, presetType),
+      format: RAPIDRAW_PRESET_FORMAT,
+      id: crypto.randomUUID(),
+      includeCropTransform,
+      includeMasks: false as const,
+      name: preset.name,
+      presetType,
+      schemaVersion: RAPIDRAW_PRESET_SCHEMA_VERSION,
+    },
+  };
+};
 
 const containerVariants = {
   hidden: { opacity: 1 },
