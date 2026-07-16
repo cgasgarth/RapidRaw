@@ -24,6 +24,7 @@ import {
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
 } from '../../../../src/utils/basicToneCommandBridge.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   handleRawEngineAppServerHostRequestAsync,
   isApprovedAgentAppServerToolName,
@@ -128,7 +129,7 @@ const dispatchWithDraftSession = async (
   );
 
 const buildBasicTonePayload = (patch: Partial<BasicToneAdjustmentPayload>): BasicToneAdjustmentPayload => {
-  const base = useEditorStore.getState().adjustments;
+  const base = useEditorStore.getState().adjustmentSnapshot.value;
   return {
     blacks: patch.blacks ?? base.blacks,
     brightness: patch.brightness ?? base.brightness,
@@ -174,9 +175,10 @@ const buildTypedBasicToneCommand = ({
     },
   );
 
+const initialEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
 useEditorStore.getState().hydrateEditorRenderAuthority({
-  adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
+  editDocumentV2: initialEditDocumentV2,
   finalPreviewUrl: 'blob:rawengine-agent-dispatch-before',
   hasRenderedFirstFrame: true,
   histogram: {
@@ -185,7 +187,7 @@ useEditorStore.getState().hydrateEditorRenderAuthority({
     [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
     [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
   },
-  history: [INITIAL_ADJUSTMENTS],
+  history: [initialEditDocumentV2],
   historyIndex: 0,
   selectedImage: {
     exif: { ISO: '320', LensModel: 'FE 24-70mm F2.8 GM II' },
@@ -294,7 +296,7 @@ const applyPayload = applyResultSchema.parse(toneColorMutationResultV1Schema.par
 if (
   applyPayload.appliedGraphRevision.length === 0 ||
   useEditorStore.getState().historyIndex !== 1 ||
-  useEditorStore.getState().adjustments.exposure !== 0.32
+  useEditorStore.getState().adjustmentSnapshot.value.exposure !== 0.32
 ) {
   throw new Error('typed tonecolor.apply_command dispatch did not mutate the editor session.');
 }
