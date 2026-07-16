@@ -11,7 +11,7 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 let rendered: { container: HTMLDivElement; root: Root } | null = null;
 
 afterEach(() => {
@@ -36,6 +36,7 @@ test('guided perspective controls create source-normalized horizontal and vertic
     historyIndex: 0,
     imageSession: createEditorImageSession({ generation: 1, path: '/fixture/guided.ARW', source: 'cache' }),
     selectedImage: {
+      exif: null,
       height: 3000,
       isRaw: true,
       isReady: true,

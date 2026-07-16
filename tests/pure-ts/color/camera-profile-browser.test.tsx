@@ -7,7 +7,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { CameraProfileBrowser } from '../../../src/components/adjustments/color/CameraProfileBrowser';
 import type { CameraProfileBrowserEntry } from '../../../src/schemas/color/cameraProfileBrowserSchemas';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
 afterEach(() => {

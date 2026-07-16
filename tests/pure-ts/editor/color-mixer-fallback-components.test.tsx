@@ -17,7 +17,7 @@ mock.module('@tauri-apps/api/core', () => ({ invoke }));
 const { default: ColorPanel } = await import('../../../src/components/adjustments/Color');
 const { ColorAdvancedControls } = await import('../../../src/components/adjustments/color/ColorAdvancedControls');
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
@@ -81,10 +81,10 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
     enabled: true,
     midtones: { red: 10 },
   });
-  expect(useEditorStore.getState().editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(
+  expect(requireEditNode('color_balance_rgb').params['colorBalanceRgb']).toEqual(
     useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb,
   );
-  expect(useEditorStore.getState().editDocumentV2.nodes.channel_mixer.params).not.toHaveProperty('colorBalanceRgb');
+  expect(requireEditNode('channel_mixer').params).not.toHaveProperty('colorBalanceRgb');
 
   act(() => getButton(container, 'channel-mixer-toggle').click());
   expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer.enabled).toBeTrue();
@@ -95,8 +95,8 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
     hslHue.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
   expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.reds.hue).toBe(21);
-  expect(useEditorStore.getState().editDocumentV2.nodes.selective_color_mixer.params.hsl.reds.hue).toBe(21);
-  expect(useEditorStore.getState().editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('hsl');
+  expect(requireEditNode('selective_color_mixer').params).toMatchObject({ hsl: { reds: { hue: 21 } } });
+  expect(useEditorStore.getState().editDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('hsl');
   expect(useEditorStore.getState().history).toHaveLength(5);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     adjustmentRevision: 4,
@@ -158,8 +158,8 @@ test('ColorAdvancedControls Levels actions commit through the luma Levels node',
 
   act(() => getButton(container, 'color-levels-toggle').click());
   expect(useEditorStore.getState().adjustmentSnapshot.value.levels.enabled).toBeTrue();
-  expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels.enabled).toBeTrue();
-  expect(useEditorStore.getState().editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('levels');
+  expect(requireEditNode('luma_levels').params).toMatchObject({ levels: { enabled: true } });
+  expect(useEditorStore.getState().editDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('levels');
 
   const inputBlack = container.querySelector('[data-testid="color-levels-controls"] input[type="range"]');
   if (!(inputBlack instanceof window.HTMLInputElement)) throw new Error('missing Levels input-black slider');
@@ -169,10 +169,7 @@ test('ColorAdvancedControls Levels actions commit through the luma Levels node',
   });
 
   expect(useEditorStore.getState().adjustmentSnapshot.value.levels.inputBlack).toBe(0.08);
-  expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels).toMatchObject({
-    enabled: true,
-    inputBlack: 0.08,
-  });
+  expect(requireEditNode('luma_levels').params).toMatchObject({ levels: { enabled: true, inputBlack: 0.08 } });
   expect(useEditorStore.getState().history).toHaveLength(3);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     adjustmentRevision: 2,
@@ -197,6 +194,12 @@ function initializeFallbackStore(imageSessionId: number): Adjustments {
     history: [editDocumentV2],
   });
   return adjustments;
+}
+
+function requireEditNode(nodeType: string) {
+  const node = useEditorStore.getState().editDocumentV2.nodes[nodeType];
+  if (node === undefined) throw new Error(`Expected ${nodeType} edit node.`);
+  return node;
 }
 
 function render(element: React.ReactElement): HTMLDivElement {

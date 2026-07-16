@@ -4,6 +4,7 @@ import userEvent, { type UserEvent } from '@testing-library/user-event';
 import i18next from 'i18next';
 import { createElement, type ReactNode } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
+import { editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2.ts';
 import { Mask } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
@@ -84,8 +85,8 @@ describe('compact masks panel workflow', () => {
     const stateAfterCreate = useEditorStore.getState();
     const createdContainer = stateAfterCreate.adjustmentSnapshot.value.masks[0];
     const createdSubMask = createdContainer?.subMasks[0];
-    expect(stateAfterCreate.activeMaskContainerId).toBe(createdContainer?.id);
-    expect(stateAfterCreate.activeMaskId).toBe(createdSubMask?.id);
+    expect(stateAfterCreate.activeMaskContainerId).toBe(createdContainer?.id ?? null);
+    expect(stateAfterCreate.activeMaskId).toBe(createdSubMask?.id ?? null);
 
     await clickControl(user, container, '[data-testid="mask-reset-all"]');
     expect(useEditorStore.getState().adjustmentSnapshot.value.masks).toHaveLength(0);
@@ -114,10 +115,11 @@ describe('compact masks panel workflow', () => {
     expect(required<HTMLElement>(container, '[data-testid="mask-panel-mask-count"]').textContent).toBe('2');
     expect(required<HTMLElement>(container, '[data-testid="mask-stack-count"]').textContent).toBe('2');
     expect(
-      required<HTMLElement>(container, `[data-testid="mask-container-row-${initialActiveContainerId}"]`).dataset
-        .maskContainerActive,
+      required<HTMLElement>(container, `[data-testid="mask-container-row-${initialActiveContainerId}"]`).dataset[
+        'maskContainerActive'
+      ],
     ).toBe('true');
-    expect(firstRow.dataset.maskContainerVisible).toBe('true');
+    expect(firstRow.dataset['maskContainerVisible']).toBe('true');
 
     await clickControl(user, container, '[data-testid="mask-contextual-create-brush"]');
 
@@ -127,19 +129,23 @@ describe('compact masks panel workflow', () => {
     const createdSubMask = activeContainer?.subMasks[0];
     expect(createdSubMask?.type).toBe(Mask.Brush);
     expect(useEditorStore.getState().activeMaskContainerId).toBe(initialActiveContainerId);
-    expect(useEditorStore.getState().activeMaskId).toBe(createdSubMask?.id);
+    expect(useEditorStore.getState().activeMaskId).toBe(createdSubMask?.id ?? null);
     expect(
-      required<HTMLElement>(container, `[data-testid="mask-submask-row-${createdSubMask?.id ?? ''}"]`).dataset
-        .maskSubmaskActive,
+      required<HTMLElement>(container, `[data-testid="mask-submask-row-${createdSubMask?.id ?? ''}"]`).dataset[
+        'maskSubmaskActive'
+      ],
     ).toBe('true');
 
     const revisionBeforeVisibility = useEditorStore.getState().adjustmentRevision;
     await user.click(required<HTMLButtonElement>(firstRow, '[aria-label="Hide Mask"]'));
 
     expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.visible).toBe(false);
-    expect(firstRow.dataset.maskContainerVisible).toBe('false');
+    expect(firstRow.dataset['maskContainerVisible']).toBe('false');
     expect(useEditorStore.getState().adjustmentRevision).toBe(revisionBeforeVisibility + 1);
-    expect(useEditorStore.getState().editDocumentV2.nodes.layers?.params.masks[0]?.visible).toBe(false);
+    expect(
+      editDocumentLayersV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['layers']?.params).masks[0]
+        ?.visible,
+    ).toBe(false);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       persistence: 'commit',
       source: 'layer-command',
@@ -153,7 +159,10 @@ describe('compact masks panel workflow', () => {
       useEditorStore.getState().undo();
     });
     expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.visible).toBe(true);
-    expect(useEditorStore.getState().editDocumentV2.nodes.layers?.params.masks[0]?.visible).toBe(true);
+    expect(
+      editDocumentLayersV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['layers']?.params).masks[0]
+        ?.visible,
+    ).toBe(true);
     expect(secondRow.getAttribute('aria-expanded')).toBe('false');
 
     fireEvent.keyDown(firstRow, { key: 'Enter' });

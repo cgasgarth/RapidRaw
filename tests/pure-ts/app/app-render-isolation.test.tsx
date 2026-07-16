@@ -6,6 +6,7 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useLibraryStore } from '../../../src/store/useLibraryStore';
 import { useProcessStore } from '../../../src/store/useProcessStore';
 import { useUIStore } from '../../../src/store/useUIStore';
+import { thumbnailCache } from '../../../src/thumbnails/thumbnailCacheInstance';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const counts = {
@@ -107,12 +108,13 @@ describe('application render islands', () => {
       useEditorStore.getState().setEditor({
         selectedImage: {
           exif: null,
-          is_edited: false,
-          is_virtual_copy: false,
-          modified: 0,
+          height: 3000,
+          isRaw: true,
+          isReady: true,
+          originalUrl: null,
           path: '/fixture/open.raw',
-          rating: 0,
-          tags: null,
+          thumbnailUrl: '',
+          width: 4000,
         },
       });
     });
@@ -142,9 +144,7 @@ describe('application render islands', () => {
     const baseline = { ...counts };
     for (let index = 0; index < 1_000; index += 1) {
       await act(async () => {
-        useProcessStore.getState().setProcess((state) => ({
-          thumbnails: { ...state.thumbnails, [`/fixture/${index}.jpg`]: `thumb:${index}` },
-        }));
+        thumbnailCache.setMany([{ generation: index + 1, path: `/fixture/${index}.jpg`, url: `thumb:${index}` }]);
       });
     }
     expect(counts.editor).toBe(baseline.editor);

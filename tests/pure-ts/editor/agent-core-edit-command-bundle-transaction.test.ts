@@ -30,7 +30,10 @@ class DeferredBundleBridge extends RawEngineLocalAppServerBridge {
   releaseApply(): void {
     this.releaseGate();
   }
-  override async dispatch(command: unknown, context?: EditCommandBusContext): Promise<EditCommandDispatchResult> {
+  override async dispatch<TResult = unknown>(
+    command: unknown,
+    context?: EditCommandBusContext,
+  ): Promise<EditCommandDispatchResult<TResult>> {
     if (
       typeof command === 'object' &&
       command !== null &&
@@ -42,7 +45,7 @@ class DeferredBundleBridge extends RawEngineLocalAppServerBridge {
       this.signalEntered();
       await this.gate;
     }
-    return super.dispatch(command, context);
+    return super.dispatch<TResult>(command, context);
   }
 }
 
@@ -173,7 +176,7 @@ describe('agent core command bundle transaction', () => {
       buildAgentToolEditTransaction(
         { ...fallbackState, imageSessionId: 83 },
         identity,
-        { ...fallbackState.adjustments, exposure: 0.2 },
+        { ...fallbackState.adjustmentSnapshot.value, exposure: 0.2 },
         'stale-reopened-a',
       ),
     ).toThrow('agent_tool_transaction.stale_session:editor-image-session:81:editor-image-session:83');

@@ -20,8 +20,13 @@ const initial: ColumnWidths = {
 
 function installDom() {
   const window = new Window({ url: 'http://localhost' });
-  Object.assign(globalThis, { window, document: window.document, HTMLElement: window.HTMLElement });
-  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  Object.assign(globalThis, {
+    window,
+    document: window.document,
+    HTMLElement: window.HTMLElement,
+    PointerEvent: window.PointerEvent,
+  });
+  Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
   let callbacks = new Map<number, FrameRequestCallback>();
   let nextId = 1;
   globalThis.requestAnimationFrame = (callback) => {
@@ -99,7 +104,7 @@ describe('library column resize journey', () => {
     handle.releasePointerCapture = (id) => captured.delete(id);
     const fire = (type: string, clientX: number) =>
       handle.dispatchEvent(
-        new dom.window.PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'mouse', button: 0, clientX }),
+        new PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'mouse', button: 0, clientX }),
       );
 
     await act(async () => {
@@ -133,7 +138,7 @@ describe('library column resize journey', () => {
     handle.releasePointerCapture = () => {};
     await act(async () => {
       handle.dispatchEvent(
-        new dom.window.PointerEvent('pointerdown', {
+        new PointerEvent('pointerdown', {
           bubbles: true,
           pointerId: 2,
           pointerType: 'mouse',
@@ -141,7 +146,7 @@ describe('library column resize journey', () => {
           clientX: 0,
         }),
       );
-      handle.dispatchEvent(new dom.window.PointerEvent('pointermove', { bubbles: true, pointerId: 2, clientX: 200 }));
+      handle.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 2, clientX: 200 }));
     });
     expect(dom.pending()).toBe(1);
     await act(async () => dom.window.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' })));
