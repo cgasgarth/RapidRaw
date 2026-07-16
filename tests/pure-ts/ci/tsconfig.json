@@ -11,7 +11,8 @@
     "../validation-dag.test.ts",
     "../edit-document/source-layer-authority.test.ts",
     "../edit-document/owned-node-migrations.test.ts",
-    "../edit-document/camera-detail-migrations.test.ts"
+    "../edit-document/camera-detail-migrations.test.ts",
+    "../edit-document/creative-curves-geometry.test.ts"
   ],
   "exclude": ["../../../node_modules"]
 }
