@@ -141,6 +141,7 @@ export function CropOverlaySurface({
             <div
               aria-label={t('editor.crop.tooltips.straighten')}
               className="absolute inset-0"
+              data-controller-geometry-epoch={descriptor.geometryEpoch}
               data-controller-session={descriptor.sessionFingerprint}
               data-controller-image-session={descriptor.sessionKey.imageSessionId}
               data-controller-operation-generation={descriptor.sessionKey.operationGeneration}
