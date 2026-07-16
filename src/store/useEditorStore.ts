@@ -45,6 +45,15 @@ import {
   reduceEditorCompare,
 } from '../utils/editorCompare';
 import {
+  type EditorNamedSnapshot,
+  hasDuplicateSnapshotLabel,
+  normalizeSnapshotLabel,
+  readNamedSnapshots,
+  snapshotDocumentEquals,
+  stripNamedSnapshots,
+  withNamedSnapshots,
+} from '../utils/editorNamedSnapshots';
+import {
   type EditorTeardownTransactionRequest,
   type EditorTeardownTransactionResult,
   isEditorTeardownIdentityCurrent,
@@ -289,6 +298,10 @@ interface EditorState {
   ) => void;
   setPresetApplication: (presetApplication: PresetApplication | null) => void;
   createHistoryCheckpoint: (label: string) => void;
+  createNamedSnapshot: (label: string) => boolean;
+  renameNamedSnapshot: (snapshotId: string, label: string) => boolean;
+  deleteNamedSnapshot: (snapshotId: string) => boolean;
+  restoreNamedSnapshot: (snapshotId: string) => boolean;
   applyBasicToneCommand: (
     command: BasicToneCommandEnvelope,
     identity: BasicToneCommitIdentity,
@@ -348,6 +361,23 @@ const createSessionCheckpointId = (historyIndex: number): string => {
   const randomId = globalThis.crypto?.randomUUID?.();
   return randomId ?? `checkpoint-${String(historyIndex)}-${String(Date.now())}`;
 };
+
+const currentSnapshotSessionId = (
+  state: Pick<EditorState, 'imageSession' | 'imageSessionId' | 'selectedImage'>,
+): string =>
+  state.selectedImage?.path
+    ? `editor-image-source:${state.selectedImage.path}`
+    : (state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`);
+
+const currentNamedSnapshots = (
+  state: Pick<EditorState, 'editDocumentV2' | 'imageSession' | 'imageSessionId' | 'selectedImage'>,
+): readonly EditorNamedSnapshot[] =>
+  readNamedSnapshots(state.editDocumentV2, state.selectedImage?.path ?? null, currentSnapshotSessionId(state));
+
+const withSnapshotsOnHistory = (
+  history: readonly EditDocumentV2[],
+  snapshots: readonly EditorNamedSnapshot[],
+): EditDocumentV2[] => history.map((entry) => withNamedSnapshots(stripNamedSnapshots(entry), snapshots));
 
 const historyNavigationPreviewInvalidation = {
   exportSoftProofTransform: null,
@@ -861,34 +891,43 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nextHistory =
         request.history === 'none' || request.history === 'navigation'
           ? { history: currentHistory, checkpoints: state.historyCheckpoints, historyIndex: state.historyIndex }
-          : compensationHistory !== undefined
+          : request.history === 'metadata'
             ? {
-                history: structuredClone(compensationHistory.entries),
-                checkpoints: structuredClone(compensationHistory.checkpoints),
-                historyIndex: compensationHistory.historyIndex,
+                history: withSnapshotsOnHistory(
+                  state.history,
+                  currentNamedSnapshots({ ...state, editDocumentV2: nextResult.after }),
+                ),
+                checkpoints: state.historyCheckpoints,
+                historyIndex: state.historyIndex,
               }
-            : request.history === 'reset'
-              ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
-              : coalescedReceipt
-                ? {
-                    history: currentHistory.map((entry, index) =>
-                      index === state.historyIndex ? nextResult.after : entry,
-                    ),
-                    checkpoints: state.historyCheckpoints,
-                    historyIndex: state.historyIndex,
-                  }
-                : pushEditHistoryEntryWithCheckpoints(
-                    reconcilesHydratedNativeCommit
-                      ? currentHistory.map((entry, index) =>
-                          index === state.historyIndex && nativeHistoryBaseline !== undefined
-                            ? nativeHistoryBaseline
-                            : entry,
-                        )
-                      : currentHistory,
-                    state.historyIndex,
-                    nextResult.after,
-                    state.historyCheckpoints,
-                  );
+            : compensationHistory !== undefined
+              ? {
+                  history: structuredClone(compensationHistory.entries),
+                  checkpoints: structuredClone(compensationHistory.checkpoints),
+                  historyIndex: compensationHistory.historyIndex,
+                }
+              : request.history === 'reset'
+                ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
+                : coalescedReceipt
+                  ? {
+                      history: currentHistory.map((entry, index) =>
+                        index === state.historyIndex ? nextResult.after : entry,
+                      ),
+                      checkpoints: state.historyCheckpoints,
+                      historyIndex: state.historyIndex,
+                    }
+                  : pushEditHistoryEntryWithCheckpoints(
+                      reconcilesHydratedNativeCommit
+                        ? currentHistory.map((entry, index) =>
+                            index === state.historyIndex && nativeHistoryBaseline !== undefined
+                              ? nativeHistoryBaseline
+                              : entry,
+                          )
+                        : currentHistory,
+                      state.historyIndex,
+                      nextResult.after,
+                      state.historyCheckpoints,
+                    );
       return {
         ...historyNavigationPreviewInvalidation,
         ...publishEditDocumentState(state, nextResult.after),
@@ -1012,6 +1051,98 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         new Date().toISOString(),
       ),
     }));
+  },
+
+  createNamedSnapshot: (label) => {
+    const state = get();
+    const trimmedLabel = normalizeSnapshotLabel(label);
+    const sourceImagePath = state.selectedImage?.path ?? null;
+    if (!sourceImagePath || !trimmedLabel) return false;
+    const snapshots = currentNamedSnapshots(state);
+    if (hasDuplicateSnapshotLabel(snapshots, trimmedLabel)) return false;
+    const snapshot: EditorNamedSnapshot = {
+      createdAt: new Date().toISOString(),
+      editDocumentV2: structuredClone(stripNamedSnapshots(state.editDocumentV2)),
+      id: globalThis.crypto?.randomUUID?.() ?? `snapshot-${String(Date.now())}`,
+      label: trimmedLabel,
+      sourceImagePath,
+      sourceSessionId: currentSnapshotSessionId(state),
+    };
+    const nextSnapshots = [...snapshots, snapshot];
+    const editDocumentV2 = withNamedSnapshots(state.editDocumentV2, nextSnapshots);
+    state.applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: 'metadata',
+      imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+      operations: [{ editDocumentV2, type: 'replace-edit-document' }],
+      persistence: 'commit',
+      source: 'snapshot',
+      transactionId: `snapshot-create:${snapshot.id}`,
+    });
+    return true;
+  },
+
+  renameNamedSnapshot: (snapshotId, label) => {
+    const state = get();
+    const trimmedLabel = normalizeSnapshotLabel(label);
+    if (!trimmedLabel) return false;
+    const snapshots = currentNamedSnapshots(state);
+    if (!snapshots.some((snapshot) => snapshot.id === snapshotId)) return false;
+    if (hasDuplicateSnapshotLabel(snapshots, trimmedLabel, snapshotId)) return false;
+    const nextSnapshots = snapshots.map((snapshot) =>
+      snapshot.id === snapshotId ? { ...snapshot, label: trimmedLabel } : snapshot,
+    );
+    const editDocumentV2 = withNamedSnapshots(state.editDocumentV2, nextSnapshots);
+    state.applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: 'metadata',
+      imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+      operations: [{ editDocumentV2, type: 'replace-edit-document' }],
+      persistence: 'commit',
+      source: 'snapshot',
+      transactionId: `snapshot-rename:${snapshotId}`,
+    });
+    return true;
+  },
+
+  deleteNamedSnapshot: (snapshotId) => {
+    const state = get();
+    const snapshots = currentNamedSnapshots(state);
+    if (!snapshots.some((snapshot) => snapshot.id === snapshotId)) return false;
+    const nextSnapshots = snapshots.filter((snapshot) => snapshot.id !== snapshotId);
+    const editDocumentV2 = withNamedSnapshots(state.editDocumentV2, nextSnapshots);
+    state.applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: 'metadata',
+      imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+      operations: [{ editDocumentV2, type: 'replace-edit-document' }],
+      persistence: 'commit',
+      source: 'snapshot',
+      transactionId: `snapshot-delete:${snapshotId}`,
+    });
+    return true;
+  },
+
+  restoreNamedSnapshot: (snapshotId) => {
+    const state = get();
+    const sourceImagePath = state.selectedImage?.path ?? null;
+    if (!sourceImagePath) return false;
+    const snapshots = currentNamedSnapshots(state);
+    const snapshot = snapshots.find((candidate) => candidate.id === snapshotId);
+    if (!snapshot || snapshot.sourceImagePath !== sourceImagePath) return false;
+    const editDocumentV2 = withNamedSnapshots(structuredClone(snapshot.editDocumentV2), snapshots);
+    if (snapshotDocumentEquals(state.editDocumentV2, editDocumentV2)) return true;
+    const imageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+    state.applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId,
+      operations: [{ editDocumentV2, type: 'replace-edit-document' }],
+      persistence: 'commit',
+      source: 'snapshot',
+      transactionId: `snapshot-restore:${snapshot.id}:${String(Date.now())}`,
+    });
+    return true;
   },
 
   applyBasicToneCommand: (command, identity) => {
