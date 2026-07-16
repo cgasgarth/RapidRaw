@@ -3239,7 +3239,7 @@ mod blur_pass_tests {
     #[test]
     fn compiled_graph_contract_is_valid_for_cpu_fallback_admission() {
         let raw = crate::render_plan::current_render_adjustments(serde_json::json!({
-            "rawEngineEditGraphVersion": 1,
+            "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
             "exposure": 20
         }));
         let revision = crate::render_plan::content_revision(&raw, 1, 2, 3);
@@ -3854,7 +3854,7 @@ mod blur_pass_tests {
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
         let adjustments = crate::render_plan::current_render_adjustments(json!({
-            "rawEngineEditGraphVersion": 1,
+            "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
             "exposure": 35
         }));
         let revision = crate::render_plan::content_revision(&adjustments, 1, 2, 3);
@@ -3920,7 +3920,7 @@ mod blur_pass_tests {
             plan.edit_graph
                 .receipt
                 .ordered_node_ids
-                .contains(&"legacy_gpu_scene_view_pass")
+                .contains(&"scene_global_color_tone")
         );
     }
 
