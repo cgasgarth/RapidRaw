@@ -11,7 +11,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { Panel, type Preset } from '../../../src/components/ui/AppProperties';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext';
 import type { UserPreset } from '../../../src/hooks/editor/usePresets';
-import { useEditorStore } from '../../../src/store/useEditorStore';
+import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { useUIStore } from '../../../src/store/useUIStore';
 import { Invokes } from '../../../src/tauri/commands';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -19,6 +19,7 @@ import {
   BUILT_IN_COLOR_STYLE_PRESETS,
   COLOR_STYLE_PRESET_CATALOG,
 } from '../../../src/utils/color/style/colorStylePresetCatalog';
+import { presetPreviewInvokeArgsSchema } from '../../../src/utils/presetPreviewContract';
 
 type RenderedPanel = {
   container: HTMLDivElement;
@@ -26,7 +27,7 @@ type RenderedPanel = {
   unmount: () => void;
 };
 
-type InvokeHandler = (command: string) => unknown | Promise<unknown>;
+type InvokeHandler = (command: string, args?: unknown) => unknown | Promise<unknown>;
 
 const failures: string[] = [];
 let invokeHandler: InvokeHandler = () => {
@@ -34,7 +35,7 @@ let invokeHandler: InvokeHandler = () => {
 };
 
 mock.module('@tauri-apps/api/core', () => ({
-  invoke: (command: string) => invokeHandler(command),
+  invoke: (command: string, args?: unknown) => invokeHandler(command, args),
 }));
 mock.module('@tauri-apps/plugin-dialog', () => ({
   open: () => null,
@@ -48,6 +49,7 @@ const { PresetsPanel } = await import('../../../src/components/panel/right/color
 
 await validateEmptyStateWithoutBuiltInStyles();
 await validateDiscoveryPreviewApplyAndRevert();
+await validateSamePathPreviewReopen();
 await validateLoadFailure();
 
 if (failures.length > 0) {
@@ -82,10 +84,12 @@ async function validateEmptyStateWithoutBuiltInStyles() {
 
 async function validateDiscoveryPreviewApplyAndRevert() {
   let previewResolvers: Array<(value: Uint8Array) => void> = [];
+  const previewRequests: unknown[] = [];
   const rendered = await renderPanel({
-    invoke: (command) => {
+    invoke: (command, args) => {
       if (command === Invokes.LoadPresets) return buildUserPresetFixtures();
       if (command === Invokes.GeneratePresetPreview) {
+        previewRequests.push(args);
         return new Promise<Uint8Array>((resolve) => {
           previewResolvers.push(resolve);
         });
@@ -96,6 +100,12 @@ async function validateDiscoveryPreviewApplyAndRevert() {
   });
 
   await waitForText(rendered.container, 'User Portrait Style', 'root user preset was not rendered.');
+
+  const previewRequest = presetPreviewInvokeArgsSchema.parse(previewRequests[0]);
+  assert.equal(previewRequest.request.expectedImagePath, '/photos/presets-panel.ARW');
+  assert.equal(previewRequest.request.previewIdentity.sourceImagePath, '/photos/presets-panel.ARW');
+  assert.ok(previewRequest.request.previewIdentity.imageSessionId > 0);
+  assert.ok(previewRequest.request.previewIdentity.requestId > 0);
 
   previewResolvers.forEach((resolve) => resolve(new Uint8Array([1, 2, 3, 4])));
   previewResolvers = [];
@@ -184,6 +194,62 @@ async function validateLoadFailure() {
 
   await waitForText(rendered.container, 'Presets could not be loaded.', 'preset load failure was not rendered.');
   assertVisibleText(rendered.container, 'Retry', 'preset load retry action was not rendered.');
+  rendered.unmount();
+}
+
+async function validateSamePathPreviewReopen() {
+  const pending: Array<{ args: unknown; resolve: (value: Uint8Array) => void }> = [];
+  const rendered = await renderPanel({
+    invoke: (command, args) => {
+      if (command === Invokes.LoadPresets) return buildUserPresetFixtures();
+      if (command === Invokes.GeneratePresetPreview) {
+        return new Promise<Uint8Array>((resolve) => pending.push({ args, resolve }));
+      }
+      return null;
+    },
+    selectedReady: true,
+  });
+  await waitForText(rendered.container, 'User Portrait Style', 'reopen fixture preset was not rendered.');
+  assert.equal(pending.length, 1);
+  const stale = pending[0];
+  assert.ok(stale);
+  const staleIdentity = presetPreviewInvokeArgsSchema.parse(stale.args).request.previewIdentity;
+  const currentSession = useEditorStore.getState().imageSession;
+  assert.ok(currentSession);
+
+  await act(async () => {
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustments: useEditorStore.getState().adjustments,
+      imageSession: createEditorImageSession({
+        generation: currentSession.generation + 1,
+        path: currentSession.path,
+        source: 'cache',
+      }),
+    });
+    await flushPromises();
+  });
+  await act(async () => {
+    stale.resolve(new Uint8Array([255, 216, 1, 255, 217]));
+    await flushPromises();
+  });
+  await waitForCondition('same-path reopen did not issue a new preset preview.', () => pending.length === 2);
+  assert.ok(
+    rendered.container.querySelector('[aria-label="Preview loading"]'),
+    'stale same-path result replaced the current loading preview.',
+  );
+  const current = pending[1];
+  assert.ok(current);
+  const currentIdentity = presetPreviewInvokeArgsSchema.parse(current.args).request.previewIdentity;
+  assert.notEqual(currentIdentity.imageSessionId, staleIdentity.imageSessionId);
+
+  await act(async () => {
+    current.resolve(new Uint8Array([255, 216, 2, 255, 217]));
+    await flushPromises();
+  });
+  assert.ok(
+    rendered.container.querySelector('img[alt="User Portrait Style preview"]'),
+    'current same-path preview did not publish.',
+  );
   rendered.unmount();
 }
 

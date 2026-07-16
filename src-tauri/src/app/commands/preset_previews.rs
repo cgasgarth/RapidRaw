@@ -5,6 +5,11 @@ use image::{DynamicImage, GenericImageView, ImageBuffer, Luma, RgbImage};
 use tauri::ipc::Response;
 
 use crate::AppState;
+use crate::app::commands::preset_preview_contract::{
+    PresetPreviewRequest, PresetPreviewSession, validate_current_preset_preview_source,
+    validate_preset_preview_request,
+};
+use crate::app::preview_session_service::validate_expected_preview_image;
 use crate::app::settings::load_settings_or_default;
 use crate::color::adjustment_fields;
 use crate::community_presets::CommunityPreset;
@@ -70,18 +75,28 @@ fn compose_community_tiles(mut tiles: Vec<RgbImage>, tile_dimension: u32) -> Opt
 
 #[tauri::command]
 pub(crate) fn generate_preset_preview(
-    js_adjustments: serde_json::Value,
+    request: PresetPreviewRequest,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
-    render_preset_preview_bytes(js_adjustments, &state, &app_handle, 400, None, None)
-        .map(Response::new)
+    validate_preset_preview_request(&request)?;
+    render_preset_preview_bytes(
+        request.js_adjustments,
+        &state,
+        &app_handle,
+        Some(&request.expected_image_path),
+        400,
+        None,
+        None,
+    )
+    .map(Response::new)
 }
 
 pub(crate) fn render_preset_preview_bytes(
     js_adjustments: serde_json::Value,
     state: &tauri::State<AppState>,
     app_handle: &tauri::AppHandle,
+    expected_image_path: Option<&str>,
     preview_dim: u32,
     output_dimensions: Option<(u32, u32)>,
     cancellation: Option<&dyn Fn() -> Result<(), String>>,
@@ -94,6 +109,17 @@ pub(crate) fn render_preset_preview_bytes(
         .editor()
         .image_snapshot()
         .ok_or("No original image loaded for preset preview")?;
+    let preview_session = expected_image_path
+        .map(|expected_image_path| {
+            validate_expected_preview_image(&loaded_image.path, expected_image_path)
+                .map_err(|error| error.to_string())?;
+            Ok::<PresetPreviewSession, String>(PresetPreviewSession::new(
+                state.render().preview_session().current_generation(),
+                loaded_image.artifact_source.source_fingerprint(),
+                loaded_image.path.clone(),
+            ))
+        })
+        .transpose()?;
     let is_raw = loaded_image.is_raw;
 
     let (preview_image, scale_for_gpu, unscaled_crop_offset) =
@@ -181,7 +207,33 @@ pub(crate) fn render_preset_preview_bytes(
     checkpoint()?;
     let encoded = encode_preset_preview_output(processed_image, output_dimensions)?;
     checkpoint()?;
-    Ok(encoded)
+    let Some(session) = preview_session else {
+        return Ok(encoded);
+    };
+    state
+        .render()
+        .preview_session()
+        .with_active_image_session(session.generation, &session.source_identity, || {
+            let current_generation = state.render().preview_session().current_generation();
+            let (current_source_identity, current_source_fingerprint) = state
+                .editor()
+                .image_snapshot()
+                .map(|image| {
+                    (
+                        Some(image.path.clone()),
+                        Some(image.artifact_source.source_fingerprint()),
+                    )
+                })
+                .unwrap_or((None, None));
+            validate_current_preset_preview_source(
+                &session,
+                current_generation,
+                current_source_identity.as_deref(),
+                current_source_fingerprint,
+            )?;
+            Ok(encoded)
+        })
+        .unwrap_or_else(|| Err("preset_preview_superseded".to_string()))
 }
 
 fn encode_preset_preview_output(

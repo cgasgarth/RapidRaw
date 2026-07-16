@@ -48,33 +48,24 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { z } from 'zod';
 
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { PresetListType, type UserPreset, usePresets } from '../../../../hooks/editor/usePresets';
 import type { ColorStylePreset } from '../../../../schemas/color/colorStylePresetSchemas';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
-import { Invokes } from '../../../../tauri/commands';
 import type { Adjustments } from '../../../../utils/adjustments';
-import { createBlobFromUint8Array } from '../../../../utils/blobUtils';
 import {
   BUILT_IN_COLOR_STYLE_PRESETS,
   COLOR_STYLE_PRESET_CATALOG,
 } from '../../../../utils/color/style/colorStylePresetCatalog';
-import {
-  buildPresetEditTransaction,
-  buildPresetPreviewAdjustments,
-  resolveEditDocumentPresetPayload,
-} from '../../../../utils/editDocumentPreset';
+import { buildPresetEditTransaction, resolveEditDocumentPresetPayload } from '../../../../utils/editDocumentPreset';
 import { areEditDocumentsEqual } from '../../../../utils/editTransaction';
-import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
 import RenameFolderModal from '../../../modals/library/RenameFolderModal';
@@ -87,6 +78,7 @@ import {
 } from '../../../ui/AppProperties';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import InspectorPanelFrame from '../inspector/InspectorPanelFrame';
+import { usePresetPreviewQueue } from './usePresetPreviewQueue';
 
 interface PresetsPanelProps {
   placement?: 'right-panel' | 'sidebar';
@@ -101,11 +93,6 @@ interface ConfigureModalState {
 interface FolderModalState {
   folder: PresetFolder | null;
   isOpen: boolean;
-}
-
-interface PreviewQueueItem {
-  folderId: string | null;
-  preset: Preset;
 }
 
 type PresetFolder = Omit<PresetFolderBase, 'children' | 'id' | 'name'> & {
@@ -424,6 +411,7 @@ function FolderResult({
 export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' }: PresetsPanelProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
+  const imageSession = useEditorStore((state) => state.imageSession);
   const adjustments = useEditorStore((state) => state.adjustments);
   const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const appliedPreset = useEditorStore((state) => state.presetApplication);
@@ -457,9 +445,8 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const [sort, setSort] = useState<DiscoverySort>('library');
   const [resultDensity, setResultDensity] = useState<DiscoveryDensity>('list');
   const [expandedFolders, setExpandedFolders] = useState(new Set<string>());
-  const [previews, setPreviews] = useState<Record<string, string | null>>({});
-  const [previewStates, setPreviewStates] = useState<Record<string, 'failed' | 'idle' | 'loading' | 'ready'>>({});
-  const [isGeneratingPreviews, setIsGeneratingPreviews] = useState(false);
+  const { clearPreviews, enqueuePreviews, installImageSession, isGeneratingPreviews, previews, previewStates } =
+    usePresetPreviewQueue();
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [previewedPresetId, setPreviewedPresetId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -470,15 +457,6 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const presetButtonRefs = useRef(new Map<string, HTMLButtonElement>());
-  const previewsRef = useRef(previews);
-  const previewQueue = useRef<PreviewQueueItem[]>([]);
-  const isProcessingQueue = useRef(false);
-  const currentImagePathRef = useRef<string | null>(selectedImage?.path ?? null);
-
-  useLayoutEffect(() => {
-    previewsRef.current = previews;
-  }, [previews]);
-
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const { setNodeRef: setRootDropRef, isOver: isRootOver } = useDroppable({ id: 'preset-root' });
 
@@ -552,74 +530,13 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const hasDiscoveryResults =
     displayBuiltInStyles.length > 0 || displayFolders.length > 0 || displayRootPresets.length > 0;
 
-  const clearPreviews = useCallback(() => {
-    Object.values(previewsRef.current).forEach((url) => {
-      if (url?.startsWith('blob:')) URL.revokeObjectURL(url);
-    });
-    previewsRef.current = {};
-    previewQueue.current = [];
-    setPreviews({});
-    setPreviewStates({});
-  }, []);
-
-  const processPreviewQueue = useCallback(async () => {
-    if (isProcessingQueue.current || previewQueue.current.length === 0) return;
-    isProcessingQueue.current = true;
-    setIsGeneratingPreviews(true);
-    const imagePathAtStart = currentImagePathRef.current;
-
-    while (previewQueue.current.length > 0) {
-      if (imagePathAtStart !== currentImagePathRef.current) break;
-      const item = previewQueue.current.shift();
-      if (!item || previewsRef.current[item.preset.id] !== undefined) continue;
-
-      try {
-        const previewAdjustments = buildPresetPreviewAdjustments(item.preset);
-        if (previewAdjustments === null) throw new Error('Preset has invalid edit-document preview authority.');
-        const imageData = await invokeWithSchema(
-          Invokes.GeneratePresetPreview,
-          { jsAdjustments: previewAdjustments },
-          z.instanceof(Uint8Array),
-        );
-        if (imagePathAtStart !== currentImagePathRef.current) break;
-        const previewUrl = URL.createObjectURL(createBlobFromUint8Array(imageData, 'image/jpeg'));
-        setPreviews((current) => {
-          const previous = current[item.preset.id];
-          if (previous?.startsWith('blob:')) URL.revokeObjectURL(previous);
-          return { ...current, [item.preset.id]: previewUrl };
-        });
-        setPreviewStates((current) => ({ ...current, [item.preset.id]: 'ready' }));
-      } catch (error) {
-        console.error(`Failed to generate preview for preset ${item.preset.name}:`, error);
-        if (imagePathAtStart === currentImagePathRef.current) {
-          setPreviews((current) => ({ ...current, [item.preset.id]: null }));
-          setPreviewStates((current) => ({ ...current, [item.preset.id]: 'failed' }));
-        }
-      }
-    }
-
-    isProcessingQueue.current = false;
-    setIsGeneratingPreviews(false);
-  }, []);
-
-  const enqueuePreviews = useCallback(
-    (items: PreviewQueueItem[]) => {
-      const newItems = items.filter((item) => previewsRef.current[item.preset.id] === undefined);
-      if (newItems.length === 0) return;
-      previewQueue.current.push(...newItems);
-      setPreviewStates((current) => ({
-        ...current,
-        ...Object.fromEntries(newItems.map((item) => [item.preset.id, 'loading' as const])),
-      }));
-      void processPreviewQueue();
-    },
-    [processPreviewQueue],
-  );
-
   useEffect(() => {
-    const hasChangedImage = selectedImage?.path !== currentImagePathRef.current;
-    if (hasChangedImage) {
-      currentImagePathRef.current = selectedImage?.path ?? null;
+    const nextImageSession =
+      selectedImage?.isReady === true && imageSession?.path === selectedImage.path
+        ? { imageSessionId: imageSession.generation, sourceImagePath: selectedImage.path }
+        : null;
+    const hasChangedImageSession = installImageSession(nextImageSession);
+    if (hasChangedImageSession) {
       clearPreviews();
     }
     const isSurfaceActive = placement === 'sidebar' || activePanel === Panel.Presets;
@@ -641,15 +558,10 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     rootPresets,
     selectedImage?.isReady,
     selectedImage?.path,
+    imageSession?.generation,
+    imageSession?.path,
+    installImageSession,
   ]);
-
-  useEffect(
-    () => () => {
-      clearPreviews();
-      isProcessingQueue.current = false;
-    },
-    [clearPreviews],
-  );
 
   const toggleFolder = useCallback((folderId: string) => {
     setExpandedFolders((current) => {
