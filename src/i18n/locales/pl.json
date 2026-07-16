@@ -1943,7 +1943,7 @@
         "exportAllTitle": "Eksportuj wszystkie presety",
         "exportTitle": "Eksportuj {{type}}",
         "importPresetsTitle": "Importuj presety",
-        "legacyPreset": "Przestarzały preset",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Plik presetu",
         "rapidRawPreset": "Preset RapidRAW"
       },
@@ -2933,12 +2933,12 @@
         "vignette": "Winieta",
         "whiteBalance": "Balans bieli"
       },
-      "includedAdjustments": "Uwzględnione ustawienia",
       "modeMerge": "Scal",
       "modeReplace": "Zastąp",
       "pasteMode": "Tryb wklejania",
       "save": "Zapisz",
       "selectAll": "Zaznacz wszystko",
+      "selectedNodes": "Uwzględnione ustawienia",
       "selectNone": "Odznacz wszystko",
       "title": "Kopiuj i Wklej Ustawienia"
     },

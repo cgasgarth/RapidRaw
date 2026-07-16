@@ -1831,7 +1831,7 @@
         "exportAllTitle": "Exporter tous les paramètres prédéfinis",
         "exportTitle": "Exporter {{type}}",
         "importPresetsTitle": "Importer des paramètres prédéfinis",
-        "legacyPreset": "Ancien paramètre prédéfini",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Fichier de paramètre prédéfini",
         "rapidRawPreset": "Paramètre prédéfini RapidRAW"
       },
@@ -2798,12 +2798,12 @@
         "vignette": "Vignettage",
         "whiteBalance": "Balance des blancs"
       },
-      "includedAdjustments": "Ajustements inclus",
       "modeMerge": "Fusionner",
       "modeReplace": "Remplacer",
       "pasteMode": "Mode de collage",
       "save": "Enregistrer",
       "selectAll": "Tout sélectionner",
+      "selectedNodes": "Ajustements inclus",
       "selectNone": "Ne rien sélectionner",
       "title": "Copier & Coller les paramètres"
     },

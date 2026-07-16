@@ -1831,7 +1831,7 @@
         "exportAllTitle": "Exportar todos los ajustes preestablecidos",
         "exportTitle": "Exportar {{type}}",
         "importPresetsTitle": "Importar ajustes preestablecidos",
-        "legacyPreset": "Ajuste preestablecido heredado",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Archivo de ajuste preestablecido",
         "rapidRawPreset": "Ajuste preestablecido de RapidRAW"
       },
@@ -2798,12 +2798,12 @@
         "vignette": "Viñeteado",
         "whiteBalance": "Balance de blancos"
       },
-      "includedAdjustments": "Ajustes incluidos",
       "modeMerge": "Fusionar",
       "modeReplace": "Reemplazar",
       "pasteMode": "Modo de pegado",
       "save": "Guardar",
       "selectAll": "Seleccionar todo",
+      "selectedNodes": "Ajustes incluidos",
       "selectNone": "No seleccionar nada",
       "title": "Copiar y pegar ajustes"
     },

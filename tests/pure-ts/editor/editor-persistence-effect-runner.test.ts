@@ -189,7 +189,7 @@ describe('editor persistence effect runner', () => {
     expect(accepted).toHaveLength(1);
   });
 
-  test('owns the multi-selection baseline and projects only included changed keys', async () => {
+  test('owns the multi-selection baseline and projects every changed field for selected nodes', async () => {
     const executions: EditorPersistenceExecution[] = [];
     const { clock, runner } = harness(async (value) => {
       executions.push(value);
@@ -199,7 +199,7 @@ describe('editor persistence effect runner', () => {
     runner.submitCommitted(
       input({
         adjustments: { ...adjustments(1), contrast: 25 },
-        multiSelection: { includedAdjustments: ['exposure'], paths: ['/fixtures/b.raw'] },
+        multiSelection: { paths: ['/fixtures/b.raw'], selectedNodeIds: ['scene_global_color_tone'] },
       }),
       0,
     );
@@ -207,7 +207,7 @@ describe('editor persistence effect runner', () => {
     await flush();
 
     expect(executions[0]?.multiSelection).toEqual({
-      adjustments: { exposure: 1, referenceMatchApplicationReceipt: null },
+      adjustments: { contrast: 25, exposure: 1, referenceMatchApplicationReceipt: null },
       paths: ['/fixtures/b.raw'],
     });
   });

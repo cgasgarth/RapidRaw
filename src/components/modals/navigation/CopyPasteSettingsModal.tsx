@@ -6,12 +6,10 @@ import {
   type EditDocumentNodeTypeV2,
 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
+import type { CopyPasteSettings } from '../../../schemas/copyPasteSettingsSchemas';
 import { TextVariants } from '../../../types/typography';
-import { type CopyPasteSettings, PasteMode } from '../../../utils/adjustments';
-import {
-  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
-  getEditDocumentV2CopyableNodeTypes,
-} from '../../../utils/editDocumentV2';
+import { PasteMode } from '../../../utils/adjustments';
+import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../utils/editDocumentV2';
 import Button from '../../ui/primitives/Button';
 import InspectorSegmentedControl from '../../ui/primitives/InspectorSegmentedControl';
 import Switch from '../../ui/primitives/Switch';
@@ -94,7 +92,7 @@ export default function CopyPasteSettingsModal(props: CopyPasteSettingsModalProp
     isOpen
       ? {
           id: `copy-paste:${epochRef.current}`,
-          settings: { ...settings, includedAdjustments: [...settings.includedAdjustments] },
+          settings: { ...settings, selectedNodeIds: [...settings.selectedNodeIds] },
         }
       : null,
   );
@@ -102,7 +100,7 @@ export default function CopyPasteSettingsModal(props: CopyPasteSettingsModalProp
     epochRef.current += 1;
     sessionRef.current = {
       id: `copy-paste:${epochRef.current}`,
-      settings: { ...settings, includedAdjustments: [...settings.includedAdjustments] },
+      settings: { ...settings, selectedNodeIds: [...settings.selectedNodeIds] },
     };
   }
   wasOpenRef.current = isOpen;
@@ -124,8 +122,7 @@ export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show 
   const { t } = useTranslation();
   const [localSettings, setLocalSettings] = useState<CopyPasteSettings>(() => ({
     ...initialSettings,
-    includedAdjustments: [...getEditDocumentV2CopyableNodeTypes(initialSettings.includedAdjustments)],
-    knownAdjustments: [...EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES],
+    selectedNodeIds: [...initialSettings.selectedNodeIds],
   }));
 
   const handleSave = useCallback(() => {
@@ -152,22 +149,22 @@ export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show 
   const handleSelectAll = () => {
     setLocalSettings((prev) => ({
       ...prev,
-      includedAdjustments: [...EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES],
+      selectedNodeIds: [...EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES],
     }));
   };
 
   const handleSelectNone = () => {
-    setLocalSettings((prev) => ({ ...prev, includedAdjustments: [] }));
+    setLocalSettings((prev) => ({ ...prev, selectedNodeIds: [] }));
   };
 
-  const handleGroupToggle = (keys: string[], checked: boolean) => {
+  const handleGroupToggle = (keys: readonly EditDocumentNodeTypeV2[], checked: boolean) => {
     setLocalSettings((prev) => {
-      const newSet = new Set(prev.includedAdjustments);
+      const newSet = new Set(prev.selectedNodeIds);
       keys.forEach((key) => {
         if (checked) newSet.add(key);
         else newSet.delete(key);
       });
-      return { ...prev, includedAdjustments: Array.from(newSet) };
+      return { ...prev, selectedNodeIds: Array.from(newSet) };
     });
   };
 
@@ -200,9 +197,9 @@ export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show 
               {t('modals.copyPaste.pasteMode')}
             </UiText>
             <PasteModeSwitch
-              selectedMode={localSettings.mode}
-              onModeChange={(mode) => {
-                setLocalSettings((p) => ({ ...p, mode }));
+              selectedMode={localSettings.pasteMode}
+              onModeChange={(pasteMode) => {
+                setLocalSettings((p) => ({ ...p, pasteMode }));
               }}
             />
             <UiText variant={TextVariants.small} className="mt-2">
@@ -214,7 +211,7 @@ export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show 
 
           <div>
             <div className="flex justify-between items-center mb-2">
-              <UiText variant={TextVariants.heading}>{t('modals.copyPaste.includedAdjustments')}</UiText>
+              <UiText variant={TextVariants.heading}>{t('modals.copyPaste.selectedNodes')}</UiText>
               <div className="flex gap-2">
                 <Button
                   className="px-4 py-2 rounded-md text-text-secondary hover:bg-surface transition-colors"
@@ -240,7 +237,7 @@ export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show 
                       {t(`editor.adjustmentSnapshot.value.sections.${section}`, { defaultValue: capitalize(section) })}
                     </UiText>
                     {descriptors?.map((descriptor) => {
-                      const isChecked = localSettings.includedAdjustments.includes(descriptor.nodeType);
+                      const isChecked = localSettings.selectedNodeIds.includes(descriptor.nodeType);
                       const labelKey = NODE_LABEL_KEY_PARTS[descriptor.nodeType]?.join('.');
 
                       return (

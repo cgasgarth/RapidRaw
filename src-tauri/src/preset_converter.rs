@@ -1,10 +1,139 @@
 use regex::Regex;
+use serde::Serialize;
 use serde_json::{Map, Value, json};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
+use crate::adjustments::edit_document_v2::validate_edit_document_v2_copy_payload;
 use crate::color::white_balance::{WHITE_BALANCE_CONTRACT, cct_duv_to_coordinates};
 use crate::presets::Preset;
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalPresetImportDiagnostic {
+    pub code: &'static str,
+    pub field: String,
+    pub message: String,
+}
+
+#[derive(Debug)]
+pub struct ConvertedExternalPreset {
+    pub diagnostics: Vec<ExternalPresetImportDiagnostic>,
+    pub preset: Preset,
+}
+
+fn node_envelope(node_type: &str, process: &str, params: Value) -> Value {
+    json!({
+        "enabled": true,
+        "implementationVersion": 1,
+        "params": params,
+        "process": process,
+        "type": node_type,
+    })
+}
+
+fn insert_node(
+    nodes: &mut Map<String, Value>,
+    node_type: &str,
+    process: &str,
+    params: Map<String, Value>,
+) {
+    nodes.insert(
+        node_type.to_string(),
+        node_envelope(node_type, process, Value::Object(params)),
+    );
+}
+
+fn object(value: Value) -> Map<String, Value> {
+    value.as_object().cloned().expect("static object literal")
+}
+
+fn default_detail_params() -> Map<String, Value> {
+    object(json!({
+        "centré": 0,
+        "clarity": 0,
+        "colorNoiseReduction": 0,
+        "deblurEnabled": false,
+        "deblurSigmaPx": 0.8,
+        "deblurStrength": 0,
+        "dehaze": 0,
+        "denoiseContrastProtection": 50,
+        "denoiseDetail": 50,
+        "denoiseNaturalGrain": 0,
+        "denoiseShadowBias": 0,
+        "localContrastHaloGuard": 50,
+        "localContrastMidtoneMask": 50,
+        "localContrastRadiusPx": 24,
+        "lumaNoiseReduction": 0,
+        "sharpness": 0,
+        "sharpnessThreshold": 15,
+        "structure": 0,
+    }))
+}
+
+fn default_display_creative_params() -> Map<String, Value> {
+    object(json!({
+        "flareAmount": 0,
+        "glowAmount": 0,
+        "grainAmount": 0,
+        "grainRoughness": 50,
+        "grainSize": 25,
+        "halationAmount": 0,
+        "lutData": null,
+        "lutIntensity": 100,
+        "lutName": null,
+        "lutPath": null,
+        "lutSize": 0,
+        "vignetteAmount": 0,
+        "vignetteFeather": 50,
+        "vignetteMidpoint": 50,
+        "vignetteRoundness": 0,
+    }))
+}
+
+fn default_lens_params() -> Map<String, Value> {
+    object(json!({
+        "chromaticAberrationBlueYellow": 0,
+        "chromaticAberrationRedCyan": 0,
+        "lensCorrectionMode": "manual",
+        "lensDistortionAmount": 100,
+        "lensDistortionEnabled": true,
+        "lensDistortionParams": null,
+        "lensMaker": null,
+        "lensModel": null,
+        "lensTcaAmount": 100,
+        "lensTcaEnabled": true,
+        "lensVignetteAmount": 100,
+        "lensVignetteEnabled": true,
+    }))
+}
+
+fn default_color_grading_params() -> Map<String, Value> {
+    object(json!({
+        "colorGrading": {
+            "balance": 0,
+            "blending": 50,
+            "global": { "hue": 0, "luminance": 0, "saturation": 0 },
+            "highlights": { "hue": 0, "luminance": 0, "saturation": 0 },
+            "midtones": { "hue": 0, "luminance": 0, "saturation": 0 },
+            "shadows": { "hue": 0, "luminance": 0, "saturation": 0 }
+        },
+        "perceptualGradingV1": {
+            "balance": 0,
+            "blending": 0.5,
+            "falloff": 1,
+            "global": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
+            "highlightFulcrumEv": 2,
+            "highlights": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
+            "midtones": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
+            "neutralProtection": 0.5,
+            "perceptualModel": "oklab_d65_from_acescg_v1",
+            "shadowFulcrumEv": -2,
+            "shadows": { "brilliance": 0, "chroma": 0, "hueDegrees": 0, "luminanceEv": 0, "saturation": 0 },
+            "skinProtection": 0
+        }
+    }))
+}
 
 #[derive(Copy, Clone, Debug)]
 enum Num {
@@ -105,7 +234,7 @@ fn extract_tone_curve_points(xmp_str: &str, curve_name: &str) -> Option<Vec<Valu
     }
 }
 
-pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
+pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<ConvertedExternalPreset, String> {
     let xmp_one_line = xmp_content.split('\n').collect::<Vec<_>>().join(" ");
 
     let attr_re = Regex::new(r#"crs:([A-Za-z0-9]+)="([^"]*)""#)
@@ -115,34 +244,92 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         attrs.insert(cap[1].to_string(), cap[2].to_string());
     }
 
-    let mut adjustments = Map::new();
+    if attrs.is_empty() && extract_tone_curve_points(xmp_content, "ToneCurvePV2012").is_none() {
+        return Err("External preset contains no supported Lightroom/XMP settings".to_string());
+    }
+
+    let mut nodes = Map::new();
+    let mut scene_tone = object(json!({
+        "blacks": 0,
+        "brightness": 0,
+        "contrast": 0,
+        "exposure": 0,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0,
+    }));
+    let mut color_presence = object(json!({ "hue": 0, "saturation": 0, "vibrance": 0 }));
+    let mut detail = default_detail_params();
+    let mut display_creative = default_display_creative_params();
+    let mut lens = default_lens_params();
+    let mut touched_scene_tone = false;
+    let mut touched_color_presence = false;
+    let mut touched_detail = false;
+    let mut touched_display_creative = false;
+    let mut touched_lens = false;
     let mut hsl_map = Map::new();
     let mut color_grading_map = Map::new();
     let mut curves_map = Map::new();
 
-    let mappings = vec![
+    for (xmp_key, node_key) in [
         ("Exposure2012", "exposure"),
         ("Contrast2012", "contrast"),
         ("Highlights2012", "highlights"),
         ("Whites2012", "whites"),
         ("Blacks2012", "blacks"),
+    ] {
+        if let Some(raw_val) = attrs.get(xmp_key)
+            && let Some(num) = parse_num(raw_val.trim_start_matches('+'))
+            && let Some(json_val) = num_to_json(num)
+        {
+            scene_tone.insert(node_key.to_string(), json_val);
+            touched_scene_tone = true;
+        }
+    }
+
+    for (xmp_key, node_key) in [("Vibrance", "vibrance"), ("Saturation", "saturation")] {
+        if let Some(raw_val) = attrs.get(xmp_key)
+            && let Some(num) = parse_num(raw_val.trim_start_matches('+'))
+            && let Some(json_val) = num_to_json(num)
+        {
+            color_presence.insert(node_key.to_string(), json_val);
+            touched_color_presence = true;
+        }
+    }
+
+    for (xmp_key, node_key) in [
         ("Clarity2012", "clarity"),
         ("Dehaze", "dehaze"),
-        ("Vibrance", "vibrance"),
-        ("Saturation", "saturation"),
         ("Texture", "structure"),
-        ("SharpenRadius", "sharpenRadius"),
-        ("SharpenDetail", "sharpenDetail"),
-        ("SharpenEdgeMasking", "sharpenMasking"),
         ("LuminanceSmoothing", "lumaNoiseReduction"),
         ("ColorNoiseReduction", "colorNoiseReduction"),
-        ("ColorNoiseReductionDetail", "colorNoiseDetail"),
-        ("ColorNoiseReductionSmoothness", "colorNoiseSmoothness"),
+    ] {
+        if let Some(raw_val) = attrs.get(xmp_key)
+            && let Some(num) = parse_num(raw_val.trim_start_matches('+'))
+            && let Some(json_val) = num_to_json(num)
+        {
+            detail.insert(node_key.to_string(), json_val);
+            touched_detail = true;
+        }
+    }
+
+    for (xmp_key, node_key) in [
         ("ChromaticAberrationRedCyan", "chromaticAberrationRedCyan"),
         (
             "ChromaticAberrationBlueYellow",
             "chromaticAberrationBlueYellow",
         ),
+    ] {
+        if let Some(raw_val) = attrs.get(xmp_key)
+            && let Some(num) = parse_num(raw_val.trim_start_matches('+'))
+            && let Some(json_val) = num_to_json(num)
+        {
+            lens.insert(node_key.to_string(), json_val);
+            touched_lens = true;
+        }
+    }
+
+    for (xmp_key, node_key) in [
         ("PostCropVignetteAmount", "vignetteAmount"),
         ("PostCropVignetteMidpoint", "vignetteMidpoint"),
         ("PostCropVignetteFeather", "vignetteFeather"),
@@ -150,36 +337,53 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         ("GrainAmount", "grainAmount"),
         ("GrainSize", "grainSize"),
         ("GrainFrequency", "grainRoughness"),
-        ("ColorGradeBlending", "blending"),
-    ];
-
-    for (xmp_key, rr_key) in mappings {
+    ] {
         if let Some(raw_val) = attrs.get(xmp_key)
             && let Some(num) = parse_num(raw_val.trim_start_matches('+'))
             && let Some(json_val) = num_to_json(num)
         {
-            if rr_key == "blending" {
-                color_grading_map.insert(rr_key.to_string(), json_val);
-            } else {
-                adjustments.insert(rr_key.to_string(), json_val);
-            }
+            display_creative.insert(node_key.to_string(), json_val);
+            touched_display_creative = true;
         }
+    }
+
+    if let Some(raw_val) = attrs.get("ColorGradeBlending")
+        && let Some(num) = parse_num(raw_val.trim_start_matches('+'))
+        && let Some(json_val) = num_to_json(num)
+    {
+        color_grading_map.insert("blending".to_string(), json_val);
     }
 
     if let Some(shadows_val) = get_attr_as_f64(&attrs, "Shadows2012") {
         let adjusted_shadows = (shadows_val * 1.5).min(100.0);
-        adjustments.insert("shadows".to_string(), json!(adjusted_shadows));
+        scene_tone.insert("shadows".to_string(), json!(adjusted_shadows));
+        touched_scene_tone = true;
     }
 
     if let Some(sharpness_val) = get_attr_as_f64(&attrs, "Sharpness") {
         let scaled_sharpness = (sharpness_val / 150.0) * 100.0;
-        adjustments.insert(
+        detail.insert(
             "sharpness".to_string(),
             json!(scaled_sharpness.clamp(0.0, 100.0)),
         );
+        touched_detail = true;
     }
 
-    if attrs.contains_key("Temperature") || attrs.contains_key("Tint") {
+    let white_balance_fields_valid = ["Temperature", "AsShotTemperature", "Tint"]
+        .into_iter()
+        .all(|field| {
+            attrs.get(field).is_none_or(|value| {
+                value
+                    .trim_start_matches('+')
+                    .parse::<f64>()
+                    .is_ok_and(f64::is_finite)
+            })
+        });
+    if white_balance_fields_valid
+        && (attrs.contains_key("Temperature")
+            || attrs.contains_key("AsShotTemperature")
+            || attrs.contains_key("Tint"))
+    {
         let kelvin = get_attr_as_f64(&attrs, "Temperature")
             .or_else(|| get_attr_as_f64(&attrs, "AsShotTemperature"))
             .unwrap_or(5500.0)
@@ -187,9 +391,10 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         let duv = (get_attr_as_f64(&attrs, "Tint").unwrap_or(0.0) / 3000.0).clamp(-0.05, 0.05);
         let coordinates = cct_duv_to_coordinates(kelvin, duv)
             .map_err(|error| format!("Invalid Lightroom/XMP white balance: {error}"))?;
-        adjustments.insert(
-            "whiteBalanceTechnical".to_string(),
-            json!({
+        let camera_input = object(json!({
+            "cameraProfile": "camera_standard",
+            "cameraProfileAmount": 100,
+            "whiteBalanceTechnical": {
                 "adaptation": "cat16_v1",
                 "confidence": null,
                 "contract": WHITE_BALANCE_CONTRACT,
@@ -203,7 +408,13 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
                 "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
                 "x": coordinates.xy[0],
                 "y": coordinates.xy[1]
-            }),
+            }
+        }));
+        insert_node(
+            &mut nodes,
+            "camera_input",
+            "scene_referred_v2",
+            camera_input,
         );
     }
 
@@ -243,10 +454,6 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
             hsl_map.insert(dst.to_string(), Value::Object(color_map));
         }
     }
-    if !hsl_map.is_empty() {
-        adjustments.insert("hsl".to_string(), Value::Object(hsl_map));
-    }
-
     if imports_black_white(&attrs) {
         let weights = colors
             .into_iter()
@@ -257,15 +464,19 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
                 (dst.to_string(), json!(value))
             })
             .collect::<Map<String, Value>>();
-        adjustments.insert(
-            "blackWhiteMixer".to_string(),
-            json!({
+        insert_node(
+            &mut nodes,
+            "black_white_mixer",
+            "scene_referred_v2",
+            object(json!({
+                "blackWhiteMixer": {
                 "enabled": true,
                 "presetId": "manual",
                 "process": "continuous_sensitivity_v1",
                 "sourceClass": "color_source",
                 "weights": weights,
-            }),
+                }
+            })),
         );
     }
 
@@ -363,10 +574,6 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
     if !global_map.is_empty() {
         color_grading_map.insert("global".to_string(), Value::Object(global_map));
     }
-    if !color_grading_map.is_empty() {
-        adjustments.insert("colorGrading".to_string(), Value::Object(color_grading_map));
-    }
-
     let curve_mappings = [
         ("ToneCurvePV2012", "luma"),
         ("ToneCurvePV2012Red", "red"),
@@ -378,38 +585,305 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
             curves_map.insert(rr_curve.to_string(), Value::Array(points));
         }
     }
-    if !curves_map.is_empty() {
-        adjustments.insert("curves".to_string(), Value::Object(curves_map));
+    if touched_scene_tone {
+        insert_node(
+            &mut nodes,
+            "scene_global_color_tone",
+            "scene_referred_v2",
+            scene_tone,
+        );
     }
+    if touched_color_presence {
+        insert_node(
+            &mut nodes,
+            "color_presence",
+            "scene_referred_v2",
+            color_presence,
+        );
+    }
+    if touched_detail {
+        insert_node(
+            &mut nodes,
+            "detail_denoise_dehaze",
+            "scene_referred_v2",
+            detail,
+        );
+    }
+    if touched_display_creative {
+        insert_node(
+            &mut nodes,
+            "display_creative",
+            "scene_referred_v2",
+            display_creative,
+        );
+    }
+    if touched_lens {
+        insert_node(&mut nodes, "lens_correction", "scene_referred_v2", lens);
+    }
+    if !hsl_map.is_empty() {
+        let mut params = object(json!({
+            "hsl": {
+                "aquas": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "blues": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "greens": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "magentas": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "oranges": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "purples": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "reds": { "hue": 0, "luminance": 0, "saturation": 0 },
+                "yellows": { "hue": 0, "luminance": 0, "saturation": 0 }
+            },
+            "selectiveColorRangeControls": {
+                "aquas": { "centerHueDegrees": 180, "falloffSmoothness": 1.5, "widthDegrees": 60 },
+                "blues": { "centerHueDegrees": 225, "falloffSmoothness": 1.5, "widthDegrees": 60 },
+                "greens": { "centerHueDegrees": 115, "falloffSmoothness": 1.5, "widthDegrees": 90 },
+                "magentas": { "centerHueDegrees": 330, "falloffSmoothness": 1.5, "widthDegrees": 50 },
+                "oranges": { "centerHueDegrees": 25, "falloffSmoothness": 1.5, "widthDegrees": 45 },
+                "purples": { "centerHueDegrees": 280, "falloffSmoothness": 1.5, "widthDegrees": 55 },
+                "reds": { "centerHueDegrees": 358, "falloffSmoothness": 1.5, "widthDegrees": 35 },
+                "yellows": { "centerHueDegrees": 60, "falloffSmoothness": 1.5, "widthDegrees": 40 }
+            }
+        }));
+        params
+            .get_mut("hsl")
+            .and_then(Value::as_object_mut)
+            .expect("static HSL defaults")
+            .extend(hsl_map);
+        insert_node(
+            &mut nodes,
+            "selective_color_mixer",
+            "scene_referred_v2",
+            params,
+        );
+    }
+    if !color_grading_map.is_empty() {
+        let mut params = default_color_grading_params();
+        let defaults = params
+            .get_mut("colorGrading")
+            .and_then(Value::as_object_mut)
+            .expect("static color-grading defaults");
+        for (key, value) in color_grading_map {
+            if let (Some(current), Some(imported)) = (
+                defaults.get_mut(&key).and_then(Value::as_object_mut),
+                value.as_object(),
+            ) {
+                current.extend(imported.clone());
+            } else {
+                defaults.insert(key, value);
+            }
+        }
+        insert_node(
+            &mut nodes,
+            "perceptual_grading",
+            "scene_referred_v2",
+            params,
+        );
+    }
+    if !curves_map.is_empty() {
+        let identity = json!([
+            { "x": 0, "y": 0 },
+            { "x": 255, "y": 255 }
+        ]);
+        let mut curves = object(json!({
+            "blue": identity,
+            "green": identity,
+            "luma": identity,
+            "red": identity,
+        }));
+        curves.extend(curves_map);
+        let parametric_channel = json!({
+            "blackLevel": 0, "darks": 0, "highlights": 0, "lights": 0,
+            "shadows": 0, "split1": 25, "split2": 50, "split3": 75, "whiteLevel": 0
+        });
+        insert_node(
+            &mut nodes,
+            "scene_curve",
+            "scene_referred_v2",
+            object(json!({
+                "curveMode": "point",
+                "curves": curves,
+                "parametricCurve": {
+                    "blue": parametric_channel,
+                    "green": parametric_channel,
+                    "luma": parametric_channel,
+                    "red": parametric_channel
+                },
+                "pointCurves": curves,
+                "toneCurve": "auto_filmic"
+            })),
+        );
+    }
+
+    if nodes.is_empty() {
+        return Err("External preset contains no supported Lightroom/XMP settings".to_string());
+    }
+
+    let supported_fields: HashSet<&str> = [
+        "AsShotTemperature",
+        "Blacks2012",
+        "ChromaticAberrationBlueYellow",
+        "ChromaticAberrationRedCyan",
+        "Clarity2012",
+        "ColorGradeBlending",
+        "ColorGradeGlobalHue",
+        "ColorGradeGlobalLum",
+        "ColorGradeGlobalSat",
+        "ColorGradeHighlightLum",
+        "ColorGradeMidtoneHue",
+        "ColorGradeMidtoneLum",
+        "ColorGradeMidtoneSat",
+        "ColorGradeShadowLum",
+        "ColorNoiseReduction",
+        "Contrast2012",
+        "ConvertToGrayscale",
+        "Dehaze",
+        "Exposure2012",
+        "GrainAmount",
+        "GrainFrequency",
+        "GrainSize",
+        "Highlights2012",
+        "LuminanceSmoothing",
+        "PostCropVignetteAmount",
+        "PostCropVignetteFeather",
+        "PostCropVignetteMidpoint",
+        "PostCropVignetteRoundness",
+        "Saturation",
+        "Sharpness",
+        "Shadows2012",
+        "SplitToningBalance",
+        "SplitToningHighlightHue",
+        "SplitToningHighlightSaturation",
+        "SplitToningShadowHue",
+        "SplitToningShadowSaturation",
+        "Temperature",
+        "Texture",
+        "Tint",
+        "Treatment",
+        "Vibrance",
+        "Whites2012",
+        "HueAdjustmentRed",
+        "HueAdjustmentOrange",
+        "HueAdjustmentYellow",
+        "HueAdjustmentGreen",
+        "HueAdjustmentAqua",
+        "HueAdjustmentBlue",
+        "HueAdjustmentPurple",
+        "HueAdjustmentMagenta",
+        "SaturationAdjustmentRed",
+        "SaturationAdjustmentOrange",
+        "SaturationAdjustmentYellow",
+        "SaturationAdjustmentGreen",
+        "SaturationAdjustmentAqua",
+        "SaturationAdjustmentBlue",
+        "SaturationAdjustmentPurple",
+        "SaturationAdjustmentMagenta",
+        "LuminanceAdjustmentRed",
+        "LuminanceAdjustmentOrange",
+        "LuminanceAdjustmentYellow",
+        "LuminanceAdjustmentGreen",
+        "LuminanceAdjustmentAqua",
+        "LuminanceAdjustmentBlue",
+        "LuminanceAdjustmentPurple",
+        "LuminanceAdjustmentMagenta",
+        "GrayMixerRed",
+        "GrayMixerOrange",
+        "GrayMixerYellow",
+        "GrayMixerGreen",
+        "GrayMixerAqua",
+        "GrayMixerBlue",
+        "GrayMixerPurple",
+        "GrayMixerMagenta",
+        "Name",
+        "PresetType",
+        "ProcessVersion",
+        "UUID",
+    ]
+    .into_iter()
+    .collect();
+    let mut diagnostics = attrs
+        .keys()
+        .filter(|field| !supported_fields.contains(field.as_str()))
+        .map(|field| ExternalPresetImportDiagnostic {
+            code: "unsupported_external_field",
+            field: field.clone(),
+            message: format!("Lightroom/XMP field '{field}' is not supported and was not imported"),
+        })
+        .collect::<Vec<_>>();
+    let numeric_fields: HashSet<&str> = supported_fields
+        .iter()
+        .copied()
+        .filter(|field| {
+            !matches!(
+                *field,
+                "ConvertToGrayscale"
+                    | "Name"
+                    | "PresetType"
+                    | "ProcessVersion"
+                    | "Treatment"
+                    | "UUID"
+            )
+        })
+        .collect();
+    diagnostics.extend(attrs.iter().filter_map(|(field, value)| {
+        if !numeric_fields.contains(field.as_str())
+            || value
+                .trim_start_matches('+')
+                .parse::<f64>()
+                .is_ok_and(f64::is_finite)
+        {
+            return None;
+        }
+        Some(ExternalPresetImportDiagnostic {
+            code: "invalid_external_value",
+            field: field.clone(),
+            message: format!(
+                "Lightroom/XMP field '{field}' has an invalid numeric value and was not imported"
+            ),
+        })
+    }));
+    diagnostics.sort_by(|left, right| left.field.cmp(&right.field));
 
     let preset_name =
         extract_xmp_name(xmp_content).unwrap_or_else(|| "Imported Preset".to_string());
+    let current_payload = json!({ "nodes": nodes, "schemaVersion": 2 });
+    validate_edit_document_v2_copy_payload(&current_payload)
+        .map_err(|error| format!("Imported Lightroom/XMP preset is invalid: {error}"))?;
 
-    Ok(Preset {
-        id: Uuid::new_v4().to_string(),
-        name: preset_name,
-        adjustments: Value::Object(adjustments),
-        edit_document_v2: None,
-        color_style_provenance: None,
-        include_masks: Some(false),
-        include_crop_transform: Some(false),
-        preset_type: Some("style".to_string()),
+    Ok(ConvertedExternalPreset {
+        diagnostics,
+        preset: Preset {
+            id: Uuid::new_v4().to_string(),
+            name: preset_name,
+            adjustments: json!({}),
+            edit_document_v2: Some(current_payload),
+            color_style_provenance: None,
+            include_masks: Some(false),
+            include_crop_transform: Some(touched_lens),
+            preset_type: Some("style".to_string()),
+        },
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::convert_xmp_to_preset;
+    use serde_json::json;
 
     #[test]
     fn lightroom_white_balance_compiles_directly_to_current_technical_contract() {
-        let preset =
-            convert_xmp_to_preset(r#"<rdf:Description crs:Temperature="6500" crs:Tint="30" />"#)
-                .expect("Lightroom/XMP preset converts");
-        let adjustments = preset.adjustments.as_object().expect("adjustment object");
-        assert!(!adjustments.contains_key("temperature"));
-        assert!(!adjustments.contains_key("tint"));
-        let white_balance = adjustments["whiteBalanceTechnical"]
+        let converted = convert_xmp_to_preset(include_str!(
+            "../../fixtures/import/lightroom-current-nodes.xmp"
+        ))
+        .expect("Lightroom/XMP preset converts");
+        assert_eq!(converted.diagnostics.len(), 1);
+        assert_eq!(converted.diagnostics[0].field, "SharpenRadius");
+        let preset = converted.preset;
+        assert_eq!(preset.name, "Current Nodes Fixture");
+        let current = preset
+            .edit_document_v2
+            .as_ref()
+            .expect("current preset authority");
+        assert_eq!(preset.adjustments, json!({}));
+        let white_balance = current["nodes"]["camera_input"]["params"]["whiteBalanceTechnical"]
             .as_object()
             .expect("technical white balance");
         assert_eq!(white_balance["contract"], "rapidraw.white_balance.v1");
@@ -419,6 +893,16 @@ mod tests {
         assert_eq!(white_balance["duv"], 0.01);
         assert!(white_balance["x"].as_f64().is_some_and(f64::is_finite));
         assert!(white_balance["y"].as_f64().is_some_and(f64::is_finite));
+        assert_eq!(
+            current["nodes"]["scene_global_color_tone"]["params"]["exposure"],
+            0.75
+        );
+        assert_eq!(
+            current["nodes"]["detail_denoise_dehaze"]["params"]["structure"],
+            18
+        );
+        assert!(current.get("extensions").is_none());
+        assert!(current.get("migration").is_none());
     }
 
     #[test]
@@ -426,8 +910,10 @@ mod tests {
         let preset = convert_xmp_to_preset(
             r#"<rdf:Description crs:AsShotTemperature="5200" crs:Tint="-15" />"#,
         )
-        .expect("Lightroom/XMP preset converts");
-        let white_balance = &preset.adjustments["whiteBalanceTechnical"];
+        .expect("Lightroom/XMP preset converts")
+        .preset;
+        let white_balance = &preset.edit_document_v2.as_ref().expect("current authority")["nodes"]
+            ["camera_input"]["params"]["whiteBalanceTechnical"];
         assert_eq!(white_balance["kelvin"], 5200.0);
         assert_eq!(white_balance["duv"], -0.005);
     }
@@ -437,8 +923,10 @@ mod tests {
         let preset = convert_xmp_to_preset(
             r#"<rdf:Description crs:ConvertToGrayscale="True" crs:GrayMixerRed="35" crs:GrayMixerBlue="-42" />"#,
         )
-        .expect("XMP preset converts");
-        let mixer = &preset.adjustments["blackWhiteMixer"];
+        .expect("XMP preset converts")
+        .preset;
+        let mixer = &preset.edit_document_v2.as_ref().expect("current authority")["nodes"]["black_white_mixer"]
+            ["params"]["blackWhiteMixer"];
 
         assert_eq!(mixer["enabled"], true);
         assert_eq!(mixer["process"], "continuous_sensitivity_v1");
@@ -450,13 +938,15 @@ mod tests {
         let treatment = convert_xmp_to_preset(
             r#"<rdf:Description crs:Treatment="Black &amp; White" crs:GrayMixerGreen="18" />"#,
         )
-        .expect("monochrome Treatment preset converts");
+        .expect("monochrome Treatment preset converts")
+        .preset;
+        let treatment = treatment.edit_document_v2.expect("current authority");
         assert_eq!(
-            treatment.adjustments["blackWhiteMixer"]["process"],
+            treatment["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["process"],
             "continuous_sensitivity_v1"
         );
         assert_eq!(
-            treatment.adjustments["blackWhiteMixer"]["weights"]["greens"],
+            treatment["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["weights"]["greens"],
             18.0
         );
     }
@@ -464,10 +954,75 @@ mod tests {
     #[test]
     fn color_xmp_import_does_not_invent_monochrome_state() {
         let preset = convert_xmp_to_preset(
-            r#"<rdf:Description crs:ConvertToGrayscale="False" crs:GrayMixerRed="35" />"#,
+            r#"<rdf:Description crs:Exposure2012="0.25" crs:ConvertToGrayscale="False" crs:GrayMixerRed="35" />"#,
         )
-        .expect("XMP preset converts");
+        .expect("XMP preset converts")
+        .preset;
 
-        assert!(preset.adjustments.get("blackWhiteMixer").is_none());
+        assert!(
+            preset.edit_document_v2.expect("current authority")["nodes"]
+                .get("black_white_mixer")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn unsupported_external_fields_are_diagnostic_only() {
+        let converted = convert_xmp_to_preset(
+            r#"<rdf:Description crs:Exposure2012="0.75" crs:Texture="not-a-number" crs:SharpenRadius="1.2" crs:UnknownFutureField="9" />"#,
+        )
+        .expect("supported field keeps import valid");
+        assert_eq!(
+            converted
+                .diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.field.as_str())
+                .collect::<Vec<_>>(),
+            ["SharpenRadius", "Texture", "UnknownFutureField"]
+        );
+        assert_eq!(converted.diagnostics[1].code, "invalid_external_value");
+        let current = converted
+            .preset
+            .edit_document_v2
+            .expect("current authority");
+        assert_eq!(
+            current["nodes"]["scene_global_color_tone"]["params"]["exposure"],
+            0.75
+        );
+        assert!(!current.to_string().contains("SharpenRadius"));
+        assert!(!current.to_string().contains("UnknownFutureField"));
+        assert!(convert_xmp_to_preset("not an XMP preset").is_err());
+    }
+
+    #[test]
+    fn every_supported_external_node_family_passes_native_contract_validation() {
+        let converted = convert_xmp_to_preset(
+            r#"
+            <rdf:Description crs:Exposure2012="0.5" crs:Vibrance="12"
+              crs:Clarity2012="8" crs:ChromaticAberrationRedCyan="-4"
+              crs:PostCropVignetteAmount="-15" crs:HueAdjustmentBlue="20"
+              crs:SaturationAdjustmentBlue="10" crs:LuminanceAdjustmentBlue="-5"
+              crs:ColorGradeGlobalHue="220" crs:ColorGradeGlobalSat="18"
+              crs:ColorGradeGlobalLum="-3" crs:ColorGradeBlending="45" />
+            <crs:ToneCurvePV2012><rdf:Seq><rdf:li>0, 0</rdf:li><rdf:li>128, 140</rdf:li><rdf:li>255, 255</rdf:li></rdf:Seq></crs:ToneCurvePV2012>
+            "#,
+        )
+        .expect("all mapped node families validate natively");
+        let nodes = &converted
+            .preset
+            .edit_document_v2
+            .expect("current authority")["nodes"];
+        for node in [
+            "scene_global_color_tone",
+            "color_presence",
+            "detail_denoise_dehaze",
+            "lens_correction",
+            "display_creative",
+            "selective_color_mixer",
+            "perceptual_grading",
+            "scene_curve",
+        ] {
+            assert!(nodes.get(node).is_some(), "missing {node}");
+        }
     }
 }

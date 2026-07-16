@@ -1638,7 +1638,7 @@ export default interface Resources {
           exportAllTitle: 'Export All Presets';
           exportTitle: 'Export {{type}}';
           importPresetsTitle: 'Import Presets';
-          legacyPreset: 'Legacy Preset';
+          lightroomPreset: 'Lightroom/XMP Preset';
           presetFile: 'Preset File';
           rapidRawPreset: 'RapidRAW Preset';
         };
@@ -2508,7 +2508,7 @@ export default interface Resources {
           vignette: 'Vignette';
           whiteBalance: 'White Balance';
         };
-        includedAdjustments: 'Included Adjustments';
+        selectedNodes: 'Selected edit nodes';
         modeMerge: 'Merge';
         modeReplace: 'Replace';
         pasteMode: 'Paste Mode';

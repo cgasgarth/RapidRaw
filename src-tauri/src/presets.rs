@@ -8,7 +8,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
-use crate::preset_converter;
+use crate::preset_converter::{self, ExternalPresetImportDiagnostic};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Preset {
@@ -56,6 +56,13 @@ pub enum PresetItem {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PresetFile {
     pub presets: Vec<PresetItem>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExternalPresetImportResult {
+    diagnostics: Vec<ExternalPresetImportDiagnostic>,
+    presets: Vec<PresetItem>,
 }
 
 fn get_presets_path(app_handle: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -205,40 +212,44 @@ pub fn handle_import_presets_from_file(
 }
 
 #[tauri::command]
-pub fn handle_import_legacy_presets_from_file(
+pub fn handle_import_external_presets_from_file(
     file_path: String,
     app_handle: AppHandle,
-) -> Result<Vec<PresetItem>, String> {
+) -> Result<ExternalPresetImportResult, String> {
     let content = fs::read_to_string(&file_path)
-        .map_err(|e| format!("Failed to read legacy preset file: {}", e))?;
+        .map_err(|e| format!("Failed to read external preset file: {}", e))?;
 
-    let xmp_content = extract_legacy_xmp(&file_path, content);
+    let xmp_content = extract_external_xmp(&file_path, content)?;
 
-    let converted_preset = preset_converter::convert_xmp_to_preset(&xmp_content)?;
+    let converted = preset_converter::convert_xmp_to_preset(&xmp_content)?;
 
     let mut current_presets = load_presets(app_handle.clone())?;
     let current_names = collect_preset_names(&current_presets);
-    let mut final_preset = converted_preset;
+    let mut final_preset = converted.preset;
     final_preset.name = unique_preset_name(&final_preset.name, &current_names);
 
     current_presets.push(PresetItem::Preset(final_preset));
 
     save_presets(current_presets.clone(), app_handle)?;
-    Ok(current_presets)
+    Ok(ExternalPresetImportResult {
+        diagnostics: converted.diagnostics,
+        presets: current_presets,
+    })
 }
 
-fn extract_legacy_xmp(file_path: &str, content: String) -> String {
+fn extract_external_xmp(file_path: &str, content: String) -> Result<String, String> {
     if file_path.to_lowercase().ends_with(".lrtemplate") {
         let re = Regex::new(r#"(?s)s\.xmp = "(.*)""#).expect("static lrtemplate regex");
         if let Some(caps) = re.captures(&content) {
-            caps.get(1)
+            Ok(caps
+                .get(1)
                 .map(|m| m.as_str().replace(r#"\""#, r#"""#))
-                .unwrap_or(content)
+                .unwrap_or(content))
         } else {
-            content
+            Err("Lightroom template does not contain an embedded XMP preset".to_string())
         }
     } else {
-        content
+        Ok(content)
     }
 }
 
@@ -299,7 +310,7 @@ pub fn save_community_preset(
 #[cfg(test)]
 mod tests {
     use super::{
-        Preset, PresetItem, extract_legacy_xmp, read_presets_from_path, write_presets_to_path,
+        Preset, PresetItem, extract_external_xmp, read_presets_from_path, write_presets_to_path,
     };
     use serde_json::json;
     use std::fs;
@@ -323,7 +334,7 @@ mod tests {
         write_presets_to_path(
             &path,
             &[PresetItem::Preset(Preset {
-                adjustments: json!({ "exposure": 1.25 }),
+                adjustments: json!({}),
                 color_style_provenance: None,
                 edit_document_v2: Some(edit_document_v2.clone()),
                 id: "preset-v2".to_string(),
@@ -342,6 +353,7 @@ mod tests {
             panic!("expected preset item");
         };
         assert_eq!(reopened.edit_document_v2.as_ref(), Some(&edit_document_v2));
+        assert_eq!(reopened.adjustments, json!({}));
 
         fs::write(
             &path,
@@ -358,20 +370,22 @@ mod tests {
 
     #[test]
     fn lrtemplate_embedded_xmp_reaches_current_monochrome_converter() {
-        let embedded = extract_legacy_xmp(
+        let embedded = extract_external_xmp(
             "/tmp/current-bw.lrtemplate",
-            r#"s.xmp = "<rdf:Description crs:Treatment=\"Black &amp; White\" crs:GrayMixerBlue=\"-24\" />""#
-                .to_string(),
-        );
-        let preset = crate::preset_converter::convert_xmp_to_preset(&embedded)
+            include_str!("../../fixtures/import/lightroom-current-nodes.lrtemplate").to_string(),
+        )
+        .expect("embedded XMP extraction");
+        let converted = crate::preset_converter::convert_xmp_to_preset(&embedded)
             .expect("embedded lrtemplate XMP converts");
+        let preset = converted.preset;
+        let current = preset.edit_document_v2.expect("current preset authority");
 
         assert_eq!(
-            preset.adjustments["blackWhiteMixer"]["process"],
+            current["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["process"],
             "continuous_sensitivity_v1"
         );
         assert_eq!(
-            preset.adjustments["blackWhiteMixer"]["weights"]["blues"],
+            current["nodes"]["black_white_mixer"]["params"]["blackWhiteMixer"]["weights"]["blues"],
             -24.0
         );
     }

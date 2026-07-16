@@ -2289,6 +2289,13 @@ pub(crate) struct EditDocumentV2 {
     source_artifacts: SourceArtifactsV2,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EditDocumentV2CopyPayload {
+    nodes: BTreeMap<EditNodeTypeV2, EditNodeEnvelopeV2>,
+    schema_version: u8,
+}
+
 impl EditDocumentV2 {
     pub(crate) fn into_render_adjustments(self) -> Result<Value, String> {
         self.validate_document_contract()?;
@@ -2417,6 +2424,34 @@ pub(crate) fn validate_edit_document_v2(value: &Value) -> Result<(), String> {
     let document: EditDocumentV2 = serde_json::from_value(value.clone())
         .map_err(|error| format!("EditDocumentV2 persistence payload is invalid: {error}"))?;
     document.validate_document_contract()
+}
+
+pub(crate) fn validate_edit_document_v2_copy_payload(value: &Value) -> Result<(), String> {
+    let payload: EditDocumentV2CopyPayload = serde_json::from_value(value.clone())
+        .map_err(|error| format!("EditDocumentV2 preset payload is invalid: {error}"))?;
+    if payload.schema_version != EDIT_DOCUMENT_V2_SCHEMA_VERSION {
+        return Err(format!(
+            "Unsupported EditDocumentV2 preset schemaVersion: {}",
+            payload.schema_version
+        ));
+    }
+    if payload.nodes.is_empty() {
+        return Err("EditDocumentV2 preset payload must contain at least one node".to_string());
+    }
+    for (node_type, node) in payload.nodes {
+        if matches!(
+            node_type,
+            EditNodeTypeV2::SourceDecode | EditNodeTypeV2::Layers | EditNodeTypeV2::SourceArtifacts
+        ) {
+            return Err(format!(
+                "EditDocumentV2 node '{}' is not transferable in presets",
+                node_type.contract().0
+            ));
+        }
+        validate_node_contract(node_type, &node)?;
+        compile_node_params(node_type, &node)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn compile_edit_document_v2(value: &Value) -> Result<Value, String> {

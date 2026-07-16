@@ -1,0 +1,12 @@
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description xmlns:crs="http://ns.adobe.com/camera-raw-settings/1.0/"
+      crs:Exposure2012="+0.75"
+      crs:Texture="18"
+      crs:Temperature="6500"
+      crs:Tint="30"
+      crs:SharpenRadius="1.2">
+      <crs:Name><rdf:Alt><rdf:li xml:lang="x-default">Current Nodes Fixture</rdf:li></rdf:Alt></crs:Name>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>

@@ -1757,7 +1757,7 @@
         "exportAllTitle": "すべてのプリセットを書き出し",
         "exportTitle": "{{type}}を書き出し",
         "importPresetsTitle": "プリセットをインポート",
-        "legacyPreset": "レガシープリセット",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "プリセットファイル",
         "rapidRawPreset": "RapidRAWプリセット"
       },
@@ -2690,12 +2690,12 @@
         "vignette": "周辺光量補正",
         "whiteBalance": "ホワイトバランス"
       },
-      "includedAdjustments": "対象の補正項目",
       "modeMerge": "マージ",
       "modeReplace": "置換",
       "pasteMode": "貼り付けモード",
       "save": "保存",
       "selectAll": "すべて選択",
+      "selectedNodes": "対象の補正項目",
       "selectNone": "選択をクリア",
       "title": "補正設定のコピーと貼り付け"
     },

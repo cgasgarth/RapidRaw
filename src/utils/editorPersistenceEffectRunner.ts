@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
+import {
+  EDIT_DOCUMENT_NODE_DESCRIPTORS,
+  type EditDocumentNodeTypeV2,
+  type EditDocumentV2,
+} from '../../packages/rawengine-schema/src/editDocumentV2';
 import { Invokes } from '../tauri/commands';
 import type { Adjustments } from './adjustments';
 import { areAdjustmentsEqual } from './adjustmentsSnapshot';
@@ -38,8 +42,8 @@ export interface EditorPersistenceInput {
   imageSessionId: string;
   interactionActive: boolean;
   multiSelection: {
-    includedAdjustments: readonly string[];
     paths: readonly string[];
+    selectedNodeIds: readonly EditDocumentNodeTypeV2[];
   } | null;
   path: string;
   receipt: EditApplicationReceipt;
@@ -275,10 +279,17 @@ export class EditorPersistenceEffectRunner {
   private resolveMultiSelection(input: EditorPersistenceInput): EditorPersistenceExecution['multiSelection'] {
     const request = input.multiSelection;
     if (request === null || this.baseline?.path !== input.path || request.paths.length === 0) return null;
+    const selectedNodeIds = new Set(request.selectedNodeIds);
+    // The multi-image persistence command still consumes the flat adjustment projection; #5945 removes this boundary.
+    const selectedAdjustmentKeys = new Set<string>(
+      EDIT_DOCUMENT_NODE_DESCRIPTORS.flatMap((descriptor) =>
+        selectedNodeIds.has(descriptor.nodeType) ? descriptor.legacyFields : [],
+      ),
+    );
     const delta: Partial<Adjustments> = {};
     for (const key of Object.keys(input.adjustments) as Array<keyof Adjustments>) {
       if (
-        request.includedAdjustments.includes(key as string) &&
+        selectedAdjustmentKeys.has(key as string) &&
         JSON.stringify(input.adjustments[key]) !== JSON.stringify(this.baseline.adjustments[key])
       ) {
         Object.assign(delta, { [key]: input.adjustments[key] });

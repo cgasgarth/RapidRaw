@@ -16,7 +16,6 @@ import {
   buildEditDocumentV2Diagnostics,
   copyEditDocumentV2Node,
   copyEditDocumentV2Nodes,
-  EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS,
   editDocumentV2NodeInventory,
   legacyAdjustmentsToEditDocumentV2,
   lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
@@ -160,10 +159,8 @@ describe('EditDocumentV2 batch reset and clipboard', () => {
     expect(clipboard.nodes).not.toHaveProperty('source_artifacts');
     expect(clipboard).not.toHaveProperty('provenance');
     expect(clipboard).not.toHaveProperty('sourceArtifacts');
-    expect(EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS).not.toContain('masks');
-    expect(EDIT_DOCUMENT_V2_COPYABLE_LEGACY_FIELDS).not.toContain('aiPatches');
 
-    const selected = selectEditDocumentV2CopyPayload(clipboard, ['exposure'], true);
+    const selected = selectEditDocumentV2CopyPayload(clipboard, ['scene_global_color_tone'], true);
     expect(Object.keys(selected.nodes)).toEqual(['scene_global_color_tone']);
     expect(selected.nodes['scene_global_color_tone']?.enabled).toBeFalse();
     expect(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(selected)).toMatchObject({ exposure: 1.25 });
@@ -178,7 +175,7 @@ describe('EditDocumentV2 batch reset and clipboard', () => {
       'scene_global_color_tone',
       false,
     );
-    const clipboard = copyEditDocumentV2Nodes(source, ['exposure']);
+    const clipboard = copyEditDocumentV2Nodes(source, ['scene_global_color_tone']);
     const destination = replaceEditDocumentV2SourceArtifacts(
       legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: -1 }),
       { aiPatches: [sourcePatch] },

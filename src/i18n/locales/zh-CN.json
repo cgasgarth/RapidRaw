@@ -1828,7 +1828,7 @@
         "exportAllTitle": "导出所有预设",
         "exportTitle": "导出 {{type}}",
         "importPresetsTitle": "导入预设",
-        "legacyPreset": "旧版预设",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "预设文件",
         "rapidRawPreset": "RapidRAW 预设"
       },
@@ -2768,12 +2768,12 @@
         "vignette": "暗角",
         "whiteBalance": "白平衡"
       },
-      "includedAdjustments": "包含的调整",
       "modeMerge": "合并",
       "modeReplace": "替换",
       "pasteMode": "粘贴模式",
       "save": "保存",
       "selectAll": "全选",
+      "selectedNodes": "包含的调整",
       "selectNone": "取消全选",
       "title": "复制与粘贴设置"
     },

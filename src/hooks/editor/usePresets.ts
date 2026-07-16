@@ -8,6 +8,7 @@ import {
   configureEditDocumentPresetPayload,
   createEditDocumentPresetPayload,
   lowerEditDocumentPresetPayload,
+  parseExternalPresetImportResult,
   parsePresetLibrary,
 } from '../../utils/editDocumentPreset';
 import { debounce } from '../../utils/timing';
@@ -588,20 +589,25 @@ export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV
     [setPresets],
   );
 
-  const importLegacyPresetsFromFile = useCallback(
+  const importExternalPresetsFromFile = useCallback(
     async (filePath: string) => {
       setIsLoading(true);
       try {
-        const parsed = parsePresetLibrary(
-          await invoke<unknown>(Invokes.HandleImportLegacyPresetsFromFile, { filePath }),
+        const result = parseExternalPresetImportResult(
+          await invoke<unknown>(Invokes.HandleImportExternalPresetsFromFile, { filePath }),
         );
+        const parsed = result.library;
         setPresets(parsed.items);
-        if (parsed.quarantinedCount > 0) {
-          setLoadError(`Quarantined ${String(parsed.quarantinedCount)} invalid imported preset entries.`);
-        }
+        const messages = [
+          ...(parsed.quarantinedCount > 0
+            ? [`Quarantined ${String(parsed.quarantinedCount)} invalid imported preset entries.`]
+            : []),
+          ...result.diagnostics.map(({ message }) => message),
+        ];
+        setLoadError(messages.length > 0 ? messages.join(' ') : null);
         return parsed.items;
       } catch (error) {
-        console.error('Failed to import legacy presets from file:', error);
+        console.error('Failed to import external presets from file:', error);
         throw error;
       } finally {
         setIsLoading(false);
@@ -627,7 +633,7 @@ export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV
     duplicatePreset,
     exportPresetsToFile,
     importPresetsFromFile,
-    importLegacyPresetsFromFile,
+    importExternalPresetsFromFile,
     isLoading,
     loadError,
     movePreset,

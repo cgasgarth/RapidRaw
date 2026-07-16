@@ -1891,7 +1891,7 @@
         "exportAllTitle": "Export All Presets",
         "exportTitle": "Export {{type}}",
         "importPresetsTitle": "Import Presets",
-        "legacyPreset": "Legacy Preset",
+        "lightroomPreset": "Lightroom/XMP Preset",
         "presetFile": "Preset File",
         "rapidRawPreset": "RapidRAW Preset"
       },
@@ -2865,12 +2865,12 @@
         "vignette": "Vignette",
         "whiteBalance": "White Balance"
       },
-      "includedAdjustments": "Included Adjustments",
       "modeMerge": "Merge",
       "modeReplace": "Replace",
       "pasteMode": "Paste Mode",
       "save": "Save",
       "selectAll": "Select All",
+      "selectedNodes": "Selected edit nodes",
       "selectNone": "Select None",
       "title": "Copy & Paste Settings"
     },
