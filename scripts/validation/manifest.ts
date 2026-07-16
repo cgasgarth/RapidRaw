@@ -29,7 +29,17 @@ const node = (
   cachePolicy: ValidationNode['cachePolicy'] = 'local-ci',
   timeoutMs = 10 * 60_000,
   outputs?: readonly string[],
-): ValidationNode => ({ id, command, inputs, resourceClass, modes, dependencies, cachePolicy, timeoutMs, outputs });
+): ValidationNode => ({
+  id,
+  command,
+  inputs,
+  resourceClass,
+  modes,
+  dependencies,
+  cachePolicy,
+  timeoutMs,
+  ...(outputs === undefined ? {} : { outputs }),
+});
 
 export const validationManifest: readonly ValidationNode[] = [
   node('lint', ['bun', 'run', 'lint'], ['frontend', 'schema', 'scripts']),
