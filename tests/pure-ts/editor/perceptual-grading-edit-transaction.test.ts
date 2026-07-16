@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { perceptualGradingFromWheelSurface } from '../../../src/utils/color/perceptualGrading';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
@@ -66,11 +65,11 @@ describe('perceptual grading edit transaction', () => {
       nextAdjustmentRevision: 1,
       noOp: false,
     });
-    expect(result.afterEditDocumentV2.nodes.perceptual_grading.params).toEqual({
+    expect(result.afterEditDocumentV2.nodes['perceptual_grading']?.params).toEqual({
       colorGrading,
       perceptualGradingV1,
     });
-    expect(result.afterEditDocumentV2.nodes.scene_curve).toBe(result.beforeEditDocumentV2.nodes.scene_curve);
+    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();

@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
@@ -46,9 +45,9 @@ describe('skin-tone uniformity edit transaction', () => {
       imageSessionId: 53,
       lastEditApplicationReceipt: null,
       navigatorPreviewArtifact: {
-        artifactId: 'skin-navigator-before',
+        graphIdentity: 'graph:skin-before',
+        id: 'skin-navigator-before',
         imageSessionId: session.id,
-        sourceIdentity: sourcePath,
         url: 'blob:skin-navigator-before',
       },
       selectedImage,
@@ -59,7 +58,7 @@ describe('skin-tone uniformity edit transaction', () => {
 
   test('commits, resets, undoes, and redoes one focused output-invalidating node transaction', () => {
     const before = useEditorStore.getState();
-    const sibling = before.editDocumentV2.nodes.selective_color_mixer;
+    const sibling = before.editDocumentV2.nodes['selective_color_mixer'];
     const edited = { ...INITIAL_ADJUSTMENTS.skinToneUniformity, enabled: true, targetHueDegrees: 31 };
     const request = buildSkinToneUniformityEditTransaction(before, identity(), edited, 'skin-tone-edit');
     const result = before.applyEditTransaction(request);
@@ -85,7 +84,7 @@ describe('skin-tone uniformity edit transaction', () => {
       transformedOriginalUrl: null,
     });
     expect(selectSkinToneUniformity(result.afterEditDocumentV2)).toEqual(edited);
-    expect(result.afterEditDocumentV2.nodes.selective_color_mixer).toBe(sibling);
+    expect(result.afterEditDocumentV2.nodes['selective_color_mixer']).toBe(sibling);
 
     const editedState = useEditorStore.getState();
     editedState.applyEditTransaction(
@@ -113,12 +112,12 @@ describe('skin-tone uniformity edit transaction', () => {
     before.applyEditTransaction(buildSkinToneUniformityEditTransaction(before, identity(), edited, 'skin-tone-save'));
     const committed = useEditorStore.getState();
     const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: committed.adjustments, editDocumentV2: committed.editDocumentV2 },
-      committed.adjustments,
+      { adjustments: committed.adjustmentSnapshot.value, editDocumentV2: committed.editDocumentV2 },
+      committed.adjustmentSnapshot.value,
     );
 
     expect(selectSkinToneUniformity(reopened)).toEqual(edited);
-    expect(reopened.extensions.legacyAdjustments).not.toHaveProperty('skinToneUniformity');
+    expect(reopened.extensions['legacyAdjustments']).not.toHaveProperty('skinToneUniformity');
     expect(reopened).toEqual(committed.editDocumentV2);
   });
 

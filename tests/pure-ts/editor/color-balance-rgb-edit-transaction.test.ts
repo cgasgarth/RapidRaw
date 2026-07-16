@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import type { ColorBalanceRgbSettings } from '../../../src/schemas/color/colorBalanceRgbSchemas';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildColorBalanceRgbEditTransaction,
@@ -60,8 +59,8 @@ describe('Color Balance RGB edit transaction', () => {
 
   test('commits one RGB change with receipt, output invalidation, and complete Undo/Redo', () => {
     const before = useEditorStore.getState();
-    const beforeNode = before.editDocumentV2.nodes.color_balance_rgb;
-    const beforeTone = before.editDocumentV2.nodes.scene_global_color_tone;
+    const beforeNode = before.editDocumentV2.nodes['color_balance_rgb'];
+    const beforeTone = before.editDocumentV2.nodes['scene_global_color_tone'];
     const next = initialColorBalance();
     next.midtones = { ...next.midtones, red: 24 };
     next.enabled = true;
@@ -91,21 +90,23 @@ describe('Color Balance RGB edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(next);
-    expect(result.afterEditDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(next);
-    expect(result.afterEditDocumentV2.nodes.color_balance_rgb).not.toBe(beforeNode);
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
-    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('colorBalanceRgb');
+    expect(result.afterEditDocumentV2.nodes['color_balance_rgb']?.params).toMatchObject({ colorBalanceRgb: next });
+    expect(result.afterEditDocumentV2.nodes['color_balance_rgb']).not.toBe(beforeNode);
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
+    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('colorBalanceRgb');
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(
       INITIAL_ADJUSTMENTS.colorBalanceRgb,
     );
-    expect(useEditorStore.getState().editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(
-      INITIAL_ADJUSTMENTS.colorBalanceRgb,
-    );
+    expect(useEditorStore.getState().editDocumentV2.nodes['color_balance_rgb']?.params).toMatchObject({
+      colorBalanceRgb: INITIAL_ADJUSTMENTS.colorBalanceRgb,
+    });
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(next);
-    expect(useEditorStore.getState().editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(next);
+    expect(useEditorStore.getState().editDocumentV2.nodes['color_balance_rgb']?.params).toMatchObject({
+      colorBalanceRgb: next,
+    });
   });
 
   test('carries Color Balance RGB node authority through save execution and reopen', async () => {
@@ -126,9 +127,9 @@ describe('Color Balance RGB edit transaction', () => {
         return { path: execution.path, sidecarRevision: `sha256:${'a'.repeat(64)}` };
       },
       onAccepted: () => {},
-      setTimer: (callback) => {
+      setTimer: (callback, _delayMs) => {
         callback();
-        return 0;
+        return setTimeout(() => {}, 0);
       },
     });
     runner.installSession({
@@ -155,12 +156,12 @@ describe('Color Balance RGB edit transaction', () => {
     await Promise.resolve();
 
     expect(executions).toHaveLength(1);
-    expect(executions[0]?.editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(next);
+    expect(executions[0]?.editDocumentV2.nodes['color_balance_rgb']?.params).toMatchObject({ colorBalanceRgb: next });
     const reopened = hydrateImageOpenEditDocumentV2(
       { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
       executions[0]?.adjustments ?? committed.adjustmentSnapshot.value,
     );
-    expect(reopened.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(next);
+    expect(reopened.nodes['color_balance_rgb']?.params).toMatchObject({ colorBalanceRgb: next });
     expect(reopened).toEqual(committed.editDocumentV2);
   });
 
