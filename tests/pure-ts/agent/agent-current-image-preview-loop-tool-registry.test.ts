@@ -88,12 +88,8 @@ const buildAcceptedDryRunApprovals = async () => {
   const approvals: RawEngineLocalAppServerSelectedImagePreviewLoopCommandV1['dryRunApprovals'] = [];
 
   for (const [index, step] of baseLoopRequest.steps.entries()) {
-    const {
-      assistantRationale: _assistantRationale,
-      preview: _preview,
-      userFollowUp: _userFollowUp,
-      ...adjustments
-    } = step;
+    const adjustments =
+      'exposure' in step ? { exposure: step.exposure, highlights: step.highlights } : { shadows: step.shadows };
     const snapshot = buildAgentImageContextSnapshot();
     const operationId = `${baseLoopRequest.operationId}-${index + 1}`;
     const dryRun = await dryRunAgentGlobalAdjustments({
@@ -283,6 +279,7 @@ describe('agent selected-image preview-loop executable tool registry', () => {
       message: 'Edit command rawengine.agent.selected_image.preview_loop failed schema validation.',
       reason: 'invalid_command',
     });
+    if (response.ok || !('issues' in response)) throw new Error('Expected invalid-command schema issues.');
     expect(response.issues?.some((issue) => issue.message.includes('accepted dry-run approval'))).toBe(true);
   });
 });

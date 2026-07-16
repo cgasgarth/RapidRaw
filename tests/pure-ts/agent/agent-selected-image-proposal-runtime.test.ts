@@ -7,6 +7,7 @@ import {
 } from '../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { buildAgentReviewedAdjustmentCommandPlan } from '../../../src/utils/agent/agentReviewedAdjustmentCommands';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import {
   AgentMediumPreviewAttachmentManager,
@@ -70,6 +71,7 @@ const seedEditor = () => {
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
+      exif: null,
       height: 4000,
       isRaw: true,
       isReady: true,
@@ -87,7 +89,7 @@ const seedEditor = () => {
 const snapshotMutableEditorState = () => {
   const state = useEditorStore.getState();
   return structuredClone({
-    adjustments: state.adjustments,
+    editDocumentV2: state.editDocumentV2,
     finalPreviewUrl: state.finalPreviewUrl,
     history: state.history,
     historyIndex: state.historyIndex,
@@ -203,6 +205,10 @@ describe('agent selected-image proposal runtime', () => {
       operationId: 'issue-5014-live-session',
       prompt: 'Brighten the selected RAW while preserving highlights.',
       requestId: 'issue-5014-live-session',
+      reviewedCommand: buildAgentReviewedAdjustmentCommandPlan({
+        commandId: 'highlight_recovery',
+        sourceAdjustments: useEditorStore.getState().adjustmentSnapshot.value,
+      }).receipt,
       sessionId: 'issue-5014-live-session',
     });
 
