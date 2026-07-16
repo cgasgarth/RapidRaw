@@ -5,11 +5,12 @@ import { Invokes } from '../tauri/commands';
 type FrontendLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 type ConsoleMethod = (...args: unknown[]) => void;
+type ConsoleMethodName = 'debug' | 'info' | 'warn' | 'error' | 'log';
 
 const MAX_LOG_MESSAGE_LENGTH = 12000;
 const MAX_SERIALIZE_DEPTH = 5;
 const DEDUPE_WINDOW_MS = 1500;
-const CONSOLE_LEVEL_MAP: Array<[keyof Console, FrontendLogLevel]> = [
+const CONSOLE_LEVEL_MAP: Array<[ConsoleMethodName, FrontendLogLevel]> = [
   ['debug', 'debug'],
   ['info', 'info'],
   ['warn', 'warn'],
@@ -17,7 +18,7 @@ const CONSOLE_LEVEL_MAP: Array<[keyof Console, FrontendLogLevel]> = [
   ['log', 'info'],
 ];
 
-const originalConsole = new Map<keyof Console, ConsoleMethod>();
+const originalConsole = new Map<ConsoleMethodName, ConsoleMethod>();
 const recentLogMap = new Map<string, number>();
 let isInstalled = false;
 
@@ -264,6 +265,41 @@ function sendToBackend(level: FrontendLogLevel, args: unknown[]): void {
   });
 }
 
+function bindConsoleMethod(methodName: ConsoleMethodName): ConsoleMethod {
+  switch (methodName) {
+    case 'debug':
+      return console.debug.bind(console);
+    case 'info':
+      return console.info.bind(console);
+    case 'warn':
+      return console.warn.bind(console);
+    case 'error':
+      return console.error.bind(console);
+    case 'log':
+      return console.log.bind(console);
+  }
+}
+
+function replaceConsoleMethod(methodName: ConsoleMethodName, method: ConsoleMethod): void {
+  switch (methodName) {
+    case 'debug':
+      console.debug = method;
+      break;
+    case 'info':
+      console.info = method;
+      break;
+    case 'warn':
+      console.warn = method;
+      break;
+    case 'error':
+      console.error = method;
+      break;
+    case 'log':
+      console.log = method;
+      break;
+  }
+}
+
 export function installFrontendLogBridge(): void {
   if (isInstalled || typeof window === 'undefined') {
     return;
@@ -271,18 +307,13 @@ export function installFrontendLogBridge(): void {
   isInstalled = true;
 
   for (const [methodName, level] of CONSOLE_LEVEL_MAP) {
-    const original = console[methodName];
-    if (typeof original !== 'function') {
-      continue;
-    }
-
-    const typedOriginal = original.bind(console) as ConsoleMethod;
+    const typedOriginal = bindConsoleMethod(methodName);
     originalConsole.set(methodName, typedOriginal);
 
-    (console[methodName] as ConsoleMethod) = (...args: unknown[]) => {
+    replaceConsoleMethod(methodName, (...args: unknown[]) => {
       typedOriginal(...args);
       sendToBackend(level, args);
-    };
+    });
   }
 
   window.addEventListener('error', (event) => {

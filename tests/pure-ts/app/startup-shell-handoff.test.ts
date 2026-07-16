@@ -37,7 +37,11 @@ afterEach(() => {
 
 describe('static startup shell handoff', () => {
   test('adopts an existing classic-preboot receipt without repeating native setup', async () => {
-    const invoke = mock(async <T>() => trace() as T);
+    let invokeCallCount = 0;
+    const invoke: Invoke = async <T>() => {
+      invokeCallCount += 1;
+      return trace() as T;
+    };
     installShell(invoke);
     let releaseReceipt: ((traceId: string) => void) | undefined;
     const receipt = new Promise<string>((resolve) => {
@@ -52,7 +56,7 @@ describe('static startup shell handoff', () => {
 
     const startup = startApplication(load);
     await Bun.sleep(0);
-    expect(invoke).not.toHaveBeenCalled();
+    expect(invokeCallCount).toBe(0);
     expect(load).not.toHaveBeenCalled();
     expect(consumeStartupShellIntent()).toBe('settings');
     releaseReceipt?.('startup:classic-preboot');
@@ -69,7 +73,7 @@ describe('static startup shell handoff', () => {
       releaseInteractive = resolve;
     });
     const invoke: Invoke = async <T>(command: string, args?: Record<string, unknown>) => {
-      calls.push({ args, command });
+      calls.push({ command, ...(args === undefined ? {} : { args }) });
       if (command === startupBootstrapCommands.frontendReady) return undefined as T;
       if (command === startupBootstrapCommands.getTrace) return trace() as T;
       if (args?.['phase'] === 'interactive') await interactiveReceipt;
@@ -80,7 +84,9 @@ describe('static startup shell handoff', () => {
     const load = mock(async () => ({ mountApplication: mount }));
 
     const startup = startApplication(load, completeStaticStartup);
-    testWindow.document.getElementById('startup-settings')?.click();
+    testWindow.document
+      .getElementById('startup-settings')
+      ?.dispatchEvent(new testWindow.MouseEvent('click', { bubbles: true }));
     expect(consumeStartupShellIntent()).toBe('settings');
     await Bun.sleep(0);
     expect(load).not.toHaveBeenCalled();
@@ -131,7 +137,9 @@ describe('static startup shell handoff', () => {
       return trace() as T;
     });
     await completeStaticStartup();
-    testWindow.document.getElementById('startup-add-folder')?.click();
+    testWindow.document
+      .getElementById('startup-add-folder')
+      ?.dispatchEvent(new testWindow.MouseEvent('click', { bubbles: true }));
     expect(consumeStartupShellIntent()).toBe('add-folder');
   });
 });

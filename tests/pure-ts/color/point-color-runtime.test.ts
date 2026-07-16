@@ -50,8 +50,10 @@ describe('Point Color perceptual runtime', () => {
 
   test('supports multiple samples without order dependence and rejects neutrals', () => {
     const adjustment = point(20);
+    const firstSample = adjustment.samples[0];
+    if (firstSample === undefined) throw new Error('Expected Point Color fixture sample.');
     adjustment.samples.push({
-      ...adjustment.samples[0],
+      ...firstSample,
       confidence: 0.75,
       id: 'sample-2',
       sourceColor: { chroma: 0.12, hueDegrees: 30, lightness: 0.55 },

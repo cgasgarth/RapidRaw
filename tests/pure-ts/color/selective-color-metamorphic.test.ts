@@ -26,11 +26,13 @@ describe('selective color production runtime metamorphic properties', () => {
       return { influence: result.influence, pixelDelta };
     });
 
-    for (const [near, far] of results.slice(0, -1).map((result, index) => [result, results[index + 1]])) {
+    for (const [index, near] of results.slice(0, -1).entries()) {
+      const far = results[index + 1];
+      if (far === undefined) throw new Error('Expected adjacent selective-color result.');
       expect(near.influence).toBeGreaterThanOrEqual(far.influence);
       expect(near.pixelDelta).toBeGreaterThanOrEqual(far.pixelDelta - 1e-12);
     }
-    expect(results[0].influence).toBe(1);
+    expect(results[0]?.influence).toBe(1);
     expect(results.at(-1)?.influence).toBeLessThan(0.002);
   });
 
