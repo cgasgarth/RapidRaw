@@ -65,20 +65,20 @@ async function captured(command: string[], options: { cwd: string; env?: Record<
 }
 
 describe('Bun native confidence gates', () => {
-  test('uses native parallel randomization with a stable exact reproduction command', () => {
+  test('uses named native parallel randomization with a stable exact reproduction command', () => {
     const seed = resolveRandomizedTestSeed('424242');
     expect(seed).toBe(424242);
     expect(resolveRandomizedTestSeed('github-run-42')).toBe(resolveRandomizedTestSeed('github-run-42'));
     expect(buildRandomizedTestArgs(seed)).toEqual([
       'test',
       '--no-orphans',
-      '--dots',
       '--parallel',
       '--bail=1',
       '--randomize',
       '--seed=424242',
       'tests/pure-ts',
     ]);
+    expect(buildRandomizedTestArgs(seed)).not.toContain('--dots');
     expect(RANDOMIZED_SUITE_RUN_COUNT).toBe(2);
     expect(resolveRandomizedPassTimeout(undefined)).toBe(DEFAULT_RANDOMIZED_PASS_TIMEOUT_MS);
     expect(resolveRandomizedPassTimeout('750')).toBe(750);
