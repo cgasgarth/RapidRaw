@@ -12,6 +12,7 @@ import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
+import { getOrientedDimensions, pixelCropFromNormalizedCrop } from '../../../utils/cropUtils';
 import type { EditorCompareOrientation } from '../../../utils/editorCompare';
 import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
 import {
@@ -322,11 +323,19 @@ export const ImageCanvas = memo(
       status: 'error' | 'ready';
       url: string;
     } | null>(null);
+    const orientedCropDimensions = getOrientedDimensions(
+      selectedImage.width,
+      selectedImage.height,
+      adjustments.orientationSteps ?? 0,
+    );
+    const currentPixelCrop = adjustments.crop
+      ? pixelCropFromNormalizedCrop(adjustments.crop, orientedCropDimensions.width, orientedCropDimensions.height)
+      : null;
     const overlayGeometry = useMemo(
       () =>
         providedOverlayGeometry ??
         createEditorOverlayGeometry({
-          crop: adjustments.crop,
+          crop: currentPixelCrop,
           devicePixelRatio: 1,
           geometryEpoch: 1,
           orientationSteps: adjustments.orientationSteps ?? 0,
@@ -350,7 +359,7 @@ export const ImageCanvas = memo(
           },
         }),
       [
-        adjustments.crop,
+        currentPixelCrop,
         adjustments.orientationSteps,
         adjustments.rotation,
         imageRenderSize,

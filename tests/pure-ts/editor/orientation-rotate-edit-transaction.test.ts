@@ -3,7 +3,7 @@ import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { calculateCenteredCrop } from '../../../src/utils/cropUtils';
+import { calculateCenteredCrop, normalizedCropFromPixelCrop } from '../../../src/utils/cropUtils';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildOrientationRotateEditTransaction,
@@ -38,7 +38,7 @@ describe('orientation rotate edit transaction', () => {
     const adjustments = {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       aspectRatio: 4 / 3,
-      crop: { height: 1800, unit: 'px' as const, width: 2400, x: 800, y: 600 },
+      crop: { height: 0.6, unit: 'normalized' as const, width: 0.6, x: 0.2, y: 0.2 },
       exposure: 0.35,
       rotation: 2.5,
     };
@@ -72,7 +72,7 @@ describe('orientation rotate edit transaction', () => {
         nodeType: 'geometry',
         patch: {
           aspectRatio: 3 / 4,
-          crop: calculateCenteredCrop(4000, 3000, 1, 3 / 4),
+          crop: normalizedCropFromPixelCrop(calculateCenteredCrop(4000, 3000, 1, 3 / 4)!, 3000, 4000),
           orientationSteps: 1,
           rotation: 0,
         },

@@ -1,4 +1,4 @@
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView};
 use std::borrow::Cow;
 
 use crate::adjustment_fields;
@@ -42,10 +42,12 @@ pub fn apply_all_transformations<'a, I: IntoCowImage<'a>>(
 
     let crop_data: Option<Crop> =
         serde_json::from_value(adjustments[adjustment_fields::CROP].clone()).ok();
+    let crop_dimensions = rotated_image.dimensions();
+    let unscaled_crop_offset = crop_data
+        .and_then(|crop| crop.pixel_bounds(crop_dimensions.0, crop_dimensions.1))
+        .map_or((0.0, 0.0), |(x, y, _, _)| (x as f32, y as f32));
     let crop_json = serde_json::to_value(crop_data).unwrap_or(serde_json::Value::Null);
     let cropped_image = apply_crop(rotated_image, &crop_json);
-
-    let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
 
     let total_duration = start_time.elapsed();
     log::info!("apply_all_transformations took {:.2?}", total_duration);

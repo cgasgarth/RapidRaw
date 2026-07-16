@@ -23,19 +23,19 @@ export const AGENT_GEOMETRY_APPLY_OUTPUT_SCHEMA_NAME = 'AgentGeometryApplyRespon
 
 const cropSchema = z
   .object({
-    height: z.number().positive().max(100),
-    unit: z.literal('%'),
-    width: z.number().positive().max(100),
-    x: z.number().min(0).max(100),
-    y: z.number().min(0).max(100),
+    height: z.number().positive().max(1),
+    unit: z.literal('normalized'),
+    width: z.number().positive().max(1),
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
   })
   .strict()
-  .refine((crop) => crop.x + crop.width <= 100, {
-    message: 'Crop x + width must stay within percentage image bounds.',
+  .refine((crop) => crop.x + crop.width <= 1, {
+    message: 'Crop x + width must stay within normalized image bounds.',
     path: ['width'],
   })
-  .refine((crop) => crop.y + crop.height <= 100, {
-    message: 'Crop y + height must stay within percentage image bounds.',
+  .refine((crop) => crop.y + crop.height <= 1, {
+    message: 'Crop y + height must stay within normalized image bounds.',
     path: ['height'],
   });
 

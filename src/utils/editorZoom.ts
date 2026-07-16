@@ -1,3 +1,5 @@
+import type { EditDocumentGeometryCropV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
+
 export interface EditorZoomDimensions {
   height: number;
   width: number;
@@ -28,7 +30,7 @@ export interface ResolveEditorZoomInput {
 }
 
 export interface EditorZoomSourceInput {
-  crop: EditorZoomDimensions | null | undefined;
+  crop: EditDocumentGeometryCropV2 | EditorZoomDimensions | null | undefined;
   orientationSteps: number | undefined;
   originalSize: EditorZoomDimensions;
 }
@@ -92,11 +94,16 @@ export const getEditorZoomSourceSize = ({
   orientationSteps,
   originalSize,
 }: EditorZoomSourceInput): EditorZoomDimensions => {
-  if (crop && crop.width > 0 && crop.height > 0) return crop;
   const isRotated = (orientationSteps ?? 0) % 2 !== 0;
-  return isRotated
+  const orientedSize = isRotated
     ? { height: originalSize.width, width: originalSize.height }
     : { height: originalSize.height, width: originalSize.width };
+  if (crop && crop.width > 0 && crop.height > 0) {
+    return 'unit' in crop && crop.unit === 'normalized'
+      ? { height: crop.height * orientedSize.height, width: crop.width * orientedSize.width }
+      : crop;
+  }
+  return orientedSize;
 };
 
 const isEditorZoomModeEqual = (left: EditorZoomMode, right: EditorZoomMode): boolean =>

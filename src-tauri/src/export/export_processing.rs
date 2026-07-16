@@ -53,7 +53,7 @@ use crate::image_loader::{
     raw_processing_settings_for_adjustments,
 };
 use crate::image_processing::{
-    AllAdjustments, Crop, GpuContext, ImageMetadata, RenderRequest, downscale_f32_image,
+    AllAdjustments, GpuContext, ImageMetadata, RenderRequest, downscale_f32_image,
     get_or_init_gpu_context, process_and_get_dynamic_image,
     process_and_get_unclamped_dynamic_image, resolve_tonemapper_override_from_handle,
 };
@@ -3095,7 +3095,7 @@ pub async fn estimate_export_sizes(
         (preview_byte_size as f64 * pixel_ratio) as usize
     } else {
         let metadata = crate::exif_processing::load_sidecar(&sidecar_path);
-        let mut js_adjustments = adjustments_with_raw_engine_artifacts(metadata)?;
+        let js_adjustments = adjustments_with_raw_engine_artifacts(metadata)?;
 
         const ESTIMATE_DIM: u32 = 1280;
 
@@ -3132,18 +3132,6 @@ pub async fn estimate_export_sizes(
         } else {
             1.0
         };
-
-        if let Some(crop_val) = js_adjustments.get_mut("crop")
-            && let Ok(c) = serde_json::from_value::<Crop>(crop_val.clone())
-        {
-            *crop_val = serde_json::to_value(Crop {
-                x: c.x * raw_scale_factor as f64,
-                y: c.y * raw_scale_factor as f64,
-                width: c.width * raw_scale_factor as f64,
-                height: c.height * raw_scale_factor as f64,
-            })
-            .unwrap_or(serde_json::Value::Null);
-        }
 
         let (transformed_shrunk_res, unscaled_crop_offset) =
             apply_all_transformations(Cow::Borrowed(&original_image), &js_adjustments);

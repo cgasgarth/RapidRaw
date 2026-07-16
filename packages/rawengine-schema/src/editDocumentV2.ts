@@ -489,26 +489,21 @@ const editDocumentGeometryCropCoordinatesV2Schema = z.object({
   y: z.number().finite().nonnegative(),
 });
 
-export const editDocumentGeometryCropV2Schema = z
-  .discriminatedUnion('unit', [
-    editDocumentGeometryCropCoordinatesV2Schema.extend({ unit: z.literal('px') }).strict(),
-    editDocumentGeometryCropCoordinatesV2Schema.extend({ unit: z.literal('%') }).strict(),
-    editDocumentGeometryCropCoordinatesV2Schema.extend({ unit: z.literal('normalized') }).strict(),
-  ])
+export const editDocumentGeometryCropV2Schema = editDocumentGeometryCropCoordinatesV2Schema
+  .extend({ unit: z.literal('normalized') })
+  .strict()
   .superRefine((crop, context) => {
-    const maximum = crop.unit === '%' ? 100 : crop.unit === 'normalized' ? 1 : null;
-    if (maximum === null) return;
-    if (crop.x + crop.width > maximum) {
+    if (crop.x + crop.width > 1) {
       context.addIssue({
         code: 'custom',
-        message: `Crop x + width must not exceed ${String(maximum)}.`,
+        message: 'Crop x + width must not exceed 1.',
         path: ['width'],
       });
     }
-    if (crop.y + crop.height > maximum) {
+    if (crop.y + crop.height > 1) {
       context.addIssue({
         code: 'custom',
-        message: `Crop y + height must not exceed ${String(maximum)}.`,
+        message: 'Crop y + height must not exceed 1.',
         path: ['height'],
       });
     }
@@ -994,7 +989,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       'lensVignetteEnabled',
     ],
     nodeType: 'lens_correction',
-    process: 'legacy_pipeline_v1',
+    process: 'scene_referred_v2',
     renderStage: 'lens_correction',
     implementationVersion: 1,
   },
@@ -1063,7 +1058,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       'transformYOffset',
     ],
     nodeType: 'geometry',
-    process: 'legacy_pipeline_v1',
+    process: 'scene_referred_v2',
     renderStage: 'geometry',
     implementationVersion: 1,
   },
@@ -1111,7 +1106,7 @@ export const editDocumentNodeDescriptorSchema = z.object({
   editorSection: z.enum(['basic', 'color', 'curves', 'details', 'effects']).nullable(),
   legacyFields: z.array(z.string()),
   nodeType: z.string(),
-  process: z.enum(['legacy_pipeline_v1', 'scene_referred_v2']),
+  process: z.literal('scene_referred_v2'),
   renderStage: z.string(),
   implementationVersion: z.number().int().positive(),
 });
@@ -1125,7 +1120,7 @@ export const editDocumentNodeEnvelopeV2Schema = z
     enabled: z.boolean(),
     implementationVersion: z.number().int().positive(),
     params: z.record(z.string(), z.unknown()),
-    process: z.enum(['legacy_pipeline_v1', 'scene_referred_v2']),
+    process: z.literal('scene_referred_v2'),
     type: editDocumentNodeTypeV2Schema,
   })
   .strict();
@@ -1607,7 +1602,7 @@ interface LegacyNodeOwnershipMigration {
   createNode?: {
     enabledFromNodeType?: string;
     implementationVersion: number;
-    process: 'legacy_pipeline_v1' | 'scene_referred_v2';
+    process: 'scene_referred_v2';
   };
   defaults: Readonly<Record<string, unknown>>;
   fields: readonly string[];
@@ -1875,6 +1870,7 @@ export type EditDocumentPerceptualGradingV2 = z.infer<typeof editDocumentPercept
 export type EditDocumentColorCalibrationV2 = z.infer<typeof editDocumentColorCalibrationV2Schema>;
 export type EditDocumentSceneCurveV2 = z.infer<typeof editDocumentSceneCurveV2Schema>;
 export type EditDocumentGeometryV2 = z.infer<typeof editDocumentGeometryV2Schema>;
+export type EditDocumentGeometryCropV2 = z.infer<typeof editDocumentGeometryCropV2Schema>;
 export type EditDocumentLensCorrectionV2 = z.infer<typeof editDocumentLensCorrectionV2Schema>;
 export type SceneGlobalColorToneParamsV2 = z.infer<typeof sceneGlobalColorToneParamsV2Schema>;
 export type EditDocumentSceneToViewTransformV2 = z.infer<typeof editDocumentSceneToViewTransformV2Schema>;
@@ -1884,7 +1880,7 @@ export interface CompiledEditDocumentNodeV2 {
   readonly implementationVersion: number;
   readonly nodeType: EditDocumentNodeTypeV2;
   readonly params: Readonly<Record<string, unknown>>;
-  readonly process: 'legacy_pipeline_v1' | 'scene_referred_v2';
+  readonly process: 'scene_referred_v2';
   readonly renderStage: string;
 }
 

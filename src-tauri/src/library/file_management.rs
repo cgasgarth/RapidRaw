@@ -37,8 +37,8 @@ use crate::gpu_processing;
 use crate::image_loader;
 use crate::image_processing::GpuContext;
 use crate::image_processing::{
-    Crop, ImageMetadata, RawEngineArtifacts, apply_coarse_rotation,
-    apply_cpu_default_raw_processing, apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
+    ImageMetadata, RawEngineArtifacts, apply_coarse_rotation, apply_cpu_default_raw_processing,
+    apply_crop, apply_flip, apply_geometry_warp, apply_rotation,
 };
 use crate::library::thumbnail_generation_service::{
     ThumbnailLifecycleEmission, ThumbnailOperationAuthority, ThumbnailServiceJob,
@@ -1100,8 +1100,8 @@ fn generate_thumbnail_data_with_target(
                     && c.width > 0.0
                     && c.height > 0.0
                 {
-                    let final_crop_max_dim =
-                        (c.width as f32 * *scale).max(c.height as f32 * *scale);
+                    let final_crop_max_dim = (c.width as f32 * img.width() as f32)
+                        .max(c.height as f32 * img.height() as f32);
                     if final_crop_max_dim < (target_res as f32 * 0.95) {
                         sufficient_resolution = false;
                     }
@@ -1181,7 +1181,9 @@ fn generate_thumbnail_data_with_target(
                 && c.width > 0.0
                 && c.height > 0.0
             {
-                let crop_max_dim_loaded = c.width.max(c.height) * raw_scale_factor as f64;
+                let crop_max_dim_loaded = c
+                    .pixel_bounds(full_w, full_h)
+                    .map_or(0.0, |(_, _, width, height)| width.max(height) as f64);
                 let full_max_dim = full_w.max(full_h) as f64;
                 if crop_max_dim_loaded > 0.0 {
                     processing_dim = ((target_res as f64 * full_max_dim / crop_max_dim_loaded)
@@ -1225,21 +1227,21 @@ fn generate_thumbnail_data_with_target(
         let flipped_image = apply_flip(Cow::Owned(processing_base), flip_horizontal, flip_vertical);
         let rotated_image = apply_rotation(flipped_image, rotation_degrees);
 
-        let scaled_crop_json = if let Some(c) = &crop_data {
-            serde_json::to_value(Crop {
-                x: c.x * total_scale as f64,
-                y: c.y * total_scale as f64,
-                width: c.width * total_scale as f64,
-                height: c.height * total_scale as f64,
+        let unscaled_crop_offset = crop_data
+            .and_then(|crop| {
+                crop.pixel_bounds(rotated_image.width(), rotated_image.height())
+                    .map(|(x, y, _, _)| {
+                        (
+                            x as f32 / total_scale.max(f32::EPSILON),
+                            y as f32 / total_scale.max(f32::EPSILON),
+                        )
+                    })
             })
-            .unwrap_or(serde_json::Value::Null)
-        } else {
-            serde_json::Value::Null
-        };
+            .unwrap_or((0.0, 0.0));
+        let scaled_crop_json = serde_json::to_value(crop_data).unwrap_or(serde_json::Value::Null);
 
         let cropped_preview = apply_crop(rotated_image, &scaled_crop_json);
         let (preview_w, preview_h) = cropped_preview.dimensions();
-        let unscaled_crop_offset = crop_data.map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
 
         let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = render_plan
             .masks

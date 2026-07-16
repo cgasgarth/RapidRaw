@@ -67,7 +67,7 @@ describe('EditDocumentV2 batch reset and clipboard', () => {
 
     expect(diagnostics.schemaVersion).toBe(2);
     expect(diagnostics.activeNodeTypes).toEqual(editDocumentV2NodeInventory(document));
-    expect(diagnostics.legacyNodeTypes).toEqual(['lens_correction', 'geometry']);
+    expect(diagnostics.legacyNodeTypes).toEqual([]);
     expect(diagnostics.nodeDiagnostics.find(({ nodeType }) => nodeType === 'scene_curve')?.status).toBe('disabled');
     expect(diagnostics.quarantinedNodeTypes).toEqual(['future_color_v9']);
     expect(diagnostics.renderStageFingerprints[0]?.fingerprint).toContain('source_decode');
@@ -220,7 +220,7 @@ describe('EditDocumentV2 batch reset and clipboard', () => {
     expect(compiled.map(({ nodeType }) => nodeType)).toEqual([...editDocumentV2NodeInventory(document)]);
     expect(compiled.find(({ nodeType }) => nodeType === 'geometry')).toMatchObject({
       nodeType: 'geometry',
-      process: 'legacy_pipeline_v1',
+      process: 'scene_referred_v2',
       renderStage: 'geometry',
     });
   });
@@ -230,9 +230,9 @@ describe('EditDocumentV2 batch reset and clipboard', () => {
     expect(() =>
       compileEditDocumentNodeV2({
         ...requireNode(document, 'geometry'),
-        process: 'scene_referred_v2',
+        process: 'legacy_pipeline_v1',
       }),
-    ).toThrow('incompatible process');
+    ).toThrow();
     expect(() =>
       compileEditDocumentNodeV2({
         ...requireNode(document, 'geometry'),

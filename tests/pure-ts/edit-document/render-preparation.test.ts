@@ -67,7 +67,7 @@ describe('EditDocumentV2 render preparation', () => {
   test('render preparation keeps payload residency while overlaying authoritative migrated nodes', () => {
     const authoritative = legacyAdjustmentsToEditDocumentV2({
       ...structuredClone(INITIAL_ADJUSTMENTS),
-      crop: { height: 1800, unit: 'px', width: 2400, x: 400, y: 300 },
+      crop: { height: 0.6, unit: 'normalized', width: 0.6, x: 0.1, y: 0.1 },
       exposure: 1.25,
     });
     const prepared = {
