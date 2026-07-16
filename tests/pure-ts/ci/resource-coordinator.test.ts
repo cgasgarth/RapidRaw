@@ -454,6 +454,40 @@ await lease.release();`,
     expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
   });
 
+  test('preserves cancellation when abort is observed before the queue deadline', async () => {
+    const root = await temporaryRoot();
+    const holder = await acquireResourceLease({
+      label: 'abort-order-holder',
+      ownerId: 'abort-order-holder-id',
+      resource: 'native-heavy',
+      root,
+    });
+    const controller = new AbortController();
+    const abort = setTimeout(() => controller.abort(), 10);
+    const startedAt = Date.now();
+    const waiting = acquireResourceLease({
+      label: 'abort-before-timeout',
+      ownerId: 'abort-before-timeout-id',
+      pollMs: 1_000,
+      resource: 'native-heavy',
+      root,
+      signal: controller.signal,
+      timeoutMs: 1_000,
+    });
+
+    try {
+      await expect(waiting).rejects.toThrow('resource_wait_cancelled');
+      expect(Date.now() - startedAt).toBeLessThan(250);
+      expect(await queuedLabels(root)).toEqual([]);
+      expect((await readFile(join(root, 'native-heavy.owner.json'), 'utf8')).includes('abort-order-holder')).toBeTrue();
+    } finally {
+      clearTimeout(abort);
+      controller.abort();
+      await Promise.allSettled([waiting]);
+      await holder.release();
+    }
+  });
+
   test('bounds queue stalls with owner diagnostics and removes the timed-out waiter', async () => {
     const root = await temporaryRoot();
     const holder = await acquireResourceLease({
