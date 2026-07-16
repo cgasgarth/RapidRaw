@@ -77,19 +77,26 @@ const lifecycle=setInterval(()=>{try{process.kill(lifecycleParent,0)}catch{proce
 lifecycle.unref();
 try{${script}}finally{clearInterval(lifecycle)}`;
   return trackChild(
-    Bun.spawn(['bun', '-e', `import { acquireResourceLease } from ${JSON.stringify(modulePath)};${lifecycle}`], {
-      env: {
-        ...Bun.env,
-        RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID(),
-        RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
-        RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
-        RAWENGINE_TEST_PARENT_PID: String(process.pid),
-        ...environment,
+    Bun.spawn(
+      [
+        'bun',
+        '-e',
+        `import { acquireResourceLease, acquireResourceLeaseGroup } from ${JSON.stringify(modulePath)};${lifecycle}`,
+      ],
+      {
+        env: {
+          ...Bun.env,
+          RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID(),
+          RAWENGINE_RESOURCE_COORDINATOR_ROOT: root,
+          RAWENGINE_RESOURCE_WAIT_POLL_MS: '10',
+          RAWENGINE_TEST_PARENT_PID: String(process.pid),
+          ...environment,
+        },
+        cwd,
+        stderr: 'pipe',
+        stdout: 'pipe',
       },
-      cwd,
-      stderr: 'pipe',
-      stdout: 'pipe',
-    }),
+    ),
   );
 };
 
@@ -786,6 +793,74 @@ await nested.release(); await outer.release();`,
     }
     expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
   });
+
+  test('orders three-process validation topology before host capacity so the native cycle cannot form', async () => {
+    const root = await temporaryRoot();
+    const nativeHeld = join(root, 'standalone-native-held');
+    const allowStandaloneBudget = join(root, 'allow-standalone-budget');
+    const standaloneCompleted = join(root, 'standalone-completed');
+    const firstAcquired = join(root, 'first-validation-acquired');
+    const releaseFirst = join(root, 'release-first-validation');
+    const secondAcquired = join(root, 'second-validation-acquired');
+    const validationWorker = (label: string, acquired: string, release?: string) =>
+      directLease(
+        root,
+        `const lease=await acquireResourceLeaseGroup([
+  {resource:'validation-class-native-heavy',capacity:1,label:'${label}-class',hostBudgetCapacity:4,hostBudgetOwnerId:'${label}-node',ownerId:'${label}-run'},
+  {resource:'native-heavy',label:'${label}-native',hostBudgetCapacity:4,hostBudgetOwnerId:'${label}-node',ownerId:'${label}-run'}
+]);
+await Bun.write(${JSON.stringify(acquired)},'acquired');
+${release === undefined ? '' : `while(!(await Bun.file(${JSON.stringify(release)}).exists())) await Bun.sleep(10);`}
+await lease.release();`,
+      );
+
+    const standalone = directLease(
+      root,
+      `const identity={ownerId:'standalone-node-owner'};
+const outer=await acquireResourceLease({...identity,resource:'native-heavy',label:'standalone-native'});
+await Bun.write(${JSON.stringify(nativeHeld)},'held');
+while(!(await Bun.file(${JSON.stringify(allowStandaloneBudget)}).exists())) await Bun.sleep(10);
+const nested=await acquireResourceLease({...identity,resource:'native-heavy',label:'standalone-native-budget',hostBudgetCapacity:4,hostBudgetOwnerId:'standalone-node-owner'});
+await nested.release(); await outer.release();
+await Bun.write(${JSON.stringify(standaloneCompleted)},'completed');`,
+    );
+    await waitFor(async () => await Bun.file(nativeHeld).exists(), 'standalone command did not hold native');
+
+    const first = validationWorker('first-validation', firstAcquired, releaseFirst);
+    await waitFor(
+      async () => (await queuedLabels(root)).includes('first-validation-native'),
+      'first validation did not queue on native first',
+    );
+    expect(await queuedLabels(root, 'validation-host-heavy')).toEqual([]);
+    expect(await Bun.file(join(root, 'validation-class-native-heavy.owner.json')).exists()).toBeFalse();
+
+    const second = validationWorker('second-validation', secondAcquired);
+    await waitFor(
+      async () => (await queuedLabels(root)).includes('second-validation-native'),
+      'second validation did not queue transitively behind the first',
+    );
+    expect(await queuedLabels(root, 'validation-host-heavy')).toEqual([]);
+
+    await writeFile(allowStandaloneBudget, 'continue\n');
+    await waitFor(
+      async () => await Bun.file(standaloneCompleted).exists(),
+      'standalone command could not acquire host capacity after validation queued',
+    );
+    await waitFor(
+      async () => await Bun.file(firstAcquired).exists(),
+      'first validation did not acquire after standalone',
+    );
+    expect(await Bun.file(secondAcquired).exists()).toBeFalse();
+    await writeFile(releaseFirst, 'release\n');
+    await waitFor(
+      async () => await Bun.file(secondAcquired).exists(),
+      'second validation did not acquire in FIFO order',
+    );
+
+    await Promise.all([expectSuccessfulExit(standalone), expectSuccessfulExit(first), expectSuccessfulExit(second)]);
+    expect(await Bun.file(join(root, 'native-heavy.lock')).exists()).toBeFalse();
+    expect(await queuedLabels(root)).toEqual([]);
+  }, 15_000);
 
   test('reaps a killed oldest waiter without skipping the next live ticket', async () => {
     const root = await temporaryRoot();

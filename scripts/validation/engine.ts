@@ -4,6 +4,7 @@ import { readBoundedStream, writeBoundedOutput } from '../lib/ci/compact-output.
 import { isolatedGitEnvironment } from '../lib/ci/git-environment';
 import {
   acquireResourceLease,
+  acquireResourceLeaseGroup,
   type ResourceLease,
   resolveResourceCoordinatorRoot,
 } from '../lib/ci/resource-coordinator';
@@ -448,9 +449,8 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
     const coordinatedClass = ['cpu-heavy', 'suite-exclusive', 'native-heavy', 'browser', 'network'].includes(
       node.resourceClass,
     );
-    let classLease: ResourceLease | undefined;
+    let executionLease: ResourceLease | undefined;
     let cacheLease: ResourceLease | undefined;
-    const commandResourceLeases: ResourceLease[] = [];
     try {
       cacheLease =
         node.cachePolicy === 'none'
@@ -473,33 +473,34 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       }
       if (interrupted) throw new Error('validation_interrupted');
       if (options.explainCache) console.log(`${cached ? 'VERIFY' : 'MISS'} ${node.id} key=${key}`);
-      classLease = coordinatedClass
-        ? await acquireResourceLease({
-            capacity: capacities[node.resourceClass],
-            label: `validation-class-${node.resourceClass}:${node.id}`,
-            hostBudgetCapacity: options.hostBudgetCapacity,
-            hostBudgetOwnerId: nodeHostBudgetOwnerId,
-            resource: `validation-class-${node.resourceClass}`,
-            root: resourceCoordinatorRoot,
-            ownerId: runOwnerId,
-            signal: queueAbortController.signal,
-            timeoutMs: node.queueTimeoutMs,
-          })
-        : undefined;
-      for (const resource of [...(node.queueResources ?? [])].sort()) {
-        commandResourceLeases.push(
-          await acquireResourceLease({
-            label: `validation-resource-${resource}:${node.id}`,
-            hostBudgetCapacity: options.hostBudgetCapacity,
-            hostBudgetOwnerId: nodeHostBudgetOwnerId,
-            resource,
-            root: resourceCoordinatorRoot,
-            ownerId: runOwnerId,
-            signal: queueAbortController.signal,
-            timeoutMs: node.queueTimeoutMs,
-          }),
-        );
-      }
+      const executionResources = [
+        ...(coordinatedClass
+          ? [
+              {
+                capacity: capacities[node.resourceClass],
+                label: `validation-class-${node.resourceClass}:${node.id}`,
+                hostBudgetCapacity: options.hostBudgetCapacity,
+                hostBudgetOwnerId: nodeHostBudgetOwnerId,
+                resource: `validation-class-${node.resourceClass}`,
+                root: resourceCoordinatorRoot,
+                ownerId: runOwnerId,
+                signal: queueAbortController.signal,
+                timeoutMs: node.queueTimeoutMs,
+              },
+            ]
+          : []),
+        ...[...(node.queueResources ?? [])].sort().map((resource) => ({
+          label: `validation-resource-${resource}:${node.id}`,
+          hostBudgetCapacity: options.hostBudgetCapacity,
+          hostBudgetOwnerId: nodeHostBudgetOwnerId,
+          resource,
+          root: resourceCoordinatorRoot,
+          ownerId: runOwnerId,
+          signal: queueAbortController.signal,
+          timeoutMs: node.queueTimeoutMs,
+        })),
+      ];
+      executionLease = executionResources.length > 0 ? await acquireResourceLeaseGroup(executionResources) : undefined;
       // The run owns every declared output root at this point. Always prepare a
       // producer from an empty root so cache mismatches, interrupted children,
       // and prior failed runs cannot leak partial artifacts into its inputs.
@@ -530,8 +531,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       let timedOut = false;
       children.add(child);
       await cacheLease?.updateOwnerPid(child.pid);
-      await classLease?.updateOwnerPid(child.pid);
-      for (const lease of commandResourceLeases) await lease.updateOwnerPid(child.pid);
+      await executionLease?.updateOwnerPid(child.pid);
       const killGroup = (signal: 'SIGTERM' | 'SIGKILL'): void => {
         try {
           process.kill(-child.pid, signal);
@@ -590,8 +590,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       }
       completed.set(node.id, { ok, key });
     } finally {
-      for (const lease of commandResourceLeases.reverse()) await lease.release();
-      await classLease?.release();
+      await executionLease?.release();
       await cacheLease?.release();
     }
   };

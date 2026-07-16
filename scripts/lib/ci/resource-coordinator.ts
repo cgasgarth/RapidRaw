@@ -476,48 +476,86 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
 }
 
 export async function acquireResourceLease(options: ResourceLeaseOptions): Promise<ResourceLease> {
-  const resourceClass = hostBudgetClass(options);
-  if (resourceClass === undefined) return await acquireSingleResourceLease(options);
+  return await acquireResourceLeaseGroup([options]);
+}
 
-  const capacity = await resolveValidationHostBudgetCapacity(options.hostBudgetCapacity);
-  const root = resolveResourceCoordinatorRoot(options.root);
+export async function acquireResourceLeaseGroup(options: readonly ResourceLeaseOptions[]): Promise<ResourceLease> {
+  if (options.length === 0) throw new Error('resource lease group requires at least one resource');
+  const roots = new Set(options.map((entry) => resolveResourceCoordinatorRoot(entry.root)));
+  if (roots.size !== 1) throw new Error('resource lease group requires one coordinator root');
+  const root = [...roots][0];
+  if (root === undefined) throw new Error('resource lease group requires one coordinator root');
+
+  const resourceClasses = options.map(hostBudgetClass).filter((value): value is HostBudgetClass => value !== undefined);
+  const explicitHostOwners = new Set(
+    options.map((entry) => entry.hostBudgetOwnerId).filter((value): value is string => value !== undefined),
+  );
+  if (explicitHostOwners.size > 1) throw new Error('resource lease group requires one host budget owner');
+  const explicitOwners = new Set(
+    options.map((entry) => entry.ownerId).filter((value): value is string => value !== undefined),
+  );
+  if (explicitOwners.size > 1) throw new Error('resource lease group requires one resource owner');
+
   const inheritedHostOwner = Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ID;
   const inheritedHostRoot = Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ROOT;
   const effectiveOwnerId =
-    options.hostBudgetOwnerId ??
+    [...explicitHostOwners][0] ??
     (inheritedHostOwner !== undefined && inheritedHostRoot === root
       ? inheritedHostOwner
-      : (options.ownerId ?? processOwnerId));
+      : ([...explicitOwners][0] ?? processOwnerId));
   let queuedNotified = false;
   const notifyQueued = (): void => {
     if (queuedNotified) return;
     queuedNotified = true;
-    options.onQueued?.();
+    for (const entry of options) entry.onQueued?.();
   };
-  // Queue on the concrete resource before reserving host-wide capacity. A
-  // cross-worktree waiter must not consume weighted budget while its native
-  // resource is still owned, and both layers must share one reentrant owner.
-  const resourceLease = await acquireSingleResourceLease({
-    ...options,
-    onQueued: notifyQueued,
-    ownerAliases: [...new Set([...(options.ownerAliases ?? []), options.ownerId])].filter(
-      (ownerId): ownerId is string => ownerId !== undefined && ownerId !== effectiveOwnerId,
-    ),
-    ownerId: effectiveOwnerId,
-  });
+
+  // Every caller uses one global order: concrete resources first (sorted by
+  // identity), then weighted host capacity. Acquiring a node's class and
+  // command resources as one group prevents class -> host -> native from
+  // inverting the standalone native -> host path.
+  const resourceLeases: ResourceLease[] = [];
   try {
-    const hostLease = await acquireSingleResourceLease({
-      capacity,
-      label: `host-budget:${options.label}`,
-      onQueued: notifyQueued,
-      ownerId: effectiveOwnerId,
-      pollMs: options.pollMs,
-      resource: HOST_BUDGET_RESOURCE,
-      root,
-      signal: options.signal,
-      timeoutMs: options.timeoutMs,
-      weight: validationHostBudgetWeight(resourceClass, capacity),
-    });
+    const ordered = [...options].sort((left, right) =>
+      left.resource < right.resource ? -1 : left.resource > right.resource ? 1 : left.label.localeCompare(right.label),
+    );
+    for (const entry of ordered) {
+      resourceLeases.push(
+        await acquireSingleResourceLease({
+          ...entry,
+          onQueued: notifyQueued,
+          ownerAliases: [...new Set([...(entry.ownerAliases ?? []), entry.ownerId])].filter(
+            (ownerId): ownerId is string => ownerId !== undefined && ownerId !== effectiveOwnerId,
+          ),
+          ownerId: effectiveOwnerId,
+          root,
+        }),
+      );
+    }
+
+    const hostSource = options.find((entry) => hostBudgetClass(entry) !== undefined) ?? options[0];
+    let hostLease: ResourceLease | undefined;
+    if (resourceClasses.length > 0) {
+      const hostCapacities = new Set(
+        options.map((entry) => entry.hostBudgetCapacity).filter((value): value is number => value !== undefined),
+      );
+      if (hostCapacities.size > 1) throw new Error('resource lease group requires one host budget capacity');
+      const capacity = await resolveValidationHostBudgetCapacity([...hostCapacities][0]);
+      hostLease = await acquireSingleResourceLease({
+        capacity,
+        label: `host-budget:${options.map((entry) => entry.label).join('+')}`,
+        onQueued: notifyQueued,
+        ownerId: effectiveOwnerId,
+        pollMs: hostSource?.pollMs,
+        resource: HOST_BUDGET_RESOURCE,
+        root,
+        signal: hostSource?.signal,
+        timeoutMs: hostSource?.timeoutMs,
+        weight: Math.max(
+          ...resourceClasses.map((resourceClass) => validationHostBudgetWeight(resourceClass, capacity)),
+        ),
+      });
+    }
     let released = false;
     return {
       ownerId: effectiveOwnerId,
@@ -525,18 +563,18 @@ export async function acquireResourceLease(options: ResourceLeaseOptions): Promi
         if (released) return;
         released = true;
         try {
-          await hostLease.release();
+          await hostLease?.release();
         } finally {
-          await resourceLease.release();
+          for (const lease of resourceLeases.reverse()) await lease.release();
         }
       },
       updateOwnerPid: async (pid: number) => {
-        await resourceLease.updateOwnerPid(pid);
-        await hostLease.updateOwnerPid(pid);
+        for (const lease of resourceLeases) await lease.updateOwnerPid(pid);
+        await hostLease?.updateOwnerPid(pid);
       },
     };
   } catch (error) {
-    await resourceLease.release();
+    for (const lease of resourceLeases.reverse()) await lease.release();
     throw error;
   }
 }
