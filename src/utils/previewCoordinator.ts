@@ -1027,10 +1027,13 @@ export function reducePreviewCoordinator(
       }
       return { effects, state: withReceipt(state, event, 'operation-presented', identity.operationId) };
     }
+    const settledArtifactMatchesInteractiveInputs =
+      identity.kind === 'interactive' &&
+      state.visibleArtifact?.identity.kind === 'settled' &&
+      fingerprintPreviewSessionIdentity(state.visibleArtifact.identity.session) ===
+        fingerprintPreviewSessionIdentity(identity.session);
     const shouldPublish =
-      event.artifact !== undefined &&
-      identity.kind !== 'analytics' &&
-      !(identity.kind === 'interactive' && state.visibleArtifact?.identity.kind === 'settled');
+      event.artifact !== undefined && identity.kind !== 'analytics' && !settledArtifactMatchesInteractiveInputs;
     if (event.artifact !== undefined && !shouldPublish && event.artifact.url !== state.visibleArtifact?.url) {
       effects.push({ type: 'release-url', url: event.artifact.url, reason: 'artifact-not-presented' });
     }
