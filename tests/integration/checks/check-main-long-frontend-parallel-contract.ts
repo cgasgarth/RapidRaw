@@ -1,0 +1,120 @@
+#!/usr/bin/env bun
+
+import { readFileSync } from 'node:fs';
+
+import { MAIN_FRONTEND_LANES, mainFrontendClosureFailures } from '../../../scripts/ci/verify-main-frontend-closure.ts';
+
+type Step = {
+  env?: Record<string, string>;
+  name?: string;
+  run?: string;
+  uses?: string;
+  with?: Record<string, unknown>;
+};
+type Job = {
+  if?: string;
+  name?: string;
+  needs?: string[];
+  'runs-on'?: string;
+  steps?: Step[];
+  'timeout-minutes'?: number;
+};
+type Workflow = { jobs?: Record<string, Job> };
+
+const workflow = Bun.YAML.parse(readFileSync('.github/workflows/main-long-validation.yml', 'utf8')) as Workflow;
+const jobs = workflow.jobs ?? {};
+const packageScripts =
+  (JSON.parse(readFileSync('package.json', 'utf8')) as { scripts?: Record<string, string> }).scripts ?? {};
+const expectedCommands: Readonly<Record<(typeof MAIN_FRONTEND_LANES)[number], readonly string[]>> = {
+  'frontend-static': ['bun run lint', 'bun run format:check', 'bun run typecheck'],
+  'frontend-contracts': [
+    'bun run check:schema',
+    'bunx i18next-cli lint',
+    'bunx i18next-cli extract --ci --dry-run',
+    'bunx knip --config knip.jsonc --dependencies --reporter compact',
+    'bun tests/integration/checks/check-script-extension-policy.ts',
+    'bun tests/integration/checks/check-unsafe-casts.ts',
+    'bun tests/integration/checks/editor/check-editor-render-authority-boundary.ts',
+    'bun run check:docs',
+  ],
+  'frontend-unit': ['bun run test:unit'],
+  'frontend-browser': [
+    'bunx playwright install chromium',
+    'bun run check:browser-harness',
+    'bun tests/integration/checks/editor/check-section-disclosure-edit-authority-browser.ts',
+    'bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library',
+  ],
+  'frontend-bundle': ['bun run check:bundle', 'bun scripts/ci/write-vite-bundle-step-summary.ts'],
+};
+
+for (const lane of MAIN_FRONTEND_LANES) {
+  const job = jobs[lane];
+  if (job === undefined) throw new Error(`Main frontend workflow is missing ${lane}.`);
+  if (job.needs !== undefined) throw new Error(`${lane} must start independently, without needs.`);
+  if (job['runs-on'] !== 'ubuntu-latest') throw new Error(`${lane} must use the maintained Linux runner.`);
+  if ((job['timeout-minutes'] ?? 0) <= 0 || (job['timeout-minutes'] ?? 0) > 25)
+    throw new Error(`${lane} must retain a bounded, lane-sized timeout.`);
+  if (!job.steps?.some((step) => step.uses === './.github/actions/setup-bun-deps'))
+    throw new Error(`${lane} must use the maintained Bun dependency setup.`);
+  const commands =
+    job.steps?.flatMap(
+      (step) =>
+        step.run
+          ?.split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean) ?? [],
+    ) ?? [];
+  for (const command of expectedCommands[lane]) {
+    if (commands.filter((candidate) => candidate === command).length !== 1)
+      throw new Error(`${lane} must execute ${command} exactly once.`);
+  }
+  if (commands.some((command) => /\bturbo\b|--cache|run-resource-coordinated/u.test(command)))
+    throw new Error(`${lane} introduced a cache or custom scheduler instead of native Bun/GHA execution.`);
+}
+
+const allLaneCommands = MAIN_FRONTEND_LANES.flatMap(
+  (lane) => jobs[lane]?.steps?.flatMap((step) => step.run?.split('\n').map((line) => line.trim()) ?? []) ?? [],
+);
+if (allLaneCommands.filter((command) => command === 'bun run check:bundle').length !== 1)
+  throw new Error('The production Vite bundle must be built and validated exactly once.');
+if (allLaneCommands.some((command) => command === 'bun scripts/ci/generate-vite-bundle-report.ts'))
+  throw new Error('Bundle reporting must consume the report already produced by check:bundle.');
+if (!packageScripts['test:unit']?.startsWith('bun test ') || !packageScripts['test:unit'].includes('--parallel'))
+  throw new Error('The unit lane must delegate directly to Bun test with native parallel scheduling.');
+for (const command of [
+  'bun run build',
+  'check-vite-product-bundle-guard.ts',
+  'check-vite-production-payload.ts',
+  'check-vite-bundle-budget.ts',
+  'generate-vite-bundle-report.ts',
+]) {
+  if (!packageScripts['check:bundle']?.includes(command)) throw new Error(`The single bundle lane lost ${command}.`);
+}
+for (const command of ['check-edit-command-bus.ts', 'check-schema-contract-gate.ts']) {
+  if (!packageScripts['check:schema']?.includes(command)) throw new Error(`The schema lane lost ${command}.`);
+}
+
+const bundle = jobs['frontend-bundle'];
+const upload = bundle?.steps?.find((step) => step.name === 'Upload bundle analysis report');
+if (!upload?.uses?.startsWith('actions/upload-artifact@')) throw new Error('Bundle report upload must stay pinned.');
+if (!String(upload.with?.name).includes('github.sha') || upload.with?.['if-no-files-found'] !== 'error')
+  throw new Error('Bundle report artifact must be commit-addressed and fail closed when missing.');
+
+const closure = jobs['frontend-full'];
+if (closure?.if !== '${{ always() }}') throw new Error('Frontend closure must run after failures.');
+if (closure.needs?.toSorted().join(',') !== [...MAIN_FRONTEND_LANES].toSorted().join(','))
+  throw new Error('Frontend closure must depend on every parallel lane exactly once.');
+const closureStep = closure.steps?.find((step) => step.name === 'Fail closed on any frontend lane failure');
+if (
+  closureStep?.run !== 'bun scripts/ci/verify-main-frontend-closure.ts' ||
+  closureStep.env?.NEEDS_CONTEXT === undefined
+)
+  throw new Error('Frontend closure must verify the complete native needs context.');
+
+const successes = Object.fromEntries(MAIN_FRONTEND_LANES.map((lane) => [lane, { result: 'success' }]));
+if (mainFrontendClosureFailures(successes).length !== 0) throw new Error('Successful frontend lanes did not close.');
+const failed = { ...successes, 'frontend-browser': { result: 'failure' } };
+if (mainFrontendClosureFailures(failed).join(',') !== 'frontend-browser=failure')
+  throw new Error('Frontend closure did not fail on a failed independent lane.');
+
+console.log('main-long frontend contract ok (five parallel native Bun/GHA lanes, fail-closed aggregate)');
