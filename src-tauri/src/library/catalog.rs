@@ -870,7 +870,13 @@ fn rebuild_folder_aggregates(
             })
             .count() as i64;
         transaction.execute(
-            "INSERT INTO folders(folder_path,root_path,direct_image_count,recursive_image_count,child_folder_count,catalog_revision) VALUES (?1,?2,?3,?4,?5,?6)",
+            "INSERT INTO folders(folder_path,root_path,direct_image_count,recursive_image_count,child_folder_count,catalog_revision) VALUES (?1,?2,?3,?4,?5,?6)
+             ON CONFLICT(folder_path) DO UPDATE SET
+               root_path=excluded.root_path,
+               direct_image_count=excluded.direct_image_count,
+               recursive_image_count=excluded.recursive_image_count,
+               child_folder_count=excluded.child_folder_count,
+               catalog_revision=excluded.catalog_revision",
             params![folder, root, direct.get(folder).copied().unwrap_or(0), recursive, child_count, revision],
         ).map_err(|error| error.to_string())?;
     }
@@ -1129,6 +1135,50 @@ mod tests {
         connection.execute_batch(schema_sql()).expect("schema");
         let tables: i64 = connection.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('roots','sources','entities','folders')", [], |row| row.get(0)).expect("table count");
         assert_eq!(tables, 4);
+    }
+
+    #[test]
+    fn folder_aggregate_rebuild_is_idempotent_when_a_nested_root_already_exists() {
+        let connection = Connection::open_in_memory().expect("memory catalog");
+        connection.execute_batch(schema_sql()).expect("schema");
+        connection
+            .execute(
+                "INSERT INTO entities(image_id,source_path,root_path,folder_path,entity_json,entity_revision,seen_generation)
+                 VALUES ('/library/alaska/image.arw','/library/alaska/image.arw','/library','/library/alaska','{}',1,1)",
+                [],
+            )
+            .expect("parent-root entity");
+        let mut inner = CatalogInner {
+            connection: Some(connection),
+            ..CatalogInner::default()
+        };
+        rebuild_folder_aggregates(&mut inner, "/library", 1).expect("parent aggregates");
+
+        inner
+            .connection
+            .as_ref()
+            .expect("catalog")
+            .execute(
+                "UPDATE entities SET root_path='/library/alaska' WHERE image_id='/library/alaska/image.arw'",
+                [],
+            )
+            .expect("promote nested root");
+        rebuild_folder_aggregates(&mut inner, "/library/alaska", 2)
+            .expect("nested root aggregates");
+        rebuild_folder_aggregates(&mut inner, "/library/alaska", 3)
+            .expect("repeat nested root aggregates");
+
+        let aggregate = inner
+            .connection
+            .as_ref()
+            .expect("catalog")
+            .query_row(
+                "SELECT root_path,direct_image_count,recursive_image_count,catalog_revision FROM folders WHERE folder_path='/library/alaska'",
+                [],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?, row.get::<_, i64>(3)?)),
+            )
+            .expect("nested aggregate");
+        assert_eq!(aggregate, ("/library/alaska".to_string(), 1, 1, 3));
     }
 
     #[test]
