@@ -448,15 +448,15 @@ pub async fn begin_image_open(
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     promote_editor_initialization(&app);
     let joined = state
-        .services
-        .image_open
+        .editor()
+        .image_open()
         .begin_foreground(&request.session_id, &request.path)?;
     if let Some(notify) = &joined {
         let _ = tokio::time::timeout(Duration::from_secs(30), notify.notified()).await;
     }
     if !state
-        .services
-        .image_open
+        .editor()
+        .image_open()
         .is_current(&request.session_id, &request.path)
     {
         let _ = app.emit(
@@ -494,7 +494,7 @@ pub async fn begin_image_open(
         None
     };
     if crate::formats::is_raw_file(&request.path) {
-        let preview_coordinator = Arc::clone(&state.services.image_open);
+        let preview_coordinator = Arc::clone(state.editor().image_open());
         preview_coordinator.record_embedded_attempt();
         let preview_source_path = source_path.clone();
         let preview_session = request.session_id.clone();
@@ -611,8 +611,8 @@ pub async fn begin_image_open(
         });
     }
     if !state
-        .services
-        .image_open
+        .editor()
+        .image_open()
         .is_current(&request.session_id, &request.path)
     {
         return Err("image_open_superseded".to_string());
@@ -628,16 +628,16 @@ pub async fn begin_image_open(
     )
     .await?;
     if !state
-        .services
-        .image_open
+        .editor()
+        .image_open()
         .is_current(&request.session_id, &request.path)
     {
         return Err("image_open_superseded".to_string());
     }
     let decode_ready_millis = started.elapsed().as_millis() as u64;
     let frame_generation = state
-        .services
-        .image_open
+        .editor()
+        .image_open()
         .claim_frame(
             &request.session_id,
             &request.path,
@@ -693,14 +693,14 @@ pub fn schedule_image_prefetch(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> ImageOpenDiagnostics {
-    for scheduled in state.services.image_open.schedule(&request) {
+    for scheduled in state.editor().image_open().schedule(&request) {
         let ScheduledPrefetch {
             path,
             notify,
             identity,
         } = scheduled;
         let task_app = app.clone();
-        let cancellation = Arc::clone(&state.services.image_open.prefetch_generation);
+        let cancellation = Arc::clone(&state.editor().image_open().prefetch_generation);
         let cancellation_generation = identity.cancellation_generation;
         tauri::async_runtime::spawn(async move {
             let task_state = task_app.state::<AppState>();
@@ -713,18 +713,18 @@ pub fn schedule_image_prefetch(
             .await
             .is_ok();
             task_state
-                .services
-                .image_open
+                .editor()
+                .image_open()
                 .finish_prefetch(&path, identity, completed);
             notify.notify_one();
         });
     }
-    state.services.image_open.report()
+    state.editor().image_open().report()
 }
 
 #[tauri::command]
 pub fn get_image_open_diagnostics(state: State<'_, AppState>) -> ImageOpenDiagnostics {
-    state.services.image_open.report()
+    state.editor().image_open().report()
 }
 
 #[cfg(test)]
@@ -780,12 +780,15 @@ mod tests {
     #[test]
     fn app_service_keeps_only_newest_concurrent_open_publishable() {
         let services = Arc::new(crate::app::services::AppServices::new());
-        let scheduled = services.image_open.schedule(&ScheduleImagePrefetchRequest {
-            collection_generation: 1,
-            candidates: vec!["target.raw".into(), "neighbor.raw".into()],
-            memory_pressure: false,
-            workload_busy: false,
-        });
+        let scheduled = services
+            .editor()
+            .image_open()
+            .schedule(&ScheduleImagePrefetchRequest {
+                collection_generation: 1,
+                candidates: vec!["target.raw".into(), "neighbor.raw".into()],
+                memory_pressure: false,
+                workload_busy: false,
+            });
         assert_eq!(scheduled.len(), 2);
         let sessions: Vec<_> = (1..=8)
             .map(|generation| ImageOpenSessionId {
@@ -802,7 +805,10 @@ mod tests {
                 let barrier = Arc::clone(&barrier);
                 std::thread::spawn(move || {
                     barrier.wait();
-                    services.image_open.begin_foreground(&session, "target.raw")
+                    services
+                        .editor()
+                        .image_open()
+                        .begin_foreground(&session, "target.raw")
                 })
             })
             .collect();
@@ -816,12 +822,22 @@ mod tests {
         }
 
         let newest = sessions.last().unwrap();
-        assert!(services.image_open.is_current(newest, "target.raw"));
+        assert!(
+            services
+                .editor()
+                .image_open()
+                .is_current(newest, "target.raw")
+        );
         for stale in &sessions[..sessions.len() - 1] {
-            assert!(!services.image_open.is_current(stale, "target.raw"));
+            assert!(
+                !services
+                    .editor()
+                    .image_open()
+                    .is_current(stale, "target.raw")
+            );
         }
         assert_eq!(
-            services.image_open.claim_frame(
+            services.editor().image_open().claim_frame(
                 newest,
                 "target.raw",
                 ImageFrameQuality::EmbeddedProvisional,
@@ -829,7 +845,7 @@ mod tests {
             Some(1)
         );
         assert_eq!(
-            services.image_open.claim_frame(
+            services.editor().image_open().claim_frame(
                 newest,
                 "target.raw",
                 ImageFrameQuality::SettledDeveloped,
@@ -837,14 +853,14 @@ mod tests {
             Some(2)
         );
         assert_eq!(
-            services.image_open.claim_frame(
+            services.editor().image_open().claim_frame(
                 newest,
                 "target.raw",
                 ImageFrameQuality::EmbeddedProvisional,
             ),
             None
         );
-        assert!(services.image_open.report().prefetch_promotions >= 1);
+        assert!(services.editor().image_open().report().prefetch_promotions >= 1);
     }
 
     #[test]

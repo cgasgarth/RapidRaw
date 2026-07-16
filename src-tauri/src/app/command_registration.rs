@@ -44,6 +44,12 @@ macro_rules! collect_export_commands {
 
 macro_rules! collect_computational_commands {
     ([$($entries:tt)*]) => {
+        crate::computational::command_registration::with_commands!(collect_merge_commands [$($entries)*]);
+    };
+}
+
+macro_rules! collect_merge_commands {
+    ([$($entries:tt)*]) => {
         crate::merge::command_registration::with_commands!(define_command_registry [$($entries)*]);
     };
 }
@@ -148,7 +154,7 @@ mod tests {
                 crate::image_open_session::get_image_open_diagnostics,
                 crate::file_management::get_supported_file_types,
                 crate::export::export_processing::get_export_color_capabilities,
-                crate::merge::hdr::commands::cancel_hdr_plan,
+                crate::computational::commands::cancellation::cancel_hdr_plan,
             ])
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .expect("composed command application");

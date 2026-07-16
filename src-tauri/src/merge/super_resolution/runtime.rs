@@ -661,17 +661,6 @@ pub async fn plan_super_resolution(
     result
 }
 
-pub fn cancel_super_resolution_registration(
-    state: tauri::State<'_, AppState>,
-) -> Result<(), String> {
-    state.computational().burst_sr().cancel();
-    state
-        .computational()
-        .jobs()
-        .cancel_active_family(ComputationalMergeFamily::SuperResolution)
-        .map(|_| ())
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;

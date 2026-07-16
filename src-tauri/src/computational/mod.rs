@@ -1,3 +1,5 @@
+pub(crate) mod command_registration;
+pub(crate) mod commands;
 pub(crate) mod deblur_api;
 pub mod deblur_cpu_reference;
 pub(crate) mod deblur_render;

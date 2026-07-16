@@ -521,14 +521,6 @@ pub async fn plan_panorama(
 }
 
 #[tauri::command]
-pub fn cancel_panorama_alignment(
-    cancellation_id: String,
-    state: tauri::State<'_, AppState>,
-) -> bool {
-    state.computational().panorama().cancel(&cancellation_id)
-}
-
-#[tauri::command]
 pub async fn stitch_panorama(
     cancellation_id: Option<String>,
     options: Option<PanoramaStitchOptions>,
