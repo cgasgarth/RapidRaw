@@ -146,7 +146,7 @@ const waitForRenderedPointColor = async (page: Page, expected: boolean) => {
     if (
       call.success &&
       call.data.endedAtMs !== null &&
-      call.data.args.request.editDocumentV2.nodes.point_color.params.pointColor.enabled === expected
+      call.data.args.request.editDocumentV2.nodes.point_color.params['pointColor'].enabled === expected
     )
       return call.data;
     await page.waitForTimeout(50);

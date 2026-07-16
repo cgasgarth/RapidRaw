@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentNodeParamsV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   ActorKind,
@@ -12,8 +13,8 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
+import { selectEditDocumentGeometry } from '../../editDocumentSelectors';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
@@ -113,10 +114,10 @@ const GEOMETRY_KEYS = [
 ] as const satisfies ReadonlyArray<keyof z.infer<typeof geometryPatchSchema>>;
 
 const applyGeometryPatchToAdjustments = (
-  base: Adjustments,
+  base: EditDocumentNodeParamsV2<'geometry'>,
   patch: z.infer<typeof geometryPatchSchema>,
-): Adjustments => {
-  const next: Adjustments = { ...base };
+): EditDocumentNodeParamsV2<'geometry'> => {
+  const next: EditDocumentNodeParamsV2<'geometry'> = { ...base };
   if (patch.aspectRatio !== undefined) next.aspectRatio = patch.aspectRatio;
   if (patch.crop !== undefined) next.crop = patch.crop;
   if (patch.flipHorizontal !== undefined) next.flipHorizontal = patch.flipHorizontal;
@@ -139,8 +140,8 @@ const estimateGeometryPixelChange = ({
   before,
   imageArea,
 }: {
-  after: Adjustments;
-  before: Adjustments;
+  after: EditDocumentNodeParamsV2<'geometry'>;
+  before: EditDocumentNodeParamsV2<'geometry'>;
   imageArea: number;
 }): number => {
   const changedFieldCount = GEOMETRY_KEYS.filter(
@@ -150,7 +151,7 @@ const estimateGeometryPixelChange = ({
 };
 
 const buildGeometryPatchOperations = (
-  before: Adjustments,
+  before: EditDocumentNodeParamsV2<'geometry'>,
   patch: z.infer<typeof geometryPatchSchema>,
 ): EditGraphParameterPatchOperationV1[] =>
   GEOMETRY_KEYS.flatMap((key) => {
@@ -273,7 +274,7 @@ export const applyAgentGeometry = async (
   const commitIdentity = captureAgentToolCommitIdentity(state);
   if (commitIdentity === null) throw new Error('Agent geometry apply requires a selected image session.');
 
-  const beforeAdjustments = state.adjustmentSnapshot.value;
+  const beforeAdjustments = selectEditDocumentGeometry(state.editDocumentV2);
   const undoGraphRevision = `history_${state.historyIndex}`;
   const operations = buildGeometryPatchOperations(beforeAdjustments, parsedRequest.geometry);
   const typedMutation = await dispatchTypedGeometryEditGraphApply(

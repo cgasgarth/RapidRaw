@@ -35,7 +35,7 @@ test('routes every compact zoom mode through the canonical zoom command callback
 
 test('keyboard pan updates only the canonical viewer transform', async () => {
   const transforms: number[][] = [];
-  const adjustments = useEditorStore.getState().adjustmentSnapshot.value;
+  const adjustments = useEditorStore.getState().editDocumentV2;
   const history = useEditorStore.getState().history;
   const controller: EditorTransformController = {
     instance: { transformState: { positionX: -400, positionY: -300, scale: 2 } },
@@ -47,7 +47,7 @@ test('keyboard pan updates only the canonical viewer transform', async () => {
   fireEvent.keyDown(overview, { key: 'ArrowRight' });
 
   expect(transforms.at(-1)).toEqual([-440, -300, 2]);
-  expect(useEditorStore.getState().adjustmentSnapshot.value).toBe(adjustments);
+  expect(useEditorStore.getState().editDocumentV2).toBe(adjustments);
   expect(useEditorStore.getState().history).toBe(history);
 });
 

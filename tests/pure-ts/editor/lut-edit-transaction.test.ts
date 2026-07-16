@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  setEditDocumentV2NodeEnabled,
+} from '../../../src/utils/editDocumentV2';
 import {
   buildLutClearEditTransaction,
   buildLutLoadEditTransaction,
@@ -38,7 +42,13 @@ describe('LUT edit transaction', () => {
       exposure: 0.4,
       effectsEnabled: false,
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = setEditDocumentV2NodeEnabled(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'display_creative',
+      adjustments.effectsEnabled,
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -90,23 +100,21 @@ describe('LUT edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+    expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']?.params).toMatchObject({
       lutName: null,
       lutPath: null,
       lutSize: 0,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.effectsEnabled).toBeFalse();
+    expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']!.enabled).toBeFalse();
   });
 
   test('clears complete LUT identity in one node revision and Undo restores it', () => {
-    const loaded = {
-      ...useEditorStore.getState().adjustmentSnapshot.value,
+    const editDocumentV2 = patchEditDocumentV2Node(useEditorStore.getState().editDocumentV2, 'display_creative', {
       lutIntensity: 47,
       lutName: 'loaded.cube',
       lutPath: '/luts/loaded.cube',
       lutSize: 17,
-    };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(loaded);
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       editDocumentV2,
       history: [editDocumentV2],
@@ -126,7 +134,7 @@ describe('LUT edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+    expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']?.params).toMatchObject({
       lutIntensity: 47,
       lutName: 'loaded.cube',
       lutPath: '/luts/loaded.cube',

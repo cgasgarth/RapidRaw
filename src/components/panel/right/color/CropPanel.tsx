@@ -17,12 +17,13 @@ import {
 } from 'lucide-react';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EditDocumentNodeParamsV2 } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
 
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
+import { INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
 import {
   buildLensModalEditTransaction,
   buildTransformModalEditTransaction,
@@ -31,6 +32,11 @@ import {
   isCurrentCropModalEditIdentity,
 } from '../../../../utils/cropModalEditTransaction';
 import { resolveCropForGeometryTransaction } from '../../../../utils/cropUtils';
+import {
+  selectEditDocumentGeometry,
+  selectEditDocumentMasks,
+  selectEditDocumentNode,
+} from '../../../../utils/editDocumentSelectors';
 import {
   buildOrientationFlipEditTransaction,
   type OrientationFlipAxis,
@@ -56,13 +62,13 @@ interface CropPreset {
 }
 
 export interface CropEditSessionSnapshot {
-  adjustments: Adjustments;
+  adjustments: EditDocumentNodeParamsV2<'geometry'>;
   overlayMode: OverlayMode;
   overlayRotation: number;
 }
 
 export function buildCropEditSessionSnapshot(
-  adjustments: Adjustments,
+  adjustments: EditDocumentNodeParamsV2<'geometry'>,
   overlayMode: OverlayMode,
   overlayRotation: number,
 ): CropEditSessionSnapshot {
@@ -146,7 +152,13 @@ export default function CropPanel() {
 function CropEditSession() {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((s) => s.selectedImage);
-  const adjustments = useEditorStore((s) => s.adjustmentSnapshot.value);
+  const adjustments = useEditorStore((s) => selectEditDocumentGeometry(s.editDocumentV2));
+  const lensAdjustments = useEditorStore((s) => selectEditDocumentNode(s.editDocumentV2, 'lens_correction').params);
+  const masks = useEditorStore((s) => selectEditDocumentMasks(s.editDocumentV2));
+  const modalAdjustments = useMemo(
+    () => ({ ...adjustments, ...lensAdjustments, masks }),
+    [adjustments, lensAdjustments, masks],
+  );
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
   const activeOverlay = useEditorStore((s) => s.overlayMode);
   const overlayRotation = useEditorStore((s) => s.overlayRotation);
@@ -161,7 +173,7 @@ function CropEditSession() {
   const isTransformModalOpen = useUIStore((s) => s.isTransformModalOpen);
   const setUI = useUIStore((s) => s.setUI);
   const setRightPanel = useUIStore((s) => s.setRightPanel);
-  const { setAdjustments } = useEditorActions();
+  const { commitEditNodeOperations } = useEditorActions();
   const [customDraft, setCustomDraft] = useState<{ height: string; width: string } | null>(null);
   const [isRotationActive, setIsRotationActive] = useState(false);
   const [preferredPresetOrientation, setPreferredPresetOrientation] = useState<Orientation>(() =>
@@ -285,10 +297,11 @@ function CropEditSession() {
   );
 
   const setGeometryAdjustments = useCallback(
-    (update: (previous: Adjustments) => Adjustments) => {
-      setAdjustments((previous: Adjustments) => {
-        const next = update(previous);
-        if (!selectedImage?.width || !selectedImage.height) return next;
+    (update: (previous: EditDocumentNodeParamsV2<'geometry'>) => EditDocumentNodeParamsV2<'geometry'>) => {
+      const previous = selectEditDocumentGeometry(useEditorStore.getState().editDocumentV2);
+      const next = update(previous);
+      let resolved = next;
+      if (selectedImage?.width && selectedImage.height) {
         const previousGeometry = {
           aspectRatio: previous.aspectRatio,
           orientationSteps: previous.orientationSteps || 0,
@@ -304,21 +317,23 @@ function CropEditSession() {
           previousGeometry.orientationSteps === nextGeometry.orientationSteps &&
           previousGeometry.rotation === nextGeometry.rotation
         ) {
-          return next;
+          resolved = next;
+        } else {
+          resolved = {
+            ...next,
+            crop: resolveCropForGeometryTransaction(
+              previous.crop,
+              selectedImage.width,
+              selectedImage.height,
+              previousGeometry,
+              nextGeometry,
+            ),
+          };
         }
-        return {
-          ...next,
-          crop: resolveCropForGeometryTransaction(
-            previous.crop,
-            selectedImage.width,
-            selectedImage.height,
-            previousGeometry,
-            nextGeometry,
-          ),
-        };
-      });
+      }
+      commitEditNodeOperations([{ nodeType: 'geometry', patch: resolved, type: 'patch-edit-document-node' }]);
     },
-    [selectedImage, setAdjustments],
+    [commitEditNodeOperations, selectedImage],
   );
 
   useEffect(() => {
@@ -402,7 +417,7 @@ function CropEditSession() {
       const newAspectRatio = numW / numH;
       setCustomDraft(null);
       if (!adjustments.aspectRatio || Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE) {
-        setGeometryAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio }));
+        setGeometryAdjustments((prev) => ({ ...prev, aspectRatio: newAspectRatio }));
       }
     } else {
       setCustomRatioError(true);
@@ -434,7 +449,7 @@ function CropEditSession() {
 
   const handlePresetClick = (preset: CropPreset) => {
     if (preset.value === ORIGINAL_RATIO) {
-      setGeometryAdjustments((prev: Adjustments) => ({
+      setGeometryAdjustments((prev) => ({
         ...prev,
         aspectRatio: resolveCropPresetRatio(preset.value, preferredPresetOrientation, getEffectiveOriginalRatio()),
       }));
@@ -445,7 +460,7 @@ function CropEditSession() {
     if (activePreset === preset && targetRatio && targetRatio !== 1) {
       const newRatio = 1 / (adjustments.aspectRatio ? adjustments.aspectRatio : 1);
       setPreferredPresetOrientation(newRatio < 1 ? Orientation.Vertical : Orientation.Horizontal);
-      setGeometryAdjustments((prev: Adjustments) => ({
+      setGeometryAdjustments((prev) => ({
         ...prev,
         aspectRatio: newRatio,
       }));
@@ -454,14 +469,14 @@ function CropEditSession() {
 
     const newAspectRatio = resolveCropPresetRatio(targetRatio, preferredPresetOrientation, getEffectiveOriginalRatio());
 
-    setGeometryAdjustments((prev: Adjustments) => ({ ...prev, aspectRatio: newAspectRatio }));
+    setGeometryAdjustments((prev) => ({ ...prev, aspectRatio: newAspectRatio }));
   };
 
   const handleOrientationToggle = useCallback(() => {
     if (aspectRatio && aspectRatio !== 1) {
       const newRatio = 1 / aspectRatio;
       setPreferredPresetOrientation(newRatio < 1 ? Orientation.Vertical : Orientation.Horizontal);
-      setGeometryAdjustments((prev: Adjustments) => ({
+      setGeometryAdjustments((prev) => ({
         ...prev,
         aspectRatio: newRatio,
       }));
@@ -480,7 +495,7 @@ function CropEditSession() {
 
     setOverlay('thirds');
 
-    setAdjustments((prev: Adjustments) => ({
+    setGeometryAdjustments((prev) => ({
       ...prev,
       aspectRatio: originalAspectRatio,
       crop: INITIAL_ADJUSTMENTS.crop,
@@ -522,14 +537,14 @@ function CropEditSession() {
     if (isRotationActive) {
       updateLocalRotation(newFineRotation);
     } else {
-      setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: newFineRotation }));
+      setGeometryAdjustments((prev) => ({ ...prev, rotation: newFineRotation }));
     }
   };
 
   const handleStepRotate = (degrees: number) => {
     const increment = degrees > 0 ? 1 : 3;
     const originalIsActive = activePreset?.value === ORIGINAL_RATIO;
-    setGeometryAdjustments((prev: Adjustments) => {
+    setGeometryAdjustments((prev) => {
       const nextOrientationSteps = ((prev.orientationSteps || 0) + increment) % 4;
       const newAspectRatio = originalIsActive
         ? getOrientedOriginalRatio(selectedImage?.width, selectedImage?.height, nextOrientationSteps)
@@ -547,14 +562,14 @@ function CropEditSession() {
 
   const resetFineRotation = () => {
     updateLocalRotation(null);
-    setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
+    setGeometryAdjustments((prev) => ({ ...prev, rotation: 0 }));
   };
 
   const handleStraightenToggle = () => {
     const willBeActive = !isStraightenActive;
     if (willBeActive) {
       updateLocalRotation(null);
-      setGeometryAdjustments((previous: Adjustments) => ({ ...previous, rotation: 0 }));
+      setGeometryAdjustments((previous) => ({ ...previous, rotation: 0 }));
     }
     setEditor({ isStraightenActive: willBeActive });
   };
@@ -594,7 +609,7 @@ function CropEditSession() {
         if (localRotationRef.current !== null) {
           const finalRot = localRotationRef.current;
           updateLocalRotation(null);
-          setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRot }));
+          setGeometryAdjustments((prev) => ({ ...prev, rotation: finalRot }));
         }
       }
     },
@@ -615,7 +630,7 @@ function CropEditSession() {
 
     const finalRotation = localRotationRef.current;
     updateLocalRotation(null);
-    setGeometryAdjustments((prev: Adjustments) => ({ ...prev, rotation: finalRotation }));
+    setGeometryAdjustments((prev) => ({ ...prev, rotation: finalRotation }));
   };
 
   const handleApply = () => {
@@ -634,7 +649,13 @@ function CropEditSession() {
       overlayRotation: sessionSnapshot.overlayRotation,
     });
     if (JSON.stringify(sessionSnapshot.adjustments) !== JSON.stringify(adjustments)) {
-      setAdjustments(() => structuredClone(sessionSnapshot.adjustments));
+      commitEditNodeOperations([
+        {
+          nodeType: 'geometry',
+          patch: structuredClone(sessionSnapshot.adjustments),
+          type: 'patch-edit-document-node',
+        },
+      ]);
     }
     setRightPanel(Panel.Adjustments);
   };
@@ -774,7 +795,7 @@ function CropEditSession() {
                     if (preferredPresetOrientation === Orientation.Vertical) {
                       newAspectRatio = 1 / BASE_RATIO;
                     }
-                    setAdjustments((prev: Adjustments) => ({
+                    setGeometryAdjustments((prev) => ({
                       ...prev,
                       aspectRatio: newAspectRatio,
                     }));
@@ -1132,7 +1153,7 @@ function CropEditSession() {
           if (identity === null || !isCurrentCropModalEditIdentity(state, identity)) return;
           applyEditTransaction(buildTransformModalEditTransaction(state, identity, newParams, crypto.randomUUID()));
         }}
-        currentAdjustments={adjustments}
+        currentAdjustments={modalAdjustments}
         sourceKey={selectedImage?.path ?? 'no-image'}
       />
 
@@ -1147,7 +1168,7 @@ function CropEditSession() {
           if (identity === null || !isCurrentCropModalEditIdentity(state, identity)) return;
           applyEditTransaction(buildLensModalEditTransaction(state, identity, newParams, crypto.randomUUID()));
         }}
-        currentAdjustments={adjustments}
+        currentAdjustments={modalAdjustments}
         selectedImage={selectedImage}
       />
     </div>

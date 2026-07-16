@@ -3,12 +3,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Check, Eye, EyeOff, Grid3X3, Info, LineChart, Maximize, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EditDocumentNodeParamsV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
+import { useEditorStore } from '../../../store/useEditorStore';
 import { type PreviewGeometryParams, requestPreviewGeometry } from '../../../tauri/previewGeometry';
 import { TextColors, TextVariants } from '../../../types/typography';
-import type { Adjustments } from '../../../utils/adjustments';
+import type { MaskContainer } from '../../../utils/adjustments';
 import { throttle } from '../../../utils/timing';
 import Button from '../../ui/primitives/Button';
 import Slider from '../../ui/primitives/Slider';
@@ -37,7 +39,7 @@ interface TransformModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (newParams: TransformParams) => void;
-  currentAdjustments: Adjustments;
+  currentAdjustments: TransformModalAdjustmentView;
   sourceKey: string;
 }
 
@@ -52,7 +54,10 @@ export const DEFAULT_TRANSFORM_PARAMS: TransformParams = {
   y_offset: 0,
 };
 
-export function buildTransformDraft(currentAdjustments: Adjustments): TransformParams {
+type TransformModalAdjustmentView = EditDocumentNodeParamsV2<'geometry'> &
+  EditDocumentNodeParamsV2<'lens_correction'> & { masks: readonly MaskContainer[] };
+
+export function buildTransformDraft(currentAdjustments: TransformModalAdjustmentView): TransformParams {
   return {
     distortion: currentAdjustments.transformDistortion,
     vertical: currentAdjustments.transformVertical,
@@ -254,7 +259,7 @@ function TransformSession({
           const result = await requestPreviewGeometry({
             sourceIdentity: sourceKey,
             params: fullParams,
-            adjustments: currentAdjustments,
+            editDocumentV2: useEditorStore.getState().editDocumentV2,
             showLines: linesEnabled,
           });
           if (!requestGate.current.isCurrent(requestId)) return;
@@ -335,7 +340,7 @@ function TransformSession({
       void requestPreviewGeometry({
         sourceIdentity: sourceKey,
         params: fullParams,
-        adjustments: currentAdjustments,
+        editDocumentV2: useEditorStore.getState().editDocumentV2,
         showLines: false,
       })
         .then((result) => {

@@ -11,19 +11,18 @@ import {
   rollbackApprovedAgentPlan,
 } from '../../../../src/utils/agent/safety/agentAtomicApproval.ts';
 import {
-  legacyAdjustmentsToEditDocumentV2,
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
   setEditDocumentV2NodeEnabled,
 } from '../../../../src/utils/editDocumentV2.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3160.ARW';
-const initialDocument = setEditDocumentV2NodeEnabled(
-  legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
-  'tone_equalizer',
-  false,
-);
+const initialDocument = setEditDocumentV2NodeEnabled(createDefaultEditDocumentV2(), 'tone_equalizer', false);
 const futureAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 3 };
 const futureDocument = setEditDocumentV2NodeEnabled(
-  legacyAdjustmentsToEditDocumentV2(futureAdjustments),
+  patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+    contrast: futureAdjustments.contrast,
+  }),
   'tone_equalizer',
   false,
 );

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentNodeParamsV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   ActorKind,
@@ -10,8 +11,8 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
@@ -144,8 +145,15 @@ const DETAIL_EFFECTS_PATCH_KEYS = [
   'vignetteRoundness',
 ] as const satisfies ReadonlyArray<keyof AgentDetailEffectsPatch>;
 
-const applyDetailEffectsPatchToAdjustments = (base: Adjustments, patch: AgentDetailEffectsPatch): Adjustments => {
-  const next: Adjustments = { ...base };
+type DetailEffectsView = EditDocumentNodeParamsV2<'detail_denoise_dehaze'> &
+  EditDocumentNodeParamsV2<'display_creative'> &
+  EditDocumentNodeParamsV2<'lens_correction'>;
+
+const applyDetailEffectsPatchToAdjustments = (
+  base: DetailEffectsView,
+  patch: AgentDetailEffectsPatch,
+): DetailEffectsView => {
+  const next: DetailEffectsView = { ...base };
   if (patch.chromaticAberrationBlueYellow !== undefined)
     next.chromaticAberrationBlueYellow = patch.chromaticAberrationBlueYellow;
   if (patch.chromaticAberrationRedCyan !== undefined)
@@ -188,8 +196,8 @@ const estimateChangedPixels = ({
   before,
   imageArea,
 }: {
-  after: Adjustments;
-  before: Adjustments;
+  after: DetailEffectsView;
+  before: DetailEffectsView;
   imageArea: number;
 }) => {
   const changedFieldCount = DETAIL_EFFECTS_PATCH_KEYS.filter(
@@ -316,14 +324,16 @@ export const applyAgentDetailEffects = async (
   if (commitIdentity === null) throw new Error('Agent detail/effects apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const nextAdjustments = applyDetailEffectsPatchToAdjustments(
-    state.adjustmentSnapshot.value,
-    parsedRequest.detailEffects,
-  );
+  const beforeAdjustments: DetailEffectsView = {
+    ...selectEditDocumentNode(state.editDocumentV2, 'detail_denoise_dehaze').params,
+    ...selectEditDocumentNode(state.editDocumentV2, 'display_creative').params,
+    ...selectEditDocumentNode(state.editDocumentV2, 'lens_correction').params,
+  };
+  const nextAdjustments = applyDetailEffectsPatchToAdjustments(beforeAdjustments, parsedRequest.detailEffects);
   const adjustedFields = DETAIL_EFFECTS_PATCH_KEYS.filter(
     (key) =>
       parsedRequest.detailEffects[key] !== undefined &&
-      JSON.stringify(state.adjustmentSnapshot.value[key]) !== JSON.stringify(nextAdjustments[key]),
+      JSON.stringify(beforeAdjustments[key]) !== JSON.stringify(nextAdjustments[key]),
   );
   const typedMutation =
     adjustedFields.length === 0
@@ -338,7 +348,69 @@ export const applyAgentDetailEffects = async (
         );
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
-    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+    buildAgentToolEditTransaction(
+      currentState,
+      commitIdentity,
+      [
+        {
+          nodeType: 'detail_denoise_dehaze',
+          patch: {
+            clarity: nextAdjustments.clarity,
+            colorNoiseReduction: nextAdjustments.colorNoiseReduction,
+            deblurEnabled: nextAdjustments.deblurEnabled,
+            deblurSigmaPx: nextAdjustments.deblurSigmaPx,
+            deblurStrength: nextAdjustments.deblurStrength,
+            dehaze: nextAdjustments.dehaze,
+            denoiseContrastProtection: nextAdjustments.denoiseContrastProtection,
+            denoiseDetail: nextAdjustments.denoiseDetail,
+            denoiseNaturalGrain: nextAdjustments.denoiseNaturalGrain,
+            denoiseShadowBias: nextAdjustments.denoiseShadowBias,
+            localContrastHaloGuard: nextAdjustments.localContrastHaloGuard,
+            localContrastMidtoneMask: nextAdjustments.localContrastMidtoneMask,
+            localContrastRadiusPx: nextAdjustments.localContrastRadiusPx,
+            lumaNoiseReduction: nextAdjustments.lumaNoiseReduction,
+            sharpness: nextAdjustments.sharpness,
+            sharpnessThreshold: nextAdjustments.sharpnessThreshold,
+            structure: nextAdjustments.structure,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'display_creative',
+          patch: {
+            flareAmount: nextAdjustments.flareAmount,
+            glowAmount: nextAdjustments.glowAmount,
+            grainAmount: nextAdjustments.grainAmount,
+            grainRoughness: nextAdjustments.grainRoughness,
+            grainSize: nextAdjustments.grainSize,
+            halationAmount: nextAdjustments.halationAmount,
+            vignetteAmount: nextAdjustments.vignetteAmount,
+            vignetteFeather: nextAdjustments.vignetteFeather,
+            vignetteMidpoint: nextAdjustments.vignetteMidpoint,
+            vignetteRoundness: nextAdjustments.vignetteRoundness,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'lens_correction',
+          patch: {
+            chromaticAberrationBlueYellow: nextAdjustments.chromaticAberrationBlueYellow,
+            chromaticAberrationRedCyan: nextAdjustments.chromaticAberrationRedCyan,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          patch: {
+            dustSpotMinRadiusPx: nextAdjustments.dustSpotMinRadiusPx,
+            dustSpotOverlayEnabled: nextAdjustments.dustSpotOverlayEnabled,
+            dustSpotSensitivity: nextAdjustments.dustSpotSensitivity,
+          },
+          nodeType: 'detail_denoise_dehaze',
+          type: 'patch-edit-document-node',
+        },
+      ],
+      `${parsedRequest.operationId}_apply`,
+    ),
   );
 
   const afterSnapshot = buildAgentImageContextSnapshot();
@@ -351,7 +423,7 @@ export const applyAgentDetailEffects = async (
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
       after: nextAdjustments,
-      before: state.adjustmentSnapshot.value,
+      before: beforeAdjustments,
       imageArea: selectedImage.width * selectedImage.height,
     }),
     receipt: {

@@ -13,7 +13,7 @@ struct PresetPreviewIdentity {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct PresetPreviewRequest {
     pub(super) expected_image_path: String,
-    pub(super) js_adjustments: serde_json::Value,
+    pub(super) edit_document_v2: serde_json::Value,
     preview_identity: PresetPreviewIdentity,
 }
 
@@ -80,10 +80,11 @@ mod tests {
             request: PresetPreviewRequest,
         }
 
+        let edit_document_v2 = crate::exif_processing::neutral_current_edit_document();
         let args: InvokeArgs = serde_json::from_value(serde_json::json!({
             "request": {
                 "expectedImagePath": "/fixtures/current.ARW",
-                "jsAdjustments": { "exposure": 0.9 },
+                "editDocumentV2": edit_document_v2,
                 "previewIdentity": {
                     "imageSessionId": 7,
                     "presetId": "alaska-proof-look",
@@ -95,10 +96,10 @@ mod tests {
         .expect("frontend invoke args must match the native command contract");
 
         assert!(validate_preset_preview_request(&args.request).is_ok());
-        assert_eq!(args.request.js_adjustments["exposure"], 0.9);
+        assert_eq!(args.request.edit_document_v2["schemaVersion"], 2);
         assert!(
             serde_json::from_value::<InvokeArgs>(serde_json::json!({
-                "jsAdjustments": { "exposure": 0.9 }
+                "editDocumentV2": crate::exif_processing::neutral_current_edit_document()
             }))
             .is_err()
         );
@@ -108,7 +109,7 @@ mod tests {
     fn request_identity_rejects_a_different_source_or_zero_revision() {
         let request: PresetPreviewRequest = serde_json::from_value(serde_json::json!({
             "expectedImagePath": "/fixtures/current.ARW",
-            "jsAdjustments": {},
+            "editDocumentV2": crate::exif_processing::neutral_current_edit_document(),
             "previewIdentity": {
                 "imageSessionId": 0,
                 "presetId": "alaska-proof-look",

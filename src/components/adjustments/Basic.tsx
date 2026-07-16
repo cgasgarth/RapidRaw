@@ -1,10 +1,11 @@
 import cx from 'clsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
-import { type Adjustments, BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { type BasicToneCommitIdentity, buildBasicToneEditTransaction } from '../../utils/basicToneEditTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import {
@@ -17,8 +18,13 @@ import { compactInspectorSliderTokens } from '../ui/inspectorTokens';
 import InspectorSegmentedControl from '../ui/primitives/InspectorSegmentedControl';
 import AdjustmentSlider from './AdjustmentSlider';
 
+export type BasicAdjustmentView = EditDocumentNodeParamsV2<'scene_global_color_tone'> &
+  EditDocumentNodeParamsV2<'scene_to_view_transform'> &
+  EditDocumentNodeParamsV2<'tone_equalizer'>;
+export type BasicAdjustmentUpdate = Partial<BasicAdjustmentView> | ((prev: BasicAdjustmentView) => BasicAdjustmentView);
+
 interface BasicAdjustmentsProps {
-  adjustments: Adjustments;
+  adjustments: BasicAdjustmentView;
   setAdjustments: (adjustments: AdjustmentUpdate) => void;
   isForMask?: boolean;
   onRequireEditGraphV2?: () => void;
@@ -27,12 +33,12 @@ interface BasicAdjustmentsProps {
 }
 
 interface ToneMapperSwitchProps {
-  selectedMapper: Adjustments['toneMapper'];
-  onMapperChange: (mapper: Adjustments['toneMapper']) => void;
+  selectedMapper: BasicAdjustmentView['toneMapper'];
+  onMapperChange: (mapper: BasicAdjustmentView['toneMapper']) => void;
   onReset: () => void;
 }
 
-type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
+type AdjustmentUpdate = BasicAdjustmentUpdate;
 
 const TONE_ZONE_LABELS = ['−8 EV', '−6 EV', '−4 EV', '−2 EV', '0 EV', '+2 EV', '+4 EV', '+6 EV', '+8 EV'];
 
@@ -176,7 +182,7 @@ export default function BasicAdjustments({
       };
       return;
     }
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
+    setAdjustments((prev: BasicAdjustmentView) => ({ ...prev, [key]: value }));
   };
 
   const beginBasicSliderInteraction = (key: BasicAdjustment) => {
@@ -230,22 +236,22 @@ export default function BasicAdjustments({
     [adjustmentRevision, cancelBasicToneSliderInteraction, imageSessionId, selectedImagePath],
   );
 
-  const handleToneMapperChange = (mapper: Adjustments['toneMapper']) => {
-    setAdjustments((prev: Adjustments) => ({
+  const handleToneMapperChange = (mapper: BasicAdjustmentView['toneMapper']) => {
+    setAdjustments((prev: BasicAdjustmentView) => ({
       ...prev,
       toneMapper: mapper,
     }));
   };
 
   const handleToneMapperReset = () => {
-    setAdjustments((prev: Adjustments) => ({
+    setAdjustments((prev: BasicAdjustmentView) => ({
       ...prev,
       toneMapper: INITIAL_ADJUSTMENTS.toneMapper,
     }));
   };
 
-  const handleViewSettingChange = (key: keyof Adjustments['viewTransform'], value: number) => {
-    setAdjustments((prev: Adjustments) => ({
+  const handleViewSettingChange = (key: keyof BasicAdjustmentView['viewTransform'], value: number) => {
+    setAdjustments((prev: BasicAdjustmentView) => ({
       ...prev,
       viewTransform: { ...prev.viewTransform, [key]: value },
     }));
@@ -253,7 +259,7 @@ export default function BasicAdjustments({
 
   const commitToneEqualizerAtIdentity = (
     identity: BasicToneCommitIdentity,
-    patch: Partial<Adjustments['toneEqualizer']>,
+    patch: Partial<BasicAdjustmentView['toneEqualizer']>,
   ) => {
     const result = applyEditTransaction(
       buildToneEqualizerEditTransaction(useEditorStore.getState(), identity, patch, crypto.randomUUID()),
@@ -264,12 +270,12 @@ export default function BasicAdjustments({
     };
   };
 
-  const updateToneEqualizer = (patch: Partial<Adjustments['toneEqualizer']>) => {
+  const updateToneEqualizer = (patch: Partial<BasicAdjustmentView['toneEqualizer']>) => {
     tonePlacementRequestGenerationRef.current += 1;
     if (!isForMask) {
       const identity = basicToneCommitIdentityRef.current;
       if (identity === null) {
-        setAdjustments((prev: Adjustments) => ({
+        setAdjustments((prev: BasicAdjustmentView) => ({
           ...prev,
           rawEngineEditGraphVersion: 2,
           toneEqualizer: { ...prev.toneEqualizer, ...patch },
@@ -280,14 +286,14 @@ export default function BasicAdjustments({
       return;
     }
     onRequireEditGraphV2?.();
-    setAdjustments((prev: Adjustments) => ({
+    setAdjustments((prev: BasicAdjustmentView) => ({
       ...prev,
       toneEqualizer: { ...prev.toneEqualizer, ...patch },
     }));
   };
 
   const updateToneBand = (index: number, value: number) => {
-    const bandEv = [...adjustments.toneEqualizer.bandEv] as Adjustments['toneEqualizer']['bandEv'];
+    const bandEv = [...adjustments.toneEqualizer.bandEv] as BasicAdjustmentView['toneEqualizer']['bandEv'];
     bandEv[index] = value;
     updateToneEqualizer({ bandEv, enabled: true, selectedBand: index });
   };
@@ -325,7 +331,7 @@ export default function BasicAdjustments({
       };
       if (identity === null) {
         onRequireEditGraphV2?.();
-        setAdjustments((prev: Adjustments) => ({
+        setAdjustments((prev: BasicAdjustmentView) => ({
           ...prev,
           toneEqualizer: { ...prev.toneEqualizer, ...patch },
         }));

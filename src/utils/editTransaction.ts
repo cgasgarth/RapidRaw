@@ -31,8 +31,7 @@ export type EditMutationSource =
   | 'agent-command'
   | 'reset'
   | 'history'
-  | 'hydration'
-  | 'migration';
+  | 'hydration';
 
 export type EditTransactionHistory =
   | 'single-entry'
@@ -49,11 +48,7 @@ export type EditTransactionPersistence = 'commit' | 'native-committed' | 'previe
  * read-only compatibility projection and is never transaction authority.
  */
 export type EditNodeOperation =
-  | {
-      type: 'patch-edit-document-node';
-      nodeType: EditDocumentNodeTypeV2;
-      patch: Readonly<Record<string, unknown>>;
-    }
+  | PatchEditDocumentNodeOperation
   | { type: 'set-edit-document-node-enabled'; nodeType: EditDocumentNodeTypeV2; enabled: boolean }
   | { type: 'replace-edit-document-node'; nodeType: EditDocumentNodeTypeV2; node: unknown }
   | { type: 'replace-edit-document'; editDocumentV2: EditDocumentV2 }
@@ -329,6 +324,21 @@ export const reduceEditTransaction = (
       afterEditDocumentV2 = setEditDocumentV2NodeEnabled(afterEditDocumentV2, operation.nodeType, operation.enabled);
       if (previousEnabled !== undefined && previousEnabled !== operation.enabled) {
         documentChangedKeys.push(`nodes.${operation.nodeType}.enabled`);
+      }
+      continue;
+    }
+    if (operation.type === 'set-layer-stack-artifacts') {
+      const rawEngineArtifacts =
+        operation.rawEngineArtifacts === null
+          ? null
+          : layerStackSidecarPersistenceEnvelopeV1Schema.parse({
+              rawEngineArtifacts: operation.rawEngineArtifacts,
+            }).rawEngineArtifacts;
+      if (!sameAdjustmentValue(afterEditDocumentV2.extensions['rawEngineArtifacts'], rawEngineArtifacts)) {
+        const extensions = { ...afterEditDocumentV2.extensions };
+        if (rawEngineArtifacts === null) delete extensions['rawEngineArtifacts'];
+        else extensions['rawEngineArtifacts'] = rawEngineArtifacts;
+        afterEditDocumentV2 = { ...afterEditDocumentV2, extensions };
       }
       continue;
     }

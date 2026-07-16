@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { FilmEmulationOperationV1, FilmProfileManifestV1 } from '../../../packages/rawengine-schema/src/index.js';
 import { useEditorStore } from '../../store/useEditorStore';
+import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
 import { getFilmBaselineProfileCatalog } from '../../utils/film-look/filmBaselineProfiles';
 import {
   applyFilmEmulationOperation,
@@ -30,7 +31,7 @@ const readFavorites = (): Set<string> => {
 
 export function FilmEmulationWorkspace() {
   const { t } = useTranslation();
-  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const adjustments = useEditorStore((state) => selectEditDocumentNode(state.editDocumentV2, 'film_emulation').params);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const [favorites, setFavorites] = useState(readFavorites);
   const [compare, setCompare] = useState(false);
@@ -84,7 +85,7 @@ export function FilmEmulationWorkspace() {
     const state = useEditorStore.getState();
     const source = hydrateFilmEmulationTargetState(
       { kind: 'image', variantId: 'editor' },
-      state.adjustmentSnapshot.value.filmEmulation,
+      selectEditDocumentNode(state.editDocumentV2, 'film_emulation').params['filmEmulation'],
     );
     const command = {
       actor: { id: 'film-workspace', kind: 'ui' as const, sessionId: 'film-workspace' },

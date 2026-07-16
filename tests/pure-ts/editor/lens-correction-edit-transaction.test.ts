@@ -4,7 +4,7 @@ import { editDocumentLensCorrectionV2Schema } from '../../../packages/rawengine-
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   EditorPersistenceEffectRunner,
   type EditorPersistenceExecution,
@@ -44,7 +44,13 @@ const identity = (overrides: Partial<LensCorrectionCommitIdentity> = {}): LensCo
 describe('lens correction edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4, flipHorizontal: true };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'geometry',
+      { flipHorizontal: adjustments.flipHorizontal },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -81,11 +87,8 @@ describe('lens correction edit transaction', () => {
       editDocumentLensCorrectionV2Schema.parse(result.afterEditDocumentV2.nodes['lens_correction']?.params)
         .lensVignetteAmount,
     ).toBe(135);
-    expect(result.afterEditDocumentV2.nodes['geometry']).toEqual(result.beforeEditDocumentV2.nodes['geometry']);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
-    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('lensVignetteAmount');
+    expect(result.after.nodes['geometry']).toEqual(result.before.nodes['geometry']);
+    expect(result.after.nodes['scene_global_color_tone']).toEqual(result.before.nodes['scene_global_color_tone']);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -94,9 +97,9 @@ describe('lens correction edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.lensVignetteAmount).toBe(100);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().editDocumentV2.nodes['lens_correction']!.params['lensVignetteAmount']).toBe(100);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.geometry.flipHorizontal).toBe(true);
   });
 
   test('owns all manual controls, exact no-ops, and stale source/session/revision rejection', () => {
@@ -156,12 +159,16 @@ describe('lens correction edit transaction', () => {
       editDocumentLensCorrectionV2Schema.parse(result.afterEditDocumentV2.nodes['lens_correction']?.params)
         .chromaticAberrationRedCyan,
     ).toBe(22);
-    expect(result.afterEditDocumentV2.nodes['lens_correction']).not.toBe(beforeLens);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.chromaticAberrationRedCyan).toBe(22);
+    expect(result.after.nodes['lens_correction']).not.toBe(beforeLens);
+    expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
+    expect(
+      useEditorStore.getState().editDocumentV2.nodes['lens_correction']!.params['chromaticAberrationRedCyan'],
+    ).toBe(22);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.chromaticAberrationRedCyan).toBe(0);
+    expect(
+      useEditorStore.getState().editDocumentV2.nodes['lens_correction']!.params['chromaticAberrationRedCyan'],
+    ).toBe(0);
     expect(
       editDocumentLensCorrectionV2Schema.parse(
         useEditorStore.getState().editDocumentV2.nodes['lens_correction']?.params,
@@ -191,7 +198,6 @@ describe('lens correction edit transaction', () => {
     });
     runner.installSession({
       adjustmentRevision: 0,
-      adjustments: { ...committed.adjustmentSnapshot.value, chromaticAberrationBlueYellow: 0 },
       editDocumentV2: beforeDocument,
       imageSessionId: session.id,
       path: sourcePath,
@@ -200,7 +206,6 @@ describe('lens correction edit transaction', () => {
     if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed lens receipt');
     runner.submitCommitted({
       adjustmentRevision: committed.adjustmentRevision,
-      adjustments: committed.adjustmentSnapshot.value,
       editDocumentV2: committed.editDocumentV2,
       imageSessionId: session.id,
       interactionActive: false,
@@ -219,10 +224,7 @@ describe('lens correction edit transaction', () => {
       editDocumentLensCorrectionV2Schema.parse(execution.editDocumentV2.nodes['lens_correction']?.params)
         .chromaticAberrationBlueYellow,
     ).toBe(-14);
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: execution.adjustments, editDocumentV2: execution.editDocumentV2 },
-      execution.adjustments,
-    );
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: execution.editDocumentV2 });
     expect(
       editDocumentLensCorrectionV2Schema.parse(reopened.nodes['lens_correction']?.params).chromaticAberrationBlueYellow,
     ).toBe(-14);
@@ -277,7 +279,10 @@ describe('lens correction edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ lensMaker: null, lensModel: null });
+    expect(useEditorStore.getState().editDocumentV2.nodes['lens_correction']?.params).toMatchObject({
+      lensMaker: null,
+      lensModel: null,
+    });
 
     const restored = useEditorStore.getState();
     expect(() =>
@@ -347,7 +352,7 @@ describe('lens correction edit transaction', () => {
       },
     });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.lensMaker).toBeNull();
+    expect(useEditorStore.getState().editDocumentV2.nodes['lens_correction']!.params['lensMaker']).toBeNull();
 
     useEditorStore.setState({ finalPreviewUrl: 'blob:fallback-manual-before' });
     const restored = useEditorStore.getState();
@@ -376,7 +381,7 @@ describe('lens correction edit transaction', () => {
     expect(useEditorStore.getState()).toMatchObject({ finalPreviewUrl: null, historyIndex: 1 });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.lensVignetteAmount).toBe(100);
+    expect(useEditorStore.getState().editDocumentV2.nodes['lens_correction']!.params['lensVignetteAmount']).toBe(100);
 
     expect(isCurrentLensProfileRequest(state, fallbackIdentity, 7, 7)).toBeTrue();
     expect(isCurrentLensProfileRequest(state, fallbackIdentity, 6, 7)).toBeFalse();

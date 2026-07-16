@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   EditorPersistenceEffectRunner,
   type EditorPersistenceExecution,
@@ -43,7 +44,7 @@ const initialMixer = (): SelectiveColorMixerSettings => ({
 describe('selective color edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -105,23 +106,29 @@ describe('selective color edit transaction', () => {
       transformedOriginalUrl: null,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.oranges.saturation).toBe(28);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls.oranges.widthDegrees).toBe(
-      52,
-    );
-    expect(result.afterEditDocumentV2.nodes['selective_color_mixer']?.params).toEqual(next);
-    expect(result.afterEditDocumentV2.nodes['selective_color_mixer']).not.toBe(beforeNode);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('hsl');
-    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty(
-      'selectiveColorRangeControls',
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params['hsl'].oranges
+        .saturation,
+    ).toBe(28);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params[
+        'selectiveColorRangeControls'
+      ].oranges.widthDegrees,
+    ).toBe(52);
+    expect(result.after.nodes['selective_color_mixer']?.params).toEqual(next);
+    expect(result.after.nodes['selective_color_mixer']).not.toBe(beforeNode);
+    expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.oranges.saturation).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls.oranges).toEqual(
-      INITIAL_ADJUSTMENTS.selectiveColorRangeControls.oranges,
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params['hsl'].oranges
+        .saturation,
+    ).toBe(0);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params[
+        'selectiveColorRangeControls'
+      ].oranges,
+    ).toEqual(INITIAL_ADJUSTMENTS.selectiveColorRangeControls.oranges);
     expect(useEditorStore.getState().editDocumentV2.nodes['selective_color_mixer']?.params).toEqual(initialMixer());
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().editDocumentV2.nodes['selective_color_mixer']?.params).toEqual(next);
@@ -154,7 +161,6 @@ describe('selective color edit transaction', () => {
     });
     runner.installSession({
       adjustmentRevision: 0,
-      adjustments: { ...committed.adjustmentSnapshot.value, ...initialMixer() },
       editDocumentV2: beforeDocument,
       imageSessionId: session.id,
       path: sourcePath,
@@ -163,7 +169,6 @@ describe('selective color edit transaction', () => {
     if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed selective-color receipt');
     runner.submitCommitted({
       adjustmentRevision: committed.adjustmentRevision,
-      adjustments: committed.adjustmentSnapshot.value,
       editDocumentV2: committed.editDocumentV2,
       imageSessionId: session.id,
       interactionActive: false,
@@ -177,10 +182,7 @@ describe('selective color edit transaction', () => {
 
     expect(executions).toHaveLength(1);
     expect(executions[0]?.editDocumentV2.nodes['selective_color_mixer']?.params).toEqual(next);
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
-      executions[0]?.adjustments ?? committed.adjustmentSnapshot.value,
-    );
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: executions[0]?.editDocumentV2 });
     expect(reopened.nodes['selective_color_mixer']?.params).toEqual(next);
     expect(reopened).toEqual(committed.editDocumentV2);
   });
@@ -224,16 +226,24 @@ describe('selective color edit transaction', () => {
       noOp: false,
     });
     expect(useEditorStore.getState().history).toHaveLength(3);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl).toEqual(INITIAL_ADJUSTMENTS.hsl);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls).toEqual(
-      INITIAL_ADJUSTMENTS.selectiveColorRangeControls,
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params['hsl'],
+    ).toEqual(INITIAL_ADJUSTMENTS.hsl);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params[
+        'selectiveColorRangeControls'
+      ],
+    ).toEqual(INITIAL_ADJUSTMENTS.selectiveColorRangeControls);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.blues).toEqual(edited.hsl.blues);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls.reds.centerHueDegrees).toBe(
-      18,
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params['hsl'].blues,
+    ).toEqual(edited.hsl.blues);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params[
+        'selectiveColorRangeControls'
+      ].reds.centerHueDegrees,
+    ).toBe(18);
   });
 
   test('rejects stale path, explicit/fallback session, revision, and same-path reopen identities', () => {

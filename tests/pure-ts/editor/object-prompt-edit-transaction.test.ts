@@ -4,7 +4,7 @@ import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Ma
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildObjectPromptEditTransaction } from '../../../src/utils/objectPromptEditTransaction';
 
 const sourcePath = '/fixture/object-prompt.ARW';
@@ -67,7 +67,13 @@ describe('Object Prompt edit transaction', () => {
         },
       ],
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'layers',
+      { masks: adjustments.masks },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -105,11 +111,11 @@ describe('Object Prompt edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters).toEqual({
+    expect(useEditorStore.getState().editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters).toEqual({
       pointPrompts: [],
       promptMode: 'foreground_point',
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
   });
 
   test('rejects invalid generations and stale session, source, graph, geometry, mode, tool, and mask identities', () => {
@@ -133,10 +139,11 @@ describe('Object Prompt edit transaction', () => {
     expect(() => buildObjectPromptEditTransaction(state, identity({ mode: 'box' }), parameters, 'tx')).toThrow(
       'object_prompt_transaction.stale_mode',
     );
-    const wrongToolAdjustments = structuredClone(state.adjustmentSnapshot.value);
-    const wrongTool = { ...state, adjustmentSnapshot: { ...state.adjustmentSnapshot, value: wrongToolAdjustments } };
-    const subMask = wrongToolAdjustments.masks[0]?.subMasks[0];
+    const wrongToolDocument = structuredClone(state.editDocumentV2);
+    const subMask = wrongToolDocument.layers.masks[0]?.subMasks[0];
     if (subMask !== undefined) subMask.type = Mask.Color;
+    wrongToolDocument.nodes['layers']!.params = structuredClone(wrongToolDocument.layers);
+    const wrongTool = { ...state, editDocumentV2: wrongToolDocument };
     expect(() => buildObjectPromptEditTransaction(wrongTool, identity(), parameters, 'tx')).toThrow(
       'object_prompt_transaction.stale_tool',
     );

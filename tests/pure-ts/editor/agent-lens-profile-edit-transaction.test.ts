@@ -10,7 +10,7 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import { applyAgentLensProfile } from '../../../src/utils/agent/tools/agentLensProfileApplyTool';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixtures/agent-lens-profile.ARW';
 const session = createEditorImageSession({ generation: 53, path: sourcePath, source: 'cache' });
@@ -49,7 +49,7 @@ class DeferredLensProfileBridge extends RawEngineLocalAppServerBridge {
 describe('agent lens profile EditTransaction bridge', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -105,8 +105,10 @@ describe('agent lens profile EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.exposure).toBe(0.2);
-    expect(after.adjustmentSnapshot.value.lensDistortionAmount).toBe(INITIAL_ADJUSTMENTS.lensDistortionAmount);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.2);
+    expect(after.editDocumentV2.nodes['lens_correction']!.params['lensDistortionAmount']).toBe(
+      INITIAL_ADJUSTMENTS.lensDistortionAmount,
+    );
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-lens-profile-edit');
   });
 

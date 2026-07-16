@@ -9,7 +9,7 @@ import {
   contextAutoAdjustPatchSchema,
   isCurrentContextAutoAdjustRequest,
 } from '../../../src/utils/contextAutoAdjustEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/context-auto-adjust.ARW';
 const session = createEditorImageSession({ generation: 61, path: sourcePath, source: 'cache' });
@@ -64,7 +64,7 @@ describe('context Auto Adjust edit transaction', () => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     adjustments.effectsEnabled = false;
     const editDocumentV2 = setEditDocumentV2NodeEnabled(
-      legacyAdjustmentsToEditDocumentV2(adjustments),
+      setEditDocumentV2NodeEnabled(createDefaultEditDocumentV2(), 'display_creative', adjustments.effectsEnabled),
       'scene_curve',
       false,
     );
@@ -102,7 +102,10 @@ describe('context Auto Adjust edit transaction', () => {
     });
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 1, historyIndex: 1 });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ contrast: 0, exposure: 0 });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
+      contrast: 0,
+      exposure: 0,
+    });
   });
 
   test('rejects stale source, session, revision, and superseded request generations', () => {
@@ -145,19 +148,19 @@ describe('context Auto Adjust edit transaction', () => {
     if (base === null) throw new Error('Expected context Auto Adjust base');
     const currentPatch = contextAutoAdjustPatchSchema.parse({
       ...patch,
-      blacks: state.adjustmentSnapshot.value.blacks,
-      brightness: state.adjustmentSnapshot.value.brightness,
-      clarity: state.adjustmentSnapshot.value.clarity,
-      contrast: state.adjustmentSnapshot.value.contrast,
-      dehaze: state.adjustmentSnapshot.value.dehaze,
-      exposure: state.adjustmentSnapshot.value.exposure,
-      highlights: state.adjustmentSnapshot.value.highlights,
-      shadows: state.adjustmentSnapshot.value.shadows,
-      vibrance: state.adjustmentSnapshot.value.vibrance,
-      vignetteAmount: state.adjustmentSnapshot.value.vignetteAmount,
-      whiteBalanceTechnical: state.adjustmentSnapshot.value.whiteBalanceTechnical,
-      whites: state.adjustmentSnapshot.value.whites,
-      centré: state.adjustmentSnapshot.value.centré,
+      blacks: state.editDocumentV2.nodes['scene_global_color_tone']!.params['blacks'],
+      brightness: state.editDocumentV2.nodes['scene_global_color_tone']!.params['brightness'],
+      clarity: state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['clarity'],
+      contrast: state.editDocumentV2.nodes['scene_global_color_tone']!.params['contrast'],
+      dehaze: state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['dehaze'],
+      exposure: state.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure'],
+      highlights: state.editDocumentV2.nodes['scene_global_color_tone']!.params['highlights'],
+      shadows: state.editDocumentV2.nodes['scene_global_color_tone']!.params['shadows'],
+      vibrance: state.editDocumentV2.nodes['color_presence']!.params['vibrance'],
+      vignetteAmount: state.editDocumentV2.nodes['display_creative']!.params['vignetteAmount'],
+      whiteBalanceTechnical: state.editDocumentV2.nodes['camera_input']!.params['whiteBalanceTechnical'],
+      whites: state.editDocumentV2.nodes['scene_global_color_tone']!.params['whites'],
+      centré: state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['centré'],
     });
     const result = state.applyEditTransaction(
       buildContextAutoAdjustEditTransaction(state, base, currentPatch, 'context-auto-no-op'),
@@ -207,7 +210,7 @@ describe('context Auto Adjust edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
     expect(() =>
       buildContextAutoAdjustEditTransaction({ ...state, imageSessionId: 123 }, base, patch, 'stale-reopened-a'),
     ).toThrow('context_auto_adjust_transaction.stale_session');

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentNodeParamsV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   ActorKind,
@@ -13,9 +14,10 @@ import {
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { levelsSettingsSchema } from '../../../schemas/color/levelsSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments, Coord, Curves, ParametricCurve, ParametricCurveSettings } from '../../adjustments';
+import type { Coord, Curves, ParametricCurve, ParametricCurveSettings } from '../../adjustments';
 import { ActiveChannel, getDefaultParametricCurve } from '../../adjustments';
 import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
@@ -148,8 +150,10 @@ const cloneParametricCurve = (curve: ParametricCurve): ParametricCurve => ({
   red: cloneParametricSettings(curve.red),
 });
 
-const applyCurveLevelsPatchToAdjustments = (base: Adjustments, patch: CurveLevelsPatch): Adjustments => {
-  const next: Adjustments = { ...base };
+type CurveLevelsView = EditDocumentNodeParamsV2<'scene_curve'> & EditDocumentNodeParamsV2<'luma_levels'>;
+
+const applyCurveLevelsPatchToAdjustments = (base: CurveLevelsView, patch: CurveLevelsPatch): CurveLevelsView => {
+  const next: CurveLevelsView = { ...base };
 
   if (patch.curveMode !== undefined) next.curveMode = patch.curveMode;
   if (patch.levels !== undefined) next.levels = { ...patch.levels };
@@ -180,8 +184,8 @@ const estimateChangedPixels = ({
   before,
   imageArea,
 }: {
-  after: Adjustments;
-  before: Adjustments;
+  after: CurveLevelsView;
+  before: CurveLevelsView;
   imageArea: number;
 }) => {
   const changedFieldCount = CURVE_LEVELS_KEYS.filter(
@@ -191,7 +195,7 @@ const estimateChangedPixels = ({
 };
 
 const buildCurveLevelsPatchOperations = (
-  before: Adjustments,
+  before: CurveLevelsView,
   patch: CurveLevelsPatch,
 ): EditGraphParameterPatchOperationV1[] =>
   CURVE_LEVELS_KEYS.flatMap((key) => {
@@ -315,7 +319,11 @@ export const applyAgentCurveLevels = async (
   if (commitIdentity === null) throw new Error('Agent curve/levels apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const operations = buildCurveLevelsPatchOperations(state.adjustmentSnapshot.value, parsedRequest.curveLevels);
+  const beforeAdjustments: CurveLevelsView = {
+    ...selectEditDocumentNode(state.editDocumentV2, 'scene_curve').params,
+    ...selectEditDocumentNode(state.editDocumentV2, 'luma_levels').params,
+  };
+  const operations = buildCurveLevelsPatchOperations(beforeAdjustments, parsedRequest.curveLevels);
   const typedMutation = await dispatchTypedCurveLevelsEditGraphApply(
     {
       expectedGraphRevision: undoGraphRevision,
@@ -325,7 +333,7 @@ export const applyAgentCurveLevels = async (
     },
     bridge,
   );
-  const nextAdjustments = applyCurveLevelsPatchToAdjustments(state.adjustmentSnapshot.value, parsedRequest.curveLevels);
+  const nextAdjustments = applyCurveLevelsPatchToAdjustments(beforeAdjustments, parsedRequest.curveLevels);
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
     buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
@@ -335,7 +343,7 @@ export const applyAgentCurveLevels = async (
   const adjustedFields = CURVE_LEVELS_KEYS.filter(
     (key) =>
       parsedRequest.curveLevels[key] !== undefined &&
-      JSON.stringify(state.adjustmentSnapshot.value[key]) !== JSON.stringify(nextAdjustments[key]),
+      JSON.stringify(beforeAdjustments[key]) !== JSON.stringify(nextAdjustments[key]),
   );
   const appliedGraphRevision = `history_${useEditorStore.getState().historyIndex}`;
 
@@ -346,7 +354,7 @@ export const applyAgentCurveLevels = async (
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
       after: nextAdjustments,
-      before: state.adjustmentSnapshot.value,
+      before: beforeAdjustments,
       imageArea: selectedImage.width * selectedImage.height,
     }),
     receipt: {

@@ -4,7 +4,8 @@ import { createEditorImageSession, useEditorStore } from '../../../src/store/use
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import type { BasicToneCommitIdentity } from '../../../src/utils/basicToneEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/basic-slider.ARW';
 const session = createEditorImageSession({ generation: 24, path: sourcePath, source: 'cache' });
@@ -30,7 +31,7 @@ const identity = (imageSessionId = session.id): BasicToneCommitIdentity => ({
 describe('basic tone slider interaction authority', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       basicToneSliderInteraction: null,
@@ -48,7 +49,7 @@ describe('basic tone slider interaction authority', () => {
 
   test('many previews change only the ephemeral render snapshot, then commit one undoable revision', () => {
     const store = useEditorStore.getState();
-    const canonicalAdjustments = store.adjustmentSnapshot.value;
+    const canonicalAdjustments = store.editDocumentV2;
     const canonicalSnapshot = store.adjustmentSnapshot;
     const canonicalHistory = store.history;
 
@@ -56,12 +57,14 @@ describe('basic tone slider interaction authority', () => {
     for (const value of [0.1, 0.25, 0.4, 0.65]) {
       useEditorStore.getState().updateBasicToneSliderInteraction('drag-exposure', value);
       const previewState = useEditorStore.getState();
-      expect(previewState.adjustmentSnapshot.value).toBe(canonicalAdjustments);
+      expect(previewState.editDocumentV2).toBe(canonicalAdjustments);
       expect(previewState.adjustmentSnapshot).toBe(canonicalSnapshot);
       expect(previewState.adjustmentRevision).toBe(0);
       expect(previewState.history).toBe(canonicalHistory);
       expect(previewState.lastEditApplicationReceipt).toBeNull();
-      expect(previewState.basicToneSliderInteraction?.previewSnapshot?.value.exposure).toBe(value);
+      const previewDocument = previewState.basicToneSliderInteraction?.previewSnapshot?.editDocumentV2;
+      if (previewDocument === undefined) throw new Error('Expected slider preview document.');
+      expect(selectEditDocumentNode(previewDocument, 'scene_global_color_tone').params['exposure']).toBe(value);
     }
 
     const result = useEditorStore.getState().commitBasicToneSliderInteraction('drag-exposure');
@@ -76,20 +79,22 @@ describe('basic tone slider interaction authority', () => {
         transactionId: 'drag-exposure',
       },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.65);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.65);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.65);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.65);
   });
 
   test('cancel and exact no-op drop preview authority without a late commit', async () => {
     const store = useEditorStore.getState();
     store.beginBasicToneSliderInteraction(identity(), BasicAdjustment.Contrast, 'cancel-contrast');
     useEditorStore.getState().updateBasicToneSliderInteraction('cancel-contrast', 45);
-    expect(useEditorStore.getState().basicToneSliderInteraction?.previewSnapshot?.value.contrast).toBe(45);
+    const previewDocument = useEditorStore.getState().basicToneSliderInteraction?.previewSnapshot?.editDocumentV2;
+    if (previewDocument === undefined) throw new Error('Expected slider preview document.');
+    expect(selectEditDocumentNode(previewDocument, 'scene_global_color_tone').params['contrast']).toBe(45);
     useEditorStore.getState().cancelBasicToneSliderInteraction('cancel-contrast');
     await Bun.sleep(180);
 
@@ -100,7 +105,7 @@ describe('basic tone slider interaction authority', () => {
       isSliderDragging: false,
       lastEditApplicationReceipt: null,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.contrast).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['contrast']).toBe(0);
     expect(useEditorStore.getState().history).toHaveLength(1);
 
     useEditorStore.getState().beginBasicToneSliderInteraction(identity(), BasicAdjustment.Exposure, 'no-op-exposure');
@@ -122,7 +127,7 @@ describe('basic tone slider interaction authority', () => {
     useEditorStore.setState({ selectedImage: { ...selectedImage, path: '/fixture/replacement.ARW' } });
     useEditorStore.getState().updateBasicToneSliderInteraction('stale-highlights', -40);
     expect(useEditorStore.getState().basicToneSliderInteraction).toBeNull();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.highlights).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['highlights']).toBe(0);
 
     useEditorStore.setState({ selectedImage });
     useEditorStore.getState().beginBasicToneSliderInteraction(identity(), BasicAdjustment.Shadows, 'stale-revision');
@@ -133,7 +138,7 @@ describe('basic tone slider interaction authority', () => {
       historyIndex: 0,
     });
     expect(useEditorStore.getState().commitBasicToneSliderInteraction('stale-revision')).toBeNull();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.shadows).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['shadows']).toBe(0);
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
@@ -150,7 +155,7 @@ describe('basic tone slider interaction authority', () => {
     useEditorStore.getState().updateBasicToneSliderInteraction('fallback-whites', 20);
     useEditorStore.setState({ imageSessionId: 92 });
     expect(useEditorStore.getState().commitBasicToneSliderInteraction('fallback-whites')).toBeNull();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.whites).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['whites']).toBe(0);
   });
 
   test('rapid independent sliders retain separate transaction and history boundaries', () => {
@@ -182,7 +187,10 @@ describe('basic tone slider interaction authority', () => {
       historyIndex: 2,
       lastEditApplicationReceipt: { transactionId: 'rapid-blacks' },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ blacks: -15, exposure: 0.4 });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
+      blacks: -15,
+      exposure: 0.4,
+    });
     expect(useEditorStore.getState().history).toHaveLength(3);
   });
 });

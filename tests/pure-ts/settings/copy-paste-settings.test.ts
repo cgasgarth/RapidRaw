@@ -6,7 +6,7 @@ import {
   resolveCopyPasteSettings,
 } from '../../../src/schemas/copyPasteSettingsSchemas';
 import { PasteMode } from '../../../src/utils/adjustments';
-import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../src/utils/editDocumentV2';
 
 describe('copy/paste settings current node contract', () => {
   test('accepts empty, full, and every individual current node under both paste modes', () => {

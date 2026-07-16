@@ -345,7 +345,7 @@ const buildNegativeLabRuntimeProfileWarningCodes = (profile: NegativeLabResolved
   if (profile.profileStatus === 'generic_unmeasured') warningCodes.add('generic_starting_point_only');
   if (profile.profileStatus === 'fixture_measured') warningCodes.add('measured_process_family_only');
   if (profile.profileStatus === 'user_supplied') warningCodes.add('user_supplied_profile');
-  if (profile.params.base_fog_sample === null) warningCodes.add('base_sample_reference_pending');
+  if (profile.params['base_fog_sample'] === null) warningCodes.add('base_sample_reference_pending');
 
   return [...warningCodes].sort();
 };

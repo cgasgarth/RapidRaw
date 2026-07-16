@@ -1,14 +1,15 @@
 import { expect, test } from 'bun:test';
 import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { createElement, useState } from 'react';
+import { createElement, useMemo, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import DetailsPanel from '../../../src/components/adjustments/Details.tsx';
+import DetailsPanel, { type DetailAdjustmentView } from '../../../src/components/adjustments/Details.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors.ts';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
 test('Detail inspector exposes and commits independent professional denoise controls', async () => {
   installEditorSession();
@@ -49,7 +50,9 @@ test('Detail inspector commits chromatic aberration through lens node authority'
     await flushPromises();
   });
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value.chromaticAberrationRedCyan).toBe(23);
+  expect(useEditorStore.getState().editDocumentV2.nodes['lens_correction']!.params['chromaticAberrationRedCyan']).toBe(
+    23,
+  );
   const editDocument = useEditorStore.getState().editDocumentV2;
   const lensNode = editDocument.nodes['lens_correction'];
   const detailNode = editDocument.nodes['detail_denoise_dehaze'];
@@ -79,7 +82,14 @@ test('Detail mask controls keep local denoise values outside the global transact
 });
 
 function DenoiseControlsHarness() {
-  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const document = useEditorStore((state) => state.editDocumentV2);
+  const adjustments = useMemo<DetailAdjustmentView>(
+    () => ({
+      ...selectEditDocumentNode(document, 'detail_denoise_dehaze').params,
+      ...selectEditDocumentNode(document, 'lens_correction').params,
+    }),
+    [document],
+  );
   return createElement(
     'div',
     null,
@@ -104,7 +114,11 @@ function DenoiseControlsHarness() {
 }
 
 function MaskDenoiseControlsHarness() {
-  const [adjustments, setAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
+  const document = createDefaultEditDocumentV2();
+  const [adjustments, setAdjustments] = useState<DetailAdjustmentView>(() => ({
+    ...selectEditDocumentNode(document, 'detail_denoise_dehaze').params,
+    ...selectEditDocumentNode(document, 'lens_correction').params,
+  }));
   return createElement(
     'div',
     null,
@@ -136,7 +150,7 @@ async function renderHarness(child: ReturnType<typeof createElement>): Promise<H
 function installEditorSession() {
   const path = '/fixture/detail-controls.ARW';
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,

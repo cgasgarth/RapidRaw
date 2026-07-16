@@ -24,8 +24,18 @@ const { CommunityPreviewSession, buildSaveCommunityPresetPayload } = await impor
   '../../../src/components/panel/CommunityPage'
 );
 type CommunityPreset = import('../../../src/components/panel/CommunityPage').CommunityPreset;
+const { copyEditDocumentV2Nodes, createDefaultEditDocumentV2, patchEditDocumentV2Node } = await import(
+  '../../../src/utils/editDocumentV2'
+);
 
-const preset = (name: string): CommunityPreset => ({ adjustments: { exposure: 0.5 }, creator: 'Tester', name });
+const preset = (name: string): CommunityPreset => ({
+  creator: 'Tester',
+  editDocumentV2: copyEditDocumentV2Nodes(
+    patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure: 0.5 }),
+    ['scene_global_color_tone'],
+  ),
+  name,
+});
 let cleanup: (() => Promise<void>) | null = null;
 
 afterEach(async () => {
@@ -42,7 +52,9 @@ test('rejects stale folder and preset generations, revokes their URLs, and owns 
   await render('folder-a', ['/a.RAW'], [preset('A')]);
   const requestA = generation(0);
   expect(requestA.args['imagePaths']).toEqual(['/a.RAW']);
-  expect(requestA.args['presets']).toMatchObject([{ adjustments: { contrast: 0, exposure: 0.5 } }]);
+  expect(requestA.args['presets']).toMatchObject([
+    { editDocumentV2: { nodes: { scene_global_color_tone: { params: { contrast: 0, exposure: 0.5 } } } } },
+  ]);
 
   await render('folder-b', ['/b.RAW'], [preset('A')]);
   const requestB = generation(1);
@@ -112,7 +124,10 @@ test('accepts a fallback path only in the keyed session that requested it', asyn
 
 test('preserves the Save Community Preset payload contract', () => {
   const payload = buildSaveCommunityPresetPayload({
-    adjustments: { exposure: 1 },
+    editDocumentV2: copyEditDocumentV2Nodes(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure: 1 }),
+      ['scene_global_color_tone'],
+    ),
     creator: 'Author',
     includeCropTransform: true,
     includeMasks: false,

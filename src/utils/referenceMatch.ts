@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { MatchLookApplicationReceiptV1 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { matchLookProposalV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import {
@@ -164,8 +165,8 @@ export interface ReferenceMatchProposal {
 }
 
 export interface ReferenceMatchPreviewCandidate {
-  adjustments: Adjustments;
   baseAdjustmentRevision: number;
+  editDocumentV2: EditDocumentV2;
   targetPath: string;
 }
 
@@ -364,7 +365,7 @@ export const createReferenceMatchProposal = ({
   targetProfile,
   targetProofFingerprint,
 }: {
-  adjustments: Adjustments;
+  adjustments: ReferenceMatchGlobalAdjustments;
   mode: ReferenceMatchMode;
   references: readonly ReferenceMatchReference[];
   target: ReferenceHistogramSummary;
@@ -561,17 +562,17 @@ export const createReferenceMatchAppliedDiffs = ({
     .sort((left, right) => left.key.localeCompare(right.key));
 };
 
-export const resolveReferenceMatchRenderAdjustments = ({
+export const resolveReferenceMatchRenderDocument = ({
   adjustmentRevision,
   committed,
   preview,
   targetPath,
 }: {
   adjustmentRevision: number;
-  committed: Adjustments;
+  committed: EditDocumentV2;
   preview: ReferenceMatchPreviewCandidate | null;
   targetPath: string | null;
-}): Adjustments =>
+}): EditDocumentV2 =>
   preview?.baseAdjustmentRevision === adjustmentRevision && preview.targetPath === targetPath
-    ? preview.adjustments
+    ? preview.editDocumentV2
     : committed;

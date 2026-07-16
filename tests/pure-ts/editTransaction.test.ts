@@ -4,8 +4,16 @@ import type { EditDocumentNodeTypeV2, EditDocumentV2 } from '../../packages/rawe
 import { useEditorStore } from '../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
-import { perceptualGradingFromWheelSurface } from '../../src/utils/color/perceptualGrading';
-import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../src/utils/editDocumentV2';
+import {
+  selectEditDocumentGeometry,
+  selectEditDocumentLayers,
+  selectEditDocumentNode,
+} from '../../src/utils/editDocumentSelectors';
+import {
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  setEditDocumentV2NodeEnabled,
+} from '../../src/utils/editDocumentV2';
 import {
   buildAdjustmentMutationOperations,
   buildEditorSectionNodeEnablementOperations,
@@ -14,6 +22,8 @@ import {
   reduceEditTransaction,
 } from '../../src/utils/editTransaction';
 import { buildLayerEditTransactionRequest } from '../../src/utils/layers/layerEditTransaction';
+
+const defaultDocument = (): EditDocumentV2 => createDefaultEditDocumentV2();
 
 const request = (overrides: Partial<EditTransactionRequest> = {}): EditTransactionRequest => ({
   transactionId: 'tx-1',
@@ -47,11 +57,23 @@ const resetEditorState = () => {
 beforeEach(resetEditorState);
 afterEach(resetEditorState);
 
-describe('reduceEditTransaction', () => {
-  test('routes focused tone, camera, calibration, curve, tone-equalizer, point-color, lens, grading, and geometry', () => {
-    const focused = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
-      ...INITIAL_ADJUSTMENTS,
-      exposure: 0.5,
+describe('reduceEditTransaction typed authority', () => {
+  test('patches one descriptor-owned node and preserves unrelated identities', () => {
+    const before = defaultDocument();
+    const result = reduceEditTransaction(before, 4, request());
+
+    expect(selectEditDocumentNode(result.after, 'scene_global_color_tone').params['exposure']).toBe(0.5);
+    expect(result.changedKeys).toEqual(['nodes.scene_global_color_tone.params.exposure']);
+    expect(result.nextAdjustmentRevision).toBe(5);
+    expect(result.noOp).toBeFalse();
+    expect(result.after.nodes['geometry']).toBe(before.nodes['geometry']);
+    expect(result.after.nodes['scene_curve']).toBe(before.nodes['scene_curve']);
+    expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
+    expect(result.invalidatedProvenance).toEqual(['reference-match', 'auto-edit', 'derived-render']);
+    expect(result.applicationReceipt).toMatchObject({
+      adjustmentRevision: 5,
+      imageSessionId: 'session-1',
+      transactionId: 'tx-1',
     });
     expect(focused).toEqual([
       {
@@ -278,9 +300,37 @@ describe('reduceEditTransaction', () => {
       nextAdjustmentRevision: 5,
       noOp: false,
     });
-    expect(result.after.effectsEnabled).toBeFalse();
-    expect(result.after.grainAmount).toBe(42);
-    expect(result.afterEditDocumentV2.nodes['display_creative']).toMatchObject({
+  });
+
+  test('patches strict geometry and synchronizes its explicit domain', () => {
+    const before = defaultDocument();
+    const crop = { height: 0.6, unit: 'normalized' as const, width: 0.6, x: 0.1, y: 0.1 };
+    const result = reduceEditTransaction(
+      before,
+      4,
+      request({
+        operations: [{ nodeType: 'geometry', patch: { crop, rotation: 2.5 }, type: 'patch-edit-document-node' }],
+        source: 'geometry-tool',
+      }),
+    );
+
+    expect(selectEditDocumentGeometry(result.after)).toMatchObject({ crop, rotation: 2.5 });
+    expect(selectEditDocumentNode(result.after, 'geometry').params).toEqual(selectEditDocumentGeometry(result.after));
+    expect(result.after.nodes['scene_global_color_tone']).toBe(before.nodes['scene_global_color_tone']);
+    expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail', 'geometry']);
+  });
+
+  test('toggles Effects while preserving latent parameters', () => {
+    const before = patchEditDocumentV2Node(defaultDocument(), 'display_creative', { grainAmount: 42 });
+    const result = reduceEditTransaction(
+      before,
+      4,
+      request({
+        operations: [{ enabled: false, nodeType: 'display_creative', type: 'set-edit-document-node-enabled' }],
+      }),
+    );
+
+    expect(selectEditDocumentNode(result.after, 'display_creative')).toMatchObject({
       enabled: false,
       params: { grainAmount: 42 },
     });
@@ -458,38 +508,16 @@ describe('reduceEditTransaction', () => {
       document,
     );
 
-    expect(result.changedKeys).toEqual(['brightness', 'contrast']);
-    expect(result.after).toMatchObject({ brightness: 0, clarity: 18, contrast: 0, glowAmount: 16 });
-    expect(result.after.masks).toEqual(before.masks);
-    expect(result.after.levels).toEqual(before.levels);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
-      brightness: 0,
-      contrast: 0,
-    });
+    expect(selectEditDocumentNode(result.after, 'scene_global_color_tone').params['exposure']).toBe(1.25);
+    expect(result.after.provenance.referenceMatchApplicationReceipt).toBeNull();
+    expect(result.after.nodes['geometry']).toBe(before.nodes['geometry']);
   });
 
-  test('atomic hydration publishes mixed domains before a focused Light reset', () => {
-    const hydratedAdjustments = {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      brightness: 0.42,
-      clarity: 18,
-      contrast: 12,
-      glowAmount: 16,
-    };
-    const hydratedDocument = legacyAdjustmentsToEditDocumentV2(hydratedAdjustments);
-    useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: hydratedDocument,
-      historyIndex: 0,
-      history: [hydratedDocument],
-    });
-    const hydrated = useEditorStore.getState();
-
-    expect(hydrated.adjustmentSnapshot.editDocumentV2).toBe(hydrated.editDocumentV2);
-    expect(hydrated.editDocumentV2.nodes['detail_denoise_dehaze']?.params['clarity']).toBe(18);
-    expect(hydrated.adjustmentSnapshot.value.glowAmount).toBe(16);
-
-    const afterReset = { ...hydrated.adjustmentSnapshot.value, brightness: 0, contrast: 0 };
-    hydrated.applyEditTransaction(
+  test('exact no-ops preserve document identity and revision', () => {
+    const before = defaultDocument();
+    const result = reduceEditTransaction(
+      before,
+      4,
       request({
         baseAdjustmentRevision: hydrated.adjustmentRevision,
         imageSessionId: 'editor-image-session:1',
@@ -606,8 +634,9 @@ describe('reduceEditTransaction', () => {
       .applyEditTransaction(request({ baseAdjustmentRevision: 0, imageSessionId: 'editor-image-session:1' }));
     const state = useEditorStore.getState();
 
-    expect(result.changedKeys).toEqual(['exposure']);
-    expect(state.adjustmentSnapshot.value.exposure).toBe(0.5);
+    expect(result.after).toBe(state.editDocumentV2);
+    expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
+    expect(selectEditDocumentNode(state.editDocumentV2, 'scene_global_color_tone').params['exposure']).toBe(0.5);
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
@@ -637,7 +666,7 @@ describe('reduceEditTransaction', () => {
 
   test('layer commands publish canonical state and history through the authority', () => {
     const next = {
-      ...INITIAL_ADJUSTMENTS,
+      aiPatches: [],
       masks: [
         {
           adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
@@ -685,19 +714,14 @@ describe('reduceEditTransaction', () => {
         },
       ],
     };
-    const request = buildLayerEditTransactionRequest(
-      {
-        adjustmentRevision: 7,
-        adjustmentSnapshot: { value: INITIAL_ADJUSTMENTS },
-        editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
-        imageSessionId: 4,
-        imageSession: { id: 'session-layer' },
-      },
-      next,
-      'layer-persist-1',
-    );
-    const result = reduceEditTransaction(INITIAL_ADJUSTMENTS, 7, request, 'session-layer');
-    const persistence = buildEditTransactionPersistenceContext(request, result);
+    const state = {
+      adjustmentRevision: 7,
+      editDocumentV2: defaultDocument(),
+      imageSession: { id: 'session-layer' },
+      imageSessionId: 4,
+    };
+    const transaction = buildLayerEditTransactionRequest(state, next, 'layer-persist-1');
+    const result = reduceEditTransaction(state.editDocumentV2, 7, transaction, 'session-layer');
 
     expect(request.operations).toEqual([
       {

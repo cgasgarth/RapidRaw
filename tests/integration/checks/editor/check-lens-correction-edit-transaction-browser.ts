@@ -178,9 +178,9 @@ const waitForRenderedLensAmount = async (page: Page, expected: number) => {
     if (
       call.success &&
       call.data.endedAtMs !== null &&
-      call.data.args.request.editDocumentV2.nodes.lens_correction.params.lensVignetteAmount === expected
+      call.data.args.request.editDocumentV2.nodes.lens_correction.params['lensVignetteAmount'] === expected
     ) {
-      if ('lensVignetteAmount' in call.data.args.request.editDocumentV2.extensions.legacyAdjustments) {
+      if ('legacyAdjustments' in call.data.args.request.editDocumentV2.extensions) {
         throw new Error('Lens amount leaked back into quarantined legacy adjustments.');
       }
       return;

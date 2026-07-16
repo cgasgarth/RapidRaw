@@ -67,8 +67,10 @@ pub(crate) fn generate_preset_preview(
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
     validate_preset_preview_request(&request)?;
+    let js_adjustments =
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(&request.edit_document_v2)?;
     render_preset_preview_bytes(
-        request.js_adjustments,
+        js_adjustments,
         &state,
         &app_handle,
         Some(&request.expected_image_path),
@@ -296,10 +298,12 @@ pub(crate) async fn generate_all_community_previews(
 
     for preset in presets.iter() {
         let mut processed_tiles: Vec<RgbImage> = Vec::new();
-        let js_adjustments = &preset.adjustments;
+        let js_adjustments = crate::adjustments::edit_document_v2::compile_edit_document_v2(
+            &preset.edit_document_v2,
+        )?;
 
         for (base_image, is_raw, base_scale, source_revision) in &base_thumbnails {
-            let scaled_adjustments = scale_crop_adjustment(js_adjustments, *base_scale);
+            let scaled_adjustments = scale_crop_adjustment(&js_adjustments, *base_scale);
 
             let (transformed_image, _scaled_crop_offset) =
                 crate::apply_all_transformations(Cow::Borrowed(base_image), &scaled_adjustments);

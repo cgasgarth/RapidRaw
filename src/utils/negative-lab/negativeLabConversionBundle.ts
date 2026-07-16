@@ -83,7 +83,7 @@ const validateNegativeLabConversionBundleReplay = (value: unknown): NegativeLabC
     flatLogMaster: bundle.conversion.flatLogMaster,
     paths: bundle.outputs.map((output) => output.source.path),
     presetId: selectedProfile.presetId,
-    sampleRect: bundle.conversion.params.base_fog_sample,
+    sampleRect: bundle.conversion.params['base_fog_sample'],
     scope: bundle.outputs.length > 1 ? 'all' : 'active',
     suffix: bundle.conversion.suffix,
     renderIntent: bundle.conversion.renderIntent,

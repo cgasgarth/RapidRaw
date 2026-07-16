@@ -5,7 +5,7 @@ import type { BlackWhiteMixerChannel, BlackWhiteMixerSettings } from '../../sche
 import type { ChannelMixerOutput, ChannelMixerSettings } from '../../schemas/color/channelMixerSchemas';
 import type { ColorBalanceRgbRange } from '../../schemas/color/colorBalanceRgbSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
-import { type Adjustments, ColorAdjustment } from '../../utils/adjustments';
+import { ColorAdjustment } from '../../utils/adjustments';
 import {
   type BlackWhiteMixerCommitIdentity,
   buildBlackWhiteMixerEditTransaction,
@@ -23,13 +23,14 @@ import {
   type ColorBalanceRgbCommitIdentity,
 } from '../../utils/colorBalanceRgbEditTransaction';
 import { COLOR_OUTPUT_FOCUS_EVENT, COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../utils/colorWorkspaceNavigation';
+import { selectEditDocumentMasks, selectEditDocumentNode } from '../../utils/editDocumentSelectors';
 import {
   applyColorRangeLocalAdjustmentLayerFlow,
   buildColorRangeProposalSourcePixels,
   createColorRangeLocalAdjustmentLayerDraft,
 } from '../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
 import { buildLayerEditTransactionRequest } from '../../utils/layers/layerEditTransaction';
-import { persistLayerStackSidecarInAdjustments } from '../../utils/layers/layerStackSidecarAdjustments';
+import { persistLayerStackSidecarInEditDocumentCandidate } from '../../utils/layers/layerStackSidecarAdjustments';
 import { createColorRangeMaskParameters } from '../../utils/mask/colorRangeMaskParameters';
 import {
   buildSelectiveColorEditTransaction,
@@ -76,8 +77,8 @@ interface ColorWorkspaceTab {
 
 const resolveSelectiveColorAdjustments = (
   adjustments: ColorPanelAdjustmentView,
-  authoritativeHsl: Adjustments['hsl'],
-  authoritativeSelectiveColorRangeControls: Adjustments['selectiveColorRangeControls'],
+  authoritativeHsl: ColorPanelAdjustmentView['hsl'],
+  authoritativeSelectiveColorRangeControls: ColorPanelAdjustmentView['selectiveColorRangeControls'],
   isForMask: boolean,
   selectedImagePath: string | null,
 ): ColorPanelAdjustmentView =>
@@ -163,9 +164,12 @@ export default function ColorPanel({
   const isGamutWarningOverlayVisible = useEditorStore((state) => state.isGamutWarningOverlayVisible);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const setEditor = useEditorStore((state) => state.setEditor);
-  const authoritativeHsl = useEditorStore((state) => state.adjustmentSnapshot.value.hsl);
+  const authoritativeHsl = useEditorStore(
+    (state) => selectEditDocumentNode(state.editDocumentV2, 'selective_color_mixer').params['hsl'],
+  );
   const authoritativeSelectiveColorRangeControls = useEditorStore(
-    (state) => state.adjustmentSnapshot.value.selectiveColorRangeControls,
+    (state) =>
+      selectEditDocumentNode(state.editDocumentV2, 'selective_color_mixer').params['selectiveColorRangeControls'],
   );
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
@@ -242,7 +246,7 @@ export default function ColorPanel({
   const colorBalanceRgbRef = useRef(adjustments.colorBalanceRgb);
   colorBalanceRgbRef.current = adjustments.colorBalanceRgb;
   const commitColorBalanceRgb = useCallback(
-    (update: (current: Adjustments['colorBalanceRgb']) => Adjustments['colorBalanceRgb']) => {
+    (update: (current: ColorPanelAdjustmentView['colorBalanceRgb']) => ColorPanelAdjustmentView['colorBalanceRgb']) => {
       const next = update(colorBalanceRgbRef.current);
       const identity = colorBalanceRgbCommitIdentityRef.current;
       if (isForMask) {
@@ -350,8 +354,11 @@ export default function ColorPanel({
     const currentImage = currentState.selectedImage;
     if (isForMask || currentImage === null) return;
 
-    const rangeControl = currentState.adjustmentSnapshot.value.selectiveColorRangeControls[activeColor];
-    const currentHsl = currentState.adjustmentSnapshot.value.hsl[activeColor];
+    const rangeControl = selectEditDocumentNode(currentState.editDocumentV2, 'selective_color_mixer').params
+      .selectiveColorRangeControls[activeColor];
+    const currentHsl = selectEditDocumentNode(currentState.editDocumentV2, 'selective_color_mixer').params['hsl'][
+      activeColor
+    ];
     const rangeLabel = t(getSelectiveColorRange(activeColor).labelKey);
     const layerId = crypto.randomUUID();
     const maskId = `${layerId}_color_range_mask`;
@@ -385,7 +392,7 @@ export default function ColorPanel({
       }),
       parameters: colorRangeParameters,
     });
-    const result = applyColorRangeLocalAdjustmentLayerFlow(currentState.adjustmentSnapshot.value.masks, {
+    const result = applyColorRangeLocalAdjustmentLayerFlow(selectEditDocumentMasks(currentState.editDocumentV2), {
       colorRangeParameters,
       context: {
         graphRevision: `history_${currentState.historyIndex}`,
@@ -399,8 +406,9 @@ export default function ColorPanel({
       sourceRgbPixels: buildColorRangeProposalSourcePixels(activeColor),
       toneColor,
     });
-    const nextAdjustments = persistLayerStackSidecarInAdjustments(
-      { ...currentState.adjustmentSnapshot.value, masks: result.masks },
+    const nextAdjustments = persistLayerStackSidecarInEditDocumentCandidate(
+      currentState.editDocumentV2,
+      result.masks,
       result.toneResult.sidecar,
     );
     const transaction = buildLayerEditTransactionRequest(currentState, nextAdjustments, operationId);
@@ -414,7 +422,7 @@ export default function ColorPanel({
   };
 
   const syncSkinToneUniformity = useCallback(
-    (nextSettings: Adjustments['skinToneUniformity']) => {
+    (nextSettings: ColorPanelAdjustmentView['skinToneUniformity']) => {
       const identity = skinToneUniformityCommitIdentityRef.current;
       if (isForMask) {
         setAdjustments((previous) => ({ ...previous, skinToneUniformity: nextSettings }));

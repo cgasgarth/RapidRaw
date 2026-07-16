@@ -27,13 +27,13 @@ import {
   buildAgentAdjustmentsApplyApproval,
   dryRunAgentGlobalAdjustments,
 } from '../../../src/utils/agent/tools/agentAdjustmentApplyTool';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const selectedPath = '/fixtures/pure-ts/agent-selected-image-preview-loop/DSC_4843.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 9 : 3));
 
 const seedEditor = () => {
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     brushSettings: { feather: 50, size: 64, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-preview-loop-4843',

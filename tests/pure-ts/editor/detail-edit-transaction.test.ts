@@ -14,7 +14,7 @@ import {
   isDetailNodeAdjustment,
   isDetailNumberNodeAdjustment,
 } from '../../../src/utils/detailEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   EditorPersistenceEffectRunner,
   type EditorPersistenceExecution,
@@ -45,7 +45,13 @@ const identity = (overrides: Partial<DetailCommitIdentity> = {}): DetailCommitId
 describe('detail edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4, flipHorizontal: true };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'geometry',
+      { flipHorizontal: adjustments.flipHorizontal },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -88,9 +94,9 @@ describe('detail edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.sharpness).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']!.params['sharpness']).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.geometry.flipHorizontal).toBe(true);
   });
 
   test('owns the migrated Detail keys, exact no-ops, and stale source/session/revision rejection', () => {
@@ -164,12 +170,16 @@ describe('detail edit transaction', () => {
       editDocumentDetailDenoiseDehazeV2Schema.parse(result.afterEditDocumentV2.nodes['detail_denoise_dehaze']?.params)
         .localContrastRadiusPx,
     ).toBe(42);
-    expect(result.afterEditDocumentV2.nodes['detail_denoise_dehaze']).not.toBe(beforeDetail);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.localContrastRadiusPx).toBe(42);
+    expect(result.after.nodes['detail_denoise_dehaze']).not.toBe(beforeDetail);
+    expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
+    expect(
+      useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']!.params['localContrastRadiusPx'],
+    ).toBe(42);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.localContrastRadiusPx).toBe(24);
+    expect(
+      useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']!.params['localContrastRadiusPx'],
+    ).toBe(24);
     expect(
       editDocumentDetailDenoiseDehazeV2Schema.parse(
         useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']?.params,
@@ -188,9 +198,6 @@ describe('detail edit transaction', () => {
         useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']?.params,
       ).sharpnessThreshold,
     ).toBe(42);
-    expect(useEditorStore.getState().editDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty(
-      'sharpnessThreshold',
-    );
     useEditorStore.getState().undo();
     expect(
       editDocumentDetailDenoiseDehazeV2Schema.parse(
@@ -219,7 +226,6 @@ describe('detail edit transaction', () => {
     });
     runner.installSession({
       adjustmentRevision: 0,
-      adjustments: { ...committed.adjustmentSnapshot.value, sharpnessThreshold: 15 },
       editDocumentV2: beforeDocument,
       imageSessionId: session.id,
       path: sourcePath,
@@ -228,7 +234,6 @@ describe('detail edit transaction', () => {
     if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed detail receipt');
     runner.submitCommitted({
       adjustmentRevision: committed.adjustmentRevision,
-      adjustments: committed.adjustmentSnapshot.value,
       editDocumentV2: committed.editDocumentV2,
       imageSessionId: session.id,
       interactionActive: false,
@@ -247,10 +252,7 @@ describe('detail edit transaction', () => {
       editDocumentDetailDenoiseDehazeV2Schema.parse(execution.editDocumentV2.nodes['detail_denoise_dehaze']?.params)
         .sharpnessThreshold,
     ).toBe(42);
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: execution.adjustments, editDocumentV2: execution.editDocumentV2 },
-      execution.adjustments,
-    );
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: execution.editDocumentV2 });
     expect(
       editDocumentDetailDenoiseDehazeV2Schema.parse(reopened.nodes['detail_denoise_dehaze']?.params).sharpnessThreshold,
     ).toBe(42);
@@ -280,7 +282,7 @@ describe('detail edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().finalPreviewUrl).toBeNull();
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.sharpness).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']!.params['sharpness']).toBe(0);
     expect(() =>
       buildDetailEditTransaction(
         { ...state, imageSessionId: 25 },

@@ -1,7 +1,10 @@
 import { z } from 'zod';
+import type {
+  EditDocumentNodeParamsV2,
+  EditDocumentV2,
+} from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { toneColorDryRunResultV1Schema } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import {
   BASIC_TONE_ADJUSTMENT_KEYS,
   type BasicToneAdjustmentPayload,
@@ -9,6 +12,7 @@ import {
   buildBasicToneImageCommandContext,
 } from '../../basicToneCommandBridge';
 import { technicalWhiteBalanceSchema } from '../../color/whiteBalance';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { applyBasicToneToLiveEditor } from '../session/agentLiveBasicTone';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
@@ -152,22 +156,25 @@ export type AgentAdjustmentsDryRunRequest = z.infer<typeof agentAdjustmentsDryRu
 export type AgentAdjustmentsDryRunResponse = z.infer<typeof agentAdjustmentsDryRunResponseSchema>;
 export type AgentAdjustmentsApplyApproval = z.infer<typeof agentAdjustmentsApplyApprovalSchema>;
 
-const EXTRA_ADJUSTMENT_KEYS = ['whiteBalanceTechnical', 'vibrance'] as const satisfies ReadonlyArray<keyof Adjustments>;
+const EXTRA_ADJUSTMENT_KEYS = ['whiteBalanceTechnical', 'vibrance'] as const;
 
 const buildRequestedBasicTone = (
-  base: Adjustments,
+  base: EditDocumentV2,
   patch: z.infer<typeof agentGlobalAdjustmentPatchSchema>,
-): BasicToneAdjustmentPayload => ({
-  blacks: patch.blacks ?? base.blacks,
-  brightness: patch.brightness ?? base.brightness,
-  clarity: patch.clarity ?? base.clarity,
-  contrast: patch.contrast ?? base.contrast,
-  exposure: patch.exposure ?? base.exposure,
-  highlights: patch.highlights ?? base.highlights,
-  saturation: patch.saturation ?? base.saturation,
-  shadows: patch.shadows ?? base.shadows,
-  whites: patch.whites ?? base.whites,
-});
+): BasicToneAdjustmentPayload => {
+  const global = selectEditDocumentNode(base, 'scene_global_color_tone').params;
+  return {
+    blacks: patch.blacks ?? global.blacks,
+    brightness: patch.brightness ?? global.brightness,
+    clarity: patch.clarity ?? selectEditDocumentNode(base, 'detail_denoise_dehaze').params['clarity'],
+    contrast: patch.contrast ?? global.contrast,
+    exposure: patch.exposure ?? global.exposure,
+    highlights: patch.highlights ?? global.highlights,
+    saturation: patch.saturation ?? selectEditDocumentNode(base, 'color_presence').params['saturation'],
+    shadows: patch.shadows ?? global.shadows,
+    whites: patch.whites ?? global.whites,
+  };
+};
 
 const getSnapshotGraphAndRecipe = () => {
   const snapshot = buildAgentImageContextSnapshot();
@@ -313,7 +320,7 @@ export const dryRunAgentGlobalAdjustments = async (
   if (imagePath === undefined) throw new Error('Cannot dry-run agent basic tone without a selected image.');
 
   const command = buildBasicToneCommandEnvelope(
-    buildRequestedBasicTone(initialState.adjustmentSnapshot.value, parsedRequest.adjustments),
+    buildRequestedBasicTone(initialState.editDocumentV2, parsedRequest.adjustments),
     buildBasicToneImageCommandContext({
       expectedGraphRevision: parsedRequest.expectedGraphRevision,
       imagePath,
@@ -417,7 +424,10 @@ export const applyAgentGlobalAdjustments = async (
 
   const initialState = useEditorStore.getState();
   const undoGraphRevision = parsedRequest.expectedGraphRevision;
-  const additionalAdjustmentPatch: Partial<Adjustments> = {
+  const additionalAdjustmentPatch: Partial<
+    Pick<EditDocumentNodeParamsV2<'color_presence'>, 'vibrance'> &
+      Pick<EditDocumentNodeParamsV2<'camera_input'>, 'whiteBalanceTechnical'>
+  > = {
     ...(parsedRequest.adjustments.vibrance === undefined ? {} : { vibrance: parsedRequest.adjustments.vibrance }),
     ...(parsedRequest.adjustments.whiteBalanceTechnical === undefined
       ? {}
@@ -429,7 +439,7 @@ export const applyAgentGlobalAdjustments = async (
     additionalAdjustmentPatch,
     expectedGraphRevision: parsedRequest.expectedGraphRevision,
     operationId: parsedRequest.operationId,
-    requestedAdjustments: buildRequestedBasicTone(initialState.adjustmentSnapshot.value, parsedRequest.adjustments),
+    requestedAdjustments: buildRequestedBasicTone(initialState.editDocumentV2, parsedRequest.adjustments),
     sessionId: parsedRequest.sessionId,
   });
 

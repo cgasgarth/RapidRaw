@@ -92,5 +92,31 @@ export const reconcileReferenceMatchReceiptsAfterEdit = (previous: Adjustments, 
   return reconciledMasks === reconciled.masks ? reconciled : { ...reconciled, masks: reconciledMasks };
 };
 
+export const reconcileReferenceMatchLayerReceiptsAfterEdit = (
+  previousMasks: readonly Adjustments['masks'][number][],
+  nextMasks: readonly Adjustments['masks'][number][],
+): readonly Adjustments['masks'][number][] => {
+  const previousLayers = new Map(previousMasks.map((layer) => [layer.id, layer]));
+  const reconciledMasks = [...nextMasks];
+  for (const [index, layer] of nextMasks.entries()) {
+    const previousLayer = previousLayers.get(layer.id);
+    if (previousLayer === undefined) continue;
+    const receipt = previousLayer.referenceMatchApplicationReceipt;
+    if (receipt === undefined || !receiptsMatch(layer.referenceMatchApplicationReceipt, receipt)) continue;
+    const changed =
+      previousLayer.opacity !== layer.opacity ||
+      receipt.appliedDiffs.some(
+        (diff) =>
+          diff.key !== 'whiteBalanceKelvin' &&
+          diff.key !== 'whiteBalanceDuv' &&
+          previousLayer.adjustments[diff.key] !== layer.adjustments[diff.key],
+      );
+    if (!changed) continue;
+    const { referenceMatchApplicationReceipt: _staleReceipt, ...layerWithoutReceipt } = layer;
+    reconciledMasks[index] = layerWithoutReceipt;
+  }
+  return reconciledMasks;
+};
+
 export const buildReceiptSafePresetApplication = (current: Adjustments, patch: Partial<Adjustments>): Adjustments =>
   reconcileReferenceMatchReceiptsAfterEdit(current, { ...current, ...patch });

@@ -13,7 +13,7 @@ import {
   agentCurveLevelsApplyRequestSchema,
   applyAgentCurveLevels,
 } from '../../../src/utils/agent/tools/agentCurveLevelsApplyTool';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixtures/agent-curve-levels.ARW';
 const session = createEditorImageSession({ generation: 51, path: sourcePath, source: 'cache' });
@@ -54,7 +54,7 @@ class DeferredCurveLevelsBridge extends RawEngineLocalAppServerBridge {
 describe('agent curve/levels EditTransaction bridge', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -156,8 +156,8 @@ describe('agent curve/levels EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.exposure).toBe(0.2);
-    expect(after.adjustmentSnapshot.value.toneCurve).toBe(INITIAL_ADJUSTMENTS.toneCurve);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.2);
+    expect(after.editDocumentV2.nodes['scene_curve']!.params['toneCurve']).toBe(INITIAL_ADJUSTMENTS.toneCurve);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-curve-levels-edit');
   });
 });

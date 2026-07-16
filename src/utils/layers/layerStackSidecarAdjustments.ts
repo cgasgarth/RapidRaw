@@ -3,8 +3,9 @@ import {
   readLayerStackSidecarsFromSidecar,
   upsertLayerStackSidecarInSidecar,
 } from '../../../packages/rawengine-schema/src';
-
-import type { Adjustments } from '../adjustments';
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import type { Adjustments, AiPatch, MaskContainer } from '../adjustments';
+import { selectEditDocumentAiPatches } from '../editDocumentSelectors';
 import { materializeMasksFromLayerStackSidecar } from './layerStackCommandBridge';
 
 export type PersistedLayerStackArtifacts = {
@@ -52,6 +53,24 @@ export function persistLayerStackSidecarInAdjustments(
     ...adjustments,
     rawEngineArtifacts,
   };
+}
+
+export function persistLayerStackSidecarInEditDocumentCandidate(
+  document: EditDocumentV2,
+  masks: readonly MaskContainer[],
+  layerStackSidecar: LayerStackSidecarV1,
+): {
+  aiPatches: readonly AiPatch[];
+  masks: readonly MaskContainer[];
+  rawEngineArtifacts: PersistedLayerStackArtifacts;
+} {
+  const envelope = upsertLayerStackSidecarInSidecar(
+    { rawEngineArtifacts: document.extensions['rawEngineArtifacts'] },
+    layerStackSidecar,
+  );
+  const rawEngineArtifacts = envelope.rawEngineArtifacts;
+  if (rawEngineArtifacts === undefined) throw new Error('Layer stack persistence produced no artifact envelope.');
+  return { aiPatches: selectEditDocumentAiPatches(document), masks, rawEngineArtifacts };
 }
 
 export function hydrateLayerStackMasksFromMetadata(

@@ -11,8 +11,7 @@ import {
   buildBasicToneEditTransaction,
   captureBasicToneCommitIdentity,
 } from '../../../src/utils/basicToneEditTransaction';
-import { createDefaultEditDocumentV2, updateEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
-import { buildAdjustmentMutationOperations } from '../../../src/utils/editTransaction';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 const sourcePath = '/fixture/basic-tone.ARW';
@@ -38,10 +37,10 @@ const identity = (overrides: Partial<BasicToneCommitIdentity> = {}): BasicToneCo
 
 describe('basic tone edit transaction', () => {
   beforeEach(() => {
-    const editDocumentV2 = updateEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', (geometry) => ({
-      ...geometry,
-      flipHorizontal: true,
-    }));
+    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), flipHorizontal: true };
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+      flipHorizontal: adjustments.flipHorizontal,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -82,8 +81,8 @@ describe('basic tone edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.geometry.flipHorizontal).toBe(true);
   });
 
   test('supports every Basic field, exact no-ops, and stale source/session/revision rejection', () => {
@@ -161,12 +160,8 @@ describe('basic tone edit transaction', () => {
       saturation: 0,
       vibrance: 44,
     });
-    expect(result.afterEditDocumentV2.nodes['geometry']).toBe(beforeGeometry);
-    expect(result.afterEditDocumentV2.extensions).toEqual({});
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: structuredClone(result.after), editDocumentV2: structuredClone(result.afterEditDocumentV2) },
-      structuredClone(result.after),
-    );
+    expect(result.after.nodes['geometry']).toBe(beforeGeometry);
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: structuredClone(result.after) });
     expect(editDocumentColorPresenceV2Schema.parse(reopened.nodes['color_presence']?.params)).toMatchObject({
       hue: 32,
       saturation: 0,
@@ -232,7 +227,7 @@ describe('basic tone edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
     expect(() =>
       buildBasicToneEditTransaction(
         { ...state, imageSessionId: 38 },

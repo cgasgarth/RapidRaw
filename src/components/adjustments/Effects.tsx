@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { FilmStageControlDescriptorV1 } from '../../../packages/rawengine-schema/src/index.js';
 import { useEditorStore } from '../../store/useEditorStore';
 import { TextVariants } from '../../types/typography';
-import { type Adjustments, CreativeAdjustment, Effect } from '../../utils/adjustments';
+import { CreativeAdjustment, Effect } from '../../utils/adjustments';
 import {
   buildDisplayCreativePatchEditTransaction,
   type DisplayCreativeCommitIdentity,
@@ -24,8 +25,14 @@ import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 import LUTControl from './LUTControl';
 
+export type EffectAdjustmentView = EditDocumentNodeParamsV2<'display_creative'> &
+  EditDocumentNodeParamsV2<'film_emulation'>;
+export type EffectAdjustmentUpdate =
+  | Partial<EffectAdjustmentView>
+  | ((prev: EffectAdjustmentView) => EffectAdjustmentView);
+
 interface EffectsPanelProps {
-  adjustments: Adjustments;
+  adjustments: EffectAdjustmentView;
   isForMask: boolean;
   setAdjustments: (adjustments: AdjustmentUpdate) => void;
   handleLutSelect: (path: string) => void;
@@ -41,7 +48,7 @@ interface EffectsPanelProps {
     | undefined;
 }
 
-type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
+type AdjustmentUpdate = EffectAdjustmentUpdate;
 
 const formatEffectSummaryValue = (value: number) => (value > 0 ? `+${value}` : `${value}`);
 const formatEffectSummaryPercent = (value: number) => `${value}%`;
@@ -97,7 +104,7 @@ export default function EffectsPanel({
       commitDisplayCreativePatch({ [key]: nextValue });
       return;
     }
-    setAdjustments((prev: Adjustments) => ({
+    setAdjustments((prev: EffectAdjustmentView) => ({
       ...prev,
       [key]: nextValue,
     }));
@@ -134,7 +141,7 @@ export default function EffectsPanel({
       commitDisplayCreativePatch(patch);
       return;
     }
-    setAdjustments((prev: Adjustments) => ({
+    setAdjustments((prev: EffectAdjustmentView) => ({
       ...prev,
       ...patch,
     }));

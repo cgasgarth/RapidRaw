@@ -1,9 +1,11 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { z } from 'zod';
-
-import type { EditDocumentEditorSection, EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
-
+import {
+  EDIT_DOCUMENT_NODE_DESCRIPTORS,
+  type EditDocumentEditorSection,
+  type EditDocumentV2,
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createDefaultCopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import { loadedMetadataSchema } from '../../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -32,9 +34,13 @@ import {
   captureCopyPasteCompensationTarget,
   classifyCopyPasteNativeCompletion,
 } from '../../utils/copyPasteEditTransaction';
-import { copyEditDocumentV2Nodes, selectEditDocumentV2CopyPayload } from '../../utils/editDocumentV2';
+import { selectEditDocumentGeometry } from '../../utils/editDocumentSelectors';
 import {
-  buildEditorPersistenceRequest,
+  copyEditDocumentV2Nodes,
+  selectEditDocumentV2CopyPayload,
+  setEditDocumentV2NodeEnabled,
+} from '../../utils/editDocumentV2';
+import {
   editorPersistenceReceiptArraySchema,
   editorPersistenceReceiptSchema,
 } from '../../utils/editorPersistenceEffectRunner';
@@ -85,21 +91,15 @@ export const debouncedSetHistory = debounce((_newAdj: Adjustments) => {
 }, 500);
 
 export const debouncedSave = debounce(
-  (
-    path: string,
-    adjustmentsToSave: Adjustments,
-    editDocumentV2: EditDocumentV2,
-    transaction?: EditTransactionPersistenceContext,
-  ) => {
-    const request = buildEditorPersistenceRequest({
-      editDocumentV2,
-      path,
-      ...(transaction === undefined ? {} : { transaction }),
-    });
+  (path: string, documentToSave: EditDocumentV2, transaction?: EditTransactionPersistenceContext) => {
     void trackEditorPersistence(
       path,
-      adjustmentsToSave,
-      invokeWithSchema(Invokes.SaveMetadataAndUpdateThumbnail, request, editorPersistenceReceiptSchema),
+      documentToSave,
+      invokeWithSchema(
+        Invokes.SaveMetadataAndUpdateThumbnail,
+        { path, editDocumentV2: documentToSave, transaction },
+        editorPersistenceReceiptSchema,
+      ),
     ).catch((err: unknown) => {
       console.error('Auto-save failed:', err);
       toast.error(`Failed to save changes: ${formatUnknownError(err)}`);
@@ -115,8 +115,8 @@ export const beginEditorPersistenceAuthorityBarrier = (): void => {
 
 export const awaitMatchingEditorSave = async (
   path: string,
-  adjustments: Adjustments,
-): Promise<{ path: string; sidecarRevision: string } | null> => awaitMatchingEditorPersistence(path, adjustments);
+  document: EditDocumentV2,
+): Promise<{ path: string; sidecarRevision: string } | null> => awaitMatchingEditorPersistence(path, document);
 
 const BASIC_TONE_SESSION_ID = 'rapidraw-editor-basic-tone';
 const lutLoadResponseSchema = z.object({ size: z.number().int().positive() }).strict();
@@ -189,7 +189,7 @@ export function useEditorActions() {
       applyEditTransaction(request);
       if (lastBasicToneCommand !== state.lastBasicToneCommand) setEditor({ lastBasicToneCommand });
     },
-    [applyEditTransaction, setEditor],
+    [applyEditTransaction],
   );
 
   const setEditorSectionEnabled = useCallback(
@@ -302,22 +302,12 @@ export function useEditorActions() {
         );
         assertResetAdjustmentsResultCoverage(results, pathsToReset);
         useProcessStore.getState().invalidateThumbnails(pathsToReset);
-        if (libraryActivePath && pathsToReset.includes(libraryActivePath))
-          setLibrary({ libraryActiveAdjustments: { ...INITIAL_ADJUSTMENTS } });
         if (selectedImage && resetIdentity !== null && pathsToReset.includes(selectedImage.path)) {
           const current = useEditorStore.getState();
           if (!isCurrentResetEditCommitIdentity(current, resetIdentity)) return;
           const result = results.find(({ path }) => path === resetIdentity.sourceIdentity);
           if (result === undefined) throw new Error('reset_edit_transaction.missing_selected_receipt');
-          applyEditTransaction(
-            buildResetEditTransaction(
-              current,
-              resetIdentity,
-              result,
-              { height: selectedImage.height, width: selectedImage.width },
-              createOperationId(),
-            ),
-          );
+          applyEditTransaction(buildResetEditTransaction(current, resetIdentity, result, createOperationId()));
         }
       } catch (err) {
         toast.error(`Failed to reset adjustments: ${formatUnknownError(err)}`);
@@ -331,17 +321,13 @@ export function useEditorActions() {
     const { selectedImage, editDocumentV2 } = useEditorStore.getState();
     const { libraryActivePath, multiSelectedPaths } = useLibraryStore.getState();
     let sourceDocument = selectedImage ? editDocumentV2 : null;
-
     if (!selectedImage) {
       const pathToCopyFrom = pathOverride || libraryActivePath || multiSelectedPaths[0];
       if (pathToCopyFrom) {
         try {
           const meta = await invokeWithSchema(Invokes.LoadMetadata, { path: pathToCopyFrom }, loadedMetadataSchema);
-          if (meta.editDocumentV2 === null || meta.editDocumentV2 === undefined) {
-            toast.error('The selected image does not have a current edit document to copy.');
-            return;
-          }
-          sourceDocument = meta.editDocumentV2;
+          sourceDocument = meta.editDocumentV2 ?? null;
+          if (sourceDocument === null) throw new Error('Current EditDocumentV2 is missing from image metadata.');
         } catch (err) {
           toast.error(`Failed to load metadata for copying: ${formatUnknownError(err)}`);
           return;
@@ -413,12 +399,12 @@ export function useEditorActions() {
 
       invokeWithSchema(
         Invokes.ApplyAdjustmentsToPaths,
-        { editDocumentV2: selectedPayload, paths: pathsToUpdate, transaction },
+        { editDocumentV2CopyPayload: selectedPayload, paths: pathsToUpdate, transaction },
         editorPersistenceReceiptArraySchema,
       )
         .then((receipts) => {
           const selectedReceipt = receipts.find((receipt) => receipt.path === selectedImage?.path);
-          if (selectedReceipt && selectedImage && pathsToUpdate.includes(selectedImage.path)) {
+          if (selectedReceipt?.editDocumentV2 && selectedImage && pathsToUpdate.includes(selectedImage.path)) {
             const completion = classifyCopyPasteNativeCompletion(
               useEditorStore.getState(),
               selectedImage.path,
@@ -445,8 +431,8 @@ export function useEditorActions() {
   const handleZoomChange = useCallback((command: EditorZoomCommand) => {
     const editor = useEditorStore.getState();
     const sourceSize = getEditorZoomSourceSize({
-      crop: editor.adjustmentSnapshot.value.crop,
-      orientationSteps: editor.adjustmentSnapshot.value.orientationSteps,
+      crop: selectEditDocumentGeometry(editor.editDocumentV2).crop,
+      orientationSteps: selectEditDocumentGeometry(editor.editDocumentV2).orientationSteps,
       originalSize: editor.originalSize,
     });
     const resolved = resolveEditorZoom({
@@ -468,7 +454,7 @@ export function useEditorActions() {
   }, []);
 
   return {
-    setAdjustments,
+    commitEditNodeOperations,
     setEditorSectionEnabled,
     handleRotate,
     handleAutoAdjustments,

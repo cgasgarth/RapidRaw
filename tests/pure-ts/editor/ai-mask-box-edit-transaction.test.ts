@@ -5,7 +5,7 @@ import { createEditorImageSession, useEditorStore } from '../../../src/store/use
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAiMaskBoxEditTransaction } from '../../../src/utils/aiMaskBoxEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/ai-mask-target.ARW';
 const sourceRevision = 'viewer-graph:mask:1';
@@ -56,7 +56,13 @@ describe('AI mask box edit transaction', () => {
         },
       ],
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'layers',
+      { masks: adjustments.masks },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -98,17 +104,17 @@ describe('AI mask box edit transaction', () => {
       transactionId: 'ai-mask-box-commit',
     });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters).toEqual({
+    expect(useEditorStore.getState().editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters).toEqual({
       feather: 0.5,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
   });
 
   test('targets one Quick Erase submask in the declared AI-patch family', () => {
     const state = useEditorStore.getState();
     const quickEraseId = 'quick-erase:1';
     const adjustments = {
-      ...state.adjustmentSnapshot.value,
+      ...state.editDocumentV2,
       masks: [],
       aiPatches: [
         {
@@ -133,7 +139,11 @@ describe('AI mask box edit transaction', () => {
         },
       ],
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(state.editDocumentV2, 'layers', { masks: [] }),
+      'source_artifacts',
+      { aiPatches: adjustments.aiPatches },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       editDocumentV2,
       history: [editDocumentV2],
@@ -183,39 +193,36 @@ describe('AI mask box edit transaction', () => {
   test('rejects duplicate mask identities instead of mutating across families', () => {
     const state = { ...useEditorStore.getState(), geometryEpoch, sourceRevision };
     const parameters = { endX: 2, endY: 3, startX: 0, startY: 1 };
-    const duplicatedAdjustments = {
-      ...state.adjustmentSnapshot.value,
-      masks: state.adjustmentSnapshot.value.masks.map((container) => ({
-        ...container,
-        subMasks: [...container.subMasks, structuredClone(container.subMasks[0]!)],
-      })),
-    };
+    const duplicatedDocument = structuredClone(state.editDocumentV2);
+    duplicatedDocument.layers.masks[0]!.subMasks.push(
+      structuredClone(duplicatedDocument.layers.masks[0]!.subMasks[0]!),
+    );
+    duplicatedDocument.nodes['layers']!.params = structuredClone(duplicatedDocument.layers);
     const duplicatedMaskState = {
       ...state,
-      adjustmentSnapshot: { ...state.adjustmentSnapshot, value: duplicatedAdjustments },
+      editDocumentV2: duplicatedDocument,
     };
     expect(() => buildAiMaskBoxEditTransaction(duplicatedMaskState, identity(), parameters, 'tx')).toThrow(
       'ai_mask_box_transaction.duplicate_mask_in_container',
     );
 
-    const crossFamilyAdjustments = {
-      ...state.adjustmentSnapshot.value,
-      aiPatches: [
-        {
-          id: 'patch:1',
-          invert: false,
-          isLoading: false,
-          name: 'Collision',
-          patchData: null,
-          prompt: '',
-          subMasks: [structuredClone(state.adjustmentSnapshot.value.masks[0]!.subMasks[0]!)],
-          visible: true,
-        },
-      ],
-    };
+    const crossFamilyDocument = structuredClone(state.editDocumentV2);
+    crossFamilyDocument.sourceArtifacts.aiPatches = [
+      {
+        id: 'patch:1',
+        invert: false,
+        isLoading: false,
+        name: 'Collision',
+        patchData: null,
+        prompt: '',
+        subMasks: [structuredClone(state.editDocumentV2.layers.masks[0]!.subMasks[0]!)],
+        visible: true,
+      },
+    ];
+    crossFamilyDocument.nodes['source_artifacts']!.params = structuredClone(crossFamilyDocument.sourceArtifacts);
     const crossFamilyState = {
       ...state,
-      adjustmentSnapshot: { ...state.adjustmentSnapshot, value: crossFamilyAdjustments },
+      editDocumentV2: crossFamilyDocument,
     };
     expect(() => buildAiMaskBoxEditTransaction(crossFamilyState, identity(), parameters, 'tx')).toThrow(
       'ai_mask_box_transaction.cross_family_mask_collision',

@@ -17,21 +17,20 @@ import {
   dryRunAgentGlobalAdjustments,
 } from '../../../../src/utils/agent/tools/agentAdjustmentApplyTool.ts';
 import {
-  legacyAdjustmentsToEditDocumentV2,
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
   setEditDocumentV2NodeEnabled,
 } from '../../../../src/utils/editDocumentV2.ts';
 import { buildRawEngineAppServerRouteCatalog } from '../../../../src/utils/rawEngineAppServerHost.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 18 : 2));
-const initialDocument = setEditDocumentV2NodeEnabled(
-  legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
-  'tone_equalizer',
-  false,
-);
+const initialDocument = setEditDocumentV2NodeEnabled(createDefaultEditDocumentV2(), 'tone_equalizer', false);
 const futureAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 4 };
 const futureDocument = setEditDocumentV2NodeEnabled(
-  legacyAdjustmentsToEditDocumentV2(futureAdjustments),
+  patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+    contrast: futureAdjustments.contrast,
+  }),
   'tone_equalizer',
   false,
 );

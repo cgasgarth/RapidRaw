@@ -7,7 +7,7 @@ import {
   buildBlackWhiteMixerEditTransaction,
   isCurrentBlackWhiteMixerIdentity,
 } from '../../../src/utils/blackWhiteMixerEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/black-white-mixer.ARW';
 const session = createEditorImageSession({ generation: 23, path: sourcePath, source: 'cache' });
@@ -33,7 +33,9 @@ const identity = (overrides: Partial<BlackWhiteMixerCommitIdentity> = {}): Black
 describe('black-and-white mixer edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: adjustments.exposure,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -73,10 +75,10 @@ describe('black-and-white mixer edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.blackWhiteMixer).toEqual(
+    expect(useEditorStore.getState().editDocumentV2.nodes['black_white_mixer']!.params['blackWhiteMixer']).toEqual(
       INITIAL_ADJUSTMENTS.blackWhiteMixer,
     );
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
   });
 
   test('rejects stale source, session, and revision identities', () => {
@@ -151,7 +153,7 @@ describe('black-and-white mixer edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.blackWhiteMixer).toEqual(
+    expect(useEditorStore.getState().editDocumentV2.nodes['black_white_mixer']!.params['blackWhiteMixer']).toEqual(
       INITIAL_ADJUSTMENTS.blackWhiteMixer,
     );
 

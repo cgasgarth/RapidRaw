@@ -6,7 +6,8 @@ import {
   type ViewerMaskOverlayTransition,
 } from '../../../src/components/panel/editor/viewerMaskOverlayController';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
-import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { buildMaskOverlayInvokePayload } from '../../../src/utils/mask/maskOverlayRequest';
 
 const context = (overrides: Partial<ViewerMaskOverlayContext> = {}): ViewerMaskOverlayContext => ({
@@ -18,7 +19,7 @@ const context = (overrides: Partial<ViewerMaskOverlayContext> = {}): ViewerMaskO
 });
 
 const payload = buildMaskOverlayInvokePayload({
-  jsAdjustments: INITIAL_ADJUSTMENTS,
+  editDocumentV2: createDefaultEditDocumentV2(),
   maskDef: {
     adjustments: {},
     editNodes: createDefaultMaskEditNodes(),

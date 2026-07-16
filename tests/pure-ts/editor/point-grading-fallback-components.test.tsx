@@ -6,10 +6,12 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { ColorGradingControls } from '../../../src/components/adjustments/color/ColorGradingControls';
 import { PointColorControls } from '../../../src/components/adjustments/color/PointColorControls';
+import type { ColorPanelAdjustmentView } from '../../../src/components/adjustments/color/types';
+import { selectColorPanelAdjustmentView } from '../../../src/components/panel/right/color/ColorWorkspacePanel';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
@@ -47,7 +49,9 @@ test('PointColorControls toggle commits through fallback authority without the m
   if (!(enable instanceof window.HTMLButtonElement)) throw new Error('missing point color enable control');
   act(() => enable.click());
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value.pointColor.enabled).toBeTrue();
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'point_color').params['pointColor'].enabled,
+  ).toBeTrue();
   expect(useEditorStore.getState().history).toHaveLength(2);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:111',
@@ -74,8 +78,9 @@ test('ColorGradingControls slider commits perceptual grading through fallback au
     balance.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value.colorGrading.balance).toBe(28);
-  expect(useEditorStore.getState().adjustmentSnapshot.value.perceptualGradingV1?.balance).toBeCloseTo(0.28);
+  const grading = selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'perceptual_grading').params;
+  expect(grading.colorGrading.balance).toBe(28);
+  expect(grading.perceptualGradingV1?.balance).toBeCloseTo(0.28);
   expect(useEditorStore.getState().history).toHaveLength(2);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:112',
@@ -84,9 +89,8 @@ test('ColorGradingControls slider commits perceptual grading through fallback au
   expect(genericSetter).not.toHaveBeenCalled();
 });
 
-function initializeFallbackStore(imageSessionId: number): Adjustments {
-  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+function initializeFallbackStore(imageSessionId: number): ColorPanelAdjustmentView {
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -98,7 +102,7 @@ function initializeFallbackStore(imageSessionId: number): Adjustments {
     selectedImage,
     history: [editDocumentV2],
   });
-  return adjustments;
+  return selectColorPanelAdjustmentView(editDocumentV2);
 }
 
 function render(element: React.ReactElement): HTMLElement {

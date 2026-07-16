@@ -1,14 +1,5 @@
-import type { Adjustments } from '../../adjustments';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 
-export const buildAgentLensProfileRecipeHashInput = (adjustments: Adjustments) => ({
-  lensCorrectionMode: adjustments.lensCorrectionMode,
-  lensDistortionAmount: adjustments.lensDistortionAmount,
-  lensDistortionEnabled: adjustments.lensDistortionEnabled,
-  lensDistortionParams: adjustments.lensDistortionParams,
-  lensMaker: adjustments.lensMaker,
-  lensModel: adjustments.lensModel,
-  lensTcaAmount: adjustments.lensTcaAmount,
-  lensTcaEnabled: adjustments.lensTcaEnabled,
-  lensVignetteAmount: adjustments.lensVignetteAmount,
-  lensVignetteEnabled: adjustments.lensVignetteEnabled,
-});
+export const buildAgentLensProfileRecipeHashInput = (document: EditDocumentV2) =>
+  selectEditDocumentNode(document, 'lens_correction').params;

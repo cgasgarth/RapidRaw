@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { editDocumentSourceArtifactsV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../../src/components/panel/right/layers/Masks.tsx';
 import { createEditorImageSession, useEditorStore } from '../../src/store/useEditorStore.ts';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots.ts';
@@ -10,7 +11,7 @@ import {
   selectionAfterSubMaskDeletion,
 } from '../../src/utils/aiEditSelection.ts';
 import { buildAiSourceArtifactEditTransaction } from '../../src/utils/aiSourceArtifactEditTransaction.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../src/utils/editDocumentV2.ts';
 
 const sourcePath = '/fixture/ai-source-artifacts.ARW';
 const imageSession = createEditorImageSession({ generation: 12, path: sourcePath, source: 'cache' });
@@ -48,7 +49,9 @@ const patch = (id: string, subMaskIds: Array<string> = []): AiPatch => ({
 });
 
 const seedEditor = (adjustments = structuredClone(INITIAL_ADJUSTMENTS)): void => {
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'source_artifacts', {
+    aiPatches: editDocumentSourceArtifactsV2Schema.parse({ aiPatches: adjustments.aiPatches }).aiPatches,
+  });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     activeAiPatchContainerId: null,
     activeAiSubMaskId: null,
@@ -152,7 +155,7 @@ describe('AI edit store command', () => {
     const state = useEditorStore.getState();
 
     expect(committed).toEqual({ containerId: 'first', subMaskId: 'created' });
-    expect(state.adjustmentSnapshot.value.aiPatches[0]?.subMasks).toEqual([createdSubMask]);
+    expect(state.editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks).toMatchObject([createdSubMask]);
     expect(state.activeAiPatchContainerId).toBe('first');
     expect(state.activeAiSubMaskId).toBe('created');
     expect(state.brushSettings?.tool).toBe(ToolType.Brush);
@@ -198,7 +201,7 @@ describe('AI edit store command', () => {
     const state = useEditorStore.getState();
 
     expect(committed).toBeNull();
-    expect(state.adjustmentSnapshot.value).toEqual(initial);
+    expect(state.editDocumentV2.sourceArtifacts.aiPatches).toMatchObject([initialPatch]);
     expect(state.activeAiPatchContainerId).toBe('survivor');
     expect(state.activeAiSubMaskId).toBe('child');
     expect(state.historyIndex).toBe(0);
@@ -233,7 +236,7 @@ describe('AI edit store command', () => {
       ),
       selection,
     }));
-    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.visible).toBeFalse();
+    expect(useEditorStore.getState().editDocumentV2.sourceArtifacts.aiPatches[0]?.visible).toBeFalse();
     expect(useEditorStore.getState().adjustmentRevision).toBe(1);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
@@ -241,21 +244,20 @@ describe('AI edit store command', () => {
       aiPatches: aiPatches.filter((candidate) => candidate.id !== 'second'),
       selection,
     }));
-    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches.map((candidate) => candidate.id)).toEqual([
-      'first',
-    ]);
+    expect(useEditorStore.getState().editDocumentV2.sourceArtifacts.aiPatches.map((candidate) => candidate.id)).toEqual(
+      ['first'],
+    );
     expect(useEditorStore.getState().adjustmentRevision).toBe(2);
     expect(useEditorStore.getState().history).toHaveLength(3);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches.map((candidate) => candidate.id)).toEqual([
-      'first',
-      'second',
-    ]);
+    expect(useEditorStore.getState().editDocumentV2.sourceArtifacts.aiPatches.map((candidate) => candidate.id)).toEqual(
+      ['first', 'second'],
+    );
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.visible).toBeTrue();
+    expect(useEditorStore.getState().editDocumentV2.sourceArtifacts.aiPatches[0]?.visible).toBeTrue();
     expect(useEditorStore.getState().editDocumentV2.nodes['source_artifacts']?.params['aiPatches']).toEqual(
-      useEditorStore.getState().adjustmentSnapshot.value.aiPatches,
+      useEditorStore.getState().editDocumentV2.sourceArtifacts.aiPatches,
     );
   });
 
@@ -316,7 +318,7 @@ describe('AI edit store command', () => {
       history: [useEditorStore.getState().editDocumentV2],
     });
 
-    const neutralDocument = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const neutralDocument = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       editDocumentV2: neutralDocument,
       history: [neutralDocument],
@@ -332,7 +334,7 @@ describe('AI edit store command', () => {
       editDocumentV2: useEditorStore.getState().editDocumentV2,
       history: [useEditorStore.getState().editDocumentV2],
     });
-    useEditorStore.getState().resetHistory(legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS));
+    useEditorStore.getState().resetHistory(createDefaultEditDocumentV2());
     expect(useEditorStore.getState().activeAiPatchContainerId).toBeNull();
     expect(useEditorStore.getState().activeAiSubMaskId).toBeNull();
   });

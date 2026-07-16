@@ -58,7 +58,7 @@ const buildNegativeLabProfileComparisonWarningCodes = (profile: NegativeLabRunti
   if (profile.profileStatus === 'user_supplied') {
     warningCodes.add('user_supplied_profile');
   }
-  if (profile.params.base_fog_sample === null) {
+  if (profile.params['base_fog_sample'] === null) {
     warningCodes.add('base_sample_reference_pending');
   }
 
@@ -95,17 +95,17 @@ const buildNegativeLabProfileComparisonRenderEvidence = ({
   queuedCount: number;
 }) => {
   const metrics = {
-    contrastDeltaAbs: roundProfileDelta(Math.abs(profile.params.contrast - currentParams.contrast)),
-    exposureDeltaAbs: roundProfileDelta(Math.abs(profile.params.exposure - currentParams.exposure)),
+    contrastDeltaAbs: roundProfileDelta(Math.abs(profile.params['contrast'] - currentParams.contrast)),
+    exposureDeltaAbs: roundProfileDelta(Math.abs(profile.params['exposure'] - currentParams.exposure)),
     rgbBalanceDeltaAbs: roundProfileDelta(
-      Math.abs(profile.params.red_weight - currentParams.red_weight) +
-        Math.abs(profile.params.green_weight - currentParams.green_weight) +
-        Math.abs(profile.params.blue_weight - currentParams.blue_weight),
+      Math.abs(profile.params['red_weight'] - currentParams.red_weight) +
+        Math.abs(profile.params['green_weight'] - currentParams.green_weight) +
+        Math.abs(profile.params['blue_weight'] - currentParams.blue_weight),
     ),
   };
   const warningCodes = buildNegativeLabProfileComparisonWarningCodes(profile);
   const baseSampleReference =
-    profile.params.base_fog_sample === null
+    profile.params['base_fog_sample'] === null
       ? `active-frame:${activeFrameLabel}:pending-base-fog-sample`
       : `profile:${profile.presetId}:embedded-base-fog-sample`;
   const renderPayload = {
@@ -119,10 +119,10 @@ const buildNegativeLabProfileComparisonRenderEvidence = ({
 
   return {
     baseSampleReference,
-    densityAlgorithm: profile.params.print_curve_algorithm,
+    densityAlgorithm: profile.params['print_curve_algorithm'],
     metricHash: formatProfileHash({ metrics, profileProvenanceHash }),
     metrics,
-    outputTag: profile.params.print_curve_output_tag,
+    outputTag: profile.params['print_curve_output_tag'],
     previewHash: formatProfileHash({
       currentParams,
       profileParams: profile.params,

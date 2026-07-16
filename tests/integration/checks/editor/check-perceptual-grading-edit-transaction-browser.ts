@@ -135,7 +135,7 @@ const waitForRenderedPerceptualGrading = async (page: Page, expectedBalance: num
     if (
       call.success &&
       call.data.endedAtMs !== null &&
-      call.data.args.request.editDocumentV2.nodes.perceptual_grading.params.colorGrading.balance === expectedBalance
+      call.data.args.request.editDocumentV2.nodes.perceptual_grading.params['colorGrading'].balance === expectedBalance
     )
       return call.data;
     await page.waitForTimeout(50);

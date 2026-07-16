@@ -7,7 +7,8 @@ import TransformLens from '../../../src/components/adjustments/TransformLens.tsx
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
+import { selectEditDocumentGeometry, selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors.ts';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2.ts';
 
 afterEach(() => {
   Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
@@ -22,7 +23,9 @@ test('guided perspective controls create source-normalized horizontal and vertic
     ...structuredClone(INITIAL_ADJUSTMENTS),
     perspectiveCorrection: { ...INITIAL_ADJUSTMENTS.perspectiveCorrection, mode: 'guided' as const },
   };
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+    perspectiveCorrection: adjustments.perspectiveCorrection,
+  });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -64,7 +67,11 @@ test('guided perspective controls create source-normalized horizontal and vertic
 });
 
 function PerspectiveHarness() {
-  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const document = useEditorStore((state) => state.editDocumentV2);
+  const adjustments = {
+    ...selectEditDocumentGeometry(document),
+    ...selectEditDocumentNode(document, 'lens_correction').params,
+  };
   const selectedImage = useEditorStore((state) => state.selectedImage);
   return createElement(
     'div',
@@ -77,7 +84,7 @@ function PerspectiveHarness() {
     createElement(
       'output',
       { 'data-testid': 'perspective-state' },
-      JSON.stringify(adjustments.perspectiveCorrection.guides),
+      JSON.stringify(document.geometry.perspectiveCorrection.guides),
     ),
   );
 }

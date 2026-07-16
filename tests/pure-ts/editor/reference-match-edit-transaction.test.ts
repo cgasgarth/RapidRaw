@@ -8,7 +8,7 @@ import { matchLookProposalV1Schema } from '../../../packages/rawengine-schema/sr
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildReferenceMatchGlobalEditTransaction,
   buildReferenceMatchLayerEditTransaction,
@@ -57,7 +57,7 @@ const identity = (overrides: Partial<ReferenceMatchCommitIdentity> = {}): Refere
 describe('reference match edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -98,10 +98,9 @@ describe('reference match edit transaction', () => {
     expect(useEditorStore.getState()).toMatchObject({ historyIndex: 1, adjustmentRevision: 1 });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
-      exposure: 0,
-      referenceMatchApplicationReceipt: null,
-    });
+    const undone = useEditorStore.getState().editDocumentV2;
+    expect(undone.nodes['scene_global_color_tone']?.params).toMatchObject({ exposure: 0 });
+    expect(undone.provenance.referenceMatchApplicationReceipt).toBeNull();
   });
 
   test('commits technical white balance as one camera-input patch and preserves reference lock', () => {
@@ -113,7 +112,9 @@ describe('reference match edit transaction', () => {
       },
     };
     const state = useEditorStore.getState();
-    const lockedDocument = legacyAdjustmentsToEditDocumentV2(lockedAdjustments);
+    const lockedDocument = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'camera_input', {
+      whiteBalanceTechnical: lockedAdjustments.whiteBalanceTechnical,
+    });
     state.hydrateEditorRenderAuthority({
       editDocumentV2: lockedDocument,
       history: [lockedDocument],

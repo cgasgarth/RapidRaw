@@ -53,7 +53,7 @@ import {
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { buildColorStackPreviewExportParityReceipt } from '../../../../utils/colorStackPreviewExportParityReceipt';
-import { prepareCurrentEditDocumentV2ForBackend } from '../../../../utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../../utils/editDocumentSelectors';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import {
   type ExportCancellationAck,
@@ -90,6 +90,7 @@ import {
   upsertExportSoftProofResolverPreset,
 } from '../../../../utils/export/exportSoftProofProfileCompare';
 import { resolveExportTargetPaths } from '../../../../utils/export/exportTargetPaths';
+import { prepareEditDocumentPayloadForBackend } from '../../../../utils/preparedAdjustmentPayloadCache';
 import { buildRawWarningChips } from '../../../../utils/rawWarningReceipts';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import { debounce } from '../../../../utils/timing';
@@ -543,7 +544,16 @@ export default function ExportPanel({
     () =>
       firstReceiptOutput
         ? buildColorStackPreviewExportParityReceipt({
-            editDocumentV2,
+            adjustments: {
+              ...selectEditDocumentNode(editDocumentV2, 'black_white_mixer').params,
+              ...selectEditDocumentNode(editDocumentV2, 'camera_input').params,
+              ...selectEditDocumentNode(editDocumentV2, 'channel_mixer').params,
+              ...selectEditDocumentNode(editDocumentV2, 'color_balance_rgb').params,
+              ...selectEditDocumentNode(editDocumentV2, 'perceptual_grading').params,
+              ...selectEditDocumentNode(editDocumentV2, 'scene_curve').params,
+              ...selectEditDocumentNode(editDocumentV2, 'selective_color_mixer').params,
+              ...selectEditDocumentNode(editDocumentV2, 'skin_tone_uniformity').params,
+            },
             exportOutput: firstReceiptOutput,
             exportSoftProofTransform,
             isExportSoftProofEnabled,
@@ -1012,10 +1022,7 @@ export default function ExportPanel({
 
     const { patchResidency } = useEditorStore.getState();
     const residency = patchResidency.snapshot();
-    const { editDocumentV2: preparedEditDocumentV2, newlySentPatchIds } = prepareCurrentEditDocumentV2ForBackend(
-      editDocumentV2,
-      residency.residentIds,
-    );
+    const { newlySentPatchIds, payload } = prepareEditDocumentPayloadForBackend(editDocumentV2, residency.residentIds);
     const compareRequests = buildSoftProofProfileCompareRequests({
       blackPointCompensation,
       editDocumentV2: preparedEditDocumentV2,

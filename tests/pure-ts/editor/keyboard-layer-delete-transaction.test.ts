@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { readLayerStackSidecarsFromSidecar } from '../../../packages/rawengine-schema/src';
+import { editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import {
   createDefaultMaskEditNodes,
-  INITIAL_ADJUSTMENTS,
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
 } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildKeyboardLayerDeleteTransaction } from '../../../src/utils/layers/keyboardLayerDeleteTransaction';
 import { buildLayerStackSidecarFromMasks } from '../../../src/utils/layers/layerStackCommandBridge';
-import { persistLayerStackSidecarInAdjustments } from '../../../src/utils/layers/layerStackSidecarAdjustments';
+import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../src/utils/layers/layerStackSidecarAdjustments';
 
 const imagePath = '/fixtures/keyboard-layer-delete.ARW';
 const layer: MaskContainer = {
@@ -28,14 +28,20 @@ const layer: MaskContainer = {
 };
 
 const seedStore = () => {
-  const baseAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const baseDocument = createDefaultEditDocumentV2();
   const sidecar = buildLayerStackSidecarFromMasks([layer], {
     graphRevision: 'keyboard_delete_initial',
     imagePath,
     operationId: 'keyboard-delete-seed',
     sessionId: 'keyboard-delete-test',
   });
-  const adjustments = persistLayerStackSidecarInAdjustments({ ...baseAdjustments, masks: [layer] }, sidecar);
+  const candidate = persistLayerStackSidecarInEditDocumentCandidate(baseDocument, [layer], sidecar);
+  const layers = editDocumentLayersV2Schema.parse({ masks: candidate.masks });
+  const patchedDocument = patchEditDocumentV2Node(baseDocument, 'layers', layers);
+  const editDocumentV2 = {
+    ...patchedDocument,
+    extensions: { ...patchedDocument.extensions, rawEngineArtifacts: candidate.rawEngineArtifacts },
+  };
   useEditorStore.getState().hydrateEditorRenderAuthority({
     activeMaskContainerId: layer.id,
     activeMaskId: null,
@@ -65,8 +71,8 @@ const seedStore = () => {
       width: 1800,
     },
     transformedOriginalUrl: 'blob:original-before',
-    editDocumentV2: publishAdjustmentSnapshot(null, adjustments).editDocumentV2,
-    history: [publishAdjustmentSnapshot(null, adjustments).editDocumentV2],
+    editDocumentV2,
+    history: [editDocumentV2],
   });
 };
 
@@ -90,8 +96,8 @@ describe('keyboard layer delete EditTransaction boundary', () => {
       transactionId: 'keyboard-delete-commit',
     });
     expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
-    expect(committed.adjustmentSnapshot.value.masks).toEqual([]);
-    expect(readLayerStackSidecarsFromSidecar(committed.adjustmentSnapshot.value)).toMatchObject([
+    expect(committed.editDocumentV2.layers.masks).toEqual([]);
+    expect(readLayerStackSidecarsFromSidecar(committed.editDocumentV2.extensions)).toMatchObject([
       { graphRevision: expect.stringContaining('keyboard-delete-commit'), layers: [], sourceImagePath: imagePath },
     ]);
     expect(committed.adjustmentRevision).toBe(1);
@@ -108,9 +114,9 @@ describe('keyboard layer delete EditTransaction boundary', () => {
     expect(committed.transformedOriginalUrl).toBeNull();
 
     committed.undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks.map((mask) => mask.id)).toEqual([layer.id]);
+    expect(useEditorStore.getState().editDocumentV2.layers.masks.map((mask) => mask.id)).toEqual([layer.id]);
     committed.redo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks).toEqual([]);
+    expect(useEditorStore.getState().editDocumentV2.layers.masks).toEqual([]);
   });
 
   test('a missing selected layer is an exact render no-op', () => {
@@ -145,9 +151,9 @@ describe('keyboard layer delete EditTransaction boundary', () => {
       'edit_transaction.stale_base:0:1',
     );
     const committed = useEditorStore.getState();
-    expect(committed.adjustmentSnapshot.value.masks.map((mask) => mask.id)).toEqual([layer.id]);
+    expect(committed.editDocumentV2.layers.masks.map((mask) => mask.id)).toEqual([layer.id]);
     expect(
-      readLayerStackSidecarsFromSidecar(committed.adjustmentSnapshot.value)[0]?.layers.map((item) => item.id),
+      readLayerStackSidecarsFromSidecar(committed.editDocumentV2.extensions)[0]?.layers.map((item) => item.id),
     ).toEqual([layer.id]);
   });
 });

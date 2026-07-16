@@ -20,12 +20,13 @@ use crate::{AppState, adjustment_fields, hydrate_adjustments, render_pipeline};
 
 #[tauri::command]
 pub(crate) fn generate_uncropped_preview(
-    js_adjustments: serde_json::Value,
+    edit_document_v2: serde_json::Value,
     state: tauri::State<AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<(), String> {
     let context = get_or_init_gpu_context(&state, &app_handle)?;
-    let mut adjustments_clone = js_adjustments;
+    let mut adjustments_clone =
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(&edit_document_v2)?;
     hydrate_adjustments(&state, &mut adjustments_clone);
 
     let loaded_image = state

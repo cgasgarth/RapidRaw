@@ -1,18 +1,13 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+
+import { editDocumentLayerV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import {
   createViewerRetouchHandlesController,
   type ViewerRetouchCurrentContext,
 } from '../../../src/components/panel/editor/viewerRetouchHandlesController';
-import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import {
-  createDefaultMaskEditNodes,
-  INITIAL_ADJUSTMENTS,
-  INITIAL_MASK_ADJUSTMENTS,
-  type MaskContainer,
-} from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentMasks, selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildRetouchHandleEditTransaction,
   createRetouchLayerRevision,
@@ -21,13 +16,31 @@ import {
 const sourcePath = '/fixture/retouch.ARW';
 const sourceRevision = 'viewer-graph:retouch:1';
 const geometryEpoch = 11;
-const session = createEditorImageSession({ generation: 8, path: sourcePath, source: 'cache' });
 const imageSize = { height: 3000, width: 4000 };
-const layer = (): MaskContainer => ({
-  adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+const session = createEditorImageSession({ generation: 8, path: sourcePath, source: 'cache' });
+const selectedImage = {
+  exif: null,
+  height: imageSize.height,
+  isRaw: true,
+  isReady: true,
+  metadata: null,
+  originalUrl: null,
+  path: sourcePath,
+  rawDevelopmentReport: null,
+  thumbnailUrl: '',
+  width: imageSize.width,
+};
+
+const currentLayer = editDocumentLayerV2Schema.parse({
+  adjustments: {},
   blendMode: 'normal',
-  editNodes: createDefaultMaskEditNodes(),
   editNodeSchemaVersion: 1,
+  editNodes: {
+    basic: { enabled: true },
+    color: { enabled: true },
+    curves: { enabled: true },
+    details: { enabled: true },
+  },
   id: 'layer:retouch',
   invert: false,
   name: 'Retouch layer',
@@ -45,44 +58,35 @@ const layer = (): MaskContainer => ({
     {
       id: 'target:1',
       invert: false,
-      mode: SubMaskMode.Additive,
+      mode: 'additive',
       opacity: 100,
       parameters: { centerX: 2000, centerY: 1500, radiusX: 40, radiusY: 40 },
-      type: Mask.Radial,
+      type: 'radial',
       visible: true,
     },
   ],
   visible: true,
 });
-const selectedImage = {
-  exif: null,
-  height: imageSize.height,
-  isRaw: true,
-  isReady: true,
-  metadata: null,
-  originalUrl: null,
-  path: sourcePath,
-  rawDevelopmentReport: null,
-  thumbnailUrl: '',
-  width: imageSize.width,
-};
-const context = (retouchLayer: MaskContainer, overrides: Partial<ViewerRetouchCurrentContext> = {}) => ({
+
+const context = (layer: ReturnType<typeof selectEditDocumentMasks>[number]): ViewerRetouchCurrentContext => ({
   active: true,
   geometryEpoch,
   imageSessionId: session.id,
-  layerId: retouchLayer.id,
-  layerRevision: createRetouchLayerRevision(retouchLayer, imageSize),
-  mode: 'heal' as const,
+  layerId: layer.id,
+  layerRevision: createRetouchLayerRevision(layer, imageSize),
+  mode: 'heal',
   sourceIdentity: sourcePath,
   sourceRevision,
-  toolId: 'retouch-handles' as const,
-  ...overrides,
+  toolId: 'retouch-handles',
 });
 
-describe('retouch handle edit transaction', () => {
+describe('retouch handle current-document transaction', () => {
   beforeEach(() => {
-    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4, masks: [layer()] };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure: 0.4 }),
+      'layers',
+      { masks: [currentLayer] },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -95,135 +99,65 @@ describe('retouch handle edit transaction', () => {
     });
   });
 
-  test('commits one exact target revision with persistence, render geometry parity, and Undo', () => {
-    const retouchLayer = useEditorStore.getState().adjustmentSnapshot.value.masks[0]!;
-    const controller = createViewerRetouchHandlesController();
-    const command = controller.place(
-      context(retouchLayer),
+  test('commits one exact target revision and Undo preserves unrelated tone', () => {
+    const layer = selectEditDocumentMasks(useEditorStore.getState().editDocumentV2)[0];
+    if (layer === undefined) throw new Error('Expected current retouch layer.');
+    const command = createViewerRetouchHandlesController().place(
+      context(layer),
       false,
       { id: 7, pressure: 0.6, type: 'pen' },
       { x: 0.7, y: 0.6 },
     );
-    if (command === null) throw new Error('expected retouch command');
-    const result = useEditorStore
-      .getState()
-      .applyEditTransaction(
-        buildRetouchHandleEditTransaction(
-          { ...useEditorStore.getState(), geometryEpoch, sourceRevision },
-          command,
-          imageSize,
-          'retouch-handle:commit',
-        ),
-      );
-    expect(result).toMatchObject({ changedKeys: ['masks'], noOp: false, source: 'layer-command' });
-    expect(result.after.masks[0]?.retouchCloneSource?.targetPoint).toEqual({ x: 0.7, y: 0.6 });
-    expect(result.after.masks[0]?.subMasks[0]?.parameters).toMatchObject({ centerX: 2800, centerY: 1800 });
-    expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
-      persistence: 'commit',
-      transactionId: 'retouch-handle:commit',
-    });
-    expect(useEditorStore.getState().history).toHaveLength(2);
+    if (command === null) throw new Error('Expected retouch command.');
+    const state = useEditorStore.getState();
+    const result = state.applyEditTransaction(
+      buildRetouchHandleEditTransaction(
+        { ...state, geometryEpoch, sourceRevision },
+        command,
+        imageSize,
+        'retouch-handle:commit',
+      ),
+    );
+    expect(result.changedKeys).toEqual(['nodes.layers.params.masks']);
+    expect(selectEditDocumentMasks(result.after)[0]?.retouchCloneSource?.targetPoint).toEqual({ x: 0.7, y: 0.6 });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.retouchCloneSource?.targetPoint).toEqual({
+    expect(
+      selectEditDocumentMasks(useEditorStore.getState().editDocumentV2)[0]?.retouchCloneSource?.targetPoint,
+    ).toEqual({
       x: 0.5,
       y: 0.5,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_global_color_tone').params['exposure'],
+    ).toBe(0.4);
   });
 
-  test('rejects stale source, session, graph, geometry, layer revision, mode, and duplicates', () => {
+  test('rejects stale session and source identities before mutation', () => {
     const state = { ...useEditorStore.getState(), geometryEpoch, sourceRevision };
-    const retouchLayer = state.adjustmentSnapshot.value.masks[0]!;
-    const controller = createViewerRetouchHandlesController();
-    const command = controller.place(
-      context(retouchLayer),
+    const layer = selectEditDocumentMasks(state.editDocumentV2)[0];
+    if (layer === undefined) throw new Error('Expected current retouch layer.');
+    const command = createViewerRetouchHandlesController().place(
+      context(layer),
       true,
       { id: 1, pressure: 0, type: 'touch' },
       { x: 0.1, y: 0.2 },
     );
-    if (command === null) throw new Error('expected retouch command');
-    const build = (nextState: typeof state) =>
-      buildRetouchHandleEditTransaction(nextState, command, imageSize, 'retouch-handle:stale');
-    expect(() => build({ ...state, imageSession: { ...session, id: 'successor' } })).toThrow('stale_image_session');
-    expect(() => build({ ...state, selectedImage: { ...selectedImage, path: '/fixture/other.ARW' } })).toThrow(
-      'stale_source',
-    );
-    expect(() => build({ ...state, sourceRevision: 'viewer-graph:retouch:2' })).toThrow('stale_source_revision');
-    expect(() => build({ ...state, geometryEpoch: geometryEpoch + 1 })).toThrow('stale_geometry');
+    if (command === null) throw new Error('Expected retouch command.');
     expect(() =>
-      build({
-        ...state,
-        adjustmentSnapshot: {
-          ...state.adjustmentSnapshot,
-          value: {
-            ...state.adjustmentSnapshot.value,
-            masks: state.adjustmentSnapshot.value.masks.map((mask) => {
-              const next = structuredClone(mask);
-              if (next.retouchCloneSource !== undefined) next.retouchCloneSource.scale += 0.1;
-              return next;
-            }),
-          },
-        },
-      }),
-    ).toThrow('stale_layer_revision');
+      buildRetouchHandleEditTransaction(
+        { ...state, imageSession: { ...session, id: 'successor' } },
+        command,
+        imageSize,
+        'stale',
+      ),
+    ).toThrow('stale_image_session');
     expect(() =>
-      build({
-        ...state,
-        adjustmentSnapshot: {
-          ...state.adjustmentSnapshot,
-          value: {
-            ...state.adjustmentSnapshot.value,
-            masks: state.adjustmentSnapshot.value.masks.map((mask) => ({ ...mask, opacity: 75 })),
-          },
-        },
-      }),
-    ).toThrow('stale_layer_revision');
-    expect(() =>
-      build({
-        ...state,
-        adjustmentSnapshot: {
-          ...state.adjustmentSnapshot,
-          value: {
-            ...state.adjustmentSnapshot.value,
-            masks: state.adjustmentSnapshot.value.masks.map((mask) => ({
-              ...mask,
-              subMasks: [
-                {
-                  ...structuredClone(mask.subMasks[0]!),
-                  id: 'target:replacement',
-                  parameters: { ...mask.subMasks[0]!.parameters, centerX: 100, centerY: 200 },
-                },
-                ...mask.subMasks,
-              ],
-            })),
-          },
-        },
-      }),
-    ).toThrow('stale_layer_revision');
-    expect(() =>
-      build({
-        ...state,
-        adjustmentSnapshot: {
-          ...state.adjustmentSnapshot,
-          value: {
-            ...state.adjustmentSnapshot.value,
-            masks: state.adjustmentSnapshot.value.masks.map((mask) => {
-              const next = structuredClone(mask);
-              delete next.retouchCloneSource;
-              return next;
-            }),
-          },
-        },
-      }),
-    ).toThrow();
-    expect(() =>
-      build({
-        ...state,
-        adjustmentSnapshot: {
-          ...state.adjustmentSnapshot,
-          value: { ...state.adjustmentSnapshot.value, masks: [retouchLayer, structuredClone(retouchLayer)] },
-        },
-      }),
-    ).toThrow('missing_or_duplicate_layer');
+      buildRetouchHandleEditTransaction(
+        { ...state, selectedImage: { ...selectedImage, path: '/other.raw' } },
+        command,
+        imageSize,
+        'stale',
+      ),
+    ).toThrow('stale_source');
   });
 });

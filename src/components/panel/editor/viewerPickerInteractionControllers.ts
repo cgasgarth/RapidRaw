@@ -1,5 +1,6 @@
-import type { Adjustments } from '../../../utils/adjustments';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import type { PointColorPickerResponse } from '../../../utils/color/pointColorPicker';
+import { selectEditDocumentNode } from '../../../utils/editDocumentSelectors';
 import type { ToneEqualizerPickerResponse } from '../../../utils/toneEqualizerPicker';
 
 export type ViewerPickerToolId = 'point-color' | 'tone-equalizer';
@@ -30,7 +31,7 @@ export interface ViewerPickerOverlayDescriptor extends ViewerPickerPoint {
 
 export type ViewerPickerCommitResult =
   | {
-      readonly baseline: Adjustments;
+      readonly baseline: EditDocumentV2;
       readonly deltaEv: number;
       readonly key: ViewerPickerSessionKey & { readonly toolId: 'tone-equalizer' };
       readonly kind: 'tone-equalizer';
@@ -45,13 +46,13 @@ export type ViewerPickerCommitResult =
 
 export type ViewerPickerCommand =
   | {
-      readonly adjustments: Adjustments;
+      readonly editDocumentV2: EditDocumentV2;
       readonly key: ViewerPickerSessionKey;
       readonly kind: 'sample-point-color' | 'sample-tone-equalizer';
       readonly normalizedImagePoint: ViewerPickerPoint['normalizedImagePoint'];
     }
   | {
-      readonly baseline: Adjustments;
+      readonly baseline: EditDocumentV2;
       readonly deltaEv: number;
       readonly key: ViewerPickerSessionKey & { readonly toolId: 'tone-equalizer' };
       readonly kind: 'commit-tone-equalizer';
@@ -69,7 +70,7 @@ export type ViewerPickerCommand =
   | { readonly kind: 'publish-tone-equalizer-receipt'; readonly result: ToneEqualizerPickerResponse };
 
 interface ToneSession extends ViewerPickerPoint {
-  readonly baseline: Adjustments;
+  readonly baseline: EditDocumentV2;
   readonly key: ViewerPickerSessionKey & { readonly toolId: 'tone-equalizer' };
   readonly pointerId: number;
   readonly startClientY: number;
@@ -140,13 +141,13 @@ const toneDeltaEv = (session: ToneSession): number =>
 
 export interface ViewerPickerInteractionController {
   beginPointColor(input: {
-    adjustments: Adjustments;
+    editDocumentV2: EditDocumentV2;
     key: ViewerPickerSessionKey & { readonly toolId: 'point-color' };
     point: ViewerPickerPoint;
     pointerId: number;
   }): readonly ViewerPickerCommand[];
   beginToneEqualizer(input: {
-    adjustments: Adjustments;
+    editDocumentV2: EditDocumentV2;
     clientY: number;
     key: ViewerPickerSessionKey & { readonly toolId: 'tone-equalizer' };
     point: ViewerPickerPoint;
@@ -221,16 +222,22 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
     ];
   };
   return {
-    beginPointColor: ({ adjustments, key, point, pointerId }) => {
-      if (session !== null) return [];
-      session = { ...point, key, ordinal: adjustments.pointColor.points.length + 1, pointerId, toolId: 'point-color' };
-      return [{ adjustments, key, kind: 'sample-point-color', normalizedImagePoint: point.normalizedImagePoint }];
-    },
-    beginToneEqualizer: ({ adjustments, clientY, key, point, pointerId }) => {
+    beginPointColor: ({ editDocumentV2, key, point, pointerId }) => {
       if (session !== null) return [];
       session = {
         ...point,
-        baseline: adjustments,
+        key,
+        ordinal: selectEditDocumentNode(editDocumentV2, 'point_color').params['pointColor'].points.length + 1,
+        pointerId,
+        toolId: 'point-color',
+      };
+      return [{ editDocumentV2, key, kind: 'sample-point-color', normalizedImagePoint: point.normalizedImagePoint }];
+    },
+    beginToneEqualizer: ({ editDocumentV2, clientY, key, point, pointerId }) => {
+      if (session !== null) return [];
+      session = {
+        ...point,
+        baseline: editDocumentV2,
         currentClientY: clientY,
         key,
         pointerId,
@@ -239,7 +246,7 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
         startClientY: clientY,
         toolId: 'tone-equalizer',
       };
-      return [{ adjustments, key, kind: 'sample-tone-equalizer', normalizedImagePoint: point.normalizedImagePoint }];
+      return [{ editDocumentV2, key, kind: 'sample-tone-equalizer', normalizedImagePoint: point.normalizedImagePoint }];
     },
     cancel: () => {
       if (session === null) return [];

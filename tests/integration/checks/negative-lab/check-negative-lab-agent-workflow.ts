@@ -328,14 +328,14 @@ if (
   throw new Error('Negative Lab agent apply route did not preserve accepted dry-run identity.');
 }
 
-if (conversionPlan.params.base_fog_sample?.x !== sampleRect.x) {
+if (conversionPlan.params['base_fog_sample']?.x !== sampleRect.x) {
   throw new Error('Negative Lab agent conversion route did not preserve the sampled base/fog rectangle.');
 }
 
 if (
   stockFamilyConversionPlan.stockFamily.genericPresetId !== 'negative_lab.generic.c41.portrait.v1' ||
   stockFamilyConversionPlan.conversionPlan.presetId !== 'negative_lab.generic.c41.portrait.v1' ||
-  stockFamilyConversionPlan.conversionPlan.params.base_fog_sample?.x !== sampleRect.x
+  stockFamilyConversionPlan.conversionPlan.params['base_fog_sample']?.x !== sampleRect.x
 ) {
   throw new Error('Negative Lab agent stock-family route did not map registry id to a conversion plan.');
 }

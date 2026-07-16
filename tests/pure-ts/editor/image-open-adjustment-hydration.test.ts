@@ -1,44 +1,35 @@
 import { describe, expect, test } from 'bun:test';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { hydrateImageOpenAdjustments } from '../../../src/utils/imageOpenAdjustmentHydration';
 
-describe('image-open adjustment hydration', () => {
-  test('retains persisted guided perspective evidence at the decoded-result fallback boundary', () => {
-    const adjustments = hydrateImageOpenAdjustments(
-      {
-        adjustments: {
-          whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
-          perspectiveCorrection: {
-            amount: 75,
-            cropPolicy: 'auto_crop',
-            guides: [
-              {
-                class: 'vertical',
-                endpointsSourceNormalized: [
-                  [0.2, 0.1],
-                  [0.3, 0.9],
-                ],
-                id: 'vertical-1',
-                weight: 1,
-              },
+import { selectEditDocumentGeometry } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
+
+describe('image-open current-document hydration', () => {
+  test('retains persisted guided perspective evidence', () => {
+    const document = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+      perspectiveCorrection: {
+        amount: 75,
+        cropPolicy: 'auto_crop',
+        guides: [
+          {
+            class: 'vertical',
+            endpointsSourceNormalized: [
+              [0.2, 0.1],
+              [0.3, 0.9],
             ],
-            mode: 'guided',
-            resolvedPlan: null,
+            id: 'vertical-1',
+            weight: 1,
           },
-        },
+        ],
+        mode: 'guided',
+        resolvedPlan: null,
       },
-      '/photos/building.arw',
-    );
-
-    expect(adjustments.perspectiveCorrection.mode).toBe('guided');
-    expect(adjustments.perspectiveCorrection.amount).toBe(75);
-    expect(adjustments.perspectiveCorrection.guides).toHaveLength(1);
+    });
+    const hydrated = hydrateImageOpenEditDocumentV2({ editDocumentV2: document });
+    expect(selectEditDocumentGeometry(hydrated).perspectiveCorrection).toMatchObject({ amount: 75, mode: 'guided' });
   });
 
-  test('uses safe defaults for an explicit null adjustment snapshot', () => {
-    const adjustments = hydrateImageOpenAdjustments({ adjustments: { is_null: true } }, '/photos/new.arw');
-
-    expect(adjustments.perspectiveCorrection.mode).toBe('off');
-    expect(adjustments.perspectiveCorrection.guides).toEqual([]);
+  test('uses current defaults when metadata has no document', () => {
+    expect(hydrateImageOpenEditDocumentV2({})).toEqual(createDefaultEditDocumentV2());
   });
 });

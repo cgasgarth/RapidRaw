@@ -4,8 +4,10 @@ import { access, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { z } from 'zod';
+import { editDocumentLayersV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../src/utils/editDocumentV2';
 import { type StartupTraceSnapshot, startupTraceSnapshotSchema } from '../../src/utils/startup/startupTraceReporter';
 import { acquireQaDaemon, type QaDaemonLease, requestQaDaemon, shutdownQaDaemonLease } from '../qa/daemon-client';
 import { type QaDaemonMetrics, qaDaemonMetricsSchema } from '../qa/daemon-model';
@@ -33,7 +35,25 @@ fixture.masks = Array.from({ length: 16 }, (_, index) => ({
   subMasks: [],
   visible: true,
 }));
-const snapshot = publishAdjustmentSnapshot(null, fixture);
+const snapshot = publishAdjustmentSnapshot(
+  null,
+  patchEditDocumentV2Node(
+    createDefaultEditDocumentV2(),
+    'layers',
+    editDocumentLayersV2Schema.parse({
+      masks: fixture.masks.map((mask) => ({
+        ...mask,
+        adjustments: {},
+        editNodes: {
+          basic: { enabled: true },
+          color: { enabled: true },
+          curves: { enabled: true },
+          details: { enabled: true },
+        },
+      })),
+    }),
+  ),
+);
 const adjustmentRevision = 0;
 const fixtureDigest = `sha256:${createHash('sha256').update(JSON.stringify(fixture)).digest('hex')}` as const;
 

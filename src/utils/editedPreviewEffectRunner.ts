@@ -7,7 +7,6 @@ import { Invokes } from '../tauri/commands';
 import type { PreviewQualityDecision } from './adaptivePreviewQuality';
 import type { AdjustmentSnapshot, PatchResidencySnapshot } from './adjustmentSnapshots';
 import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from './appEventLogger';
-import { prepareEditDocumentV2ForRender } from './editDocumentV2';
 import {
   buildFilmPreviewRenderIdentity,
   type FilmRenderLease,
@@ -249,7 +248,7 @@ const executeNativeEditedPreview = async (
       request: applyAdjustmentsInvokeSchema.parse({
         activeWaveformChannel: request.activeWaveformChannel,
         computeWaveform: request.computeWaveform,
-        editDocumentV2,
+        editDocumentV2: payload,
         expectedImagePath: request.session.sourceImagePath,
         isInteractive: request.kind === 'interactive',
         previewOperationIdentity: identity,
@@ -377,7 +376,7 @@ export class EditedPreviewEffectRunner<T> {
 
     const filmRenderIdentity = buildFilmPreviewRenderIdentity({
       adjustmentRevision: request.snapshot.renderRevision,
-      adjustments: request.snapshot.value,
+      editDocumentV2: request.snapshot.editDocumentV2,
       backend: request.viewerScope.backend,
       displayGeneration: request.session.displayGeneration,
       imageSessionId: request.session.imageSessionId,

@@ -405,7 +405,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const imageSession = useEditorStore((state) => state.imageSession);
-  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const adjustments = useEditorStore((state) => state.editDocumentV2);
   const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const appliedPreset = useEditorStore((state) => state.presetApplication);
   const setAppliedPreset = useEditorStore((state) => state.setPresetApplication);
@@ -430,7 +430,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     reorderItems,
     sortAllPresetsAlphabetically,
     storageError,
-  } = usePresets(adjustments, editDocumentV2);
+  } = usePresets(editDocumentV2);
   const { showContextMenu } = useContextMenu();
   const density = professionalInspectorDensityTokens;
   const [query, setQuery] = useState('');

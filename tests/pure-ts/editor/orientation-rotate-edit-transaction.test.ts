@@ -4,7 +4,7 @@ import { createEditorImageSession, useEditorStore } from '../../../src/store/use
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { calculateCenteredCrop, normalizedCropFromPixelCrop } from '../../../src/utils/cropUtils';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildOrientationRotateEditTransaction,
   captureOrientationRotateCommitIdentity,
@@ -42,7 +42,15 @@ describe('orientation rotate edit transaction', () => {
       exposure: 0.35,
       rotation: 2.5,
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+        aspectRatio: adjustments.aspectRatio,
+        crop: adjustments.crop,
+        rotation: adjustments.rotation,
+      }),
+      'scene_global_color_tone',
+      { exposure: adjustments.exposure },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -104,12 +112,12 @@ describe('orientation rotate edit transaction', () => {
     });
 
     after.undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+    expect(useEditorStore.getState().editDocumentV2.geometry).toMatchObject({
       aspectRatio: 4 / 3,
-      exposure: 0.35,
       orientationSteps: 0,
       rotation: 2.5,
     });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.35);
   });
 
   test('supports counterclockwise and half-turn geometry semantics', () => {
@@ -134,7 +142,7 @@ describe('orientation rotate edit transaction', () => {
     const after = useEditorStore.getState();
 
     expect(result).toMatchObject({ changedKeys: [], nextAdjustmentRevision: 0, noOp: true });
-    expect(after.adjustmentSnapshot.value).toBe(before.adjustmentSnapshot.value);
+    expect(after.editDocumentV2).toBe(before.editDocumentV2);
     expect(after.history).toBe(before.history);
     expect(after.lastEditApplicationReceipt).toBeNull();
     expect(after.finalPreviewUrl).toBe('blob:orientation-before-final');
@@ -152,7 +160,7 @@ describe('orientation rotate edit transaction', () => {
     expect(() =>
       buildOrientationRotateEditTransaction(before, identity({ adjustmentRevision: 1 }), 90, 'stale'),
     ).toThrow('orientation_rotate_transaction.stale_revision');
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toBe(before.adjustmentSnapshot.value);
+    expect(useEditorStore.getState().editDocumentV2).toBe(before.editDocumentV2);
     expect(useEditorStore.getState().history).toBe(before.history);
     expect(useEditorStore.getState().adjustmentRevision).toBe(0);
   });
@@ -182,8 +190,16 @@ describe('orientation rotate edit transaction', () => {
     const result = fallbackState.applyEditTransaction(
       buildOrientationRotateEditTransaction(fallbackState, fallbackIdentity, -90, 'fallback-rotate'),
     );
-    expect(result).toMatchObject({ changedKeys: ['aspectRatio', 'crop', 'orientationSteps', 'rotation'], noOp: false });
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+    expect(result).toMatchObject({
+      changedKeys: [
+        'nodes.geometry.params.aspectRatio',
+        'nodes.geometry.params.crop',
+        'nodes.geometry.params.orientationSteps',
+        'nodes.geometry.params.rotation',
+      ],
+      noOp: false,
+    });
+    expect(useEditorStore.getState().editDocumentV2.geometry).toMatchObject({
       aspectRatio: 3 / 4,
       orientationSteps: 3,
     });

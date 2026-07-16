@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import { ExportColorProfile, ExportRenderingIntent } from '../../../src/components/ui/ExportImportProperties';
 import type { PreviewQualityDecision } from '../../../src/utils/adaptivePreviewQuality';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import type { EditedPreviewRequest } from '../../../src/utils/editedPreviewEffectRunner';
 import { PreviewCoordinator, type PreviewOperationIdentity } from '../../../src/utils/previewCoordinator';
 import { PreviewInteractionSchedulingEffectRunner } from '../../../src/utils/previewInteractionSchedulingEffectRunner';
@@ -18,7 +18,7 @@ import {
 
 const source = (path: string, imageSessionId: number): PreviewRequestScopeInput => ({
   adjustmentRevision: 1,
-  adjustmentSnapshot: publishAdjustmentSnapshot(null, structuredClone(INITIAL_ADJUSTMENTS)),
+  adjustmentSnapshot: publishAdjustmentSnapshot(null, createDefaultEditDocumentV2()),
   autoEditPreviewSession: null,
   baseRenderSize: { containerHeight: 800, containerWidth: 1200, height: 800, offsetX: 0, offsetY: 0, width: 1200 },
   basicToneSliderInteraction: null,

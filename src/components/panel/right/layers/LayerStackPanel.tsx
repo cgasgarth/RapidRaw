@@ -32,7 +32,7 @@ import {
   type RetouchCloneSource,
   type RetouchRemoveSource,
 } from '../../../../utils/adjustments';
-import { buildEditTransactionPersistenceContext } from '../../../../utils/editTransaction';
+import { selectEditDocumentGeometry, selectEditDocumentMasks } from '../../../../utils/editDocumentSelectors';
 import {
   applyBrushLocalAdjustmentLayerFlow,
   createBrushLocalAdjustmentLayerDraft,
@@ -64,8 +64,8 @@ import {
   applyLayerStackCommandBridgeOperation,
   type LayerStackCommandBridgeOperation,
 } from '../../../../utils/layers/layerStackCommandBridge';
-import { persistLayerStackSidecarInAdjustments } from '../../../../utils/layers/layerStackSidecarAdjustments';
-import { reconcileReferenceMatchReceiptsAfterEdit } from '../../../../utils/referenceMatchTransfer';
+import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../../utils/layers/layerStackSidecarAdjustments';
+import { reconcileReferenceMatchLayerReceiptsAfterEdit } from '../../../../utils/referenceMatchTransfer';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Slider, { type SliderChangeEvent } from '../../../ui/primitives/Slider';
@@ -482,7 +482,7 @@ export function LayerStackPanel({
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const setEditor = useEditorStore((state) => state.setEditor);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
-  const orientationSteps = useEditorStore((state) => state.adjustmentSnapshot.value.orientationSteps);
+  const orientationSteps = useEditorStore((state) => selectEditDocumentGeometry(state.editDocumentV2).orientationSteps);
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
   const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
@@ -607,7 +607,7 @@ export function LayerStackPanel({
   ) => {
     const imagePath = selectedImage?.path ?? 'rapidraw://current-image';
     const currentState = useEditorStore.getState();
-    const persistedSidecar = readLayerStackSidecarsFromSidecar(currentState.adjustmentSnapshot.value).find(
+    const persistedSidecar = readLayerStackSidecarsFromSidecar(currentState.editDocumentV2.extensions).find(
       (sidecar) => sidecar.sourceImagePath === imagePath,
     );
     const result = applyLayerStackCommandBridgeOperation(masks, operation, {
@@ -638,12 +638,14 @@ export function LayerStackPanel({
               : 'source_state_changed',
     });
     const nextMasks = materializeMasks(result.masks);
-    const nextAdjustments = reconcileReferenceMatchReceiptsAfterEdit(
-      currentState.adjustmentSnapshot.value,
-      persistLayerStackSidecarInAdjustments(
-        { ...currentState.adjustmentSnapshot.value, masks: nextMasks },
-        result.sidecar,
-      ),
+    const reconciledMasks = reconcileReferenceMatchLayerReceiptsAfterEdit(
+      selectEditDocumentMasks(currentState.editDocumentV2),
+      nextMasks,
+    );
+    const nextAdjustments = persistLayerStackSidecarInEditDocumentCandidate(
+      currentState.editDocumentV2,
+      reconciledMasks,
+      result.sidecar,
     );
     const transactionRequest = buildLayerEditTransactionRequest(currentState, nextAdjustments, crypto.randomUUID());
     const transactionResult = applyEditTransaction(transactionRequest);
@@ -880,8 +882,9 @@ export function LayerStackPanel({
       },
     });
     const currentState = useEditorStore.getState();
-    const nextAdjustments = persistLayerStackSidecarInAdjustments(
-      { ...currentState.adjustmentSnapshot.value, masks: result.masks },
+    const nextAdjustments = persistLayerStackSidecarInEditDocumentCandidate(
+      currentState.editDocumentV2,
+      result.masks,
       result.toneResult.sidecar,
     );
     setLayerGraphRevision(result.receipt.graphRevision);

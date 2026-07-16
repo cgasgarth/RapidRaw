@@ -12,7 +12,7 @@ import {
   applyBasicToneCommandToLiveEditor,
   applyBasicToneToLiveEditor,
 } from '../../../../src/utils/agent/session/agentLiveBasicTone.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3155.ARW';
 
@@ -50,7 +50,7 @@ useLibraryStore.getState().setLibrary({
   sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
 });
 
-const initialEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+const initialEditDocumentV2 = createDefaultEditDocumentV2();
 useEditorStore.getState().hydrateEditorRenderAuthority({
   editDocumentV2: initialEditDocumentV2,
   finalPreviewUrl: 'blob:rawengine-preview-before',
@@ -91,7 +91,10 @@ const result = await applyBasicToneToLiveEditor({
 
 const state = useEditorStore.getState();
 
-if (state.adjustmentSnapshot.value.exposure !== 0.45 || state.adjustmentSnapshot.value.contrast !== 22) {
+if (
+  state.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure'] !== 0.45 ||
+  state.editDocumentV2.nodes['scene_global_color_tone']!.params['contrast'] !== 22
+) {
   throw new Error('Agent basic-tone apply did not mutate live editor adjustments.');
 }
 if (state.historyIndex !== 1 || state.history.length !== 2) {
@@ -116,8 +119,8 @@ if (
   );
 }
 if (
-  state.editDocumentV2.nodes.scene_global_color_tone?.params.exposure !== 0.45 ||
-  state.editDocumentV2.nodes.scene_global_color_tone.params.contrast !== 22
+  state.editDocumentV2.nodes.scene_global_color_tone?.params['exposure'] !== 0.45 ||
+  state.editDocumentV2.nodes.scene_global_color_tone.params['contrast'] !== 22
 ) {
   throw new Error('Agent basic-tone apply did not update the canonical scene tone node.');
 }

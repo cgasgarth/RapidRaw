@@ -9,7 +9,7 @@ import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Ma
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildViewerBrushEditTransaction } from '../../../src/utils/viewerBrushEditTransaction';
 
 const sourcePath = '/fixture/viewer-brush.ARW';
@@ -68,7 +68,9 @@ const installState = (explicitSession: boolean): string => {
       },
     ],
   };
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'layers', {
+    masks: adjustments.masks,
+  });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -129,7 +131,9 @@ const captureCommit = (imageSessionId: string, overrides: Partial<ViewerBrushCur
   const [command] = controller.end(current);
   if (command?.kind !== 'commit') throw new Error('expected brush commit');
   const containers =
-    current.containerKind === 'masks' ? state.adjustmentSnapshot.value.masks : state.adjustmentSnapshot.value.aiPatches;
+    current.containerKind === 'masks'
+      ? state.editDocumentV2.layers.masks
+      : state.editDocumentV2.sourceArtifacts.aiPatches;
   const subMask = containers
     .find((container) => container.id === current.containerId)
     ?.subMasks.find((candidate) => candidate.id === current.maskId);
@@ -163,8 +167,12 @@ describe('viewer brush edit transaction', () => {
     );
     const state = useEditorStore.getState();
 
-    expect(result).toMatchObject({ changedKeys: ['masks'], nextAdjustmentRevision: 1, noOp: false });
-    const storedLines = requireStoredBrushLines(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters);
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.layers.params.masks'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
+    const storedLines = requireStoredBrushLines(state.editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters);
     expect(storedLines).toHaveLength(1);
     const firstLine = storedLines[0];
     const storedPoints =
@@ -182,7 +190,7 @@ describe('viewer brush edit transaction', () => {
 
     state.undo();
     expect(
-      requireStoredBrushLines(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters),
+      requireStoredBrushLines(useEditorStore.getState().editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters),
     ).toEqual([]);
   });
 
@@ -225,7 +233,7 @@ describe('viewer brush edit transaction', () => {
     const aiContainerId = 'patch:brush';
     const aiSubMaskId = 'submask:flow';
     const adjustments = {
-      ...state.adjustmentSnapshot.value,
+      ...state.editDocumentV2,
       masks: [],
       aiPatches: [
         {
@@ -250,7 +258,11 @@ describe('viewer brush edit transaction', () => {
         },
       ],
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(state.editDocumentV2, 'layers', { masks: [] }),
+      'source_artifacts',
+      { aiPatches: adjustments.aiPatches },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       editDocumentV2,
       historyIndex: 0,
@@ -268,7 +280,9 @@ describe('viewer brush edit transaction', () => {
 
     expect(result).toMatchObject({ changedKeys: ['aiPatches'], nextAdjustmentRevision: 1, noOp: false });
     expect(
-      requireStoredBrushLines(useEditorStore.getState().adjustmentSnapshot.value.aiPatches[0]?.subMasks[0]?.parameters),
+      requireStoredBrushLines(
+        useEditorStore.getState().editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks[0]?.parameters,
+      ),
     ).toHaveLength(1);
     expect(useEditorStore.getState().history).toHaveLength(2);
   });

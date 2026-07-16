@@ -13,6 +13,7 @@ import {
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
 } from '../../basicToneCommandBridge';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
   buildSelectiveColorCommandEnvelope,
@@ -89,7 +90,15 @@ export const runAgentCoreEditCommandBundle = async ({
 
   const dryRuns: ToneColorDryRunResultV1[] = [];
   const mutations: ToneColorMutationResultV1[] = [];
-  let nextAdjustments = initialState.adjustmentSnapshot.value;
+  const initialTone = selectEditDocumentNode(initialState.editDocumentV2, 'scene_global_color_tone').params;
+  const initialDetail = selectEditDocumentNode(initialState.editDocumentV2, 'detail_denoise_dehaze').params;
+  const initialColor = selectEditDocumentNode(initialState.editDocumentV2, 'color_presence').params;
+  let nextBasic = {
+    ...initialTone,
+    clarity: initialDetail.clarity,
+    saturation: initialColor.saturation,
+  };
+  let nextSelective = selectEditDocumentNode(initialState.editDocumentV2, 'selective_color_mixer').params;
   let outputPixels = [...PREVIEW_PIXELS];
   let currentGraphRevision = `history_${initialState.historyIndex}`;
 
@@ -122,7 +131,7 @@ export const runAgentCoreEditCommandBundle = async ({
 
       dryRuns.push(dryRun);
       mutations.push(mutation);
-      nextAdjustments = applyBasicToneCommandEnvelopeToAdjustments(nextAdjustments, applyCommand);
+      nextBasic = applyBasicToneCommandEnvelopeToAdjustments(nextBasic, applyCommand);
       outputPixels = renderBasicTonePreviewPixels(outputPixels, applyCommand);
       currentGraphRevision = mutation.appliedGraphRevision;
       continue;
@@ -156,7 +165,7 @@ export const runAgentCoreEditCommandBundle = async ({
 
     dryRuns.push(dryRun);
     mutations.push(mutation);
-    nextAdjustments = applySelectiveColorCommandEnvelopeToAdjustments(nextAdjustments, applyCommand);
+    nextSelective = applySelectiveColorCommandEnvelopeToAdjustments(nextSelective, applyCommand);
     currentGraphRevision = mutation.appliedGraphRevision;
   }
 
@@ -171,7 +180,41 @@ export const runAgentCoreEditCommandBundle = async ({
 
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
-    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${operationId}_apply`),
+    buildAgentToolEditTransaction(
+      currentState,
+      commitIdentity,
+      [
+        {
+          nodeType: 'scene_global_color_tone',
+          patch: {
+            blacks: nextBasic.blacks,
+            brightness: nextBasic.brightness,
+            contrast: nextBasic.contrast,
+            exposure: nextBasic.exposure,
+            highlights: nextBasic.highlights,
+            shadows: nextBasic.shadows,
+            whites: nextBasic.whites,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'detail_denoise_dehaze',
+          patch: { clarity: nextBasic.clarity },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'color_presence',
+          patch: { saturation: nextBasic.saturation },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'selective_color_mixer',
+          patch: nextSelective,
+          type: 'patch-edit-document-node',
+        },
+      ],
+      `${operationId}_apply`,
+    ),
   );
 
   return {

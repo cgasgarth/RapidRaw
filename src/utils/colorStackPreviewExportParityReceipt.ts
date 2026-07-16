@@ -1,15 +1,5 @@
 import { z } from 'zod';
-import {
-  type EditDocumentV2,
-  editDocumentBlackWhiteMixerV2Schema,
-  editDocumentCameraInputV2Schema,
-  editDocumentChannelMixerV2Schema,
-  editDocumentColorBalanceRgbV2Schema,
-  editDocumentPerceptualGradingV2Schema,
-  editDocumentSceneCurveV2Schema,
-  editDocumentSelectiveColorMixerV2Schema,
-  editDocumentSkinToneUniformityV2Schema,
-} from '../../packages/rawengine-schema/src/editDocumentV2';
+import type { EditDocumentNodeParamsV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ExportReceiptOutput } from '../components/ui/ExportImportProperties';
 
 import type { ColorStackPreviewExportParityRuntimeProof } from './colorStackPreviewExportParityRuntime';
@@ -169,7 +159,14 @@ interface ExportSoftProofTransformSummary {
 }
 
 export interface BuildColorStackPreviewExportParityReceiptOptions {
-  editDocumentV2: EditDocumentV2;
+  adjustments: EditDocumentNodeParamsV2<'black_white_mixer'> &
+    EditDocumentNodeParamsV2<'camera_input'> &
+    EditDocumentNodeParamsV2<'channel_mixer'> &
+    EditDocumentNodeParamsV2<'color_balance_rgb'> &
+    EditDocumentNodeParamsV2<'perceptual_grading'> &
+    EditDocumentNodeParamsV2<'scene_curve'> &
+    EditDocumentNodeParamsV2<'selective_color_mixer'> &
+    EditDocumentNodeParamsV2<'skin_tone_uniformity'>;
   colorStylePresetId?: string | null;
   exportOutput: ExportReceiptOutput;
   exportSoftProofTransform: ExportSoftProofTransformSummary | null;
@@ -312,9 +309,7 @@ export function buildColorStackPreviewExportParityReceipt(
   });
 }
 
-function hasActiveColorGrading(
-  colorGrading: z.infer<typeof editDocumentPerceptualGradingV2Schema>['colorGrading'],
-): boolean {
+function hasActiveColorGrading(colorGrading: EditDocumentNodeParamsV2<'perceptual_grading'>['colorGrading']): boolean {
   return [colorGrading.global, colorGrading.highlights, colorGrading.midtones, colorGrading.shadows].some(
     (wheel) => wheel.saturation !== 0 || wheel.luminance !== 0,
   );

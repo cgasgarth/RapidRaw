@@ -3350,7 +3350,7 @@ try {
         ? reopenedProof.request['editDocumentV2']
         : null,
     );
-    if (reopenedDocument.nodes.scene_global_color_tone?.params.exposure !== 0.9) {
+    if (reopenedDocument.nodes.scene_global_color_tone?.params['exposure'] !== 0.9) {
       throw new Error('Reopened preview did not render the newest persisted edit document.');
     }
     if (reopenedProof.saves !== saveCount) {
@@ -3376,7 +3376,7 @@ try {
     throw new Error('Editor preview did not retire the flat adjustments render payload.');
   }
   const previewEditDocument = editDocumentV2Schema.parse(editDocumentPreviewProof['editDocumentV2']);
-  if (previewEditDocument.nodes.scene_global_color_tone?.params.exposure !== 0.9) {
+  if (previewEditDocument.nodes.scene_global_color_tone?.params['exposure'] !== 0.9) {
     throw new Error('Exposure UI edit did not reach the scene_global_color_tone render node.');
   }
   if (
@@ -5191,7 +5191,7 @@ async function verifyColorCalibrationTransaction(page: Page): Promise<void> {
     throw new Error('Color Calibration preview retained the flat adjustments render payload.');
   }
   const editDocument = editDocumentV2Schema.parse(request['editDocumentV2']);
-  const renderedCalibration = editDocument.nodes.color_calibration?.params.colorCalibration;
+  const renderedCalibration = editDocument.nodes.color_calibration?.params['colorCalibration'];
   if (renderedCalibration?.shadowsTint !== 18 || renderedCalibration.redHue !== 12) {
     throw new Error('Rapid Color Calibration UI edits did not retain both fields in render authority.');
   }

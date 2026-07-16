@@ -10,7 +10,7 @@ describe('typed edit-document node selectors', () => {
   test('exposes schema-inferred node parameters', () => {
     const document = createDefaultEditDocumentV2();
     const tone = selectEditDocumentNode(document, 'scene_global_color_tone');
-    const exposure: number = tone.params.exposure;
+    const exposure: number = tone.params['exposure'];
     const geometry = selectEditDocumentGeometry(document);
 
     expect(exposure).toBe(0);
@@ -44,7 +44,7 @@ describe('typed edit-document node selectors', () => {
 
     const nextTone = selectEditDocumentNode(edited, 'scene_global_color_tone');
     expect(nextTone).not.toBe(initialTone);
-    expect(nextTone.params.exposure).toBe(0.5);
+    expect(nextTone.params['exposure']).toBe(0.5);
     expect(selectEditDocumentNode(edited, 'geometry')).toBe(initialGeometry);
   });
 });

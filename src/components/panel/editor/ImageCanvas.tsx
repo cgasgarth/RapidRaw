@@ -1,18 +1,24 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import 'react-image-crop/dist/ReactCrop.css';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { Circle, Group, Layer, Rect, Stage } from 'react-konva';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
-import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
+import type { AiPatch, MaskContainer } from '../../../utils/adjustments';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
 import { getOrientedDimensions, pixelCropFromNormalizedCrop } from '../../../utils/cropUtils';
+import {
+  selectEditDocumentGeometry,
+  selectEditDocumentMasks,
+  selectEditDocumentSourceArtifacts,
+} from '../../../utils/editDocumentSelectors';
 import type { EditorCompareOrientation } from '../../../utils/editorCompare';
 import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
 import {
@@ -188,7 +194,7 @@ export interface ViewerToolRuntimeDescriptor {
 
 interface ImageCanvasProps {
   appSettings: AppSettings | null;
-  adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   exportSoftProofRecipeId: string | null;
   exportSoftProofTransform: ExportSoftProofTransformState | null;
   finalPreviewUrl: string | null;
@@ -227,7 +233,7 @@ const ignoreViewerPickerCommit = (): void => undefined;
 export const ImageCanvas = memo(
   ({
     appSettings,
-    adjustments,
+    editDocumentV2,
     exportSoftProofRecipeId,
     exportSoftProofTransform,
     finalPreviewUrl,
@@ -323,6 +329,9 @@ export const ImageCanvas = memo(
       status: 'error' | 'ready';
       url: string;
     } | null>(null);
+    const adjustments = selectEditDocumentGeometry(editDocumentV2);
+    const masks = selectEditDocumentMasks(editDocumentV2);
+    const aiPatches = selectEditDocumentSourceArtifacts(editDocumentV2).aiPatches;
     const orientedCropDimensions = getOrientedDimensions(
       selectedImage.width,
       selectedImage.height,
@@ -558,34 +567,27 @@ export const ImageCanvas = memo(
 
     const activeContainer = useMemo(() => {
       if (isMasking) {
-        return adjustments.masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
+        return masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
       }
       if (isAiEditing) {
-        return adjustments.aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+        return aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
       }
       return null;
-    }, [
-      adjustments.masks,
-      adjustments.aiPatches,
-      activeMaskContainerId,
-      activeAiPatchContainerId,
-      isMasking,
-      isAiEditing,
-    ]);
+    }, [masks, aiPatches, activeMaskContainerId, activeAiPatchContainerId, isMasking, isAiEditing]);
 
     const activeRetouchLayer = useMemo(() => {
       if (!activeMaskContainerId) return null;
-      const layer = adjustments.masks.find((mask: MaskContainer) => mask.id === activeMaskContainerId);
+      const layer = masks.find((mask: MaskContainer) => mask.id === activeMaskContainerId);
       return layer?.retouchCloneSource === undefined ? null : layer;
-    }, [activeMaskContainerId, adjustments.masks]);
+    }, [activeMaskContainerId, masks]);
 
     const activeRetouchSource = activeRetouchLayer?.retouchCloneSource ?? null;
 
     const activeRemoveLayer = useMemo(() => {
       if (!activeMaskContainerId) return null;
-      const layer = adjustments.masks.find((mask: MaskContainer) => mask.id === activeMaskContainerId);
+      const layer = masks.find((mask: MaskContainer) => mask.id === activeMaskContainerId);
       return layer?.retouchRemoveSource === undefined ? null : layer;
-    }, [activeMaskContainerId, adjustments.masks]);
+    }, [activeMaskContainerId, masks]);
 
     const activeRemoveSource = activeRemoveLayer?.retouchRemoveSource ?? null;
     const activeRemoveTargetSubMask = useMemo(() => {
@@ -1027,7 +1029,7 @@ export const ImageCanvas = memo(
       },
       picker: {
         adjustmentRevision,
-        adjustments,
+        editDocumentV2,
         geometry: overlayGeometry,
         imageSessionId: pickerImageSessionId,
         onCommit: onPickerCommit,

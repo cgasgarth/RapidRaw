@@ -603,7 +603,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     },
     defaultParams: defineEditDocumentNodeDefaults<EditDocumentSourceDecodeV2>(EDIT_DOCUMENT_SOURCE_DECODE_DEFAULTS),
     editorSection: null,
-    legacyFields: EDIT_DOCUMENT_SOURCE_DECODE_FIELDS,
     nodeType: 'source_decode',
     process: 'scene_referred_v2',
     renderStage: 'source_decode',
@@ -621,7 +620,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       whites: 0,
     }),
     editorSection: 'basic',
-    legacyFields: ['blacks', 'brightness', 'contrast', 'exposure', 'highlights', 'shadows', 'whites'],
     nodeType: 'scene_global_color_tone',
     process: 'scene_referred_v2',
     renderStage: 'scene_global_color_tone',
@@ -631,7 +629,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: defineEditDocumentNodeDefaults<EditDocumentColorPresenceV2>(EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS),
     editorSection: 'color',
-    legacyFields: EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS,
     nodeType: 'color_presence',
     process: 'scene_referred_v2',
     renderStage: 'hue_saturation_vibrance',
@@ -647,15 +644,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       toneCurve: 'auto_filmic',
     }),
     editorSection: 'curves',
-    legacyFields: [
-      'curveMode',
-      'curves',
-      'outputCurveV1',
-      'parametricCurve',
-      'pointCurves',
-      'sceneCurveV1',
-      'toneCurve',
-    ],
     nodeType: 'scene_curve',
     process: 'scene_referred_v2',
     renderStage: 'scene_curve',
@@ -679,7 +667,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       },
     }),
     editorSection: 'basic',
-    legacyFields: ['toneEqualizer'],
     nodeType: 'tone_equalizer',
     process: 'scene_referred_v2',
     renderStage: 'tone_equalizer',
@@ -691,7 +678,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       EDIT_DOCUMENT_SCENE_TO_VIEW_TRANSFORM_DEFAULTS,
     ),
     editorSection: 'basic',
-    legacyFields: ['toneMapper', 'viewTransform'],
     nodeType: 'scene_to_view_transform',
     process: 'scene_referred_v2',
     renderStage: 'scene_to_view_transform',
@@ -717,23 +703,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       vignetteRoundness: 0,
     }),
     editorSection: 'effects',
-    legacyFields: [
-      'flareAmount',
-      'glowAmount',
-      'grainAmount',
-      'grainRoughness',
-      'grainSize',
-      'halationAmount',
-      'lutData',
-      'lutIntensity',
-      'lutName',
-      'lutPath',
-      'lutSize',
-      'vignetteAmount',
-      'vignetteFeather',
-      'vignetteMidpoint',
-      'vignetteRoundness',
-    ],
     nodeType: 'display_creative',
     process: 'scene_referred_v2',
     renderStage: 'display_creative',
@@ -743,7 +712,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: defineEditDocumentNodeDefaults<EditDocumentFilmEmulationV2>(EDIT_DOCUMENT_FILM_EMULATION_DEFAULTS),
     editorSection: null,
-    legacyFields: EDIT_DOCUMENT_FILM_EMULATION_FIELDS,
     nodeType: 'film_emulation',
     process: 'scene_referred_v2',
     renderStage: 'film_emulation',
@@ -771,25 +739,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       ...EDIT_DOCUMENT_SHARPNESS_THRESHOLD_DEFAULTS,
     }),
     editorSection: 'details',
-    legacyFields: [
-      'clarity',
-      'colorNoiseReduction',
-      'deblurEnabled',
-      'deblurSigmaPx',
-      'deblurStrength',
-      'dehaze',
-      'denoiseContrastProtection',
-      'denoiseDetail',
-      'denoiseNaturalGrain',
-      'denoiseShadowBias',
-      'dustSpotMinRadiusPx',
-      'dustSpotOverlayEnabled',
-      'dustSpotSensitivity',
-      'lumaNoiseReduction',
-      'sharpness',
-      ...EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS,
-      ...EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
-    ],
     nodeType: 'detail_denoise_dehaze',
     process: 'scene_referred_v2',
     renderStage: 'detail_denoise_dehaze',
@@ -816,7 +765,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       },
     }),
     editorSection: 'color',
-    legacyFields: ['pointColor'],
     nodeType: 'point_color',
     process: 'scene_referred_v2',
     renderStage: 'point_color',
@@ -828,7 +776,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       EDIT_DOCUMENT_COLOR_BALANCE_RGB_DEFAULTS,
     ),
     editorSection: 'color',
-    legacyFields: EDIT_DOCUMENT_COLOR_BALANCE_RGB_FIELDS,
     nodeType: 'color_balance_rgb',
     process: 'scene_referred_v2',
     renderStage: 'color_balance_rgb',
@@ -840,7 +787,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_DEFAULTS,
     ),
     editorSection: 'color',
-    legacyFields: EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_FIELDS,
     nodeType: 'selective_color_mixer',
     process: 'scene_referred_v2',
     renderStage: 'selective_color_mixer',
@@ -852,7 +798,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_DEFAULTS,
     ),
     editorSection: 'color',
-    legacyFields: EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_FIELDS,
     nodeType: 'skin_tone_uniformity',
     process: 'scene_referred_v2',
     renderStage: 'skin_tone_uniformity',
@@ -879,7 +824,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       },
     }),
     editorSection: 'color',
-    legacyFields: ['blackWhiteMixer'],
     nodeType: 'black_white_mixer',
     process: 'scene_referred_v2',
     renderStage: 'black_white_mixer',
@@ -897,7 +841,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       },
     }),
     editorSection: 'color',
-    legacyFields: ['channelMixer'],
     nodeType: 'channel_mixer',
     process: 'scene_referred_v2',
     renderStage: 'channel_mixer',
@@ -907,7 +850,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: defineEditDocumentNodeDefaults<EditDocumentLumaLevelsV2>(EDIT_DOCUMENT_LUMA_LEVELS_DEFAULTS),
     editorSection: 'color',
-    legacyFields: EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
     nodeType: 'luma_levels',
     process: 'scene_referred_v2',
     renderStage: 'luma_levels',
@@ -940,7 +882,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       },
     }),
     editorSection: 'color',
-    legacyFields: ['colorGrading', 'perceptualGradingV1'],
     nodeType: 'perceptual_grading',
     process: 'scene_referred_v2',
     renderStage: 'perceptual_grading',
@@ -968,7 +909,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       },
     }),
     editorSection: 'color',
-    legacyFields: ['cameraProfile', 'cameraProfileAmount', 'whiteBalanceTechnical'],
     nodeType: 'camera_input',
     process: 'scene_referred_v2',
     renderStage: 'camera_input',
@@ -997,19 +937,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       lensVignetteEnabled: true,
     }),
     editorSection: null,
-    legacyFields: [
-      ...EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
-      'lensCorrectionMode',
-      'lensDistortionAmount',
-      'lensDistortionEnabled',
-      'lensDistortionParams',
-      'lensMaker',
-      'lensModel',
-      'lensTcaAmount',
-      'lensTcaEnabled',
-      'lensVignetteAmount',
-      'lensVignetteEnabled',
-    ],
     nodeType: 'lens_correction',
     process: 'scene_referred_v2',
     renderStage: 'lens_correction',
@@ -1029,7 +956,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       },
     }),
     editorSection: 'color',
-    legacyFields: ['colorCalibration'],
     nodeType: 'color_calibration',
     process: 'scene_referred_v2',
     renderStage: 'color_calibration',
@@ -1062,23 +988,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       transformYOffset: 0,
     }),
     editorSection: null,
-    legacyFields: [
-      'aspectRatio',
-      'crop',
-      'flipHorizontal',
-      'flipVertical',
-      'orientationSteps',
-      ...EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_FIELDS,
-      'rotation',
-      'transformAspect',
-      'transformDistortion',
-      'transformHorizontal',
-      'transformRotate',
-      'transformScale',
-      'transformVertical',
-      'transformXOffset',
-      'transformYOffset',
-    ],
     nodeType: 'geometry',
     process: 'scene_referred_v2',
     renderStage: 'geometry',
@@ -1088,7 +997,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     capabilities: { batch: false, copy: false, paste: false, preset: 'exclude', provenance: 'preserve', reset: false },
     defaultParams: defineEditDocumentNodeDefaults<EditDocumentLayersV2>({ masks: [] }),
     editorSection: null,
-    legacyFields: ['masks'],
     nodeType: 'layers',
     process: 'scene_referred_v2',
     renderStage: 'layers',
@@ -1105,7 +1013,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     },
     defaultParams: defineEditDocumentNodeDefaults<EditDocumentSourceArtifactsV2>({ aiPatches: [] }),
     editorSection: null,
-    legacyFields: ['aiPatches'],
     nodeType: 'source_artifacts',
     process: 'scene_referred_v2',
     renderStage: 'source_artifacts',
@@ -1133,7 +1040,6 @@ export const editDocumentNodeDescriptorSchema = z.object({
   capabilities: editDocumentNodeCapabilitySchema,
   defaultParams: z.record(z.string(), z.unknown()),
   editorSection: z.enum(['basic', 'color', 'curves', 'details', 'effects']).nullable(),
-  legacyFields: z.array(z.string()),
   nodeType: z.string(),
   process: z.literal('scene_referred_v2'),
   renderStage: z.string(),
@@ -1215,7 +1121,7 @@ export const editDocumentCameraInputV2Schema = z
   .object({
     cameraProfile: z.union([
       z.enum(['camera_standard', 'camera_neutral', 'camera_portrait', 'camera_landscape', 'linear_raw']),
-      z.string().regex(/^dcp:[a-f0-9]{64}$/u),
+      z.custom<`dcp:${string}`>((value) => typeof value === 'string' && /^dcp:[a-f0-9]{64}$/u.test(value)),
     ]),
     cameraProfileAmount: z.number().finite().min(0).max(100),
     whiteBalanceTechnical: editDocumentTechnicalWhiteBalanceV2Schema,
@@ -1566,23 +1472,12 @@ const editDocumentNodesV2Schema = z
     }
   });
 
-const editDocumentMigrationReceiptV2Schema = z
-  .object({
-    defaulted: z.array(z.string()),
-    disabled: z.array(z.string()),
-    mapped: z.array(z.string()),
-    quarantined: z.array(z.string()),
-    sourceSchemaVersion: z.literal(1),
-  })
-  .strict();
-
 const editDocumentV2ObjectSchema = z
   .object({
     extensions: z.record(z.string(), z.unknown()),
     geometry: editDocumentGeometryV2Schema,
-    graphProcess: z.enum(['legacy_pipeline_v1', 'scene_referred_v2']),
+    graphProcess: z.literal('scene_referred_v2'),
     layers: editDocumentLayersV2Schema,
-    migration: editDocumentMigrationReceiptV2Schema.optional(),
     nodes: editDocumentNodesV2Schema,
     provenance: editDocumentProvenanceV2Schema,
     schemaVersion: z.literal(EDIT_DOCUMENT_V2_SCHEMA_VERSION),
@@ -1613,258 +1508,7 @@ const editDocumentV2ObjectSchema = z
     }
   });
 
-const isEditDocumentRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
-
-interface LegacyNodeOwnershipMigration {
-  createNode?: {
-    enabledFromNodeType?: string;
-    implementationVersion: number;
-    process: 'scene_referred_v2';
-  };
-  defaults: Readonly<Record<string, unknown>>;
-  fields: readonly string[];
-  nodeType: string;
-  schemas: Readonly<Record<string, z.ZodType>>;
-}
-
-const normalizeLegacyNodeOwnership = (
-  document: Readonly<Record<string, unknown>>,
-  ownership: LegacyNodeOwnershipMigration,
-): Readonly<Record<string, unknown>> => {
-  const nodes = document['nodes'];
-  if (!isEditDocumentRecord(nodes)) return document;
-  const existingNode = nodes[ownership.nodeType];
-  const enabledSourceNode = nodes[ownership.createNode?.enabledFromNodeType ?? ''];
-  const node = isEditDocumentRecord(existingNode)
-    ? existingNode
-    : ownership.createNode === undefined
-      ? undefined
-      : {
-          enabled:
-            isEditDocumentRecord(enabledSourceNode) && typeof enabledSourceNode['enabled'] === 'boolean'
-              ? enabledSourceNode['enabled']
-              : true,
-          implementationVersion: ownership.createNode.implementationVersion,
-          params: {},
-          process: ownership.createNode.process,
-          type: ownership.nodeType,
-        };
-  if (node === undefined || !isEditDocumentRecord(node['params'])) return document;
-  if (!isEditDocumentRecord(document['extensions'])) return document;
-  const extensions = { ...document['extensions'] };
-  const rawLegacy = extensions['legacyAdjustments'];
-  if (rawLegacy !== undefined && !isEditDocumentRecord(rawLegacy)) return document;
-  const legacyAdjustments = { ...(rawLegacy ?? {}) };
-  const rawQuarantine = extensions['quarantinedLegacyAdjustments'];
-  if (rawQuarantine !== undefined && !isEditDocumentRecord(rawQuarantine)) return document;
-  const quarantinedLegacyAdjustments = { ...(rawQuarantine ?? {}) };
-  const params = { ...node['params'] };
-  const mappedPaths: string[] = [];
-  const defaultedPaths: string[] = [];
-  const quarantinedFields: string[] = [];
-
-  for (const field of ownership.fields) {
-    if (Object.hasOwn(params, field)) continue;
-    const path = `${ownership.nodeType}.${field}`;
-    if (Object.hasOwn(legacyAdjustments, field)) {
-      const candidate = legacyAdjustments[field];
-      delete legacyAdjustments[field];
-      const parsed = ownership.schemas[field]?.safeParse(candidate);
-      if (parsed === undefined) return document;
-      if (parsed.success) {
-        params[field] = parsed.data;
-        mappedPaths.push(path);
-      } else {
-        params[field] = ownership.defaults[field];
-        quarantinedLegacyAdjustments[field] = candidate;
-        defaultedPaths.push(path);
-        quarantinedFields.push(field);
-      }
-    } else {
-      params[field] = ownership.defaults[field];
-      defaultedPaths.push(path);
-      if (Object.hasOwn(quarantinedLegacyAdjustments, field)) quarantinedFields.push(field);
-    }
-  }
-  if (mappedPaths.length === 0 && defaultedPaths.length === 0) return document;
-
-  extensions['legacyAdjustments'] = legacyAdjustments;
-  if (Object.keys(quarantinedLegacyAdjustments).length > 0) {
-    extensions['quarantinedLegacyAdjustments'] = quarantinedLegacyAdjustments;
-  }
-  const parsedMigration = editDocumentMigrationReceiptV2Schema.safeParse(document['migration']);
-  const ownedFields = new Set(ownership.fields);
-  const migration = parsedMigration.success
-    ? {
-        ...parsedMigration.data,
-        defaulted: [...new Set([...parsedMigration.data.defaulted, ...defaultedPaths])].sort(),
-        mapped: [...new Set([...parsedMigration.data.mapped, ...mappedPaths])].sort(),
-        quarantined: [
-          ...new Set([
-            ...parsedMigration.data.quarantined.filter((field) => !ownedFields.has(field)),
-            ...quarantinedFields,
-          ]),
-        ].sort(),
-      }
-    : document['migration'];
-
-  return {
-    ...document,
-    extensions,
-    migration,
-    nodes: { ...nodes, [ownership.nodeType]: { ...node, params } },
-  };
-};
-
-export const editDocumentV2Schema = z.preprocess((value) => {
-  if (!isEditDocumentRecord(value)) return value;
-  let document = value;
-  const nodes = document['nodes'];
-  if (!isEditDocumentRecord(nodes)) return value;
-  const legacySceneNode = nodes['scene_global_color_tone'];
-  const legacySceneParams = isEditDocumentRecord(legacySceneNode) ? legacySceneNode['params'] : undefined;
-  if (
-    nodes['color_presence'] === undefined &&
-    isEditDocumentRecord(legacySceneNode) &&
-    isEditDocumentRecord(legacySceneParams)
-  ) {
-    const extensions = document['extensions'];
-    const legacyAdjustments = isEditDocumentRecord(extensions) ? extensions['legacyAdjustments'] : undefined;
-    if (isEditDocumentRecord(extensions) && isEditDocumentRecord(legacyAdjustments)) {
-      const migratedPresence = Object.fromEntries(
-        EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS.flatMap((field) =>
-          Object.hasOwn(legacySceneParams, field) ? [[field, legacySceneParams[field]]] : [],
-        ),
-      );
-      const nextSceneParams = { ...legacySceneParams };
-      for (const field of EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS) delete nextSceneParams[field];
-      document = {
-        ...document,
-        extensions: {
-          ...extensions,
-          legacyAdjustments: { ...legacyAdjustments, ...migratedPresence },
-        },
-        nodes: { ...nodes, scene_global_color_tone: { ...legacySceneNode, params: nextSceneParams } },
-      };
-    }
-  }
-  document = normalizeLegacyNodeOwnership(document, {
-    createNode: { implementationVersion: 1, process: 'scene_referred_v2' },
-    defaults: EDIT_DOCUMENT_SOURCE_DECODE_DEFAULTS,
-    fields: EDIT_DOCUMENT_SOURCE_DECODE_FIELDS,
-    nodeType: 'source_decode',
-    schemas: editDocumentSourceDecodeV2Schema.shape,
-  });
-  const sourceDecodeNodes = document['nodes'];
-  const sourceDecodeNode = isEditDocumentRecord(sourceDecodeNodes) ? sourceDecodeNodes['source_decode'] : undefined;
-  const sourceDecodeParams = isEditDocumentRecord(sourceDecodeNode) ? sourceDecodeNode['params'] : undefined;
-  if (isEditDocumentRecord(sourceDecodeParams) && !Object.hasOwn(document, 'sourceDecode')) {
-    document = { ...document, sourceDecode: sourceDecodeParams };
-  }
-  document = normalizeLegacyNodeOwnership(document, {
-    createNode: {
-      enabledFromNodeType: 'channel_mixer',
-      implementationVersion: 1,
-      process: 'scene_referred_v2',
-    },
-    defaults: EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS,
-    fields: EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS,
-    nodeType: 'color_presence',
-    schemas: editDocumentColorPresenceV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    createNode: { implementationVersion: 1, process: 'scene_referred_v2' },
-    defaults: EDIT_DOCUMENT_FILM_EMULATION_DEFAULTS,
-    fields: EDIT_DOCUMENT_FILM_EMULATION_FIELDS,
-    nodeType: 'film_emulation',
-    schemas: editDocumentFilmEmulationV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    defaults: EDIT_DOCUMENT_LOCAL_CONTRAST_DEFAULTS,
-    fields: EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
-    nodeType: 'detail_denoise_dehaze',
-    schemas: editDocumentLocalContrastV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    defaults: EDIT_DOCUMENT_SHARPNESS_THRESHOLD_DEFAULTS,
-    fields: EDIT_DOCUMENT_SHARPNESS_THRESHOLD_FIELDS,
-    nodeType: 'detail_denoise_dehaze',
-    schemas: editDocumentSharpnessThresholdV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    defaults: EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_DEFAULTS,
-    fields: EDIT_DOCUMENT_MANUAL_CHROMATIC_ABERRATION_FIELDS,
-    nodeType: 'lens_correction',
-    schemas: editDocumentManualChromaticAberrationV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    createNode: {
-      enabledFromNodeType: 'channel_mixer',
-      implementationVersion: 1,
-      process: 'scene_referred_v2',
-    },
-    defaults: EDIT_DOCUMENT_COLOR_BALANCE_RGB_DEFAULTS,
-    fields: EDIT_DOCUMENT_COLOR_BALANCE_RGB_FIELDS,
-    nodeType: 'color_balance_rgb',
-    schemas: editDocumentColorBalanceRgbV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    createNode: {
-      enabledFromNodeType: 'channel_mixer',
-      implementationVersion: 1,
-      process: 'scene_referred_v2',
-    },
-    defaults: EDIT_DOCUMENT_LUMA_LEVELS_DEFAULTS,
-    fields: EDIT_DOCUMENT_LUMA_LEVELS_FIELDS,
-    nodeType: 'luma_levels',
-    schemas: editDocumentLumaLevelsV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    createNode: {
-      enabledFromNodeType: 'channel_mixer',
-      implementationVersion: 1,
-      process: 'scene_referred_v2',
-    },
-    defaults: EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_DEFAULTS,
-    fields: EDIT_DOCUMENT_SELECTIVE_COLOR_MIXER_FIELDS,
-    nodeType: 'selective_color_mixer',
-    schemas: editDocumentSelectiveColorMixerV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    createNode: {
-      enabledFromNodeType: 'channel_mixer',
-      implementationVersion: 1,
-      process: 'scene_referred_v2',
-    },
-    defaults: EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_DEFAULTS,
-    fields: EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_FIELDS,
-    nodeType: 'skin_tone_uniformity',
-    schemas: editDocumentSkinToneUniformityV2Schema.shape,
-  });
-  document = normalizeLegacyNodeOwnership(document, {
-    defaults: EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_DEFAULTS,
-    fields: EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_FIELDS,
-    nodeType: 'geometry',
-    schemas: editDocumentPerspectiveCorrectionV2Schema.shape,
-  });
-  const migratedNodes = document['nodes'];
-  const migratedGeometry = document['geometry'];
-  const migratedGeometryNode = isEditDocumentRecord(migratedNodes) ? migratedNodes['geometry'] : undefined;
-  const migratedGeometryParams = isEditDocumentRecord(migratedGeometryNode)
-    ? migratedGeometryNode['params']
-    : undefined;
-  if (isEditDocumentRecord(migratedGeometry) && isEditDocumentRecord(migratedGeometryParams)) {
-    document = {
-      ...document,
-      geometry: {
-        ...migratedGeometry,
-        perspectiveCorrection: migratedGeometryParams['perspectiveCorrection'],
-      },
-    };
-  }
-  return document;
-}, editDocumentV2ObjectSchema);
+export const editDocumentV2Schema = editDocumentV2ObjectSchema;
 
 export const currentRenderEditDocumentV2Schema = editDocumentV2Schema.superRefine((document, context) => {
   if (document.migration !== undefined) {
@@ -1887,7 +1531,6 @@ export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
 export type EditDocumentV2CopyPayload = z.infer<typeof editDocumentV2CopyPayloadSchema>;
 export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
-export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
 export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;
 export type EditDocumentSourceDecodeV2 = z.infer<typeof editDocumentSourceDecodeV2Schema>;
 export type EditDocumentColorPresenceV2 = z.infer<typeof editDocumentColorPresenceV2Schema>;
@@ -1978,9 +1621,8 @@ const editDocumentV2QuarantineInputSchema = z
   .object({
     extensions: z.record(z.string(), z.unknown()),
     geometry: editDocumentGeometryV2Schema,
-    graphProcess: z.enum(['legacy_pipeline_v1', 'scene_referred_v2']),
+    graphProcess: z.literal('scene_referred_v2'),
     layers: z.record(z.string(), z.unknown()),
-    migration: editDocumentMigrationReceiptV2Schema.optional(),
     nodes: z.record(z.string(), z.unknown()),
     provenance: z.record(z.string(), z.unknown()),
     schemaVersion: z.literal(EDIT_DOCUMENT_V2_SCHEMA_VERSION),
@@ -2011,13 +1653,7 @@ export const parseEditDocumentV2WithQuarantine = (
         }
       : {}),
   };
-  const migration = raw.migration
-    ? {
-        ...raw.migration,
-        quarantined: [...new Set([...raw.migration.quarantined, ...Object.keys(quarantinedNodes)])].sort(),
-      }
-    : undefined;
-  const document = editDocumentV2Schema.parse({ ...raw, extensions, migration, nodes: knownNodes });
+  const document = editDocumentV2Schema.parse({ ...raw, extensions, nodes: knownNodes });
   return { document, quarantinedNodeTypes: Object.keys(quarantinedNodes).sort() };
 };
 

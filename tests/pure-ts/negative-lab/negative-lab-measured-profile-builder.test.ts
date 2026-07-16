@@ -36,7 +36,7 @@ describe('Negative Lab measured profile fit builder', () => {
       sourceGenericPresetId: baseline.presetId,
     });
     expect(profile.runtimeStatus).toBe('runtime_parameter_applied');
-    expect(profile.params.red_weight).toBeCloseTo(1.1);
+    expect(profile.params['red_weight']).toBeCloseTo(1.1);
     expect(profile.doesNotProve).toContain('no_stock_emulation_claim');
   });
 

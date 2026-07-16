@@ -109,7 +109,7 @@ const waitForRenderedPointCount = async (page: Page, expected: number) => {
     if (
       parsed.success &&
       parsed.data.endedAtMs !== null &&
-      parsed.data.args.request.editDocumentV2.nodes.scene_curve.params.sceneCurveV1.points.length === expected
+      parsed.data.args.request.editDocumentV2.nodes.scene_curve.params['sceneCurveV1'].points.length === expected
     )
       return;
     await page.waitForTimeout(50);

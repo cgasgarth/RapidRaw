@@ -12,7 +12,7 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useLibraryStore } from '../../../src/store/useLibraryStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createLiveEditorAppServerBridge } from '../../../src/utils/agent/session/agentLiveEditorState';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const firstPath = '/fixtures/agent-live-read-queries/IMG_4794_A.CR3';
 const secondPath = '/fixtures/agent-live-read-queries/IMG_4794_B.CR3';
@@ -51,7 +51,9 @@ const seedStores = (activePath = firstPath) => {
   });
 
   const adjustments = { ...INITIAL_ADJUSTMENTS, exposure: 0.25 };
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+    exposure: adjustments.exposure,
+  });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     finalPreviewUrl: `blob:rawengine-issue-4794-${activePath === firstPath ? 'a' : 'b'}`,
     hasRenderedFirstFrame: true,
@@ -69,7 +71,7 @@ const seedStores = (activePath = firstPath) => {
       width: 6048,
     },
     editDocumentV2,
-    history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
+    history: [createDefaultEditDocumentV2(), editDocumentV2],
   });
 };
 
@@ -137,7 +139,7 @@ describe('agent app-server live read queries', () => {
   test('read queries do not mutate adjustments or edit history', async () => {
     const bridge = createLiveEditorAppServerBridge();
     const before = useEditorStore.getState();
-    const beforeAdjustments = structuredClone(before.adjustmentSnapshot.value);
+    const beforeAdjustments = structuredClone(before.editDocumentV2);
     const beforeHistory = structuredClone(before.history);
     const beforeHistoryCheckpoints = structuredClone(before.historyCheckpoints);
 
@@ -157,7 +159,7 @@ describe('agent app-server live read queries', () => {
     expect(metadataResult.ok).toBe(true);
 
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value).toEqual(beforeAdjustments);
+    expect(after.editDocumentV2).toEqual(beforeAdjustments);
     expect(after.history).toEqual(beforeHistory);
     expect(after.historyCheckpoints).toEqual(beforeHistoryCheckpoints);
     expect(after.historyIndex).toBe(before.historyIndex);

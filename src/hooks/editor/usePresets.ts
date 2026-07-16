@@ -53,7 +53,7 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
   return newArray;
 }
 
-export function usePresets(_currentAdjustments: Adjustments, currentEditDocumentV2: EditDocumentV2) {
+export function usePresets(currentEditDocumentV2: EditDocumentV2) {
   const [presets, setPresets] = useState<Array<UserPreset>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);

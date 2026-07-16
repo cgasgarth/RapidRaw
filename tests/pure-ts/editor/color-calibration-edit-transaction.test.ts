@@ -7,7 +7,7 @@ import {
   type ColorCalibrationCommitIdentity,
   isCurrentColorCalibrationIdentity,
 } from '../../../src/utils/colorCalibrationEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/color-calibration.ARW';
 const session = createEditorImageSession({ generation: 41, path: sourcePath, source: 'cache' });
@@ -33,7 +33,7 @@ const identity = (overrides: Partial<ColorCalibrationCommitIdentity> = {}): Colo
 describe('color calibration edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -59,7 +59,7 @@ describe('color calibration edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorCalibration).toEqual(
+    expect(useEditorStore.getState().editDocumentV2.nodes['color_calibration']!.params['colorCalibration']).toEqual(
       INITIAL_ADJUSTMENTS.colorCalibration,
     );
   });
@@ -131,7 +131,7 @@ describe('color calibration edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorCalibration).toEqual(
+    expect(useEditorStore.getState().editDocumentV2.nodes['color_calibration']!.params['colorCalibration']).toEqual(
       INITIAL_ADJUSTMENTS.colorCalibration,
     );
 

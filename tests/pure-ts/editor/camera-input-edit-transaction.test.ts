@@ -10,7 +10,8 @@ import {
   isCurrentCameraInputAsyncRequest,
 } from '../../../src/utils/cameraInputEditTransaction';
 import { buildTechnicalWhiteBalance } from '../../../src/utils/color/whiteBalance';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/camera-input.ARW';
 const session = createEditorImageSession({ generation: 31, path: sourcePath, source: 'cache' });
@@ -36,7 +37,9 @@ const identity = (overrides: Partial<CameraInputCommitIdentity> = {}): CameraInp
 describe('camera input edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.45 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: adjustments.exposure,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -80,11 +83,11 @@ describe('camera input edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+    expect(useEditorStore.getState().editDocumentV2.nodes['camera_input']?.params).toMatchObject({
       cameraProfile: 'camera_standard',
       cameraProfileAmount: 100,
-      exposure: 0.45,
     });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.45);
   });
 
   test('commits the complete technical white-balance identity atomically', () => {
@@ -100,7 +103,10 @@ describe('camera input edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.whiteBalanceTechnical.mode).toBe('as_shot');
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'camera_input').params['whiteBalanceTechnical']
+        .mode,
+    ).toBe('as_shot');
   });
 
   test('captures identity, rejects stale commits and malformed values, and preserves exact no-ops', () => {
@@ -218,7 +224,9 @@ describe('camera input edit transaction', () => {
       transactionId: 'fallback-camera',
     });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.cameraProfile).toBe('camera_standard');
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'camera_input').params['cameraProfile'],
+    ).toBe('camera_standard');
 
     expect(() =>
       buildCameraInputEditTransaction(

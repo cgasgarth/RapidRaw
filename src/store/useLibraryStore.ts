@@ -10,7 +10,6 @@ import {
   SortDirection,
 } from '../components/ui/AppProperties';
 import { type LibraryImagePatch, libraryEntityRepository } from '../library/LibraryEntityRepository';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../utils/adjustments';
 
 export interface SearchCriteria {
   tags: string[];
@@ -40,7 +39,6 @@ interface LibraryState {
   multiSelectedPaths: Array<string>;
   selectionAnchorPath: string | null;
   libraryActivePath: string | null;
-  libraryActiveAdjustments: Adjustments;
 
   // Sorting & Filtering
   sortCriteria: SortCriteria;
@@ -85,7 +83,6 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   multiSelectedPaths: [],
   selectionAnchorPath: null,
   libraryActivePath: null,
-  libraryActiveAdjustments: INITIAL_ADJUSTMENTS,
 
   sortCriteria: { key: 'name', order: SortDirection.Ascending },
   filterCriteria: { colors: [], rating: 0, rawStatus: RawStatus.All },

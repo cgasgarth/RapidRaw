@@ -157,7 +157,7 @@ if (
   cloneState.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
   cloneState.lastEditApplicationReceipt?.source !== 'agent-command' ||
   cloneState.lastEditApplicationReceipt.transactionId !== 'agent_clone_spot_apply' ||
-  cloneState.editDocumentV2.nodes.layers?.params.masks[0]?.id !== 'agent_clone_spot'
+  cloneState.editDocumentV2.nodes.layers?.params['masks'][0]?.id !== 'agent_clone_spot'
 ) {
   throw new Error('agent.retouch.apply did not publish one canonical EditTransaction receipt.');
 }

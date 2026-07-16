@@ -1,7 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { MaskOverlaySettings } from '../../../schemas/masks/maskOverlaySchemas';
-import type { Adjustments } from '../../../utils/adjustments';
 import {
   buildMaskOverlayInvokePayload,
   buildMaskOverlayRequestIdentity,
@@ -23,7 +23,7 @@ import {
 } from './viewerMaskOverlayController';
 
 export interface ViewerMaskOverlayRequestInput {
-  readonly adjustments: Adjustments;
+  readonly editDocumentV2: EditDocumentV2;
   readonly maskDef: MaskPreviewDefinition;
   readonly maskOverlaySettings: MaskOverlaySettings;
   readonly patchesSentToBackend: ReadonlySet<string>;
@@ -93,7 +93,7 @@ export const useViewerMaskOverlayController = ({
       publish(controller.synchronize(current));
       const triggerHash = buildMaskOverlayTriggerHash({
         activeMaskDef: input.maskDef,
-        adjustments: input.adjustments,
+        editDocumentV2: input.editDocumentV2,
         imageRenderSize: input.renderSize,
         maskOverlaySettings: input.maskOverlaySettings,
       });
@@ -104,7 +104,7 @@ export const useViewerMaskOverlayController = ({
         triggerHash,
       });
       const payload = buildMaskOverlayInvokePayload({
-        jsAdjustments: input.adjustments,
+        editDocumentV2: input.editDocumentV2,
         maskDef: input.maskDef,
         maskOverlaySettings: input.maskOverlaySettings,
         patchesSentToBackend: input.patchesSentToBackend,

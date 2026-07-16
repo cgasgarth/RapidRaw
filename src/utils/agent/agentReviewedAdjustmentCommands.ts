@@ -1,10 +1,11 @@
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import {
   type AgentReviewedAdjustmentCommandId,
   type AgentReviewedAdjustmentCommandReceipt,
   agentReviewedAdjustmentCommandIdSchema,
   agentReviewedAdjustmentCommandReceiptSchema,
 } from '../../schemas/agent/agentReviewedCommandSchemas';
-import type { Adjustments } from '../adjustments';
+import { selectEditDocumentNode } from '../editDocumentSelectors';
 import type { AgentAdjustmentsApplyRequest } from './tools/agentAdjustmentApplyTool';
 
 type AgentAdjustmentPatch = AgentAdjustmentsApplyRequest['adjustments'];
@@ -106,14 +107,15 @@ const getCommandDefinition = (
 
 export const buildAgentReviewedAdjustmentCommandPlan = ({
   commandId,
-  sourceAdjustments,
+  sourceEditDocumentV2,
 }: {
   commandId: AgentReviewedAdjustmentCommandId;
-  sourceAdjustments: Pick<
-    Adjustments,
-    'blacks' | 'brightness' | 'clarity' | 'contrast' | 'exposure' | 'highlights' | 'shadows' | 'whites'
-  >;
+  sourceEditDocumentV2: EditDocumentV2;
 }): AgentReviewedAdjustmentCommandPlan => {
+  const sourceAdjustments = {
+    ...selectEditDocumentNode(sourceEditDocumentV2, 'scene_global_color_tone').params,
+    clarity: selectEditDocumentNode(sourceEditDocumentV2, 'detail_denoise_dehaze').params['clarity'],
+  };
   const definition = getCommandDefinition(commandId);
   const entries = Object.entries(definition.offsets) as Array<[ReviewedAdjustmentKey, number]>;
   const adjustments: AgentAdjustmentPatch = {};

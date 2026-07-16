@@ -10,7 +10,8 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import { applyAgentColor } from '../../../src/utils/agent/tools/agentColorApplyTool';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const selectedPath = '/fixtures/agent-color-apply/DSC_4751.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 10 : 3));
@@ -49,7 +50,7 @@ class DeferredColorBridge extends RawEngineLocalAppServerBridge {
 }
 
 const seedEditor = () => {
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
     finalPreviewUrl: 'blob:rawengine-agent-color-apply-before',
@@ -110,10 +111,15 @@ describe('agent color apply preview refresh', () => {
     expect(result.receipt.typedCommands).toHaveLength(1);
     expect(result.receipt.typedCommands?.[0]?.commandType).toBe('toneColor.adjustHsl');
     expect(useEditorStore.getState().uncroppedAdjustedPreviewUrl).toBeNull();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.oranges.saturation).toBe(12);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls.oranges.widthDegrees).toBe(
-      52,
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params['hsl'].oranges
+        .saturation,
+    ).toBe(12);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params[
+        'selectiveColorRangeControls'
+      ].oranges.widthDegrees,
+    ).toBe(52);
   });
 
   test('rejects an accepted typed color result after an intervening editor revision', async () => {
@@ -148,8 +154,10 @@ describe('agent color apply preview refresh', () => {
       `agent_tool_transaction.stale_revision:${String(baseRevision)}:${String(baseRevision + 1)}`,
     );
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.exposure).toBe(0.2);
-    expect(after.adjustmentSnapshot.value.hsl.oranges).toEqual(INITIAL_ADJUSTMENTS.hsl.oranges);
+    expect(selectEditDocumentNode(after.editDocumentV2, 'scene_global_color_tone').params['exposure']).toBe(0.2);
+    expect(selectEditDocumentNode(after.editDocumentV2, 'selective_color_mixer').params['hsl'].oranges).toEqual(
+      INITIAL_ADJUSTMENTS.hsl.oranges,
+    );
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-color-edit');
   });
 

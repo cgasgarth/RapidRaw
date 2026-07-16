@@ -7,7 +7,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const invoke = mock(() => new Promise<unknown>(() => {}));
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
@@ -50,7 +50,9 @@ test('TransformLens commits a manual lens control through the canonical fallback
       vig_k3: 0,
     },
   };
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'lens_correction', {
+    lensDistortionParams: adjustments.lensDistortionParams,
+  });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -78,7 +80,7 @@ test('TransformLens commits a manual lens control through the canonical fallback
   if (!(vignetteSwitch instanceof window.HTMLInputElement)) throw new Error('missing lens vignette switch');
   fireEvent.click(vignetteSwitch);
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value.lensVignetteEnabled).toBeFalse();
+  expect(useEditorStore.getState().editDocumentV2.nodes['lens_correction']!.params['lensVignetteEnabled']).toBeFalse();
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:73',
     source: 'manual-control',

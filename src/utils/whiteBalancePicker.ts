@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from './adjustments';
 import { cctToXy, type TechnicalWhiteBalance, technicalWhiteBalanceSchema } from './color/whiteBalance';
 import { editDocumentV2ToLegacyAdjustments, updateEditDocumentV2Node } from './editDocumentV2';
 import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
@@ -309,9 +308,10 @@ export const buildWhiteBalancePickerAdjustmentCommand = ({
 };
 
 export const applyWhiteBalancePickerAdjustmentCommand = (
-  baseAdjustments: Adjustments,
+  baseEditDocumentV2: EditDocumentV2,
   command: WhiteBalancePickerAdjustmentCommand,
-): Adjustments => ({
-  ...baseAdjustments,
-  ...command.patch,
-});
+): EditDocumentV2 =>
+  updateEditDocumentV2Node(baseEditDocumentV2, 'camera_input', (params) => ({
+    ...params,
+    whiteBalanceTechnical: command.patch.whiteBalanceTechnical,
+  }));

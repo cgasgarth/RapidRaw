@@ -3,6 +3,10 @@ import { Aperture, CircleDashed, Grid3X3, Loader, Plus, SquareDashed, Trash2, Wa
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
+import type {
+  EditDocumentGeometryV2,
+  EditDocumentNodeParamsV2,
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
 import {
   type PerspectiveCorrectionMode,
   type PerspectiveCropPolicy,
@@ -11,7 +15,7 @@ import {
 import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';
 import { TextVariants } from '../../types/typography';
-import type { Adjustments } from '../../utils/adjustments';
+import { selectEditDocumentGeometry } from '../../utils/editDocumentSelectors';
 import {
   buildLensCorrectionEditTransaction,
   buildLensProfileEditTransaction,
@@ -40,15 +44,19 @@ import Switch from '../ui/primitives/Switch';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 
-type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
-type LensCorrectionMode = Adjustments['lensCorrectionMode'];
+export type TransformLensAdjustmentView = EditDocumentGeometryV2 & EditDocumentNodeParamsV2<'lens_correction'>;
+export type TransformLensAdjustmentUpdate =
+  | Partial<TransformLensAdjustmentView>
+  | ((prev: TransformLensAdjustmentView) => TransformLensAdjustmentView);
+type AdjustmentUpdate = TransformLensAdjustmentUpdate;
+type LensCorrectionMode = TransformLensAdjustmentView['lensCorrectionMode'];
 type ExifData = Record<string, string | number | null | undefined>;
 type AutodetectLensResult = [string, string] | { maker: string; model: string };
 type DetectionStatus = 'idle' | 'detecting' | 'success' | 'not_found' | 'error';
 type PerspectiveStatus = 'idle' | 'analyzing' | 'ready' | 'abstained' | 'error';
 
 interface TransformLensProps {
-  adjustments: Adjustments;
+  adjustments: TransformLensAdjustmentView;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   selectedImage: SelectedImage | null;
   setAdjustments: (adjustments: AdjustmentUpdate) => void;
@@ -214,13 +222,16 @@ export default function TransformLens({
     };
   }, [adjustments.lensMaker]);
 
-  const updateAdjustment = <Key extends keyof Adjustments>(key: Key, value: Adjustments[Key]) => {
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
+  const updateAdjustment = <Key extends keyof TransformLensAdjustmentView>(
+    key: Key,
+    value: TransformLensAdjustmentView[Key],
+  ) => {
+    setAdjustments((prev: TransformLensAdjustmentView) => ({ ...prev, [key]: value }));
   };
 
   const commitLensCorrectionAdjustment = <Key extends ManualLensCorrectionAdjustment>(
     key: Key,
-    value: Adjustments[Key],
+    value: TransformLensAdjustmentView[Key],
   ) => {
     const identity = lensCorrectionCommitIdentityRef.current;
     if (identity === null) return;
@@ -397,7 +408,7 @@ export default function TransformLens({
     [t],
   );
 
-  const updatePerspective = (next: Partial<Adjustments['perspectiveCorrection']>) => {
+  const updatePerspective = (next: Partial<TransformLensAdjustmentView['perspectiveCorrection']>) => {
     const identity = perspectiveCommitIdentityRef.current;
     if (identity === null) return;
     perspectiveRequestGenerationRef.current += 1;
@@ -416,14 +427,15 @@ export default function TransformLens({
     const identity = capturePerspectiveCorrectionCommitIdentity(state);
     if (identity === null) return;
     const requestGeneration = ++perspectiveRequestGenerationRef.current;
-    const analysisAdjustments = structuredClone(state.adjustmentSnapshot.value);
+    const analysisAdjustments = structuredClone(state.editDocumentV2);
+    const analysisGeometry = selectEditDocumentGeometry(analysisAdjustments);
     setPerspectiveStatus('analyzing');
     try {
       const result = await invokeWithSchema(
         Invokes.AnalyzePerspectiveCorrection,
         {
           adjustments: analysisAdjustments,
-          settings: { ...analysisAdjustments.perspectiveCorrection, amount: 100, resolvedPlan: null },
+          settings: { ...analysisGeometry.perspectiveCorrection, amount: 100, resolvedPlan: null },
         },
         perspectiveAnalysisResultSchema,
       );
@@ -468,7 +480,7 @@ export default function TransformLens({
   };
 
   const addGuide = (className: 'horizontal' | 'vertical') => {
-    const current = useEditorStore.getState().adjustmentSnapshot.value.perspectiveCorrection;
+    const current = selectEditDocumentGeometry(useEditorStore.getState().editDocumentV2).perspectiveCorrection;
     const familyCount = current.guides.filter((guide) => guide.class === className).length;
     if (familyCount >= 2) return;
     const position = familyCount === 0 ? 0.25 : 0.75;
@@ -498,7 +510,7 @@ export default function TransformLens({
 
   const updateGuideCoordinate = (id: string, endpoint: 0 | 1, axis: 0 | 1, value: number) => {
     if (!Number.isFinite(value)) return;
-    const current = useEditorStore.getState().adjustmentSnapshot.value.perspectiveCorrection;
+    const current = selectEditDocumentGeometry(useEditorStore.getState().editDocumentV2).perspectiveCorrection;
     updatePerspective({
       guides: current.guides.map((guide) => {
         if (guide.id !== id) return guide;

@@ -5,8 +5,7 @@ import { reconcileReferenceMatchReceiptsAfterEdit } from '../referenceMatchTrans
 
 export interface FilmWorkspaceEditState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
-  editDocumentV2: EditDocumentV2;
+  readonly editDocumentV2: EditDocumentV2;
   imageSessionId: number;
   imageSession?: { id: string } | null;
 }

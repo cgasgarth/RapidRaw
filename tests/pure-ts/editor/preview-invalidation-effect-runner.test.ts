@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   fingerprintPreviewSessionIdentity,
   PreviewCoordinator,
@@ -20,7 +20,7 @@ import {
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const source = (path: string, imageSessionId: number): PreviewRequestScopeInput => {
-  const adjustmentSnapshot = publishAdjustmentSnapshot(null, structuredClone(INITIAL_ADJUSTMENTS));
+  const adjustmentSnapshot = publishAdjustmentSnapshot(null, createDefaultEditDocumentV2());
   return {
     adjustmentRevision: adjustmentSnapshot.renderRevision,
     adjustmentSnapshot,

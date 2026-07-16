@@ -94,7 +94,9 @@ describe('agent tone/color dry-run expert edit', () => {
       'tonecolor.dry_run_command',
     );
     expect(useEditorStore.getState().historyIndex).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(
+      INITIAL_ADJUSTMENTS.exposure,
+    );
   });
 
   test('validates unsupported prompt requests', async () => {

@@ -7,8 +7,8 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import TypedCurveEditor from '../../../src/components/adjustments/TypedCurveEditor';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
@@ -21,8 +21,7 @@ await i18n.use(initReactI18next).init({
 
 const sourcePath = '/fixture/typed-curve-component.ARW';
 test('TypedCurveEditor exposes and commits through the canonical fallback session', () => {
-  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -46,7 +45,14 @@ test('TypedCurveEditor exposes and commits through the canonical fallback sessio
     history: [editDocumentV2],
   });
   const { container } = render(
-    createElement(I18nextProvider, { i18n }, createElement(TypedCurveEditor, { adjustments, domain: 'scene' })),
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(TypedCurveEditor, {
+        adjustments: selectEditDocumentNode(editDocumentV2, 'scene_curve').params,
+        domain: 'scene',
+      }),
+    ),
   );
 
   const editor = container.querySelector('[data-testid="typed-curve-editor"]');
@@ -56,7 +62,9 @@ test('TypedCurveEditor exposes and commits through the canonical fallback sessio
   if (!(channelMode instanceof window.HTMLSelectElement)) throw new Error('missing channel mode selector');
   fireEvent.change(channelMode, { target: { value: 'linked_rgb' } });
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value.sceneCurveV1?.channelMode).toBe('linked_rgb');
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_curve').params['sceneCurveV1']?.channelMode,
+  ).toBe('linked_rgb');
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:57',
     source: 'manual-control',

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentNodeParamsV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 
 import {
   ApprovalClass,
@@ -12,7 +13,6 @@ import {
   toneColorMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
   type BasicToneAdjustmentPayload,
@@ -31,7 +31,10 @@ export type AgentLiveBasicTonePixel = readonly [number, number, number];
 export interface AgentLiveBasicToneApplyOptions {
   acceptedPlanHash?: string;
   acceptedPlanId?: string;
-  additionalAdjustmentPatch?: Partial<Adjustments>;
+  additionalAdjustmentPatch?: Partial<
+    Pick<EditDocumentNodeParamsV2<'color_presence'>, 'vibrance'> &
+      Pick<EditDocumentNodeParamsV2<'camera_input'>, 'whiteBalanceTechnical'>
+  >;
   expectedGraphRevision?: string;
   operationId: string;
   requestedAdjustments: BasicToneAdjustmentPayload;

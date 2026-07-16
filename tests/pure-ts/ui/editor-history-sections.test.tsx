@@ -9,10 +9,10 @@ import {
 } from '../../../src/components/panel/editor/EditorHistorySections';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 afterEach(() => {
-  act(() => useEditorStore.getState().resetHistory(legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS)));
+  act(() => useEditorStore.getState().resetHistory(createDefaultEditDocumentV2()));
 });
 
 test('history rows use the real navigation command without duplicating entries', async () => {
@@ -20,11 +20,17 @@ test('history rows use the real navigation command without duplicating entries',
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const exposure = { ...initial, exposure: 0.4 };
   const contrast = { ...exposure, contrast: 12 };
+  const documents = [initial, exposure, contrast].map(({ contrast: contrastValue, exposure: exposureValue }) =>
+    patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      contrast: contrastValue,
+      exposure: exposureValue,
+    }),
+  );
   useEditorStore.getState().hydrateEditorRenderAuthority({
     historyCheckpoints: [],
     historyIndex: 2,
-    editDocumentV2: legacyAdjustmentsToEditDocumentV2(contrast),
-    history: [initial, exposure, contrast].map(legacyAdjustmentsToEditDocumentV2),
+    editDocumentV2: documents[2]!,
+    history: documents,
   });
   const container = renderSection(EditorHistorySection);
 
@@ -32,7 +38,7 @@ test('history rows use the real navigation command without duplicating entries',
   const first = getRequired<HTMLButtonElement>(container, '[data-history-index="0"]');
   await user.click(first);
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(initial);
+  expect(useEditorStore.getState().editDocumentV2).toEqual(documents[0]!);
   expect(useEditorStore.getState().historyIndex).toBe(0);
   expect(container.querySelectorAll('[aria-selected="true"]')).toHaveLength(1);
 
@@ -40,7 +46,7 @@ test('history rows use the real navigation command without duplicating entries',
   active.focus();
   await user.keyboard('{End}');
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(contrast);
+  expect(useEditorStore.getState().editDocumentV2).toEqual(documents[2]!);
   expect(useEditorStore.getState().historyIndex).toBe(2);
   await waitFor(() => expect(document.activeElement?.getAttribute('data-active')).toBe('true'));
 });
@@ -49,11 +55,16 @@ test('snapshots expose empty, create, rename, and apply behavior through the sto
   const user = userEvent.setup();
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const exposure = { ...initial, exposure: 0.4 };
+  const documents = [initial, exposure].map(({ exposure: exposureValue }) =>
+    patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: exposureValue,
+    }),
+  );
   useEditorStore.getState().hydrateEditorRenderAuthority({
     historyCheckpoints: [],
     historyIndex: 1,
-    editDocumentV2: legacyAdjustmentsToEditDocumentV2(exposure),
-    history: [initial, exposure].map(legacyAdjustmentsToEditDocumentV2),
+    editDocumentV2: documents[1]!,
+    history: documents,
   });
   const container = renderSection(EditorSnapshotsSection);
 
@@ -75,7 +86,7 @@ test('snapshots expose empty, create, rename, and apply behavior through the sto
   });
   await user.click(getRequired<HTMLButtonElement>(container, '[role="option"]'));
   expect(useEditorStore.getState().historyIndex).toBe(1);
-  expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(exposure);
+  expect(useEditorStore.getState().editDocumentV2).toEqual(documents[1]!);
 });
 
 function renderSection(component: typeof EditorHistorySection | typeof EditorSnapshotsSection) {

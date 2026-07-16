@@ -1,6 +1,7 @@
 import { Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../store/useEditorStore';
 import type {
   Adjustments,
@@ -8,12 +9,13 @@ import type {
   SceneCurvePointV1,
   SceneCurveSettingsV1,
 } from '../../utils/adjustments';
+import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
 import { buildTypedCurveEditTransaction, type TypedCurveCommitIdentity } from '../../utils/typedCurveEditTransaction';
 
 type TypedCurveDomain = 'scene' | 'output';
 
 interface TypedCurveEditorProps {
-  adjustments: Adjustments;
+  adjustments: EditDocumentNodeParamsV2<'scene_curve'>;
   domain: TypedCurveDomain;
 }
 
@@ -87,7 +89,11 @@ export default function TypedCurveEditor({ adjustments, domain }: TypedCurveEdit
     const identity = commitIdentityRef.current;
     if (identity === null) return;
     const state = useEditorStore.getState();
-    const curve = update(structuredClone(state.adjustmentSnapshot.value.sceneCurveV1 ?? DEFAULT_SCENE_CURVE));
+    const curve = update(
+      structuredClone(
+        selectEditDocumentNode(state.editDocumentV2, 'scene_curve').params['sceneCurveV1'] ?? DEFAULT_SCENE_CURVE,
+      ),
+    );
     const result = applyEditTransaction(
       buildTypedCurveEditTransaction(state, identity, { curve, domain: 'scene' }, crypto.randomUUID()),
     );
@@ -98,7 +104,11 @@ export default function TypedCurveEditor({ adjustments, domain }: TypedCurveEdit
     const identity = commitIdentityRef.current;
     if (identity === null) return;
     const state = useEditorStore.getState();
-    const curve = update(structuredClone(state.adjustmentSnapshot.value.outputCurveV1 ?? DEFAULT_OUTPUT_CURVE));
+    const curve = update(
+      structuredClone(
+        selectEditDocumentNode(state.editDocumentV2, 'scene_curve').params['outputCurveV1'] ?? DEFAULT_OUTPUT_CURVE,
+      ),
+    );
     const result = applyEditTransaction(
       buildTypedCurveEditTransaction(state, identity, { curve, domain: 'output' }, crypto.randomUUID()),
     );

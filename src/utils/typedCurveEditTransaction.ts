@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments, OutputCurveSettingsV1, SceneCurveSettingsV1 } from './adjustments';
 import type { EditTransactionRequest } from './editTransaction';
 
@@ -9,7 +10,7 @@ export interface TypedCurveCommitIdentity {
 
 export interface TypedCurveEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'rawEngineEditGraphVersion'> };
+  readonly editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'r
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { type NavigatorPreviewArtifact, useEditorStore } from '../../../store/useEditorStore';
+import { selectEditDocumentGeometry } from '../../../utils/editDocumentSelectors';
 import { getNavigatorPanTransform, getNavigatorViewportRect } from '../../../utils/editorNavigator';
 import type { ViewportSnapshot, ViewportTransform } from '../../../utils/editorViewportBounds';
 import {
@@ -87,7 +88,7 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
   const { t } = useTranslation();
   const editor = useEditorStore(
     useShallow((state) => ({
-      adjustmentProjection: state.adjustmentSnapshot.value,
+      adjustmentProjection: selectEditDocumentGeometry(state.editDocumentV2),
       baseRenderSize: state.baseRenderSize,
       compare: state.compare,
       originalSize: state.originalSize,

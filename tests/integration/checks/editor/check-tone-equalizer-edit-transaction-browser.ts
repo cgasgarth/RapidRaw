@@ -213,7 +213,7 @@ const waitForRenderedToneEqualizer = async (
       call.data.endedAtMs !== null &&
       Object.entries(expected).every(
         ([key, value]) =>
-          call.data.args.request.editDocumentV2.nodes.tone_equalizer.params.toneEqualizer[
+          call.data.args.request.editDocumentV2.nodes.tone_equalizer.params['toneEqualizer'][
             key as keyof typeof expected
           ] === value,
       )
@@ -485,8 +485,8 @@ try {
     ),
   );
   if (
-    pickerRender.args.request.editDocumentV2.nodes.tone_equalizer.params.toneEqualizer.previewMode !== 2 ||
-    pickerRender.args.request.editDocumentV2.nodes.tone_equalizer.params.toneEqualizer.selectedBand !== 4 ||
+    pickerRender.args.request.editDocumentV2.nodes.tone_equalizer.params['toneEqualizer'].previewMode !== 2 ||
+    pickerRender.args.request.editDocumentV2.nodes.tone_equalizer.params['toneEqualizer'].selectedBand !== 4 ||
     Object.hasOwn(pickerRender.args.request, 'jsAdjustments')
   ) {
     throw new Error('Tone picker output did not render through exact node authority.');

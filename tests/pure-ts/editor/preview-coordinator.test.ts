@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import { type AdjustmentSnapshot, publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   createPreviewCoordinatorState,
   createPreviewQualityPolicy,
@@ -84,10 +85,11 @@ const schedulingInputHarness = () => {
   let previousSnapshot: AdjustmentSnapshot | null = null;
   const snapshot = (exposure: number, advance: boolean): AdjustmentSnapshot => {
     if (!advance && previousSnapshot !== null) return previousSnapshot;
-    previousSnapshot = publishAdjustmentSnapshot(previousSnapshot, {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      exposure,
-    });
+    const baseDocument = previousSnapshot?.editDocumentV2 ?? createDefaultEditDocumentV2();
+    previousSnapshot = publishAdjustmentSnapshot(
+      previousSnapshot,
+      patchEditDocumentV2Node(baseDocument, 'scene_global_color_tone', { exposure }),
+    );
     return previousSnapshot;
   };
   const prepare = ({
@@ -190,7 +192,7 @@ const schedulingInputHarness = () => {
       ? {
           request: {
             expectedImagePath: edited.scope.session.sourceImagePath,
-            jsAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+            editDocumentV2: createDefaultEditDocumentV2(),
             targetResolution: edited.scope.session.targetWidth,
             viewerSampleGraphRevision: edited.scope.session.graphRevision,
           },

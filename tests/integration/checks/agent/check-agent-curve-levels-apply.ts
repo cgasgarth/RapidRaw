@@ -15,7 +15,7 @@ import {
   agentCurveLevelsApplyRequestSchema,
   applyAgentCurveLevels,
 } from '../../../../src/utils/agent/tools/agentCurveLevelsApplyTool.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
@@ -51,7 +51,7 @@ const curveLevelsResultSchema = z
   })
   .passthrough();
 
-const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+const editDocumentV2 = createDefaultEditDocumentV2();
 useEditorStore.getState().hydrateEditorRenderAuthority({
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-curve-levels-before',
@@ -187,11 +187,11 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustmentSnapshot.value.curveMode !== 'parametric' ||
-  state.adjustmentSnapshot.value.toneCurve !== 'soft_contrast' ||
-  state.adjustmentSnapshot.value.levels.gamma !== 0.94 ||
-  state.adjustmentSnapshot.value.parametricCurve?.luma.shadows !== 8 ||
-  state.adjustmentSnapshot.value.pointCurves?.red[1]?.y !== 134
+  state.editDocumentV2.nodes['scene_curve']!.params['curveMode'] !== 'parametric' ||
+  state.editDocumentV2.nodes['scene_curve']!.params['toneCurve'] !== 'soft_contrast' ||
+  state.editDocumentV2.nodes['luma_levels']!.params['levels'].gamma !== 0.94 ||
+  state.editDocumentV2.nodes['scene_curve']!.params['parametricCurve']?.luma.shadows !== 8 ||
+  state.editDocumentV2.nodes['scene_curve']!.params['pointCurves']?.red[1]?.y !== 134
 ) {
   throw new Error('agent.curve_levels.apply did not mutate curves/levels adjustments.');
 }
@@ -208,8 +208,8 @@ if (
   throw new Error('agent.curve_levels.apply did not publish one source-bound EditTransaction receipt.');
 }
 if (
-  state.editDocumentV2.nodes.scene_curve?.params.curveMode !== 'parametric' ||
-  state.editDocumentV2.nodes.scene_curve.params.toneCurve !== 'soft_contrast'
+  state.editDocumentV2.nodes.scene_curve?.params['curveMode'] !== 'parametric' ||
+  state.editDocumentV2.nodes.scene_curve.params['toneCurve'] !== 'soft_contrast'
 ) {
   throw new Error('agent.curve_levels.apply did not update the canonical scene curve node.');
 }

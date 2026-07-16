@@ -1,13 +1,13 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerParametricMaskTargetKey } from '../components/panel/editor/viewerParametricMaskTargetInteractionController';
 import type { SubMaskParameters } from '../components/panel/right/layers/Masks';
-import type { Adjustments } from './adjustments';
+import type { MaskContainer } from './adjustments';
+import { selectEditDocumentAiPatches, selectEditDocumentMasks } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 import { buildLayerEditTransactionRequest } from './layers/layerEditTransaction';
 
 export interface ParametricMaskTargetEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustmentSnapshot: { readonly value: Adjustments };
   readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSessionId: number;
@@ -39,21 +39,21 @@ export const buildParametricMaskTargetEditTransaction = (
 ): EditTransactionRequest => {
   assertCurrent(state, key);
   let matched = false;
-  const updateSubMasks = (subMasks: Adjustments['masks'][number]['subMasks']) =>
+  const updateSubMasks = (subMasks: MaskContainer['subMasks']) =>
     subMasks.map((subMask) => {
       if (subMask.id !== key.maskId) return subMask;
       if (subMask.type !== key.tool) rejectParametricMaskTarget('stale_tool');
       matched = true;
       return { ...subMask, parameters: { ...parameters } };
     });
-  const adjustments: Adjustments = {
-    ...state.adjustmentSnapshot.value,
-    aiPatches: state.adjustmentSnapshot.value.aiPatches.map((patch) => ({
-      ...patch,
-      subMasks: updateSubMasks(patch.subMasks),
-    })),
-    masks: state.adjustmentSnapshot.value.masks.map((mask) => ({ ...mask, subMasks: updateSubMasks(mask.subMasks) })),
-  };
+  const aiPatches = selectEditDocumentAiPatches(state.editDocumentV2).map((patch) => ({
+    ...patch,
+    subMasks: updateSubMasks(patch.subMasks),
+  }));
+  const masks = selectEditDocumentMasks(state.editDocumentV2).map((mask) => ({
+    ...mask,
+    subMasks: updateSubMasks(mask.subMasks),
+  }));
   if (!matched) rejectParametricMaskTarget('missing_mask');
-  return buildLayerEditTransactionRequest(state, adjustments, transactionId);
+  return buildLayerEditTransactionRequest(state, { aiPatches, masks }, transactionId);
 };

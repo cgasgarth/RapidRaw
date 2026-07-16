@@ -173,8 +173,8 @@ const waitForRenderedVignette = async (page: Page, expectedAmount: number, expec
     if (
       call.success &&
       call.data.endedAtMs !== null &&
-      call.data.args.request.editDocumentV2.nodes.display_creative.params.vignetteAmount === expectedAmount &&
-      call.data.args.request.editDocumentV2.nodes.display_creative.params.vignetteMidpoint === expectedMidpoint
+      call.data.args.request.editDocumentV2.nodes.display_creative.params['vignetteAmount'] === expectedAmount &&
+      call.data.args.request.editDocumentV2.nodes.display_creative.params['vignetteMidpoint'] === expectedMidpoint
     )
       return;
     await page.waitForTimeout(50);
@@ -434,7 +434,7 @@ try {
     throw new Error('Disabling Effects did not produce exactly one edit transaction.');
   }
   const disabledNode = await waitForRenderedEffectsEnabled(page, false);
-  if (disabledNode.params.vignetteAmount !== -32 || disabledNode.params.vignetteMidpoint !== 63) {
+  if (disabledNode.params['vignetteAmount'] !== -32 || disabledNode.params['vignetteMidpoint'] !== 63) {
     throw new Error(`Disabling Effects lost latent parameters: ${JSON.stringify(disabledNode.params)}`);
   }
   const disabledPreviewUrl = await page.getByTestId('svg-preview-base-layer').last().getAttribute('href');
@@ -462,7 +462,7 @@ try {
   await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', enablementBaselineSaves + 2);
   await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 2);
   const reenabledNode = await waitForRenderedEffectsEnabled(page, true);
-  if (reenabledNode.params.vignetteAmount !== -32 || reenabledNode.params.vignetteMidpoint !== 63) {
+  if (reenabledNode.params['vignetteAmount'] !== -32 || reenabledNode.params['vignetteMidpoint'] !== 63) {
     throw new Error(`Re-enabling Effects did not restore latent parameters: ${JSON.stringify(reenabledNode.params)}`);
   }
 
@@ -490,8 +490,8 @@ try {
   }
   const redoneNode = await waitForRenderedEffectsEnabled(page, true);
   if (
-    redoneNode.params.vignetteAmount !== -32 ||
-    redoneNode.params.vignetteMidpoint !== 63 ||
+    redoneNode.params['vignetteAmount'] !== -32 ||
+    redoneNode.params['vignetteMidpoint'] !== 63 ||
     (await effectsSection.getByRole('button', { name: 'Disable Section' }).count()) !== 1
   ) {
     throw new Error(`Redo did not restore enabled Effects with latent parameters: ${JSON.stringify(redoneNode)}`);

@@ -165,8 +165,8 @@ class AgentCodexAppServerModelTransport implements AgentSelectedImageModelTransp
       const completed = await new Promise<z.infer<typeof turnCompletedSchema>>((resolve, reject) => {
         this.pendingTurns.set(started.turn.id, { reject, resolve });
       });
-      if (completed.params.turn.status !== 'completed') throw new Error('Codex model turn did not complete.');
-      const messages = completed.params.turn.items
+      if (completed.params['turn'].status !== 'completed') throw new Error('Codex model turn did not complete.');
+      const messages = completed.params['turn'].items
         .map((item) => agentMessageSchema.safeParse(item))
         .filter((item) => item.success);
       const message = messages.at(-1)?.data;
@@ -174,7 +174,7 @@ class AgentCodexAppServerModelTransport implements AgentSelectedImageModelTransp
       const output = agentSelectedImageModelOutputSchema.parse(JSON.parse(message.text));
       return {
         modelId: this.modelId,
-        modelTurnId: completed.params.turn.id,
+        modelTurnId: completed.params['turn'].id,
         output,
         provider: this.provider,
         providerVersion: 'codex-app-server-v2',
@@ -243,9 +243,9 @@ class AgentCodexAppServerModelTransport implements AgentSelectedImageModelTransp
     }
     const completed = turnCompletedSchema.safeParse(value);
     if (!completed.success) return;
-    const pending = this.pendingTurns.get(completed.data.params.turn.id);
+    const pending = this.pendingTurns.get(completed.data.params['turn'].id);
     if (pending === undefined) return;
-    this.pendingTurns.delete(completed.data.params.turn.id);
+    this.pendingTurns.delete(completed.data.params['turn'].id);
     pending.resolve(completed.data);
   }
 

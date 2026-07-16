@@ -105,7 +105,7 @@ const waitForRenderedMasks = async (page: Page, expected: ReadonlyArray<{ id: st
     const parsed = renderSchema.safeParse((await calls(page, 'apply_adjustments')).at(-1));
     if (parsed.success && parsed.data.endedAtMs !== null) {
       const document = parsed.data.args.request.editDocumentV2;
-      const nodeMasks = document.nodes.layers.params.masks;
+      const nodeMasks = document.nodes.layers.params['masks'];
       const projected = nodeMasks.map(({ id, visible }) => ({ id, visible }));
       if (
         JSON.stringify(projected) === JSON.stringify(expected) &&

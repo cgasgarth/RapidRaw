@@ -23,7 +23,7 @@ import {
   buildAgentEditGraphEditTransaction,
   captureAgentEditGraphCommitIdentity,
 } from '../../../src/utils/agentEditGraphEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixtures/agent-editgraph.ARW';
 const session = createEditorImageSession({ generation: 31, path: sourcePath, source: 'cache' });
@@ -90,7 +90,7 @@ class DeferredEditGraphBridge extends RawEngineLocalAppServerBridge {
 describe('agent EditGraph EditTransaction bridge', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -136,8 +136,8 @@ describe('agent EditGraph EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_editgraph_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.contrast).toBe(12);
-    expect(after.adjustmentSnapshot.value.exposure).toBe(0);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['contrast']).toBe(12);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
     expect(after.history).toHaveLength(2);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-manual-edit');
   });
@@ -169,7 +169,7 @@ describe('agent EditGraph EditTransaction bridge', () => {
     const state = useEditorStore.getState();
     const identity = captureAgentEditGraphCommitIdentity(state);
     if (identity === null) throw new Error('Expected seeded EditGraph identity.');
-    const nextAdjustments = { ...state.adjustmentSnapshot.value, exposure: 0.6 };
+    const nextAdjustments = { ...state.editDocumentV2, exposure: 0.6 };
     expect(() =>
       buildAgentEditGraphEditTransaction(
         { ...state, selectedImage: { path: '/fixtures/other.ARW' } },
@@ -203,10 +203,10 @@ describe('agent EditGraph EditTransaction bridge', () => {
         transactionId: 'agent-editgraph-apply',
       },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.6);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.6);
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
@@ -223,7 +223,7 @@ describe('agent EditGraph EditTransaction bridge', () => {
       buildAgentEditGraphEditTransaction(
         { ...fallbackState, imageSessionId: 83 },
         identity,
-        { ...fallbackState.adjustmentSnapshot.value, exposure: 0.2 },
+        { ...fallbackState.editDocumentV2, exposure: 0.2 },
         'stale-reopened-a',
       ),
     ).toThrow('agent_editgraph_transaction.stale_session:editor-image-session:81:editor-image-session:83');

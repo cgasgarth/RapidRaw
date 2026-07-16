@@ -11,7 +11,7 @@ import {
   type DisplayCreativeCommitIdentity,
   isDisplayCreativeNodeAdjustment,
 } from '../../../src/utils/displayCreativeEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/display-creative-controls.ARW';
 const session = createEditorImageSession({ generation: 19, path: sourcePath, source: 'cache' });
@@ -37,7 +37,13 @@ const identity = (overrides: Partial<DisplayCreativeCommitIdentity> = {}): Displ
 describe('display creative edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4, flipHorizontal: true };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'geometry',
+      { flipHorizontal: adjustments.flipHorizontal },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -86,9 +92,9 @@ describe('display creative edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.vignetteAmount).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']!.params['vignetteAmount']).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.geometry.flipHorizontal).toBe(true);
   });
 
   test('commits a zero LUT intensity without falling back to the display default', () => {
@@ -106,7 +112,7 @@ describe('display creative edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.lutIntensity).toBe(100);
+    expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']!.params['lutIntensity']).toBe(100);
   });
 
   test('owns display controls, exact no-ops, and rejects stale identity', () => {

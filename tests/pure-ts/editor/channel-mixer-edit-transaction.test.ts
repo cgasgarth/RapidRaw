@@ -7,7 +7,8 @@ import {
   type ChannelMixerCommitIdentity,
   isCurrentChannelMixerIdentity,
 } from '../../../src/utils/channelMixerEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/channel-mixer.ARW';
 const session = createEditorImageSession({ generation: 31, path: sourcePath, source: 'cache' });
@@ -29,11 +30,17 @@ const identity = (overrides: Partial<ChannelMixerCommitIdentity> = {}): ChannelM
   sourceIdentity: sourcePath,
   ...overrides,
 });
+const currentChannelMixer = () =>
+  structuredClone(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'channel_mixer').params.channelMixer,
+  );
 
 describe('channel mixer edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: adjustments.exposure,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -48,10 +55,11 @@ describe('channel mixer edit transaction', () => {
 
   test('commits one authoritative mixer node revision with structural sharing and Undo', () => {
     const state = useEditorStore.getState();
+    const baseline = currentChannelMixer();
     const channelMixer = {
-      ...structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
+      ...baseline,
       enabled: true,
-      red: { ...INITIAL_ADJUSTMENTS.channelMixer.red, green: 24 },
+      red: { ...baseline.red, green: 24 },
     };
     const request = buildChannelMixerEditTransaction(state, identity(), channelMixer, 'channel-mixer-red-green');
     const result = state.applyEditTransaction(request);
@@ -72,13 +80,13 @@ describe('channel mixer edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.nodes['channel_mixer']!.params['channelMixer']).toEqual(baseline);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
   });
 
   test('rejects stale source, session, and revision identities', () => {
     const state = useEditorStore.getState();
-    const next = structuredClone(INITIAL_ADJUSTMENTS.channelMixer);
+    const next = currentChannelMixer();
     expect(() =>
       buildChannelMixerEditTransaction(state, identity({ sourceIdentity: '/fixture/stale.ARW' }), next, 'stale-source'),
     ).toThrow('channel_mixer_transaction.stale_source');
@@ -97,10 +105,11 @@ describe('channel mixer edit transaction', () => {
 
   test('preserves distinct enable and coefficient Undo boundaries', () => {
     const state = useEditorStore.getState();
+    const baseline = currentChannelMixer();
     const enabled = {
-      ...structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
+      ...baseline,
       enabled: true,
-      red: { ...INITIAL_ADJUSTMENTS.channelMixer.red, red: 110 },
+      red: { ...baseline.red, red: 110 },
     };
     const first = state.applyEditTransaction(
       buildChannelMixerEditTransaction(state, identity(), enabled, 'channel-mixer-enable'),
@@ -118,9 +127,9 @@ describe('channel mixer edit transaction', () => {
       );
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer).toEqual(enabled);
+    expect(useEditorStore.getState().editDocumentV2.nodes['channel_mixer']!.params['channelMixer']).toEqual(enabled);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
+    expect(useEditorStore.getState().editDocumentV2.nodes['channel_mixer']!.params['channelMixer']).toEqual(baseline);
   });
 
   test('commits through fallback authority and rejects stale A to B to A identities', () => {
@@ -130,18 +139,14 @@ describe('channel mixer edit transaction', () => {
       imageSessionId: 84,
     });
     const state = useEditorStore.getState();
+    const baseline = currentChannelMixer();
     const fallbackIdentity: ChannelMixerCommitIdentity = {
       adjustmentRevision: 0,
       imageSessionId: 'editor-image-session:84',
       sourceIdentity: sourcePath,
     };
     const noOp = state.applyEditTransaction(
-      buildChannelMixerEditTransaction(
-        state,
-        fallbackIdentity,
-        structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
-        'fallback-channel-no-op',
-      ),
+      buildChannelMixerEditTransaction(state, fallbackIdentity, baseline, 'fallback-channel-no-op'),
     );
     expect(noOp.noOp).toBeTrue();
     expect(useEditorStore.getState()).toMatchObject({
@@ -152,9 +157,9 @@ describe('channel mixer edit transaction', () => {
     });
 
     const next = {
-      ...structuredClone(INITIAL_ADJUSTMENTS.channelMixer),
+      ...baseline,
       enabled: true,
-      red: { ...INITIAL_ADJUSTMENTS.channelMixer.red, green: 18 },
+      red: { ...baseline.red, green: 18 },
     };
     const result = state.applyEditTransaction(
       buildChannelMixerEditTransaction(state, fallbackIdentity, next, 'fallback-channel'),
@@ -170,7 +175,7 @@ describe('channel mixer edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer).toEqual(INITIAL_ADJUSTMENTS.channelMixer);
+    expect(useEditorStore.getState().editDocumentV2.nodes['channel_mixer']!.params['channelMixer']).toEqual(baseline);
 
     expect(isCurrentChannelMixerIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

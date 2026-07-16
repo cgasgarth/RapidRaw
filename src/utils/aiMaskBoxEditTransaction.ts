@@ -1,13 +1,12 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerAiMaskBoxSessionKey } from '../components/panel/editor/viewerAiMaskBoxInteractionController';
 import type { SubMaskParameters } from '../components/panel/right/layers/Masks';
-import type { Adjustments } from './adjustments';
+import { selectEditDocumentAiPatches, selectEditDocumentMasks } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 import { buildLayerEditTransactionRequest } from './layers/layerEditTransaction';
 
 export interface AiMaskBoxEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustmentSnapshot: { readonly value: Adjustments };
   readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSessionId: number;
@@ -35,30 +34,40 @@ export const buildAiMaskBoxEditTransaction = (
   if (key.sourceRevision !== state.sourceRevision) reject('stale_graph');
   if (key.geometryEpoch !== state.geometryEpoch) reject('stale_geometry');
 
-  const family = state.adjustmentSnapshot.value[key.containerFamily];
+  const masks = selectEditDocumentMasks(state.editDocumentV2);
+  const aiPatches = selectEditDocumentAiPatches(state.editDocumentV2);
+  const family = key.containerFamily === 'masks' ? masks : aiPatches;
   const duplicateContainerCount = family.filter((container) => container.id === key.containerId).length;
   if (duplicateContainerCount !== 1)
     reject(duplicateContainerCount === 0 ? 'missing_container' : 'duplicate_container');
-  const siblingFamily =
-    key.containerFamily === 'masks' ? state.adjustmentSnapshot.value.aiPatches : state.adjustmentSnapshot.value.masks;
+  const siblingFamily = key.containerFamily === 'masks' ? aiPatches : masks;
   if (siblingFamily.some((container) => container.id === key.containerId)) reject('cross_family_container_collision');
 
   let matchedSubMaskCount = 0;
-  const updatedFamily = family.map((container) => {
+  const updateSubMasks = (subMasks: readonly (typeof masks)[number]['subMasks'][number][]) =>
+    subMasks.map((subMask) => {
+      if (subMask.id !== key.maskId) return subMask;
+      matchedSubMaskCount += 1;
+      if (subMask.type !== key.tool) reject('stale_tool');
+      return { ...subMask, parameters: { ...parameters } };
+    });
+  const updatedMasks = masks.map((container) => {
     if (container.id !== key.containerId) return container;
-    return {
-      ...container,
-      subMasks: container.subMasks.map((subMask) => {
-        if (subMask.id !== key.maskId) return subMask;
-        matchedSubMaskCount += 1;
-        if (subMask.type !== key.tool) reject('stale_tool');
-        return { ...subMask, parameters: { ...parameters } };
-      }),
-    };
+    return { ...container, subMasks: updateSubMasks(container.subMasks) };
+  });
+  const updatedAiPatches = aiPatches.map((container) => {
+    if (container.id !== key.containerId) return container;
+    return { ...container, subMasks: updateSubMasks(container.subMasks) };
   });
   if (matchedSubMaskCount !== 1) reject(matchedSubMaskCount === 0 ? 'missing_mask' : 'duplicate_mask_in_container');
   if (siblingFamily.some((container) => container.subMasks.some((subMask) => subMask.id === key.maskId)))
     reject('cross_family_mask_collision');
-  const adjustments: Adjustments = { ...state.adjustmentSnapshot.value, [key.containerFamily]: updatedFamily };
-  return buildLayerEditTransactionRequest(state, adjustments, transactionId);
+  return buildLayerEditTransactionRequest(
+    state,
+    {
+      aiPatches: key.containerFamily === 'aiPatches' ? updatedAiPatches : aiPatches,
+      masks: key.containerFamily === 'masks' ? updatedMasks : masks,
+    },
+    transactionId,
+  );
 };

@@ -15,7 +15,7 @@ import {
   agentGeometryApplyRequestSchema,
   applyAgentGeometry,
 } from '../../../../src/utils/agent/tools/agentGeometryApplyTool.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
@@ -51,7 +51,7 @@ const geometryResultSchema = z
   })
   .passthrough();
 
-const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+const editDocumentV2 = createDefaultEditDocumentV2();
 useEditorStore.getState().hydrateEditorRenderAuthority({
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-geometry-before',
@@ -136,10 +136,10 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustmentSnapshot.value.crop?.x !== 0.08 ||
-  state.adjustmentSnapshot.value.rotation !== 1.25 ||
-  !state.adjustmentSnapshot.value.flipHorizontal ||
-  state.adjustmentSnapshot.value.transformScale !== 1.08
+  state.editDocumentV2.geometry.crop?.x !== 0.08 ||
+  state.editDocumentV2.geometry.rotation !== 1.25 ||
+  !state.editDocumentV2.geometry.flipHorizontal ||
+  state.editDocumentV2.geometry.transformScale !== 1.08
 ) {
   throw new Error('agent.geometry.apply did not mutate crop/geometry adjustments.');
 }
@@ -156,8 +156,8 @@ if (
   throw new Error('agent.geometry.apply did not publish one source-bound EditTransaction receipt.');
 }
 if (
-  state.editDocumentV2.nodes.geometry?.params.rotation !== 1.25 ||
-  (state.editDocumentV2.nodes.geometry.params.crop as { x?: unknown } | undefined)?.x !== 0.08
+  state.editDocumentV2.nodes.geometry?.params['rotation'] !== 1.25 ||
+  (state.editDocumentV2.nodes.geometry.params['crop'] as { x?: unknown } | undefined)?.x !== 0.08
 ) {
   throw new Error(
     `agent.geometry.apply did not update the canonical geometry node: ${JSON.stringify(

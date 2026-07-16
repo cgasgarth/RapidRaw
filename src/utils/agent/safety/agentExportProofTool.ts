@@ -190,7 +190,7 @@ export const buildAgentExportProof = (request: AgentExportProofRequest): AgentEx
   const previewRef = `agent-export-proof:${parsedRequest.operationId}:${snapshot.initialPreview.renderHash}`;
   const exportHash = stableHash(
     JSON.stringify({
-      adjustments: editor.adjustmentSnapshot.value,
+      adjustments: editor.editDocumentV2,
       colorProfile: parsedRequest.colorProfile,
       dimensions,
       fileFormat: parsedRequest.fileFormat,

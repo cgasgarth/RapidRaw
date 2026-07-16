@@ -14,7 +14,6 @@ const DEFAULT_COPY_PASTE_SELECTED_NODE_IDS = createDefaultCopyPasteSettings().se
 
 export function useEditorPersistence(): void {
   const selectedImage = useEditorStore((state) => state.selectedImage);
-  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const imageSession = useEditorStore((state) => state.imageSession);
@@ -51,7 +50,6 @@ export function useEditorPersistence(): void {
     if (!selectedImage?.path || imageSession === null) return;
     runner.installSession({
       adjustmentRevision,
-      adjustments,
       editDocumentV2,
       imageSessionId: imageSession.id,
       path: selectedImage.path,
@@ -62,7 +60,6 @@ export function useEditorPersistence(): void {
     }
     runner.submitCommitted({
       adjustmentRevision,
-      adjustments,
       editDocumentV2,
       imageSessionId: imageSession.id,
       interactionActive,
@@ -73,7 +70,6 @@ export function useEditorPersistence(): void {
     });
   }, [
     adjustmentRevision,
-    adjustments,
     editDocumentV2,
     imageSession,
     imageSessionId,

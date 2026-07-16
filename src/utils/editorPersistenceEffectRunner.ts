@@ -1,14 +1,13 @@
 import { z } from 'zod';
 import {
-  currentRenderEditDocumentV2Schema,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
   type EditDocumentV2CopyPayload,
+  editDocumentV2Schema,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { Invokes } from '../tauri/commands';
-import type { Adjustments } from './adjustments';
-import { areAdjustmentsEqual } from './adjustmentsSnapshot';
-import { copyEditDocumentV2Nodes, prepareEditDocumentV2ForPersistence } from './editDocumentV2';
+import { areEditDocumentsEqual } from './adjustmentsSnapshot';
+import { copyEditDocumentV2Nodes } from './editDocumentV2';
 import { trackEditorPersistence } from './editorPersistenceService';
 import type { EditApplicationReceipt, EditTransactionPersistenceContext } from './editTransaction';
 import { invokeWithSchema } from './tauriSchemaInvoke';
@@ -19,6 +18,7 @@ export const editorPersistenceReceiptSchema = z
     catalogRevision: z.number().int().nonnegative().nullish(),
     imageId: z.string().min(1),
     imageSessionId: z.string().min(1).nullish(),
+    editDocumentV2: editDocumentV2Schema.nullish(),
     path: z.string().trim().min(1),
     renderFingerprint: z.string().regex(/^u64:[0-9a-f]{16}$/u),
     sidecarRevision: z.string().trim().startsWith('sha256:'),
@@ -61,14 +61,12 @@ export const buildEditorPersistenceRequest = (
   });
 
 export interface EditorPersistenceSnapshot {
-  adjustments: Adjustments;
   editDocumentV2: EditDocumentV2;
   path: string;
 }
 
 export interface EditorPersistenceInput {
   adjustmentRevision: number;
-  adjustments: Adjustments;
   editDocumentV2: EditDocumentV2;
   imageSessionId: string;
   interactionActive: boolean;
@@ -87,12 +85,11 @@ export type EditorPersistenceSessionInput = Omit<
 >;
 
 export interface EditorPersistenceExecution {
-  adjustments: Adjustments;
   editDocumentV2: EditDocumentV2;
   authorityKey: string;
   imageSessionId: string;
   multiSelection: {
-    editDocumentV2: EditDocumentV2CopyPayload;
+    payload: EditDocumentV2CopyPayload;
     paths: readonly string[];
   } | null;
   path: string;
@@ -127,8 +124,16 @@ const executeEditorPersistence: EditorPersistenceExecutor = async (input, signal
   });
   const receipt = await trackEditorPersistence(
     input.path,
-    input.adjustments,
-    invokeWithSchema(Invokes.SaveMetadataAndUpdateThumbnail, request, editorPersistenceReceiptSchema),
+    input.editDocumentV2,
+    invokeWithSchema(
+      Invokes.SaveMetadataAndUpdateThumbnail,
+      {
+        editDocumentV2: input.editDocumentV2,
+        path: input.path,
+        ...(input.transaction === undefined ? {} : { transaction: input.transaction }),
+      },
+      editorPersistenceReceiptSchema,
+    ),
   );
   if (receipt.path !== input.path) {
     throw new Error(`editor_persistence.receipt_path_mismatch:${receipt.path}:${input.path}`);
@@ -136,7 +141,7 @@ const executeEditorPersistence: EditorPersistenceExecutor = async (input, signal
   if (!signal.aborted && input.multiSelection !== null && input.multiSelection.paths.length > 0) {
     await invokeWithSchema(
       Invokes.ApplyAdjustmentsToPaths,
-      { editDocumentV2: input.multiSelection.editDocumentV2, paths: input.multiSelection.paths },
+      { editDocumentV2CopyPayload: input.multiSelection.payload, paths: input.multiSelection.paths },
       editorPersistenceReceiptArraySchema,
     );
   }
@@ -175,7 +180,7 @@ export class EditorPersistenceEffectRunner {
     this.cancelPending();
     this.activeToken += 1;
     this.sessionKey = nextSessionKey;
-    this.publishSnapshot(input.path, input.adjustments, input.editDocumentV2);
+    this.publishSnapshot(input.path, input.editDocumentV2);
   }
 
   submitCommitted(input: EditorPersistenceInput, delayMs = 50): boolean {
@@ -189,11 +194,7 @@ export class EditorPersistenceEffectRunner {
     ) {
       return false;
     }
-    if (
-      areAdjustmentsEqual(this.baseline.adjustments, input.adjustments) &&
-      this.baseline.editDocumentV2 === input.editDocumentV2
-    )
-      return true;
+    if (areEditDocumentsEqual(this.baseline.editDocumentV2, input.editDocumentV2)) return true;
 
     this.cancelQueued();
     this.activeToken += 1;
@@ -203,12 +204,11 @@ export class EditorPersistenceEffectRunner {
     }
     const receipt = input.receipt;
     if (receipt.persistence === 'native-committed') {
-      this.publishSnapshot(input.path, input.adjustments, input.editDocumentV2);
+      this.publishSnapshot(input.path, input.editDocumentV2);
       return true;
     }
     const token = this.activeToken;
     const execution: EditorPersistenceExecution = {
-      adjustments: input.adjustments,
       editDocumentV2: input.editDocumentV2,
       authorityKey: nextSessionKey,
       imageSessionId: input.imageSessionId,
@@ -268,7 +268,7 @@ export class EditorPersistenceEffectRunner {
       if (receipt.path !== execution.path) {
         throw new Error(`editor_persistence.receipt_path_mismatch:${receipt.path}:${execution.path}`);
       }
-      this.publishSnapshot(execution.path, execution.adjustments, execution.editDocumentV2);
+      this.publishSnapshot(execution.path, execution.editDocumentV2);
       this.onAccepted(execution, receipt);
     } catch (error) {
       if (this.current(token, execution)) this.onCurrentFailure(error, execution);
@@ -298,8 +298,8 @@ export class EditorPersistenceEffectRunner {
     );
   }
 
-  private publishSnapshot(path: string, adjustments: Adjustments, editDocumentV2: EditDocumentV2): void {
-    this.baseline = { adjustments, editDocumentV2, path };
+  private publishSnapshot(path: string, editDocumentV2: EditDocumentV2): void {
+    this.baseline = { editDocumentV2, path };
     this.onSnapshot(this.baseline);
   }
 
@@ -313,7 +313,7 @@ export class EditorPersistenceEffectRunner {
     );
     if (changedNodeIds.length === 0) return null;
     return {
-      editDocumentV2: copyEditDocumentV2Nodes(input.editDocumentV2, changedNodeIds),
+      payload: copyEditDocumentV2Nodes(input.editDocumentV2, changedNodeIds),
       paths: request.paths,
     };
   }

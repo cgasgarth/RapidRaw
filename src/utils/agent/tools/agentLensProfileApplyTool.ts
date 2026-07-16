@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentNodeParamsV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   ActorKind,
@@ -10,8 +11,8 @@ import {
   RAW_ENGINE_SCHEMA_VERSION,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
 
@@ -117,8 +118,11 @@ const LENS_PROFILE_PATCH_KEYS = [
   'lensVignetteEnabled',
 ] as const satisfies ReadonlyArray<keyof AgentLensProfilePatch>;
 
-const applyLensProfilePatchToAdjustments = (base: Adjustments, patch: AgentLensProfilePatch): Adjustments => {
-  const next: Adjustments = { ...base };
+const applyLensProfilePatchToAdjustments = (
+  base: EditDocumentNodeParamsV2<'lens_correction'>,
+  patch: AgentLensProfilePatch,
+): EditDocumentNodeParamsV2<'lens_correction'> => {
+  const next: EditDocumentNodeParamsV2<'lens_correction'> = { ...base };
   if (patch.lensCorrectionMode !== undefined) next.lensCorrectionMode = patch.lensCorrectionMode;
   if (patch.lensDistortionAmount !== undefined) next.lensDistortionAmount = patch.lensDistortionAmount;
   if (patch.lensDistortionEnabled !== undefined) next.lensDistortionEnabled = patch.lensDistortionEnabled;
@@ -140,8 +144,8 @@ const estimateChangedPixels = ({
   before,
   imageArea,
 }: {
-  after: Adjustments;
-  before: Adjustments;
+  after: EditDocumentNodeParamsV2<'lens_correction'>;
+  before: EditDocumentNodeParamsV2<'lens_correction'>;
   imageArea: number;
 }) => {
   const changedFieldCount = LENS_PROFILE_PATCH_KEYS.filter(
@@ -268,11 +272,12 @@ export const applyAgentLensProfile = async (
   if (commitIdentity === null) throw new Error('Agent lens/profile apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const nextAdjustments = applyLensProfilePatchToAdjustments(state.adjustmentSnapshot.value, parsedRequest.lensProfile);
+  const beforeAdjustments = selectEditDocumentNode(state.editDocumentV2, 'lens_correction').params;
+  const nextAdjustments = applyLensProfilePatchToAdjustments(beforeAdjustments, parsedRequest.lensProfile);
   const adjustedFields = LENS_PROFILE_PATCH_KEYS.filter(
     (key) =>
       parsedRequest.lensProfile[key] !== undefined &&
-      JSON.stringify(state.adjustmentSnapshot.value[key]) !== JSON.stringify(nextAdjustments[key]),
+      JSON.stringify(beforeAdjustments[key]) !== JSON.stringify(nextAdjustments[key]),
   );
   const typedMutation =
     adjustedFields.length === 0
@@ -300,7 +305,7 @@ export const applyAgentLensProfile = async (
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
       after: nextAdjustments,
-      before: state.adjustmentSnapshot.value,
+      before: beforeAdjustments,
       imageArea: selectedImage.width * selectedImage.height,
     }),
     receipt: {

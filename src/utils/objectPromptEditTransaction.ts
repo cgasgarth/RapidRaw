@@ -1,14 +1,14 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerObjectPromptKey } from '../components/panel/editor/viewerObjectPromptInteractionController';
 import type { SubMaskParameters } from '../components/panel/right/layers/Masks';
-import type { Adjustments } from './adjustments';
+import type { MaskContainer } from './adjustments';
+import { selectEditDocumentAiPatches, selectEditDocumentMasks } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 import { buildLayerEditTransactionRequest } from './layers/layerEditTransaction';
 import { readObjectPromptCanvasState } from './mask/objectMaskPromptCanvas';
 
 export interface ObjectPromptEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustmentSnapshot: { readonly value: Adjustments };
   readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSessionId: number;
@@ -34,7 +34,7 @@ export const buildObjectPromptEditTransaction = (
   if (state.geometryEpoch !== key.geometryEpoch) reject('stale_geometry');
 
   let matched = false;
-  const update = (subMasks: Adjustments['masks'][number]['subMasks']) =>
+  const update = (subMasks: MaskContainer['subMasks']) =>
     subMasks.map((subMask) => {
       if (subMask.id !== key.maskId) return subMask;
       if (subMask.type !== 'ai-object' || key.tool !== 'object-prompt') reject('stale_tool');
@@ -42,14 +42,14 @@ export const buildObjectPromptEditTransaction = (
       matched = true;
       return { ...subMask, parameters: { ...parameters } };
     });
-  const adjustments: Adjustments = {
-    ...state.adjustmentSnapshot.value,
-    aiPatches: state.adjustmentSnapshot.value.aiPatches.map((patch) => ({
-      ...patch,
-      subMasks: update(patch.subMasks),
-    })),
-    masks: state.adjustmentSnapshot.value.masks.map((mask) => ({ ...mask, subMasks: update(mask.subMasks) })),
-  };
+  const aiPatches = selectEditDocumentAiPatches(state.editDocumentV2).map((patch) => ({
+    ...patch,
+    subMasks: update(patch.subMasks),
+  }));
+  const masks = selectEditDocumentMasks(state.editDocumentV2).map((mask) => ({
+    ...mask,
+    subMasks: update(mask.subMasks),
+  }));
   if (!matched) reject('missing_mask');
-  return buildLayerEditTransactionRequest(state, adjustments, transactionId);
+  return buildLayerEditTransactionRequest(state, { aiPatches, masks }, transactionId);
 };

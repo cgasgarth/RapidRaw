@@ -15,7 +15,7 @@ import {
   agentDetailEffectsApplyRequestSchema,
   applyAgentDetailEffects,
 } from '../../../../src/utils/agent/tools/agentDetailEffectsApplyTool.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
@@ -63,7 +63,7 @@ const detailEffectsResultSchema = z
   })
   .passthrough();
 
-const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+const editDocumentV2 = createDefaultEditDocumentV2();
 useEditorStore.getState().hydrateEditorRenderAuthority({
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-detail-effects-before',
@@ -181,20 +181,20 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustmentSnapshot.value.deblurEnabled !== true ||
-  state.adjustmentSnapshot.value.deblurSigmaPx !== 0.9 ||
-  state.adjustmentSnapshot.value.deblurStrength !== 24 ||
-  state.adjustmentSnapshot.value.sharpness !== 18 ||
-  state.adjustmentSnapshot.value.lumaNoiseReduction !== 16 ||
-  state.adjustmentSnapshot.value.colorNoiseReduction !== 12 ||
-  state.adjustmentSnapshot.value.localContrastRadiusPx !== 32 ||
-  state.adjustmentSnapshot.value.dustSpotOverlayEnabled !== true ||
-  state.adjustmentSnapshot.value.dustSpotSensitivity !== 62 ||
-  state.adjustmentSnapshot.value.grainAmount !== 18 ||
-  state.adjustmentSnapshot.value.vignetteAmount !== -14 ||
-  state.adjustmentSnapshot.value.glowAmount !== 6 ||
-  state.adjustmentSnapshot.value.halationAmount !== 5 ||
-  state.adjustmentSnapshot.value.flareAmount !== 4
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['deblurEnabled'] !== true ||
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['deblurSigmaPx'] !== 0.9 ||
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['deblurStrength'] !== 24 ||
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['sharpness'] !== 18 ||
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['lumaNoiseReduction'] !== 16 ||
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['colorNoiseReduction'] !== 12 ||
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['localContrastRadiusPx'] !== 32 ||
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['dustSpotOverlayEnabled'] !== true ||
+  state.editDocumentV2.nodes['detail_denoise_dehaze']!.params['dustSpotSensitivity'] !== 62 ||
+  state.editDocumentV2.nodes['display_creative']!.params['grainAmount'] !== 18 ||
+  state.editDocumentV2.nodes['display_creative']!.params['vignetteAmount'] !== -14 ||
+  state.editDocumentV2.nodes['display_creative']!.params['glowAmount'] !== 6 ||
+  state.editDocumentV2.nodes['display_creative']!.params['halationAmount'] !== 5 ||
+  state.editDocumentV2.nodes['display_creative']!.params['flareAmount'] !== 4
 ) {
   throw new Error('agent.detail_effects.apply did not mutate representative detail/effects adjustments.');
 }
@@ -211,11 +211,11 @@ if (
   throw new Error('agent.detail_effects.apply did not publish one source-bound EditTransaction receipt.');
 }
 if (
-  state.editDocumentV2.nodes.detail_denoise_dehaze?.params.clarity !== 9 ||
-  state.editDocumentV2.nodes.detail_denoise_dehaze.params.sharpness !== 18 ||
-  state.editDocumentV2.nodes.detail_denoise_dehaze.params.sharpnessThreshold !== 20 ||
-  state.editDocumentV2.nodes.display_creative?.params.grainAmount !== 18 ||
-  state.editDocumentV2.nodes.display_creative.params.vignetteAmount !== -14
+  state.editDocumentV2.nodes.detail_denoise_dehaze?.params['clarity'] !== 9 ||
+  state.editDocumentV2.nodes.detail_denoise_dehaze.params['sharpness'] !== 18 ||
+  state.editDocumentV2.nodes.detail_denoise_dehaze.params['sharpnessThreshold'] !== 20 ||
+  state.editDocumentV2.nodes.display_creative?.params['grainAmount'] !== 18 ||
+  state.editDocumentV2.nodes.display_creative.params['vignetteAmount'] !== -14
 ) {
   throw new Error('agent.detail_effects.apply did not update canonical detail and display nodes.');
 }

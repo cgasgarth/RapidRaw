@@ -1,7 +1,7 @@
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 
 import { Invokes } from '../tauri/commands';
-import type { Adjustments } from './adjustments';
 import {
   fingerprintPreviewSessionIdentity,
   type PreviewCoordinatorEffect,
@@ -13,8 +13,8 @@ import {
 import { invokeWithSchema } from './tauriSchemaInvoke';
 
 export interface OriginalPreviewRequest {
+  editDocumentV2: EditDocumentV2;
   expectedImagePath: string;
-  jsAdjustments: Adjustments;
   targetResolution: number;
   viewerSampleGraphRevision: string;
 }
@@ -47,7 +47,7 @@ const executeOriginalPreview: OriginalPreviewExecutor = async (request) => {
     Invokes.GenerateOriginalTransformedPreview,
     {
       expectedImagePath: request.expectedImagePath,
-      jsAdjustments: request.jsAdjustments,
+      editDocumentV2: request.editDocumentV2,
       targetResolution: request.targetResolution,
       viewerSampleGraphRevision: request.viewerSampleGraphRevision,
     },

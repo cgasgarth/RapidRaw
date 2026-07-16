@@ -10,8 +10,9 @@ import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
 import { useUIStore } from '../../../src/store/useUIStore.ts';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors.ts';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
 const image = (path: string): SelectedImage => ({
   exif: null,
@@ -35,7 +36,7 @@ const histogram = (luma: number, red: number, green: number, blue: number) => {
 };
 
 test('reference tray survives navigation, proposal inspection is non-mutating, and Apply is one history entry', async () => {
-  const initial = structuredClone(INITIAL_ADJUSTMENTS);
+  const initial = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     finalPreviewUrl: null,
@@ -47,8 +48,8 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     proofRevision: 3,
     referenceMatchReferences: [],
     selectedImage: image('/photos/reference.ARW'),
-    editDocumentV2: publishAdjustmentSnapshot(null, initial).editDocumentV2,
-    history: [publishAdjustmentSnapshot(null, initial).editDocumentV2],
+    editDocumentV2: initial,
+    history: [initial],
   });
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
@@ -143,13 +144,15 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     'Creative 100%',
   );
   expect(useEditorStore.getState().historyIndex).toBe(historyBeforeProposal);
-  expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(initial);
+  expect(useEditorStore.getState().editDocumentV2).toEqual(initial);
   expect(useEditorStore.getState().referenceMatchPreview).toMatchObject({
     baseAdjustmentRevision: useEditorStore.getState().adjustmentRevision,
     impact: 100,
     targetPath: '/photos/target.ARW',
   });
-  expect(useEditorStore.getState().referenceMatchPreview?.adjustments.exposure).not.toBe(initial.exposure);
+  const previewDocument = useEditorStore.getState().referenceMatchPreview?.editDocumentV2;
+  if (previewDocument === undefined) throw new Error('Expected reference preview document.');
+  expect(selectEditDocumentNode(previewDocument, 'scene_global_color_tone').params['exposure']).not.toBe(0);
   expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-apply-layer"]')?.disabled).toBe(
     true,
   );
@@ -189,7 +192,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     historyEntriesAdded: 1,
     impact: 100,
   });
-  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toEqual(
+  expect(useEditorStore.getState().editDocumentV2.provenance.referenceMatchApplicationReceipt).toEqual(
     useEditorStore.getState().lastReferenceMatchApplicationReceipt,
   );
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -200,22 +203,26 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   expect(useEditorStore.getState().lastReferenceMatchApplicationReceipt?.baseGraphFingerprint).not.toBe(
     useEditorStore.getState().lastReferenceMatchApplicationReceipt?.resultingGraphFingerprint,
   );
-  expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).not.toBe(INITIAL_ADJUSTMENTS.exposure);
-  expect(useEditorStore.getState().adjustmentSnapshot.value.cameraProfile).toBe(INITIAL_ADJUSTMENTS.cameraProfile);
+  expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).not.toBe(
+    INITIAL_ADJUSTMENTS.exposure,
+  );
+  expect(useEditorStore.getState().editDocumentV2.nodes['camera_input']!.params['cameraProfile']).toBe(
+    INITIAL_ADJUSTMENTS.cameraProfile,
+  );
   expect(useEditorStore.getState().referenceMatchPreview).toBeNull();
-  const appliedReceipt = useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt;
+  const appliedReceipt = useEditorStore.getState().editDocumentV2.provenance.referenceMatchApplicationReceipt;
   await act(async () => {
     useEditorStore.getState().undo();
     await flushPromises();
   });
-  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toBeNull();
+  expect(useEditorStore.getState().editDocumentV2.provenance.referenceMatchApplicationReceipt).toBeNull();
   await act(async () => {
     useEditorStore.getState().redo();
     await flushPromises();
   });
-  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toEqual(appliedReceipt);
+  expect(useEditorStore.getState().editDocumentV2.provenance.referenceMatchApplicationReceipt).toEqual(appliedReceipt);
 
-  const globalExposure = useEditorStore.getState().adjustmentSnapshot.value.exposure;
+  const globalExposure = useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure'];
   const historyBeforeLayer = useEditorStore.getState().historyIndex;
   await click(container, '[data-testid="reference-match-normalize"]');
   expect(container.querySelector<HTMLButtonElement>('[data-testid="reference-match-apply-layer"]')?.disabled).toBe(
@@ -223,11 +230,11 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   );
   await click(container, '[data-testid="reference-match-apply-layer"]');
   const layerState = useEditorStore.getState();
-  const normalizedLayer = layerState.adjustmentSnapshot.value.masks[0];
+  const normalizedLayer = layerState.editDocumentV2.layers.masks[0];
   if (normalizedLayer === undefined) throw new Error('Expected normalized reference layer.');
   expect(layerState.historyIndex).toBe(historyBeforeLayer + 1);
-  expect(layerState.adjustmentSnapshot.value.exposure).toBe(globalExposure);
-  expect(layerState.adjustmentSnapshot.value.masks[0]).toMatchObject({
+  expect(layerState.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(globalExposure);
+  expect(layerState.editDocumentV2.layers.masks[0]).toMatchObject({
     name: 'Reference Normalize',
     opacity: 100,
     referenceMatchApplicationReceipt: {
@@ -239,7 +246,7 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
       impact: 100,
     },
   });
-  expect(normalizedLayer.adjustments.exposure).not.toBe(0);
+  expect(normalizedLayer.adjustments['exposure']).not.toBe(0);
   expect(layerState.activeMaskContainerId).toBe(normalizedLayer.id);
   expect(layerState.lastEditApplicationReceipt).toMatchObject({
     persistence: 'commit',

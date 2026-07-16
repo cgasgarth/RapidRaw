@@ -28,7 +28,8 @@ import {
   buildAgentAdjustmentsApplyApproval,
   dryRunAgentGlobalAdjustments,
 } from '../../../src/utils/agent/tools/agentAdjustmentApplyTool';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const selectedPath = '/fixtures/pure-ts/agent-stale-apply-guards/DSC_4845.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 9 : 3));
@@ -105,7 +106,7 @@ const addReadyCurrentProposal = (draft: AgentSelectedImageLiveSessionDraft): Age
 const buildReviewedCommand = () =>
   buildAgentReviewedAdjustmentCommandPlan({
     commandId: 'highlight_recovery',
-    sourceAdjustments: useEditorStore.getState().adjustmentSnapshot.value,
+    sourceEditDocumentV2: useEditorStore.getState().editDocumentV2,
   }).receipt;
 
 const startApprovedSession = async (requestId: string) => {
@@ -158,14 +159,12 @@ describe('agent stale apply guards', () => {
     const historyIndexBeforeApply = useEditorStore.getState().historyIndex;
 
     useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2({
-        ...state.adjustmentSnapshot.value,
-        exposure: state.adjustmentSnapshot.value.exposure + 0.35,
+      editDocumentV2: patchEditDocumentV2Node(state.editDocumentV2, 'scene_global_color_tone', {
+        exposure: selectEditDocumentNode(state.editDocumentV2, 'scene_global_color_tone').params['exposure'] + 0.35,
       }),
       history: [
-        legacyAdjustmentsToEditDocumentV2({
-          ...state.adjustmentSnapshot.value,
-          exposure: state.adjustmentSnapshot.value.exposure + 0.35,
+        patchEditDocumentV2Node(state.editDocumentV2, 'scene_global_color_tone', {
+          exposure: selectEditDocumentNode(state.editDocumentV2, 'scene_global_color_tone').params['exposure'] + 0.35,
         }),
       ],
       historyIndex: 0,

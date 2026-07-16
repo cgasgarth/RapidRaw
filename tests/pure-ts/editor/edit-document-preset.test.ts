@@ -23,8 +23,10 @@ import {
   RAPIDRAW_PRESET_SCHEMA_VERSION,
   resolveEditDocumentPresetPayload,
 } from '../../../src/utils/editDocumentPreset';
+import { selectEditDocumentGeometry, selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
 import {
-  legacyAdjustmentsToEditDocumentV2,
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
   replaceEditDocumentV2SourceArtifacts,
   setEditDocumentV2NodeEnabled,
 } from '../../../src/utils/editDocumentV2';
@@ -77,7 +79,10 @@ const toneOnlyPayload = (document: EditDocumentV2, exposure: number): EditDocume
 describe('current RapidRaw preset envelope', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), brightness: 0.2, exposure: -0.5 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      brightness: adjustments.brightness,
+      exposure: adjustments.exposure,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -92,7 +97,11 @@ describe('current RapidRaw preset envelope', () => {
 
   test('serializes descriptor-approved nodes, disabled state, and optional geometry without source domains', () => {
     const artifacts = replaceEditDocumentV2SourceArtifacts(
-      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25, rotation: 3 }),
+      patchEditDocumentV2Node(
+        patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure: 1.25 }),
+        'geometry',
+        { rotation: 3 },
+      ),
       { aiPatches: [] },
     );
     const source = setEditDocumentV2NodeEnabled(artifacts, 'scene_global_color_tone', false);
@@ -108,11 +117,13 @@ describe('current RapidRaw preset envelope', () => {
     const withGeometry = createEditDocumentPresetPayload(source, true, 'style');
     expect(withGeometry.nodes['geometry']?.params['rotation']).toBe(3);
     expect(withGeometry.nodes).toHaveProperty('lens_correction');
-    expect(buildPresetPreviewAdjustments(envelope(withGeometry, { includeCropTransform: true }))?.rotation).toBe(3);
+    const preview = buildPresetPreviewAdjustments(envelope(withGeometry, { includeCropTransform: true }));
+    if (preview === null) throw new Error('Expected geometry preset preview.');
+    expect(selectEditDocumentGeometry(preview).rotation).toBe(3);
   });
 
   test('preserves disabled authored nodes in tool presets', () => {
-    const defaults = legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS));
+    const defaults = createDefaultEditDocumentV2();
     const source = setEditDocumentV2NodeEnabled(defaults, 'scene_global_color_tone', false);
     const tool = createEditDocumentPresetPayload(source, false, 'tool');
 
@@ -135,9 +146,9 @@ describe('current RapidRaw preset envelope', () => {
     expect(result.after).toMatchObject({ brightness: 0.2, exposure: 0.75 });
     expect(result.afterEditDocumentV2.nodes['source_artifacts']).toBe(sourceArtifactsBefore);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(-0.5);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(-0.5);
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.75);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.75);
   });
 
   test('is an exact no-op on reapply and reopens the same strict payload', () => {
@@ -156,9 +167,13 @@ describe('current RapidRaw preset envelope', () => {
   });
 
   test('previews only strict current authority and never promotes flat data', () => {
-    const document = legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 });
+    const document = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: 1.25,
+    });
     const current = envelope(createEditDocumentPresetPayload(document, false, 'style'));
-    expect(buildPresetPreviewAdjustments(current)?.exposure).toBe(1.25);
+    const preview = buildPresetPreviewAdjustments(current);
+    if (preview === null) throw new Error('Expected current preset preview.');
+    expect(selectEditDocumentNode(preview, 'scene_global_color_tone').params['exposure']).toBe(1.25);
 
     const flatOnly = { ...current, adjustments: { exposure: -1.75 } };
     const parsed = parsePresetLibrary([{ preset: flatOnly }]);
@@ -199,11 +214,11 @@ describe('current RapidRaw preset envelope', () => {
   });
 
   test('configures current authority between style, tool, and optional geometry policies', () => {
-    const document = legacyAdjustmentsToEditDocumentV2({
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      exposure: 1,
-      rotation: 4,
-    });
+    const document = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure: 1 }),
+      'geometry',
+      { rotation: 4 },
+    );
     const style = createEditDocumentPresetPayload(document, false, 'style');
     const configured = configureEditDocumentPresetPayload(envelope(style), true, 'style');
     if (configured === null) throw new Error('Expected current preset configuration.');
@@ -270,7 +285,13 @@ describe('current RapidRaw preset envelope', () => {
     if (resolved === null) throw new Error('Expected strict imported payload.');
     const transaction = buildPresetEditTransaction(useEditorStore.getState(), resolved, 'external-preset-apply');
     if (transaction === null) throw new Error('Expected imported preset transaction.');
-    expect(useEditorStore.getState().applyEditTransaction(transaction).after.exposure).toBe(0.8);
-    expect(buildPresetPreviewAdjustments(imported)?.exposure).toBe(0.8);
+    expect(
+      useEditorStore.getState().applyEditTransaction(transaction).after.nodes['scene_global_color_tone']?.params[
+        'exposure'
+      ],
+    ).toBe(0.8);
+    const preview = buildPresetPreviewAdjustments(imported);
+    if (preview === null) throw new Error('Expected imported preset preview.');
+    expect(selectEditDocumentNode(preview, 'scene_global_color_tone').params['exposure']).toBe(0.8);
   });
 });

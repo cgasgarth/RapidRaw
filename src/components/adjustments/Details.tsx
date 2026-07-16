@@ -1,8 +1,9 @@
 import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../store/useEditorStore';
 import { TextVariants } from '../../types/typography';
-import { type Adjustments, DetailsAdjustment } from '../../utils/adjustments';
+import { DetailsAdjustment } from '../../utils/adjustments';
 import {
   buildDetailEditTransaction,
   type DetailCommitIdentity,
@@ -19,15 +20,21 @@ import Switch from '../ui/primitives/Switch';
 import UiText from '../ui/primitives/Text';
 import AdjustmentSlider from './AdjustmentSlider';
 
+export type DetailAdjustmentView = EditDocumentNodeParamsV2<'detail_denoise_dehaze'> &
+  EditDocumentNodeParamsV2<'lens_correction'>;
+export type DetailAdjustmentUpdate =
+  | Partial<DetailAdjustmentView>
+  | ((prev: DetailAdjustmentView) => DetailAdjustmentView);
+
 interface DetailsPanelProps {
-  adjustments: Adjustments;
+  adjustments: DetailAdjustmentView;
   setAdjustments: (adjustments: AdjustmentUpdate) => void;
   appSettings: AppSettings | null;
   isForMask?: boolean;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
 }
 
-type AdjustmentUpdate = Partial<Adjustments> | ((prev: Adjustments) => Adjustments);
+type AdjustmentUpdate = DetailAdjustmentUpdate;
 const detailGroupClassName = 'border-b border-editor-border py-1.5';
 
 export default function DetailsPanel({
@@ -80,7 +87,7 @@ export default function DetailsPanel({
       };
       return;
     }
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: nextValue }));
+    setAdjustments((prev: DetailAdjustmentView) => ({ ...prev, [key]: nextValue }));
   };
 
   const handleFloatAdjustmentChange = (key: DetailsAdjustment, value: number) => {
@@ -96,7 +103,7 @@ export default function DetailsPanel({
       };
       return;
     }
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
+    setAdjustments((prev: DetailAdjustmentView) => ({ ...prev, [key]: value }));
   };
 
   const handleBooleanAdjustmentChange = (key: DetailsAdjustment, value: boolean) => {
@@ -112,7 +119,7 @@ export default function DetailsPanel({
       };
       return;
     }
-    setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
+    setAdjustments((prev: DetailAdjustmentView) => ({ ...prev, [key]: value }));
   };
 
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};

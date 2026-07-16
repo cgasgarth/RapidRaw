@@ -10,7 +10,7 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import { applyAgentDetailEffects } from '../../../src/utils/agent/tools/agentDetailEffectsApplyTool';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixtures/agent-detail-effects.ARW';
 const session = createEditorImageSession({ generation: 52, path: sourcePath, source: 'cache' });
@@ -49,7 +49,7 @@ class DeferredDetailEffectsBridge extends RawEngineLocalAppServerBridge {
 describe('agent detail/effects EditTransaction bridge', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -105,8 +105,8 @@ describe('agent detail/effects EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.exposure).toBe(0.2);
-    expect(after.adjustmentSnapshot.value.clarity).toBe(INITIAL_ADJUSTMENTS.clarity);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.2);
+    expect(after.editDocumentV2.nodes['detail_denoise_dehaze']!.params['clarity']).toBe(INITIAL_ADJUSTMENTS.clarity);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-detail-effects-edit');
   });
 

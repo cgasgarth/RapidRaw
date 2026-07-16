@@ -7,7 +7,8 @@ import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createEditDocumentPresetPayload } from '../../../src/utils/editDocumentPreset';
 import {
   copyEditDocumentV2Node,
-  legacyAdjustmentsToEditDocumentV2,
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
   resetEditDocumentV2Node,
 } from '../../../src/utils/editDocumentV2';
 import {
@@ -42,7 +43,7 @@ const identity = (
 describe('raw processing mode override edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -80,14 +81,13 @@ describe('raw processing mode override edit transaction', () => {
     );
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.rawProcessingModeOverride).toBeNull();
+    expect(useEditorStore.getState().editDocumentV2.sourceDecode.rawProcessingModeOverride).toBeNull();
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.rawProcessingModeOverride).toBe('maximum');
+    expect(useEditorStore.getState().editDocumentV2.sourceDecode.rawProcessingModeOverride).toBe('maximum');
   });
 
   test('supports inherit/reset but excludes source-decode state from copy and presets', () => {
-    const source = legacyAdjustmentsToEditDocumentV2({
-      ...structuredClone(INITIAL_ADJUSTMENTS),
+    const source = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'source_decode', {
       rawProcessingModeOverride: 'fast',
     });
     const reset = resetEditDocumentV2Node(source, 'source_decode');
@@ -108,7 +108,7 @@ describe('raw processing mode override edit transaction', () => {
       ),
     ).toThrow('raw_processing_mode_override_transaction.stale_source');
 
-    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const document = createDefaultEditDocumentV2();
     expect(() =>
       editDocumentV2Schema.parse({
         ...document,

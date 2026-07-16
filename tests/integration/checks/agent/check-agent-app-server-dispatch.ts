@@ -24,7 +24,7 @@ import {
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
 } from '../../../../src/utils/basicToneCommandBridge.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   handleRawEngineAppServerHostRequestAsync,
   isApprovedAgentAppServerToolName,
@@ -129,7 +129,7 @@ const dispatchWithDraftSession = async (
   );
 
 const buildBasicTonePayload = (patch: Partial<BasicToneAdjustmentPayload>): BasicToneAdjustmentPayload => {
-  const base = useEditorStore.getState().adjustmentSnapshot.value;
+  const base = useEditorStore.getState().editDocumentV2;
   return {
     blacks: patch.blacks ?? base.blacks,
     brightness: patch.brightness ?? base.brightness,
@@ -175,7 +175,7 @@ const buildTypedBasicToneCommand = ({
     },
   );
 
-const initialEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+const initialEditDocumentV2 = createDefaultEditDocumentV2();
 useEditorStore.getState().hydrateEditorRenderAuthority({
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   editDocumentV2: initialEditDocumentV2,
@@ -296,7 +296,7 @@ const applyPayload = applyResultSchema.parse(toneColorMutationResultV1Schema.par
 if (
   applyPayload.appliedGraphRevision.length === 0 ||
   useEditorStore.getState().historyIndex !== 1 ||
-  useEditorStore.getState().adjustmentSnapshot.value.exposure !== 0.32
+  useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure'] !== 0.32
 ) {
   throw new Error('typed tonecolor.apply_command dispatch did not mutate the editor session.');
 }

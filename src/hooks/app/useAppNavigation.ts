@@ -16,8 +16,6 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { thumbnailCache } from '../../thumbnails/thumbnailCacheInstance';
-import { normalizeLoadedAdjustments } from '../../utils/adjustments';
-import { areAdjustmentsEqual } from '../../utils/adjustmentsSnapshot';
 import {
   cancelBackgroundIndexingWithSchema,
   startBackgroundIndexingWithSchema,
@@ -350,30 +348,21 @@ export function useAppNavigation({
                 metadata: loadedMetadata,
                 upsert: useUIStore.getState().upsertDerivedOutputReceipt,
               });
-              const metadataAdjustments = loadedMetadata.adjustments;
-              const authoritativeAdjustments =
+              const authoritativeEditDocument =
                 !current.isSliderDragging &&
                 !isNativeCommittedHydrationSession(session.id) &&
-                acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint) &&
-                metadataAdjustments !== null &&
-                metadataAdjustments !== undefined &&
-                !metadataAdjustments.is_null
-                  ? normalizeLoadedAdjustments(metadataAdjustments)
+                acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint)
+                  ? hydrateImageOpenEditDocumentV2(loadedMetadata)
                   : null;
-              const authoritativeEditDocument =
-                authoritativeAdjustments === null
-                  ? null
-                  : hydrateImageOpenEditDocumentV2(loadedMetadata, authoritativeAdjustments);
               if (
-                authoritativeAdjustments !== null &&
-                (!areAdjustmentsEqual(current.adjustmentSnapshot.value, authoritativeAdjustments) ||
-                  JSON.stringify(current.editDocumentV2) !== JSON.stringify(authoritativeEditDocument))
+                authoritativeEditDocument !== null &&
+                JSON.stringify(current.editDocumentV2) !== JSON.stringify(authoritativeEditDocument)
               ) {
                 current.applyEditTransaction(
                   buildImageOpenHydrationEditTransaction(
                     current,
                     backgroundHydrationIdentity,
-                    authoritativeEditDocument ?? current.editDocumentV2,
+                    authoritativeEditDocument,
                     `cache-meta:${session.id}:${openResult.metadataFingerprint}`,
                   ),
                 );
@@ -391,11 +380,10 @@ export function useAppNavigation({
                   width: result.width,
                 },
               });
-              const currentAdjustments = useEditorStore.getState().adjustmentSnapshot.value;
+              const currentAdjustments = useEditorStore.getState().editDocumentV2;
               globalImageCache.set(path, {
                 ...cachedReadyEntry,
-                adjustments: currentAdjustments,
-                editDocumentV2: current.editDocumentV2,
+                editDocumentV2: currentAdjustments,
               });
               consumePendingNegativeConversionDustHealLayers(path);
               consumePendingNegativeConversionSavedPositiveHandoff(path);

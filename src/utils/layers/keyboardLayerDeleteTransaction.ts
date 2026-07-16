@@ -1,15 +1,16 @@
-import { readLayerStackSidecarsFromSidecar } from '../../../packages/rawengine-schema/src';
-import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from '../adjustments';
-import { buildAdjustmentMutationOperations, type EditTransactionRequest } from '../editTransaction';
-import { reconcileReferenceMatchReceiptsAfterEdit } from '../referenceMatchTransfer';
+import {
+  readLayerStackSidecarsFromSidecar,
+  upsertLayerStackSidecarInSidecar,
+} from '../../../packages/rawengine-schema/src';
+import { type EditDocumentV2, editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import { selectEditDocumentMasks } from '../editDocumentSelectors';
+import type { EditTransactionRequest } from '../editTransaction';
 import { applyLayerStackCommandBridgeOperation } from './layerStackCommandBridge';
 import { persistLayerStackSidecarInAdjustments } from './layerStackSidecarAdjustments';
 
 export interface KeyboardLayerDeleteState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
-  editDocumentV2: EditDocumentV2;
+  readonly editDocumentV2: EditDocumentV2;
   historyIndex: number;
   imageSession: { id: string } | null;
   imageSessionId: number;
@@ -28,14 +29,15 @@ export const buildKeyboardLayerDeleteTransaction = (
   operationId: string,
 ): KeyboardLayerDeleteTransaction | null => {
   const imagePath = state.selectedImage?.path;
-  if (imagePath === undefined || !state.adjustmentSnapshot.value.masks.some((mask) => mask.id === layerId)) return null;
+  if (imagePath === undefined || !selectEditDocumentMasks(state.editDocumentV2).some((mask) => mask.id === layerId))
+    return null;
 
-  const persistedSidecar = readLayerStackSidecarsFromSidecar(state.adjustmentSnapshot.value).find(
+  const persistedSidecar = readLayerStackSidecarsFromSidecar(state.editDocumentV2.extensions).find(
     (sidecar) => sidecar.sourceImagePath === imagePath,
   );
   const graphRevision = persistedSidecar?.graphRevision ?? `history_${String(state.historyIndex)}`;
   const deleted = applyLayerStackCommandBridgeOperation(
-    state.adjustmentSnapshot.value.masks,
+    selectEditDocumentMasks(state.editDocumentV2),
     { layerId, type: 'delete' },
     {
       graphRevision,
@@ -45,11 +47,8 @@ export const buildKeyboardLayerDeleteTransaction = (
       sessionId: 'rapidraw-keyboard-layer-delete',
     },
   );
-  const nextAdjustments = reconcileReferenceMatchReceiptsAfterEdit(
-    state.adjustmentSnapshot.value,
-    persistLayerStackSidecarInAdjustments({ ...state.adjustmentSnapshot.value, masks: deleted.masks }, deleted.sidecar),
-  );
-
+  const rawEngineArtifacts = upsertLayerStackSidecarInSidecar(state.editDocumentV2, deleted.sidecar).rawEngineArtifacts;
+  if (rawEngineArtifacts === undefined) throw new Error('keyboard_layer_delete.missing_sidecar_artifacts');
   return {
     graphRevision: deleted.graphRevision,
     imagePath,

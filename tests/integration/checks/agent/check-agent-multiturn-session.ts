@@ -99,8 +99,8 @@ const result = await runAgentMultiTurnAppServerSession(
     initialModelInputSink: (input, transportRequest) => {
       recordedModelInputs.push({ attachments: input.attachments, ...transportRequest.params });
       return {
-        effective: { modelId: transportRequest.params.model, reasoningTier: transportRequest.params.effort },
-        requested: { modelId: transportRequest.params.model, reasoningTier: transportRequest.params.effort },
+        effective: { modelId: transportRequest.params['model'], reasoningTier: transportRequest.params['effort'] },
+        requested: { modelId: transportRequest.params['model'], reasoningTier: transportRequest.params['effort'] },
         status: 'exact',
       };
     },
@@ -212,7 +212,7 @@ try {
       initialModelInputSink: (_input, transportRequest) => ({
         effective: null,
         reason: 'Terra light is unavailable.',
-        requested: { modelId: transportRequest.params.model, reasoningTier: transportRequest.params.effort },
+        requested: { modelId: transportRequest.params['model'], reasoningTier: transportRequest.params['effort'] },
         status: 'rejected',
       }),
     },

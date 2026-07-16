@@ -1,11 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { toneEqualizerSettingsV1Schema } from '../../packages/rawengine-schema/src/tone/toneEqualizerSchemas';
-import {
-  type Adjustments,
-  INITIAL_ADJUSTMENTS,
-  INITIAL_TONE_EQUALIZER,
-  normalizeLoadedAdjustments,
-} from '../../src/utils/adjustments';
+import { INITIAL_TONE_EQUALIZER } from '../../src/utils/adjustments';
 import {
   applyToneEqualizerPickerSelection,
   applyToneEqualizerTargetedDelta,
@@ -23,31 +18,6 @@ describe('tone equalizer settings lifecycle', () => {
     expect(toneEqualizerSettingsV1Schema.safeParse({ ...INITIAL_TONE_EQUALIZER, smoothingRadius: 65 }).success).toBe(
       false,
     );
-  });
-
-  test('keeps legacy process output selected until an explicit upgrade', () => {
-    const loaded = normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, exposure: 1.25, rawEngineEditGraphVersion: 1 });
-    expect(loaded.rawEngineEditGraphVersion).toBe(1);
-    expect(loaded.toneEqualizer).toEqual(INITIAL_TONE_EQUALIZER);
-  });
-
-  test('round-trips valid settings and quarantines malformed sidecar state', () => {
-    const validBandEv: Adjustments['toneEqualizer']['bandEv'] = [0, 0, -0.5, 0.25, 1, 0, 0, 0, 0];
-    const loaded = normalizeLoadedAdjustments({
-      ...INITIAL_ADJUSTMENTS,
-      rawEngineEditGraphVersion: 2,
-      toneEqualizer: { ...INITIAL_TONE_EQUALIZER, bandEv: [...validBandEv], enabled: true, selectedBand: 4 },
-    });
-    expect(loaded.toneEqualizer.bandEv).toEqual(validBandEv);
-    expect(loaded.toneEqualizer.bandEv).not.toBe(validBandEv);
-
-    const corrupt = JSON.parse(
-      JSON.stringify({
-        ...INITIAL_ADJUSTMENTS,
-        toneEqualizer: { ...INITIAL_TONE_EQUALIZER, bandEv: [0], smoothingRadius: 1000 },
-      }),
-    ) as Partial<Adjustments>;
-    expect(normalizeLoadedAdjustments(corrupt).toneEqualizer).toEqual(INITIAL_TONE_EQUALIZER);
   });
 
   test('rejects stale picker results and applies a current selection atomically', () => {
@@ -89,16 +59,14 @@ describe('tone equalizer settings lifecycle', () => {
       }),
     ).toBe(true);
 
-    const next = applyToneEqualizerPickerSelection(INITIAL_ADJUSTMENTS, result);
-    expect(next.rawEngineEditGraphVersion).toBe(2);
-    expect(next.toneEqualizer.selectedBand).toBe(4);
-    expect(next.toneEqualizer.previewMode).toBe(2);
-    expect(INITIAL_ADJUSTMENTS.rawEngineEditGraphVersion).toBe(1);
+    const next = applyToneEqualizerPickerSelection(INITIAL_TONE_EQUALIZER, result);
+    expect(next.selectedBand).toBe(4);
+    expect(next.previewMode).toBe(2);
 
-    const targeted = applyToneEqualizerTargetedDelta(INITIAL_ADJUSTMENTS, result, 2);
-    expect(targeted.toneEqualizer.enabled).toBe(true);
-    expect(targeted.toneEqualizer.bandEv).toEqual([0, 0, 0.1, 0.4, 1, 0.4, 0.1, 0, 0]);
-    expect(targeted.toneEqualizer.selectedBand).toBe(4);
-    expect(INITIAL_ADJUSTMENTS.toneEqualizer.bandEv).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    const targeted = applyToneEqualizerTargetedDelta(INITIAL_TONE_EQUALIZER, result, 2);
+    expect(targeted.enabled).toBe(true);
+    expect(targeted.bandEv).toEqual([0, 0, 0.1, 0.4, 1, 0.4, 0.1, 0, 0]);
+    expect(targeted.selectedBand).toBe(4);
+    expect(INITIAL_TONE_EQUALIZER.bandEv).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0]);
   });
 });

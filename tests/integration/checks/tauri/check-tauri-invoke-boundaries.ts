@@ -79,7 +79,7 @@ export const inspectTauriInvokeSource = (filePath: string, contents: string) => 
     if (isNamedInvokeCall || isNamespaceInvokeCall) {
       const line = lineAtOffset(contents, node.start);
       rawCalls.push(line);
-      if ((node.typeArguments?.params.length ?? 0) > 0) typedRawCalls.push(line);
+      if ((node.typeArguments?.params['length'] ?? 0) > 0) typedRawCalls.push(line);
     }
   });
   return { importedNames: [...importedNames], namespaceNames: [...namespaceNames], rawCalls, typedRawCalls };

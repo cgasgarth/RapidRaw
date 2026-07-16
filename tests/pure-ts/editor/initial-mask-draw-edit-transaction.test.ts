@@ -4,7 +4,7 @@ import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Ma
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildInitialMaskDrawEditTransaction } from '../../../src/utils/initialMaskDrawEditTransaction';
 
 const sourcePath = '/fixture/initial-mask-target.ARW';
@@ -66,7 +66,13 @@ describe('initial mask draw edit transaction', () => {
         },
       ],
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'layers',
+      { masks: adjustments.masks },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -104,11 +110,11 @@ describe('initial mask draw edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters).toEqual({
+    expect(useEditorStore.getState().editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters).toEqual({
       feather: 0.5,
       isInitialDraw: true,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
   });
 
   test('rejects stale session, source, graph, geometry, and tool identities', () => {

@@ -13,8 +13,9 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useContextMenu } from '../../context/ContextMenuContext';
-import { ActiveChannel, type Adjustments, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
+import { ActiveChannel, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
 import { OPTION_SEPARATOR, Theme } from '../ui/AppProperties';
 import AdjustmentSlider from './AdjustmentSlider';
 import TypedCurveEditor from './TypedCurveEditor';
@@ -22,7 +23,8 @@ import TypedCurveEditor from './TypedCurveEditor';
 let curveClipboard: Array<Coord> | null = null;
 let parametricClipboard: ParametricCurveSettings | null = null;
 
-type CurveAdjustmentUpdater = (prev: Adjustments) => Adjustments;
+export type CurveAdjustmentView = EditDocumentNodeParamsV2<'scene_curve'>;
+export type CurveAdjustmentUpdater = (prev: CurveAdjustmentView) => CurveAdjustmentView;
 type PointerInputEvent = globalThis.MouseEvent | TouchEvent | ReactMouseEvent | ReactTouchEvent;
 
 const CURVE_CHANNELS = [ActiveChannel.Luma, ActiveChannel.Red, ActiveChannel.Green, ActiveChannel.Blue] as const;
@@ -41,7 +43,7 @@ interface ColorData {
 }
 
 interface CurveGraphProps {
-  adjustments: Adjustments;
+  adjustments: CurveAdjustmentView;
   histogram: ChannelConfig | null;
   isForMask?: boolean;
   setAdjustments: (updater: CurveAdjustmentUpdater) => void;
@@ -481,12 +483,12 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
     if (current.kind === 'idle') return;
     if (current.kind === 'point') {
       setSelectedPointIndex(null);
-      setAdjustments((prev: Adjustments) => ({
+      setAdjustments((prev: CurveAdjustmentView) => ({
         ...prev,
         curves: { ...prev.curves, [current.channel]: current.startPoints },
       }));
     } else {
-      setAdjustments((prev: Adjustments) => {
+      setAdjustments((prev: CurveAdjustmentView) => {
         const parametricCurve = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         return {
           ...prev,
@@ -503,7 +505,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
     finishInteraction();
     setSelectedPointIndex(null);
 
-    setAdjustments((prev: Adjustments) => {
+    setAdjustments((prev: CurveAdjustmentView) => {
       if (newMode === 'parametric') {
         const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         return {
@@ -530,7 +532,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
 
   const updateParametricValue = useCallback(
     (key: keyof ParametricCurveSettings, value: number) => {
-      setAdjustments((prev: Adjustments) => {
+      setAdjustments((prev: CurveAdjustmentView) => {
         const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         const updatedSettings = { ...pC[activeChannel], [key]: value };
         const newPoints = buildParametricPoints(updatedSettings);
@@ -571,7 +573,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         const nextInteraction = { ...currentInteraction, settings: newSettings };
         interactionRef.current = nextInteraction;
         dispatchInteraction({ type: 'replace', interaction: nextInteraction });
-        setAdjustments((prev: Adjustments) => {
+        setAdjustments((prev: CurveAdjustmentView) => {
           const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
           return {
             ...prev,
@@ -605,7 +607,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         interactionRef.current = nextInteraction;
         dispatchInteraction({ type: 'replace', interaction: nextInteraction });
 
-        setAdjustments((prev: Adjustments) => ({
+        setAdjustments((prev: CurveAdjustmentView) => ({
           ...prev,
           curves: { ...prev.curves, [currentInteraction.channel]: newPoints },
         }));
@@ -685,7 +687,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         interactionRef.current = nextInteraction;
         dispatchInteraction({ type: 'replace', interaction: nextInteraction });
       }
-      setAdjustments((prev: Adjustments) => ({
+      setAdjustments((prev: CurveAdjustmentView) => ({
         ...prev,
         curves: { ...prev.curves, [channel]: newPoints },
       }));
@@ -700,7 +702,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
       if (index <= 0 || index >= currentPoints.length - 1) return;
       const newPoints = currentPoints.filter((_, pointIndex) => pointIndex !== index);
       setSelectedPointIndex(Math.min(index, newPoints.length - 1));
-      setAdjustments((prev: Adjustments) => ({
+      setAdjustments((prev: CurveAdjustmentView) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
       }));
@@ -769,7 +771,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
       points: newPoints,
       startPoints: activePoints.map((point) => ({ ...point })),
     });
-    setAdjustments((prev: Adjustments) => ({
+    setAdjustments((prev: CurveAdjustmentView) => ({
       ...prev,
       curves: { ...prev.curves, [activeChannel]: newPoints },
     }));
@@ -780,7 +782,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
     finishInteraction();
     if (isParametricMode) {
       const defaultSettings = { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS };
-      setAdjustments((prev: Adjustments) => {
+      setAdjustments((prev: CurveAdjustmentView) => {
         const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         return {
           ...prev,
@@ -794,7 +796,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         { x: 255, y: 255 },
       ];
       setSelectedPointIndex(null);
-      setAdjustments((prev: Adjustments) => ({
+      setAdjustments((prev: CurveAdjustmentView) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: defaultPoints },
       }));
@@ -839,7 +841,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         if (!parametricClipboard) return;
         finishInteraction();
         const clipboard = parametricClipboard;
-        setAdjustments((prev: Adjustments) => {
+        setAdjustments((prev: CurveAdjustmentView) => {
           const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
           return {
             ...prev,
@@ -851,7 +853,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
 
       const handleResetAllParametric = () => {
         finishInteraction();
-        setAdjustments((prev: Adjustments) => {
+        setAdjustments((prev: CurveAdjustmentView) => {
           return {
             ...prev,
             parametricCurve: {
@@ -917,7 +919,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
       if (!curveClipboard) return;
       finishInteraction();
       const newPoints = curveClipboard.map((p) => ({ ...p }));
-      setAdjustments((prev: Adjustments) => ({
+      setAdjustments((prev: CurveAdjustmentView) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
       }));
@@ -927,7 +929,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
       if (!parametricClipboard) return;
       finishInteraction();
       const newPoints = convertParametricToPoints(parametricClipboard);
-      setAdjustments((prev: Adjustments) => ({
+      setAdjustments((prev: CurveAdjustmentView) => ({
         ...prev,
         curves: { ...prev.curves, [activeChannel]: newPoints },
       }));
@@ -939,7 +941,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         { x: 0, y: 0 },
         { x: 255, y: 255 },
       ];
-      setAdjustments((prev: Adjustments) => ({
+      setAdjustments((prev: CurveAdjustmentView) => ({
         ...prev,
         curves: {
           [ActiveChannel.Luma]: [...defaultPoints],

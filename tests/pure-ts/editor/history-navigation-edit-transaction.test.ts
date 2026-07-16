@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { buildHistoryNavigationEditTransaction } from '../../../src/utils/historyNavigationEditTransaction';
 
 const path = '/tmp/history-navigation.ARW';
@@ -24,7 +24,7 @@ const commitExposure = (exposure: number, transactionId: string) => {
 describe('history navigation edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -65,8 +65,8 @@ describe('history navigation edit transaction', () => {
     expect(state.adjustmentRevision).toBe(3);
     expect(state.history).toHaveLength(3);
     expect(state.historyIndex).toBe(1);
-    expect(state.adjustmentSnapshot.value.exposure).toBe(0.75);
-    expect(state.adjustmentSnapshot.value.contrast).toBe(0);
+    expect(state.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.75);
+    expect(state.editDocumentV2.nodes['scene_global_color_tone']!.params['contrast']).toBe(0);
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 3,
       baseAdjustmentRevision: 2,
@@ -83,7 +83,7 @@ describe('history navigation edit transaction', () => {
     state = useEditorStore.getState();
     expect(state.adjustmentRevision).toBe(4);
     expect(state.historyIndex).toBe(2);
-    expect(state.adjustmentSnapshot.value.contrast).toBe(18);
+    expect(state.editDocumentV2.nodes['scene_global_color_tone']!.params['contrast']).toBe(18);
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 4,
       baseAdjustmentRevision: 3,
@@ -94,8 +94,8 @@ describe('history navigation edit transaction', () => {
     state = useEditorStore.getState();
     expect(state.adjustmentRevision).toBe(5);
     expect(state.historyIndex).toBe(0);
-    expect(state.adjustmentSnapshot.value.exposure).toBe(0);
-    expect(state.adjustmentSnapshot.value.contrast).toBe(0);
+    expect(state.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
+    expect(state.editDocumentV2.nodes['scene_global_color_tone']!.params['contrast']).toBe(0);
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 5,
       baseAdjustmentRevision: 4,

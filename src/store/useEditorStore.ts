@@ -89,7 +89,7 @@ export interface InteractivePatch {
 
 export interface CopiedSectionAdjustments {
   section: string;
-  values: Partial<Adjustments>;
+  payload: EditDocumentV2CopyPayload;
 }
 
 interface PresetApplication {
@@ -165,8 +165,8 @@ interface ProvisionalPreviewFrame {
 }
 
 interface ReferenceMatchPreview {
-  adjustments: Adjustments;
   baseAdjustmentRevision: number;
+  editDocumentV2: EditDocumentV2;
   enabledGroups: ReferenceMatchGroup[];
   impact: number;
   proposalFingerprint: string;
@@ -221,6 +221,7 @@ interface EditorState {
   previewScopeRecoveryError: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   isGamutWarningOverlayVisible: boolean;
+  showClipping: boolean;
   isExportSoftProofEnabled: boolean;
   exportSoftProofRecipeId: string | null;
   exportSoftProofTransform: ExportSoftProofTransformState | null;
@@ -611,6 +612,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   previewScopeRecoveryError: null,
   gamutWarningOverlay: null,
   isGamutWarningOverlayVisible: false,
+  showClipping: false,
   isExportSoftProofEnabled: false,
   exportSoftProofRecipeId: null,
   exportSoftProofTransform: null,

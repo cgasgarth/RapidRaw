@@ -4,7 +4,7 @@ import { filmEmulationNodeV1Schema } from '../../../packages/rawengine-schema/sr
 import { ExportColorProfile, ExportRenderingIntent } from '../../../src/components/ui/ExportImportProperties';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   EditedPreviewEffectRunner,
   type EditedPreviewRequest,
@@ -52,7 +52,7 @@ const execution = (marker = 1): ExecutedEditedPreview => ({
 const buildRequest = (overrides: BuildRequestOverrides = {}): EditedPreviewRequest => {
   const imageSessionId = overrides.imageSessionId ?? 1;
   const sourceImagePath = overrides.sourceImagePath ?? '/fixtures/a.raw';
-  const snapshot = overrides.snapshot ?? publishAdjustmentSnapshot(null, structuredClone(INITIAL_ADJUSTMENTS));
+  const snapshot = overrides.snapshot ?? publishAdjustmentSnapshot(null, createDefaultEditDocumentV2());
   const targetResolution = overrides.targetResolution ?? 1200;
   const proofRevision = overrides.viewerScope?.proofRevision ?? overrides.session?.proofRevision ?? 1;
   const graphRevision = fingerprintPreviewGraphRevision({
@@ -277,10 +277,12 @@ describe('edited preview effect runner', () => {
     });
     runner.request(base);
     await tick();
-    const changedSnapshot = publishAdjustmentSnapshot(base.snapshot, {
-      ...base.snapshot.value,
-      rotation: base.snapshot.value.rotation + 1,
-    });
+    const changedSnapshot = publishAdjustmentSnapshot(
+      base.snapshot,
+      patchEditDocumentV2Node(base.snapshot.editDocumentV2, 'geometry', {
+        rotation: base.snapshot.editDocumentV2.geometry.rotation + 1,
+      }),
+    );
     const changed = buildRequest({
       snapshot: changedSnapshot,
       targetResolution: 1800,
@@ -400,8 +402,14 @@ describe('edited preview effect runner', () => {
       onPresented: (value) => presented.push(value),
     });
     const first = buildRequest({ kind: 'interactive' });
-    const secondSnapshot = publishAdjustmentSnapshot(first.snapshot, { ...first.snapshot.value, exposure: 1 });
-    const thirdSnapshot = publishAdjustmentSnapshot(secondSnapshot, { ...secondSnapshot.value, exposure: 2 });
+    const secondSnapshot = publishAdjustmentSnapshot(
+      first.snapshot,
+      patchEditDocumentV2Node(first.snapshot.editDocumentV2, 'scene_global_color_tone', { exposure: 1 }),
+    );
+    const thirdSnapshot = publishAdjustmentSnapshot(
+      secondSnapshot,
+      patchEditDocumentV2Node(secondSnapshot.editDocumentV2, 'scene_global_color_tone', { exposure: 2 }),
+    );
     runner.request(first);
     await tick();
     runner.request(buildRequest({ kind: 'interactive', snapshot: secondSnapshot }));
@@ -436,7 +444,10 @@ describe('edited preview effect runner', () => {
       seedPolicy: 'source_stable_v1',
       workingSpace: 'acescg_linear_v1',
     });
-    const snapshot = publishAdjustmentSnapshot(null, { ...structuredClone(INITIAL_ADJUSTMENTS), filmEmulation });
+    const snapshot = publishAdjustmentSnapshot(
+      null,
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'film_emulation', { filmEmulation }),
+    );
 
     runner.request(buildRequest({ kind: 'interactive', snapshot }));
     await tick();
@@ -563,8 +574,9 @@ describe('edited preview effect runner', () => {
 
     const persistenceInput = {
       adjustmentRevision: 2,
-      adjustments: { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1 },
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1 }),
+      editDocumentV2: patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: 1,
+      }),
       imageSessionId: 'session-a',
       interactionActive: false,
       multiSelection: null,
@@ -583,8 +595,7 @@ describe('edited preview effect runner', () => {
     persistence.installSession({
       ...persistenceInput,
       adjustmentRevision: 0,
-      adjustments: structuredClone(INITIAL_ADJUSTMENTS),
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+      editDocumentV2: createDefaultEditDocumentV2(),
     });
     persistence.submitCommitted(persistenceInput);
     preview.runner.request(buildRequest());

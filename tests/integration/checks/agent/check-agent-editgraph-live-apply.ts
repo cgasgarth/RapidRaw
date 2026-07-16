@@ -191,8 +191,8 @@ if (
   finalState.lastEditApplicationReceipt.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
   finalState.adjustments.brightness !== 1.4 ||
   finalState.adjustments.contrast !== 18 ||
-  finalState.editDocumentV2.nodes.scene_global_color_tone?.params.brightness !== 1.4 ||
-  finalState.editDocumentV2.nodes.scene_global_color_tone.params.contrast !== 18 ||
+  finalState.editDocumentV2.nodes.scene_global_color_tone?.params['brightness'] !== 1.4 ||
+  finalState.editDocumentV2.nodes.scene_global_color_tone.params['contrast'] !== 18 ||
   finalSnapshot.initialPreview.recipeHash === initialSnapshot.initialPreview.recipeHash
 ) {
   throw new Error('editgraph.apply_command did not mutate the live editor state and refresh recipe identity.');

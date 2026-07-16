@@ -123,7 +123,7 @@ const waitForRenderedPatches = async (page: Page, expected: ReadonlyArray<{ id: 
     const parsed = renderCallSchema.safeParse((await callsFor(page, 'apply_adjustments')).at(-1));
     if (parsed.success && parsed.data.endedAtMs !== null) {
       const request = parsed.data.args.request;
-      const nodePatches = request.editDocumentV2.nodes.source_artifacts.params.aiPatches;
+      const nodePatches = request.editDocumentV2.nodes.source_artifacts.params['aiPatches'];
       const domainPatches = request.editDocumentV2.sourceArtifacts.aiPatches;
       const projected = nodePatches.map(({ id, visible }) => ({ id, visible }));
       if (

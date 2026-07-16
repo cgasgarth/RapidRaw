@@ -4,7 +4,7 @@ import type { CropStraightenSessionIdentity } from '../../../src/components/pane
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 import { buildStraightenEditTransaction } from '../../../src/utils/straightenEditTransaction';
 
@@ -42,7 +42,7 @@ const transactionState = () => ({
 
 describe('straighten edit transaction', () => {
   beforeEach(() => {
-    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       historyCheckpoints: [],
@@ -50,8 +50,8 @@ describe('straighten edit transaction', () => {
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
-      editDocumentV2: publishAdjustmentSnapshot(null, adjustments).editDocumentV2,
-      history: [publishAdjustmentSnapshot(null, adjustments).editDocumentV2],
+      editDocumentV2,
+      history: [editDocumentV2],
     });
   });
 
@@ -80,25 +80,16 @@ describe('straighten edit transaction', () => {
     });
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.rotation).toBe(-5.5);
-    const geometry = editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params);
-    expect(result.afterEditDocumentV2.nodes['geometry']).not.toBe(beforeGeometry);
+    expect(useEditorStore.getState().editDocumentV2.geometry.rotation).toBe(-5.5);
+    const geometry = editDocumentGeometryV2Schema.parse(result.after.nodes['geometry']?.params);
+    expect(result.after.nodes['geometry']).not.toBe(beforeGeometry);
     expect(geometry).toMatchObject({
       crop: result.after.crop,
       rotation: -5.5,
     });
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('crop');
-    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('rotation');
-    const reopened = hydrateImageOpenEditDocumentV2(
-      {
-        adjustments: structuredClone(result.after),
-        editDocumentV2: structuredClone(result.afterEditDocumentV2),
-      },
-      structuredClone(result.after),
-    );
+    expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: structuredClone(result.after) });
     expect(editDocumentGeometryV2Schema.parse(reopened.nodes['geometry']?.params)).toEqual(geometry);
-    expect(reopened.extensions['legacyAdjustments']).not.toHaveProperty('rotation');
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       baseAdjustmentRevision: 0,
@@ -107,7 +98,7 @@ describe('straighten edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.rotation).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.geometry.rotation).toBe(0);
     expect(
       editDocumentGeometryV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['geometry']?.params).rotation,
     ).toBe(0);
@@ -164,8 +155,7 @@ describe('straighten edit transaction', () => {
   test('keeps normalized current crops exact while the node document remains unit-explicit', () => {
     const currentCrop = { height: 0.6, unit: 'normalized' as const, width: 0.6, x: 0.1, y: 0.1 };
     useEditorStore.getState().hydrateEditorRenderAuthority((state) => {
-      const adjustments = { ...state.adjustmentSnapshot.value, crop: currentCrop };
-      const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+      const editDocumentV2 = patchEditDocumentV2Node(state.editDocumentV2, 'geometry', { crop: currentCrop });
       return {
         adjustmentRevision: 0,
         editDocumentV2,
@@ -183,7 +173,7 @@ describe('straighten edit transaction', () => {
     );
     expect(result.noOp).toBeTrue();
     expect(result.nextAdjustmentRevision).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.crop).toEqual(currentCrop);
+    expect(useEditorStore.getState().editDocumentV2.geometry.crop).toEqual(currentCrop);
     expect(
       editDocumentGeometryV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['geometry']?.params).crop,
     ).toEqual(currentCrop);

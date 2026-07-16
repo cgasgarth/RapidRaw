@@ -7,7 +7,7 @@ import { useLibraryStore } from '../../../src/store/useLibraryStore';
 import { useProcessStore } from '../../../src/store/useProcessStore';
 import { useUIStore } from '../../../src/store/useUIStore';
 import { thumbnailCache } from '../../../src/thumbnails/thumbnailCacheInstance';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const counts = {
   editor: 0,
@@ -20,7 +20,7 @@ const counts = {
 };
 
 function EditorIsland() {
-  useEditorStore((state) => state.adjustmentSnapshot.value.exposure);
+  useEditorStore((state) => state.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']);
   counts.editor += 1;
   return null;
 }
@@ -79,8 +79,8 @@ function IsolationHarness() {
 beforeEach(async () => {
   for (const key of Object.keys(counts) as Array<keyof typeof counts>) counts[key] = 0;
   useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
-    editDocumentV2: legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure: -1 }),
-    history: [legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure: -1 })],
+    editDocumentV2: patchEditDocumentV2Node(state.editDocumentV2, 'scene_global_color_tone', { exposure: -1 }),
+    history: [patchEditDocumentV2Node(state.editDocumentV2, 'scene_global_color_tone', { exposure: -1 })],
     historyIndex: 0,
     selectedImage: null,
   }));
@@ -109,11 +109,12 @@ describe('application render islands', () => {
       for (let index = 0; index < 100; index += 1)
         flushSync(() =>
           useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
-            editDocumentV2: legacyAdjustmentsToEditDocumentV2({
-              ...state.adjustmentSnapshot.value,
+            editDocumentV2: patchEditDocumentV2Node(state.editDocumentV2, 'scene_global_color_tone', {
               exposure: index / 100,
             }),
-            history: [legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure: index / 100 })],
+            history: [
+              patchEditDocumentV2Node(state.editDocumentV2, 'scene_global_color_tone', { exposure: index / 100 }),
+            ],
             historyIndex: 0,
           })),
         );

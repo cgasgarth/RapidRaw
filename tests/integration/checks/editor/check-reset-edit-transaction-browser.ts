@@ -94,7 +94,7 @@ const waitForRenderedProfile = async (page: Page, profile: string) => {
     if (
       parsed.success &&
       parsed.data.endedAtMs !== null &&
-      parsed.data.args.request.editDocumentV2.nodes.camera_input.params.cameraProfile === profile
+      parsed.data.args.request.editDocumentV2.nodes.camera_input.params['cameraProfile'] === profile
     )
       return;
     await page.waitForTimeout(50);

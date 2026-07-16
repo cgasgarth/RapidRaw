@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import type { Adjustments } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { OriginalPreviewEffectRunner } from '../../../src/utils/originalPreviewEffectRunner';
 import {
   fingerprintPreviewGraphRevision,
@@ -54,7 +54,9 @@ const session = (overrides: Partial<PreviewSessionIdentity> = {}): PreviewSessio
 
 const request = (identity: PreviewSessionIdentity) => ({
   expectedImagePath: identity.sourceImagePath,
-  jsAdjustments: { exposure: identity.adjustmentRevision } as Adjustments,
+  editDocumentV2: patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+    exposure: identity.adjustmentRevision,
+  }),
   targetResolution: identity.targetWidth,
   viewerSampleGraphRevision: identity.graphRevision,
 });

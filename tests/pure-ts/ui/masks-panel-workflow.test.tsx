@@ -15,7 +15,7 @@ import {
   INITIAL_MASK_ADJUSTMENTS,
   type MaskContainer,
 } from '../../../src/utils/adjustments.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2.ts';
 
 mock.module('@clerk/react', () => ({
   ClerkProvider: ({ children }: { children?: ReactNode }) => children ?? null,
@@ -53,7 +53,7 @@ const secondMask: MaskContainer = {
 };
 
 afterEach(() => {
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   act(() => {
     useEditorStore.getState().hydrateEditorRenderAuthority({
       activeMaskContainerId: null,
@@ -69,7 +69,7 @@ afterEach(() => {
 
 describe('compact masks panel workflow', () => {
   test('commits first creation selection and reset without a repair pass', async () => {
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       historyIndex: 0,
       selectedImage: null,
@@ -83,20 +83,22 @@ describe('compact masks panel workflow', () => {
     await clickControl(user, container, '[data-testid="mask-creation-linear"]');
 
     const stateAfterCreate = useEditorStore.getState();
-    const createdContainer = stateAfterCreate.adjustmentSnapshot.value.masks[0];
+    const createdContainer = stateAfterCreate.editDocumentV2.layers.masks[0];
     const createdSubMask = createdContainer?.subMasks[0];
     expect(stateAfterCreate.activeMaskContainerId).toBe(createdContainer?.id ?? null);
     expect(stateAfterCreate.activeMaskId).toBe(createdSubMask?.id ?? null);
 
     await clickControl(user, container, '[data-testid="mask-reset-all"]');
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks).toHaveLength(0);
+    expect(useEditorStore.getState().editDocumentV2.layers.masks).toHaveLength(0);
     expect(useEditorStore.getState().activeMaskContainerId).toBeNull();
     expect(useEditorStore.getState().activeMaskId).toBeNull();
   });
 
   test('keeps create, select, visibility, keyboard, and context-menu commands bound to the mask state', async () => {
-    const adjustments = { ...INITIAL_ADJUSTMENTS, masks: [firstMask, secondMask] };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const masks = editDocumentLayersV2Schema.parse({
+      masks: [firstMask, secondMask].map((mask) => ({ ...mask, adjustments: {} })),
+    }).masks;
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'layers', { masks });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       activeMaskContainerId: secondMask.id,
       activeMaskId: null,
@@ -125,7 +127,7 @@ describe('compact masks panel workflow', () => {
 
     const activeContainer = useEditorStore
       .getState()
-      .adjustmentSnapshot.value.masks.find((mask) => mask.id === initialActiveContainerId);
+      .editDocumentV2.layers.masks.find((mask) => mask.id === initialActiveContainerId);
     const createdSubMask = activeContainer?.subMasks[0];
     expect(createdSubMask?.type).toBe(Mask.Brush);
     expect(useEditorStore.getState().activeMaskContainerId).toBe(initialActiveContainerId);
@@ -139,7 +141,7 @@ describe('compact masks panel workflow', () => {
     const revisionBeforeVisibility = useEditorStore.getState().adjustmentRevision;
     await user.click(required<HTMLButtonElement>(firstRow, '[aria-label="Hide Mask"]'));
 
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.visible).toBe(false);
+    expect(useEditorStore.getState().editDocumentV2.layers.masks[0]?.visible).toBe(false);
     expect(firstRow.dataset['maskContainerVisible']).toBe('false');
     expect(useEditorStore.getState().adjustmentRevision).toBe(revisionBeforeVisibility + 1);
     expect(
@@ -158,7 +160,7 @@ describe('compact masks panel workflow', () => {
     act(() => {
       useEditorStore.getState().undo();
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.visible).toBe(true);
+    expect(useEditorStore.getState().editDocumentV2.layers.masks[0]?.visible).toBe(true);
     expect(
       editDocumentLayersV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['layers']?.params).masks[0]
         ?.visible,
@@ -185,7 +187,7 @@ describe('compact masks panel workflow', () => {
 
     await user.click(duplicate);
 
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks).toHaveLength(3);
+    expect(useEditorStore.getState().editDocumentV2.layers.masks).toHaveLength(3);
     expect(required<HTMLElement>(container, '[data-testid="mask-stack-count"]').textContent).toBe('3');
   });
 });

@@ -4,8 +4,9 @@ import {
   rawEngineAgentSelectedImageProposalArtifactV1Schema,
   rawEngineAgentSelectedImageProposalReceiptV1Schema,
 } from '../../../../packages/rawengine-schema/src/agentSelectedImageProposalSchemas';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
+import { patchEditDocumentV2Node } from '../../editDocumentV2';
 import { assertAgentAdjustmentsDryRunPlanForProposal } from '../tools/agentAdjustmentApplyTool';
 import { assertAgentToneDryRunPlanForProposal } from '../tools/agentToneAdjustmentTool';
 import { buildAgentImageContextSnapshot } from './agentImageContextSnapshot';
@@ -97,12 +98,22 @@ export const verifyAgentSelectedImageProposalReceipt = async (receipt: unknown):
 };
 
 const proposedAdjustments = (
-  base: Adjustments,
+  base: EditDocumentV2,
   patch: RawEngineAgentSelectedImageProposalRenderCommandV1['edit']['patch'],
-): Adjustments => {
-  const next = structuredClone(base);
-  for (const [key, value] of Object.entries(patch)) {
-    if (value !== undefined) next[key as keyof Adjustments] = value as Adjustments[keyof Adjustments];
+): EditDocumentV2 => {
+  let next = patchEditDocumentV2Node(base, 'scene_global_color_tone', {
+    ...(patch.blacks === undefined ? {} : { blacks: patch.blacks }),
+    ...(patch.contrast === undefined ? {} : { contrast: patch.contrast }),
+    ...(patch.exposure === undefined ? {} : { exposure: patch.exposure }),
+    ...(patch.highlights === undefined ? {} : { highlights: patch.highlights }),
+    ...(patch.shadows === undefined ? {} : { shadows: patch.shadows }),
+    ...(patch.whites === undefined ? {} : { whites: patch.whites }),
+  });
+  if (patch.clarity !== undefined) {
+    next = patchEditDocumentV2Node(next, 'detail_denoise_dehaze', { clarity: patch.clarity });
+  }
+  if (patch.saturation !== undefined) {
+    next = patchEditDocumentV2Node(next, 'color_presence', { saturation: patch.saturation });
   }
   return next;
 };
@@ -383,7 +394,7 @@ export const createAgentSelectedImageProposalRuntime = ({
       }
 
       acquiredAfter = await attachmentManager.acquire({
-        adjustments: proposedAdjustments(useEditorStore.getState().adjustmentSnapshot.value, command.edit.patch),
+        adjustments: proposedAdjustments(useEditorStore.getState().editDocumentV2, command.edit.patch),
         deadlineAt: commandDeadline,
         outputIdentity: {
           graphRevision: command.dryRunPlan.predictedGraphRevision,

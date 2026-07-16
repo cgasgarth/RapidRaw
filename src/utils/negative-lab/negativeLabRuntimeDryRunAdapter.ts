@@ -519,7 +519,7 @@ export async function renderNegativeLabRuntimeDryRunPreview(params: {
     Invokes.RenderNegativeLabDryRunPreviewArtifact,
     {
       params: {
-        ...params.recipeParams,
+        ...params['recipeParams'],
         conversion_model: conversionModel,
         source_interpretation_hash: sourceInterpretation.interpretationHash,
         color_finish: {

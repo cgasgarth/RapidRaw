@@ -101,7 +101,7 @@ pub(crate) struct ToneEqualizerPickerRequest {
     graph_revision: String,
     source_identity: String,
     normalized_image_point: ViewerSamplePoint,
-    js_adjustments: serde_json::Value,
+    edit_document_v2: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -132,7 +132,8 @@ pub(crate) fn sample_tone_equalizer_picker(
         return Err("tone_equalizer.stale_source".to_string());
     }
     let source_fingerprint = loaded.artifact_source.source_fingerprint();
-    let mut adjustments = request.js_adjustments;
+    let mut adjustments =
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(&request.edit_document_v2)?;
     hydrate_adjustments(&state, &mut adjustments);
     let render_plan =
         compile_consumer_render_plan(&adjustments, &loaded.path, loaded.is_raw, None, None)?;
@@ -166,7 +167,7 @@ pub(crate) struct PointColorPickerRequest {
     graph_revision: String,
     source_identity: String,
     normalized_image_point: ViewerSamplePoint,
-    js_adjustments: serde_json::Value,
+    edit_document_v2: serde_json::Value,
 }
 
 #[derive(Serialize)]
@@ -206,7 +207,8 @@ pub(crate) fn sample_point_color_picker(
         return Err("point_color.stale_source".to_string());
     }
     let source_fingerprint = loaded.artifact_source.source_fingerprint();
-    let mut adjustments = request.js_adjustments;
+    let mut adjustments =
+        crate::adjustments::edit_document_v2::compile_edit_document_v2(&request.edit_document_v2)?;
     hydrate_adjustments(&state, &mut adjustments);
     let render_plan =
         compile_consumer_render_plan(&adjustments, &loaded.path, loaded.is_raw, None, None)?;

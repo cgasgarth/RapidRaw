@@ -19,6 +19,7 @@ import {
   type RetouchRemoveSource,
 } from '../../adjustments';
 import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
+import { selectEditDocumentMasks } from '../../editDocumentSelectors';
 import { applyLayerStackCommandBridgeOperation } from '../../layers/layerStackCommandBridge';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { stableAgentPreviewHash } from '../context/agentPreviewEnvelope';
@@ -518,7 +519,7 @@ export const applyAgentRetouch = (request: AgentRetouchApplyRequest): AgentRetou
     buildRetouchLayerRuntimeProvenance(parsedRequest, draftLayer, outputProof),
   );
   const result = applyLayerStackCommandBridgeOperation(
-    state.adjustmentSnapshot.value.masks,
+    selectEditDocumentMasks(state.editDocumentV2),
     { layer, type: 'create' },
     {
       graphRevision: beforeSnapshot.graphRevision,

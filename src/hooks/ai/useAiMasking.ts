@@ -2,16 +2,27 @@ import { useAuth } from '@clerk/react';
 import { invoke } from '@tauri-apps/api/core';
 import { useCallback, useEffect } from 'react';
 import { toast } from 'react-toastify';
+import {
+  type EditDocumentV2,
+  editDocumentLayersV2Schema,
+  editDocumentSourceArtifactsV2Schema,
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { Mask, type SubMask } from '../../components/panel/right/layers/Masks';
 import { AiProviderId, normalizeAiProviderId } from '../../schemas/ai/aiProviderSchemas';
 import { type AiPeopleMaskPart, parseAiPatchDataJson } from '../../schemas/masks/aiMaskingSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
-import type { Adjustments, AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
+import type { AiPatch, Coord, MaskContainer } from '../../utils/adjustments';
 import type { AiMaskBoxAsyncRequest } from '../../utils/ai/aiMaskBoxAsyncOperations';
 import { getAiPeopleMaskPartCapability } from '../../utils/ai/aiPeopleMaskContracts';
 import { selectionAfterPatchDeletion } from '../../utils/aiEditSelection';
+import {
+  selectEditDocumentGeometry,
+  selectEditDocumentMasks,
+  selectEditDocumentNode,
+  selectEditDocumentSourceArtifacts,
+} from '../../utils/editDocumentSelectors';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { mergeMaskParameters } from '../../utils/mask/maskParameterAccess';
 import { useEditorActions } from '../editor/useEditorActions';
@@ -28,28 +39,13 @@ interface AiDepthMaskParameters {
   minFade?: number;
 }
 
-const getTransformAdjustments = (adj: Adjustments) => ({
-  transformDistortion: adj.transformDistortion,
-  transformVertical: adj.transformVertical,
-  transformHorizontal: adj.transformHorizontal,
-  transformRotate: adj.transformRotate,
-  transformAspect: adj.transformAspect,
-  transformScale: adj.transformScale,
-  transformXOffset: adj.transformXOffset,
-  transformYOffset: adj.transformYOffset,
-  lensDistortionAmount: adj.lensDistortionAmount,
-  lensVignetteAmount: adj.lensVignetteAmount,
-  lensTcaAmount: adj.lensTcaAmount,
-  lensDistortionParams: adj.lensDistortionParams,
-  lensMaker: adj.lensMaker,
-  lensModel: adj.lensModel,
-  lensDistortionEnabled: adj.lensDistortionEnabled,
-  lensTcaEnabled: adj.lensTcaEnabled,
-  lensVignetteEnabled: adj.lensVignetteEnabled,
+const getTransformAdjustments = (document: EditDocumentV2) => ({
+  ...selectEditDocumentGeometry(document),
+  ...selectEditDocumentNode(document, 'lens_correction').params,
 });
 
 export function useAiMasking() {
-  const { setAdjustments } = useEditorActions();
+  const { commitEditNodeOperations } = useEditorActions();
   const setEditor = useEditorStore((state) => state.setEditor);
   const applyAiEditCommand = useEditorStore((state) => state.applyAiEditCommand);
   const activeMaskId = useEditorStore((state) => state.activeMaskId);
@@ -60,40 +56,53 @@ export function useAiMasking() {
 
   const updateSubMask = useCallback(
     (subMaskId: string, updatedData: Partial<SubMask>) => {
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        masks: prev.masks.map((c: MaskContainer) => ({
-          ...c,
-          subMasks: c.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
-        })),
-        aiPatches: prev.aiPatches.map((p: AiPatch) => ({
-          ...p,
-          subMasks: p.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
-        })),
-      }));
+      const document = useEditorStore.getState().editDocumentV2;
+      commitEditNodeOperations([
+        {
+          nodeType: 'layers',
+          patch: {
+            masks: editDocumentLayersV2Schema.parse({
+              masks: selectEditDocumentMasks(document).map((c: MaskContainer) => ({
+                ...c,
+                subMasks: c.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
+              })),
+            }).masks,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'source_artifacts',
+          patch: {
+            aiPatches: editDocumentSourceArtifactsV2Schema.parse({
+              aiPatches: selectEditDocumentSourceArtifacts(document).aiPatches.map((p: AiPatch) => ({
+                ...p,
+                subMasks: p.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
+              })),
+            }).aiPatches,
+          },
+          type: 'patch-edit-document-node',
+        },
+      ]);
     },
-    [setAdjustments],
+    [commitEditNodeOperations],
   );
 
   const handleGenerativeReplace = useCallback(
     async (patchId: string, prompt: string, useFastInpaint: boolean) => {
-      const {
-        selectedImage,
-        adjustmentSnapshot: { value: adjustments },
-        isGeneratingAi,
-        patchResidency,
-      } = useEditorStore.getState();
+      const { selectedImage, editDocumentV2: adjustments, isGeneratingAi, patchResidency } = useEditorStore.getState();
       if (!selectedImage?.path || isGeneratingAi) return;
 
-      const patch: AiPatch | undefined = adjustments.aiPatches.find((p: AiPatch) => p.id === patchId);
+      const patch: AiPatch | undefined = selectEditDocumentSourceArtifacts(adjustments).aiPatches.find(
+        (p: AiPatch) => p.id === patchId,
+      );
       if (!patch) return;
 
       const patchDefinition = { ...patch, prompt };
       const token = await getToken();
 
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true, prompt } : p)),
+      applyAiEditCommand(({ aiPatches, selection }) => ({
+        aiPatches: aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true, prompt } : p)),
+        selection,
       }));
 
       setEditor({ isGeneratingAi: true });
@@ -128,15 +137,15 @@ export function useAiMasking() {
         });
       } catch (err) {
         toast.error(`AI Replace Failed: ${formatUnknownError(err)}`);
-        setAdjustments((prev: Adjustments) => ({
-          ...prev,
-          aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
+        applyAiEditCommand(({ aiPatches, selection }) => ({
+          aiPatches: aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
+          selection,
         }));
       } finally {
         setEditor({ isGeneratingAi: false });
       }
     },
-    [applyAiEditCommand, getToken, setAdjustments, setEditor],
+    [applyAiEditCommand, getToken, setEditor],
   );
 
   const handleQuickErase = useCallback(
@@ -150,15 +159,21 @@ export function useAiMasking() {
   const handleDeleteMaskContainer = useCallback(
     (containerId: string) => {
       const { activeMaskContainerId } = useEditorStore.getState();
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        masks: prev.masks.filter((c) => c.id !== containerId),
-      }));
+      const masks = selectEditDocumentMasks(useEditorStore.getState().editDocumentV2);
+      commitEditNodeOperations([
+        {
+          nodeType: 'layers',
+          patch: {
+            masks: editDocumentLayersV2Schema.parse({ masks: masks.filter((c) => c.id !== containerId) }).masks,
+          },
+          type: 'patch-edit-document-node',
+        },
+      ]);
       if (activeMaskContainerId === containerId) {
         setEditor({ activeMaskContainerId: null, activeMaskId: null });
       }
     },
-    [setAdjustments, setEditor],
+    [commitEditNodeOperations, setEditor],
   );
 
   const handleDeleteAiPatch = useCallback(
@@ -193,11 +208,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiDepthMask = async (subMaskId: string, parameters: AiDepthMaskParameters) => {
-    const {
-      selectedImage,
-      adjustmentSnapshot: { value: adjustments },
-      patchResidency,
-    } = useEditorStore.getState();
+    const { selectedImage, editDocumentV2: adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -211,14 +222,14 @@ export function useAiMasking() {
         minFade: parameters.minFade ?? 15,
         maxFade: parameters.maxFade ?? 15,
         feather: parameters.feather ?? 10,
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        rotation: adjustments.rotation,
+        flipHorizontal: selectEditDocumentGeometry(adjustments).flipHorizontal,
+        flipVertical: selectEditDocumentGeometry(adjustments).flipVertical,
+        orientationSteps: selectEditDocumentGeometry(adjustments).orientationSteps,
+        rotation: selectEditDocumentGeometry(adjustments).rotation,
       });
 
-      const subMask = adjustments.aiPatches
-        .flatMap((p: AiPatch) => p.subMasks)
+      const subMask = selectEditDocumentSourceArtifacts(adjustments)
+        .aiPatches.flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
       patchResidency.remove(subMaskId);
@@ -231,11 +242,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiForegroundMask = async (subMaskId: string) => {
-    const {
-      selectedImage,
-      adjustmentSnapshot: { value: adjustments },
-      patchResidency,
-    } = useEditorStore.getState();
+    const { selectedImage, editDocumentV2: adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -243,14 +250,14 @@ export function useAiMasking() {
       const transformAdjustments = getTransformAdjustments(adjustments);
       const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiForegroundMask, {
         jsAdjustments: transformAdjustments,
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        rotation: adjustments.rotation,
+        flipHorizontal: selectEditDocumentGeometry(adjustments).flipHorizontal,
+        flipVertical: selectEditDocumentGeometry(adjustments).flipVertical,
+        orientationSteps: selectEditDocumentGeometry(adjustments).orientationSteps,
+        rotation: selectEditDocumentGeometry(adjustments).rotation,
       });
 
-      const subMask = adjustments.aiPatches
-        .flatMap((p: AiPatch) => p.subMasks)
+      const subMask = selectEditDocumentSourceArtifacts(adjustments)
+        .aiPatches.flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
       patchResidency.remove(subMaskId);
@@ -263,11 +270,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiWholePersonMask = async (subMaskId: string) => {
-    const {
-      selectedImage,
-      adjustmentSnapshot: { value: adjustments },
-      patchResidency,
-    } = useEditorStore.getState();
+    const { selectedImage, editDocumentV2: adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -275,14 +278,14 @@ export function useAiMasking() {
       const transformAdjustments = getTransformAdjustments(adjustments);
       const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiWholePersonMask, {
         jsAdjustments: transformAdjustments,
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        rotation: adjustments.rotation,
+        flipHorizontal: selectEditDocumentGeometry(adjustments).flipHorizontal,
+        flipVertical: selectEditDocumentGeometry(adjustments).flipVertical,
+        orientationSteps: selectEditDocumentGeometry(adjustments).orientationSteps,
+        rotation: selectEditDocumentGeometry(adjustments).rotation,
       });
 
-      const subMask = adjustments.aiPatches
-        .flatMap((p: AiPatch) => p.subMasks)
+      const subMask = selectEditDocumentSourceArtifacts(adjustments)
+        .aiPatches.flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, {
         ...newParameters,
@@ -299,11 +302,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiPersonPartMask = async (subMaskId: string, part: AiPeopleMaskPart) => {
-    const {
-      selectedImage,
-      adjustmentSnapshot: { value: adjustments },
-      patchResidency,
-    } = useEditorStore.getState();
+    const { selectedImage, editDocumentV2: adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
 
     const capability = getAiPeopleMaskPartCapability(part);
@@ -320,14 +319,14 @@ export function useAiMasking() {
       const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiPersonPartMask, {
         jsAdjustments: transformAdjustments,
         part,
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        rotation: adjustments.rotation,
+        flipHorizontal: selectEditDocumentGeometry(adjustments).flipHorizontal,
+        flipVertical: selectEditDocumentGeometry(adjustments).flipVertical,
+        orientationSteps: selectEditDocumentGeometry(adjustments).orientationSteps,
+        rotation: selectEditDocumentGeometry(adjustments).rotation,
       });
 
-      const subMask = adjustments.aiPatches
-        .flatMap((p: AiPatch) => p.subMasks)
+      const subMask = selectEditDocumentSourceArtifacts(adjustments)
+        .aiPatches.flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, {
         ...newParameters,
@@ -345,11 +344,7 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiSkyMask = async (subMaskId: string) => {
-    const {
-      selectedImage,
-      adjustmentSnapshot: { value: adjustments },
-      patchResidency,
-    } = useEditorStore.getState();
+    const { selectedImage, editDocumentV2: adjustments, patchResidency } = useEditorStore.getState();
     if (!selectedImage?.path) return;
     setEditor({ isGeneratingAiMask: true });
 
@@ -357,14 +352,14 @@ export function useAiMasking() {
       const transformAdjustments = getTransformAdjustments(adjustments);
       const newParameters = await invoke<Record<string, unknown>>(Invokes.GenerateAiSkyMask, {
         jsAdjustments: transformAdjustments,
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
-        rotation: adjustments.rotation,
+        flipHorizontal: selectEditDocumentGeometry(adjustments).flipHorizontal,
+        flipVertical: selectEditDocumentGeometry(adjustments).flipVertical,
+        orientationSteps: selectEditDocumentGeometry(adjustments).orientationSteps,
+        rotation: selectEditDocumentGeometry(adjustments).rotation,
       });
 
-      const subMask = adjustments.aiPatches
-        .flatMap((p: AiPatch) => p.subMasks)
+      const subMask = selectEditDocumentSourceArtifacts(adjustments)
+        .aiPatches.flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, newParameters);
       patchResidency.remove(subMaskId);
@@ -377,12 +372,14 @@ export function useAiMasking() {
   };
 
   useEffect(() => {
-    const {
-      adjustmentSnapshot: { value: adjustments },
-    } = useEditorStore.getState();
+    const { editDocumentV2: adjustments } = useEditorStore.getState();
     const activeSubMask =
-      adjustments.masks.flatMap((m: MaskContainer) => m.subMasks).find((sm: SubMask) => sm.id === activeMaskId) ||
-      adjustments.aiPatches.flatMap((p: AiPatch) => p.subMasks).find((sm: SubMask) => sm.id === activeAiSubMaskId);
+      selectEditDocumentMasks(adjustments)
+        .flatMap((m: MaskContainer) => m.subMasks)
+        .find((sm: SubMask) => sm.id === activeMaskId) ||
+      selectEditDocumentSourceArtifacts(adjustments)
+        .aiPatches.flatMap((p: AiPatch) => p.subMasks)
+        .find((sm: SubMask) => sm.id === activeAiSubMaskId);
 
     if (activeSubMask?.type === Mask.AiSubject && selectedImagePath) {
       const transformAdjustments = getTransformAdjustments(adjustments);

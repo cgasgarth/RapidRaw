@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { perceptualGradingFromWheelSurface } from '../../../src/utils/color/perceptualGrading';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildPerceptualGradingEditTransaction,
   isCurrentPerceptualGradingIdentity,
@@ -34,7 +34,7 @@ const identity = (overrides: Partial<PerceptualGradingCommitIdentity> = {}): Per
 describe('perceptual grading edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -73,7 +73,9 @@ describe('perceptual grading edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorGrading).toEqual(INITIAL_ADJUSTMENTS.colorGrading);
+    expect(useEditorStore.getState().editDocumentV2.nodes['perceptual_grading']!.params['colorGrading']).toEqual(
+      INITIAL_ADJUSTMENTS.colorGrading,
+    );
   });
 
   test('rejects stale source, session, and revision before constructing a node transaction', () => {
@@ -158,7 +160,9 @@ describe('perceptual grading edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorGrading).toEqual(INITIAL_ADJUSTMENTS.colorGrading);
+    expect(useEditorStore.getState().editDocumentV2.nodes['perceptual_grading']!.params['colorGrading']).toEqual(
+      INITIAL_ADJUSTMENTS.colorGrading,
+    );
 
     expect(isCurrentPerceptualGradingIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

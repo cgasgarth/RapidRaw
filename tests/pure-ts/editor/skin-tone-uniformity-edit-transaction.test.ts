@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 import {
   buildSkinToneUniformityEditTransaction,
@@ -34,7 +34,7 @@ const identity = (overrides: Partial<SkinToneUniformityCommitIdentity> = {}): Sk
 describe('skin-tone uniformity edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -111,13 +111,9 @@ describe('skin-tone uniformity edit transaction', () => {
     const edited = { ...INITIAL_ADJUSTMENTS.skinToneUniformity, enabled: true, saturationUniformity: 0.55 };
     before.applyEditTransaction(buildSkinToneUniformityEditTransaction(before, identity(), edited, 'skin-tone-save'));
     const committed = useEditorStore.getState();
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: committed.adjustmentSnapshot.value, editDocumentV2: committed.editDocumentV2 },
-      committed.adjustmentSnapshot.value,
-    );
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: committed.editDocumentV2 });
 
     expect(selectSkinToneUniformity(reopened)).toEqual(edited);
-    expect(reopened.extensions['legacyAdjustments']).not.toHaveProperty('skinToneUniformity');
     expect(reopened).toEqual(committed.editDocumentV2);
   });
 

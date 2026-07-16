@@ -13,7 +13,8 @@ import {
   buildAgentToolEditTransaction,
   captureAgentToolCommitIdentity,
 } from '../../../src/utils/agentToolEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixtures/agent-core-bundle.ARW';
 const session = createEditorImageSession({ generation: 61, path: sourcePath, source: 'cache' });
@@ -52,7 +53,7 @@ class DeferredBundleBridge extends RawEngineLocalAppServerBridge {
 describe('agent core command bundle transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -108,9 +109,11 @@ describe('agent core command bundle transaction', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.contrast).toBe(14);
-    expect(after.adjustmentSnapshot.value.exposure).toBe(0);
-    expect(after.adjustmentSnapshot.value.hsl.oranges).toEqual(INITIAL_ADJUSTMENTS.hsl.oranges);
+    expect(selectEditDocumentNode(after.editDocumentV2, 'scene_global_color_tone').params['contrast']).toBe(14);
+    expect(selectEditDocumentNode(after.editDocumentV2, 'scene_global_color_tone').params['exposure']).toBe(0);
+    expect(selectEditDocumentNode(after.editDocumentV2, 'selective_color_mixer').params['hsl'].oranges).toEqual(
+      INITIAL_ADJUSTMENTS.hsl.oranges,
+    );
     expect(after.history).toHaveLength(2);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-bundle-edit');
   });
@@ -156,10 +159,14 @@ describe('agent core command bundle transaction', () => {
         transactionId: 'fallback-core-bundle_apply',
       },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_global_color_tone').params['exposure'],
+    ).toBe(0.4);
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_global_color_tone').params['exposure'],
+    ).toBe(0);
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,

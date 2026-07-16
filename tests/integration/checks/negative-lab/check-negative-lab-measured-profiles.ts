@@ -296,7 +296,7 @@ const resolvedRuntimeProfile = resolveNegativeLabRuntimeProfile(
 if (
   resolvedRuntimeProfile.profileStatus !== 'fixture_measured' ||
   resolvedRuntimeProfile.measurementProfileId !== validRuntimeAppliedMeasuredProfile.profileId ||
-  resolvedRuntimeProfile.params.red_weight !== validRuntimeAppliedMeasuredProfile.params.red_weight
+  resolvedRuntimeProfile.params['red_weight'] !== validRuntimeAppliedMeasuredProfile.params['red_weight']
 ) {
   throw new Error('Measured Negative Lab runtime resolver did not preserve measured profile provenance and params.');
 }
@@ -313,7 +313,7 @@ const runtimeConversionPlan = buildNegativeLabConversionPlanResult(
     outputFormat: NegativeLabOutputFormatId.Tiff16,
     paths: ['/fixtures/negative-measured.tif'],
     presetId: validRuntimeAppliedMeasuredProfile.profileId,
-    sampleRect: validRuntimeAppliedMeasuredProfile.params.base_fog_sample,
+    sampleRect: validRuntimeAppliedMeasuredProfile.params['base_fog_sample'],
     scope: 'active',
     suffix: 'Positive',
   },
@@ -324,7 +324,7 @@ if (
   runtimeConversionPlan.profile.profileStatus !== 'fixture_measured' ||
   runtimeConversionPlan.profile.measurementProfileId !== validRuntimeAppliedMeasuredProfile.profileId ||
   !runtimeConversionPlan.profileProvenanceHash.startsWith('fnv1a32:') ||
-  runtimeConversionPlan.params.blue_weight !== validRuntimeAppliedMeasuredProfile.params.blue_weight
+  runtimeConversionPlan.params['blue_weight'] !== validRuntimeAppliedMeasuredProfile.params['blue_weight']
 ) {
   throw new Error('Measured Negative Lab app-server conversion plan did not apply measured runtime params.');
 }
@@ -345,7 +345,7 @@ const runtimeAcceptedApply = buildNegativeLabAcceptedBatchApplyRouteResult(
       outputFormat: NegativeLabOutputFormatId.Tiff16,
       paths: runtimeDryRun.targetPaths,
       presetId: validRuntimeAppliedMeasuredProfile.profileId,
-      sampleRect: validRuntimeAppliedMeasuredProfile.params.base_fog_sample,
+      sampleRect: validRuntimeAppliedMeasuredProfile.params['base_fog_sample'],
       scope: 'all',
       suffix: 'Positive',
     },
@@ -358,7 +358,7 @@ if (
   runtimeAcceptedApply.conversionPlan.profile.profileStatus !== 'fixture_measured' ||
   runtimeAcceptedApply.apply.options.profileProvenanceHash !==
     runtimeAcceptedApply.conversionPlan.profileProvenanceHash ||
-  runtimeAcceptedApply.apply.params.green_weight !== validRuntimeAppliedMeasuredProfile.params.green_weight
+  runtimeAcceptedApply.apply.params['green_weight'] !== validRuntimeAppliedMeasuredProfile.params['green_weight']
 ) {
   throw new Error('Measured Negative Lab accepted apply plan did not preserve measured profile params.');
 }

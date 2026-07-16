@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-import type { Adjustments } from './adjustments';
-
 const BASIC_TONE_COMMAND_SCHEMA_VERSION = 1;
 
 export const BasicToneApprovalClass = {
@@ -67,7 +65,7 @@ export const BASIC_TONE_ADJUSTMENT_KEYS = [
   'saturation',
   'shadows',
   'whites',
-] as const satisfies ReadonlyArray<keyof Adjustments>;
+] as const satisfies ReadonlyArray<keyof BasicToneAdjustmentPayload>;
 
 export interface BasicToneCommandBridgeContext {
   actor: BasicToneCommandContextActor;
@@ -137,8 +135,10 @@ export const buildBasicToneImageCommandContext = ({
   },
 });
 
-export const hasBasicToneAdjustmentChange = (previous: Adjustments, next: Adjustments): boolean =>
-  BASIC_TONE_ADJUSTMENT_KEYS.some((key) => previous[key] !== next[key]);
+export const hasBasicToneAdjustmentChange = (
+  previous: BasicToneAdjustmentPayload,
+  next: BasicToneAdjustmentPayload,
+): boolean => BASIC_TONE_ADJUSTMENT_KEYS.some((key) => previous[key] !== next[key]);
 
 export const buildBasicToneCommandEnvelope = (
   adjustments: BasicToneAdjustmentPayload,
@@ -190,9 +190,9 @@ export const buildBasicToneCommandEnvelope = (
 };
 
 export const applyBasicToneCommandEnvelopeToAdjustments = (
-  base: Adjustments,
+  base: BasicToneAdjustmentPayload,
   command: BasicToneCommandEnvelope,
-): Adjustments => ({
+): BasicToneAdjustmentPayload => ({
   ...base,
   blacks: command.parameters.blackPoint,
   clarity: command.parameters.clarity,
