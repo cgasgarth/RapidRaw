@@ -4,73 +4,11 @@ import { Invokes } from '../tauri/commands.ts';
 import { INITIAL_ADJUSTMENTS } from '../utils/adjustments.ts';
 import { type PreviewOperationIdentity, previewOperationIdentitySchema } from '../utils/previewCoordinator.ts';
 import { createBrowserHarnessImportLifecycle } from './browserHarnessImportEvents.ts';
-
-type BrowserTauriInvoke = (command: string, args?: Record<string, unknown>, options?: unknown) => Promise<unknown>;
-type BrowserTauriEventCallback = (event: unknown) => void;
-
-interface BrowserTauriInternals {
-  convertFileSrc: (filePath: string, protocol?: string) => string;
-  invoke: BrowserTauriInvoke;
-  transformCallback: (callback: unknown, once?: boolean) => number;
-  unregisterCallback: (id: number) => void;
-}
-
-interface BrowserTauriInvokeCall {
-  args?: Record<string, unknown> | undefined;
-  command: string;
-  endedAtMs: number | null;
-  options?: unknown;
-  startedAtMs: number;
-}
-
-interface BrowserHarnessImage {
-  exif: null;
-  is_edited: boolean;
-  is_virtual_copy: boolean;
-  modified: number;
-  path: string;
-  rating: number;
-  tags: null;
-}
-
-interface BrowserHarnessOriginalPreviewResponse {
-  delayMs: number;
-  url: string;
-}
-
-interface BrowserHarnessApplyPreviewResponse {
-  color: [number, number, number];
-  delayMs: number;
-}
-
-interface BrowserHarnessMetadataSaveResponse {
-  delayMs: number;
-  failure?: string;
-  sidecarRevision?: string;
-}
-
-interface BrowserHarnessInvokeResponse {
-  delayMs: number;
-  value: unknown;
-}
-
-interface BrowserHarnessAutoAdjustResponse {
-  delayMs: number;
-  failure?: string;
-  value?: unknown;
-}
-
-interface BrowserHarnessTonePlacementResponse {
-  delayMs: number;
-  failure?: string;
-  value: unknown;
-}
-
-interface BrowserHarnessViewerSampleResponse {
-  delayMs: number;
-  rgb?: [number, number, number];
-  status?: 'available' | 'unavailable';
-}
+import type {
+  BrowserHarnessImage,
+  BrowserTauriEventCallback,
+  BrowserTauriInvokeCall,
+} from './browserTauriHarnessContract';
 
 declare global {
   interface ImportMetaEnv {
@@ -80,41 +18,6 @@ declare global {
 
   interface ImportMeta {
     env: ImportMetaEnv;
-  }
-
-  interface Window {
-    __RAWENGINE_BROWSER_TAURI_HARNESS__?: {
-      calls: Array<BrowserTauriInvokeCall>;
-      enabled: boolean;
-      emitEvent: (event: string, payload: unknown) => void;
-      failNextSettingsSave: boolean;
-      applyAdjustmentsToPathsDelayMs: number;
-      autoAdjustResponses: Array<BrowserHarnessAutoAdjustResponse>;
-      applyPreviewResponses: Array<BrowserHarnessApplyPreviewResponse>;
-      originalPreviewResponses: Array<BrowserHarnessOriginalPreviewResponse>;
-      resetAdjustmentsResponses: Array<BrowserHarnessInvokeResponse>;
-      revokedObjectUrls: Array<string>;
-      batchAutoAdjustCommitDelayMs: number;
-      batchAutoAdjustPrepareDelayMs: number;
-      imageOpenDelayMs: number;
-      lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
-      aiSubjectMaskResponses: Array<BrowserHarnessInvokeResponse>;
-      metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;
-      perspectiveAnalysisResponses: Array<BrowserHarnessInvokeResponse>;
-      tonePlacementResponses: Array<BrowserHarnessTonePlacementResponse>;
-      viewerSampleResponses: Array<BrowserHarnessViewerSampleResponse>;
-      setAdjustmentsForPath: (path: string, adjustments: unknown) => void;
-    };
-    __RAWENGINE_QA_PERFORMANCE_TRACE__?: {
-      callIndex: number;
-      firstMutationMs: number | null;
-      lastMutationMs: number | null;
-      mutationCount: number;
-      observer: MutationObserver;
-      startedAtMs: number;
-    };
-    __TAURI_INTERNALS__?: BrowserTauriInternals;
-    isTauri?: boolean;
   }
 }
 
