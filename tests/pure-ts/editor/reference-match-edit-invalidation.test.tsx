@@ -9,7 +9,7 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 const fingerprint = (digit: string): `fnv1a64:${string}` => `fnv1a64:${digit.repeat(16)}`;
 const receipt = matchLookApplicationReceiptV1Schema.parse({

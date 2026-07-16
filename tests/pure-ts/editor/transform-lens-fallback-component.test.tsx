@@ -15,7 +15,7 @@ const invoke = mock(() => new Promise<unknown>(() => {}));
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 const { default: TransformLens } = await import('../../../src/components/adjustments/TransformLens');
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({

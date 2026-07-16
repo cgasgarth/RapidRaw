@@ -7,9 +7,12 @@ import { createElement, type ReactElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 const invokeCalls: Array<{ args: unknown; command: string }> = [];
-const invokeCommand = (command: string, args?: unknown) => {
+let releaseInvokeCommand: () => void = () => undefined;
+const invokeCommand = (command: string, args?: unknown): Promise<unknown> => {
   invokeCalls.push({ args, command });
-  return Promise.resolve(null);
+  return new Promise((resolve) => {
+    releaseInvokeCommand = () => resolve(undefined);
+  });
 };
 
 const i18n = await createTestI18n();
@@ -110,13 +113,18 @@ test('rename file preserves a single-file extension and applies multi-file seque
 });
 
 test('tagging keeps edits across equivalent tag-array allocation and resets only for a new keyed invocation', async () => {
+  invokeCalls.length = 0;
   const changedTags: string[][] = [];
   let hideCount = 0;
   const baseProps = {
     appSettings: null,
-    hideContextMenu: () => hideCount++,
+    hideContextMenu: () => {
+      hideCount += 1;
+    },
     invokeCommand,
-    onTagsChanged: (_paths: string[], tags: Array<{ tag: string }>) => changedTags.push(tags.map(({ tag }) => tag)),
+    onTagsChanged: (_paths: string[], tags: Array<{ tag: string }>) => {
+      changedTags.push(tags.map(({ tag }) => tag));
+    },
     paths: ['/Photo Library/旅行/scan one.CR3'],
   };
   const rendered = render(
@@ -132,6 +140,10 @@ test('tagging keeps edits across equivalent tag-array allocation and resets only
   const user = userEvent.setup();
   await user.type(tagInput, '{Enter}{Enter}');
   expect(invokeCalls).toHaveLength(1);
+  await act(async () => {
+    releaseInvokeCommand();
+    await Promise.resolve();
+  });
   expect(changedTags).toEqual([['alpha', 'beta']]);
   await user.type(tagInput, '{Escape}');
   expect(hideCount).toBe(1);
@@ -165,19 +177,19 @@ function rerender(rendered: RenderResult, child: ReactElement) {
   rendered.rerender(createElement(I18nextProvider, { i18n }, child));
 }
 
-function getInput(container: HTMLDivElement, testId: string): HTMLInputElement {
+function getInput(container: Element, testId: string): HTMLInputElement {
   const input = container.querySelector(`[data-testid="${testId}"]`);
   if (!(input instanceof HTMLInputElement)) throw new Error(`Expected input ${testId}.`);
   return input;
 }
 
-function getButton(container: HTMLDivElement, testId: string): HTMLButtonElement {
+function getButton(container: Element, testId: string): HTMLButtonElement {
   const button = container.querySelector(`[data-testid="${testId}"]`);
   if (!(button instanceof HTMLButtonElement)) throw new Error(`Expected button ${testId}.`);
   return button;
 }
 
-async function setInputValue(container: HTMLDivElement, testId: string, value: string) {
+async function setInputValue(container: Element, testId: string, value: string) {
   await setElementValue(getInput(container, testId), value);
 }
 
@@ -185,11 +197,20 @@ async function setElementValue(input: HTMLInputElement, value: string) {
   await act(async () => {
     await Bun.sleep(50);
   });
-  input.focus();
-  input.select();
-  const user = userEvent.setup();
-  await user.type(input, value, { skipClick: true });
-  expect(input).toHaveValue(value);
+  const user = userEvent.setup({ delay: 1 });
+  await user.click(input);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await user.clear(input);
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    });
+    if (input.value === '') break;
+  }
+  expect(input.value).toBe('');
+  for (const character of value) {
+    input.setSelectionRange(input.value.length, input.value.length);
+    await user.type(input, character, { skipClick: true });
+  }
 }
 
 async function createTestI18n() {

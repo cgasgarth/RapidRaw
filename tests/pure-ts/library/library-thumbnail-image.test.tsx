@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { LibraryThumbnailImage } from '../../../src/components/panel/library/LibraryItems.tsx';
 import { ThumbnailAspectRatio } from '../../../src/components/ui/AppProperties.tsx';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 let mounted: { container: HTMLDivElement; root: Root } | null = null;
 
@@ -107,13 +107,13 @@ async function renderThumbnail(path: string, url: string | null, compact: boolea
 
 function layerUrls(container: Element) {
   return [...container.querySelectorAll<HTMLElement>('[data-thumbnail-layer-url]')].map(
-    (element) => element.dataset.thumbnailLayerUrl,
+    (element) => element.dataset['thumbnailLayerUrl'],
   );
 }
 
 function layer(container: Element, url: string) {
   const element = [...container.querySelectorAll<HTMLElement>('[data-thumbnail-layer-url]')].find(
-    (candidate) => candidate.dataset.thumbnailLayerUrl === url,
+    (candidate) => candidate.dataset['thumbnailLayerUrl'] === url,
   );
   if (element === undefined) throw new Error(`Expected thumbnail layer ${url}.`);
   return element;

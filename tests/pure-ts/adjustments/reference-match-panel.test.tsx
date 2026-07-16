@@ -14,7 +14,7 @@ import { useUIStore } from '../../../src/store/useUIStore.ts';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 let rendered: { container: HTMLDivElement; root: Root } | null = null;
 
@@ -27,6 +27,7 @@ afterEach(() => {
 });
 
 const image = (path: string): SelectedImage => ({
+  exif: null,
   height: 4000,
   isRaw: true,
   isReady: true,
@@ -239,6 +240,8 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
   );
   await click(container, '[data-testid="reference-match-apply-layer"]');
   const layerState = useEditorStore.getState();
+  const normalizedLayer = layerState.adjustmentSnapshot.value.masks[0];
+  if (normalizedLayer === undefined) throw new Error('Expected normalized reference layer.');
   expect(layerState.historyIndex).toBe(historyBeforeLayer + 1);
   expect(layerState.adjustmentSnapshot.value.exposure).toBe(globalExposure);
   expect(layerState.adjustmentSnapshot.value.masks[0]).toMatchObject({
@@ -253,8 +256,8 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
       impact: 100,
     },
   });
-  expect(layerState.adjustmentSnapshot.value.masks[0]?.adjustments.exposure).not.toBe(0);
-  expect(layerState.activeMaskContainerId).toBe(layerState.adjustmentSnapshot.value.masks[0]?.id);
+  expect(normalizedLayer.adjustments.exposure).not.toBe(0);
+  expect(layerState.activeMaskContainerId).toBe(normalizedLayer.id);
   expect(layerState.lastEditApplicationReceipt).toMatchObject({
     persistence: 'commit',
     source: 'reference-match',

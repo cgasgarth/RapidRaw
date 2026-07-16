@@ -18,14 +18,13 @@ import en from '../../../src/i18n/locales/en.json';
 import { EXPORT_LAST_USED_PRESET_ID } from '../../../src/schemas/export/exportRecipeIds.ts';
 import { parseExportReceiptPayload } from '../../../src/schemas/tauriEventSchemas.ts';
 import { useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { useProcessStore } from '../../../src/store/useProcessStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 
-const invoke = mock(async () => null);
+const invoke = mock(async (_command: string, _args?: unknown): Promise<unknown> => null);
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
 const { default: ExportPanel } = await import('../../../src/components/panel/right/export/ExportPanel.tsx');
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 const imagePath = '/validation/export-footer-workflow.ARW';
 const proofPreset: ExportPreset = {
@@ -150,7 +149,7 @@ describe('export panel compact footer workflow', () => {
     });
 
     const workflow = required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]');
-    expect(workflow.dataset.exportFooterWorkflowState).toBe('idle');
+    expect(workflow.dataset['exportFooterWorkflowState']).toBe('idle');
     expect(workflow.querySelector('[data-testid="export-readiness-summary"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="export-proof-footer-proof-state"]')).toBeNull();
     expect(primaryAction(container).textContent).toContain('Export Image');
@@ -166,8 +165,9 @@ describe('export panel compact footer workflow', () => {
     const proofDetails = required<HTMLDetailsElement>(container, '[data-testid="export-proof-footer-proof-state"]');
     expect(proofDetails.open).toBe(false);
     expect(
-      required<HTMLElement>(container, '[data-testid="export-soft-proof-warnings"]').dataset
-        .exportSoftProofWarningCount,
+      required<HTMLElement>(container, '[data-testid="export-soft-proof-warnings"]').dataset[
+        'exportSoftProofWarningCount'
+      ],
     ).toBe('1');
     expect(container.querySelector('[data-testid="export-soft-proof-resolver"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="export-soft-proof-resolver-preview-export"]')).not.toBeNull();
@@ -193,7 +193,7 @@ describe('export panel compact footer workflow', () => {
 
     const workflow = required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]');
     const action = primaryAction(container);
-    expect(workflow.dataset.exportFooterWorkflowState).toBe('running');
+    expect(workflow.dataset['exportFooterWorkflowState']).toBe('running');
     expect(action.getAttribute('aria-busy')).toBe('true');
     expect(action.getAttribute('aria-keyshortcuts')).toBe('Escape');
     expect(action.textContent).toContain('Cancel export');
@@ -205,12 +205,12 @@ describe('export panel compact footer workflow', () => {
     expect(invoke.mock.calls.some(([command]) => command === 'cancel_export')).toBe(true);
     const cancellingAction = primaryAction(container);
     expect(cancellingAction.hasAttribute('disabled')).toBe(true);
-    expect(cancellingAction.dataset.cancelActiveJobId).toBe('export-job:test');
-    expect(cancellingAction.dataset.cancelTaskAttached).toBe('true');
-    expect(cancellingAction.dataset.cancelTokenObserved).toBe('true');
+    expect(cancellingAction.dataset['cancelActiveJobId']).toBe('export-job:test');
+    expect(cancellingAction.dataset['cancelTaskAttached']).toBe('true');
+    expect(cancellingAction.dataset['cancelTokenObserved']).toBe('true');
     const cancellationReceipt = required<HTMLElement>(container, '[data-testid="export-cancellation-ack"]');
-    expect(cancellationReceipt.dataset.cancelActiveJobId).toBe('export-job:test');
-    expect(cancellationReceipt.dataset.cancelTokenObserved).toBe('true');
+    expect(cancellationReceipt.dataset['cancelActiveJobId']).toBe('export-job:test');
+    expect(cancellationReceipt.dataset['cancelTokenObserved']).toBe('true');
 
     const cancelledReceipt = parseExportReceiptPayload({
       completedAt: '2026-07-12T02:30:00.000Z',
@@ -225,8 +225,9 @@ describe('export panel compact footer workflow', () => {
       status: Status.Cancelled,
     });
     expect(
-      required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]').dataset
-        .exportFooterWorkflowState,
+      required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]').dataset[
+        'exportFooterWorkflowState'
+      ],
     ).toBe('canceled');
     expect(primaryAction(container).textContent).toContain('Retry Export');
   });
@@ -240,16 +241,18 @@ describe('export panel compact footer workflow', () => {
     });
 
     expect(
-      required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]').dataset
-        .exportFooterWorkflowState,
+      required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]').dataset[
+        'exportFooterWorkflowState'
+      ],
     ).toBe('failed');
     expect(required<HTMLDetailsElement>(container, '[data-testid="export-error-alert"]').open).toBe(false);
     expect(primaryAction(container).textContent).toContain('Retry Export');
 
     await rerenderFooter({ errorMessage: '', progress: { current: 0, total: 1 }, status: Status.Cancelled });
     expect(
-      required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]').dataset
-        .exportFooterWorkflowState,
+      required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]').dataset[
+        'exportFooterWorkflowState'
+      ],
     ).toBe('canceled');
     expect(primaryAction(container).textContent).toContain('Retry Export');
   });
@@ -264,9 +267,9 @@ describe('export panel compact footer workflow', () => {
     });
 
     const workflow = required<HTMLElement>(container, '[data-testid="export-footer-workflow-state"]');
-    expect(workflow.dataset.exportFooterWorkflowState).toBe('completed');
-    expect(workflow.dataset.exportFooterCanOpen).toBe('true');
-    expect(workflow.dataset.exportFooterCanImportLinkedVariant).toBe('true');
+    expect(workflow.dataset['exportFooterWorkflowState']).toBe('completed');
+    expect(workflow.dataset['exportFooterCanOpen']).toBe('true');
+    expect(workflow.dataset['exportFooterCanImportLinkedVariant']).toBe('true');
     expect(container.querySelector('[data-testid="export-success-receipt"]')).not.toBeNull();
     expect(completedReceipt.outputs[0]?.outputDigest?.provenance).toBe('finalByteAtomicWriter');
     expect(container.querySelector('[data-testid="export-success-import-linked-variant"]')).not.toBeNull();
@@ -337,7 +340,6 @@ function setProofState(isConsistent: boolean) {
     history: [useEditorStore.getState().editDocumentV2],
     historyIndex: 0,
   });
-  useProcessStore.setState({ thumbnailSmartPreviews: {} });
 }
 
 function resetEditorState() {
@@ -352,7 +354,6 @@ function resetEditorState() {
     history: [useEditorStore.getState().editDocumentV2],
     historyIndex: 0,
   });
-  useProcessStore.setState({ thumbnailSmartPreviews: {} });
 }
 
 function primaryAction(container: HTMLElement): HTMLButtonElement {

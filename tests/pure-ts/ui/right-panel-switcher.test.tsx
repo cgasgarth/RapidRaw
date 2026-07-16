@@ -41,8 +41,8 @@ describe('right panel switcher', () => {
       '[data-testid="right-panel-switcher-button-adjustments"]',
     );
     expect(activeButton.getAttribute('aria-pressed')).toBe('true');
-    expect(activeButton.dataset.panelState).toBe('active');
-    expect(activeButton.dataset.panelPriority).toBe('primary');
+    expect(activeButton.dataset['panelState']).toBe('active');
+    expect(activeButton.dataset['panelPriority']).toBe('primary');
     expect(required(container, '[data-testid="right-panel-switcher-group-1"]')).not.toBeNull();
 
     await user.click(required<HTMLButtonElement>(container, '[data-testid="right-panel-switcher-button-crop"]'));

@@ -48,7 +48,7 @@ Key runtime dependencies:
 - Tauri API `^2.11.0`
 - Tauri plugins for dialog, OS, process, and shell
 - Vite `^8.0.12`
-- TypeScript `^6.0.0`
+- TypeScript `^7.0.2` (the sole supported compiler; superseded dependency history remains available in Git)
 - ESLint `^9.39.2`
 - `typescript-eslint` `^8.59.3`
 - Prettier `^3.8.3`

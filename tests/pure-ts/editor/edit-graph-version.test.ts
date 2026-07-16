@@ -94,7 +94,7 @@ describe('persisted edit graph version', () => {
         ],
       },
       outputCurveV1: {
-        domain: 'display_referred' as const,
+        domain: 'view_encoded' as const,
         targetIdentity: 'srgb_sdr' as const,
         sdrReferenceWhiteNits: 100,
         peakNits: 100,

@@ -40,7 +40,7 @@ test('collapsible sections retain Shift+F10 actions without nesting action butto
 });
 
 test('segmented controls use roving focus with arrow, Home, and End keyboard selection', async () => {
-  const changes: string[] = [];
+  const changes: Array<'raw' | 'proof' | 'mask'> = [];
   const { container } = await renderWithI18n(createElement(SegmentedHarness, { changes }));
   const raw = getRequiredElement<HTMLButtonElement>(container, '[role="radio"][aria-checked="true"]');
 
@@ -63,27 +63,27 @@ test('segmented controls use roving focus with arrow, Home, and End keyboard sel
 function CollapsibleHarness({ onOpenActionsMenu }: { onOpenActionsMenu?: (x: number, y: number) => void }) {
   const [isOpen, setIsOpen] = useState(true);
 
-  return createElement(
-    CollapsibleSection,
-    {
-      isContentVisible: true,
-      isDirty: true,
-      isOpen,
-      onOpenActionsMenu,
-      onToggle: () => {
+  return (
+    <CollapsibleSection
+      isContentVisible
+      isDirty
+      isOpen={isOpen}
+      {...(onOpenActionsMenu === undefined ? {} : { onOpenActionsMenu })}
+      onToggle={() => {
         setIsOpen((current) => !current);
-      },
-      testId: 'tone-section',
-      title: 'Tone',
-    },
-    createElement('input', { 'data-testid': 'tone-section-input' }),
+      }}
+      testId="tone-section"
+      title="Tone"
+    >
+      <input data-testid="tone-section-input" />
+    </CollapsibleSection>
   );
 }
 
-function SegmentedHarness({ changes }: { changes: string[] }) {
+function SegmentedHarness({ changes }: { changes: Array<'raw' | 'proof' | 'mask'> }) {
   const [value, setValue] = useState<'raw' | 'proof' | 'mask'>('raw');
 
-  return createElement(InspectorSegmentedControl, {
+  return createElement(InspectorSegmentedControl<'raw' | 'proof' | 'mask'>, {
     ariaLabel: 'Preview mode',
     onChange: (nextValue) => {
       changes.push(nextValue);
