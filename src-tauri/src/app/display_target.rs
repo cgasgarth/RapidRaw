@@ -237,6 +237,10 @@ pub struct DisplayTargetCoordinator;
 
 #[cfg(not(any(test, target_os = "macos", feature = "validation-harness")))]
 impl DisplayTargetCoordinator {
+    pub fn request_refresh(&self, _device_generation: u64) -> u64 {
+        0
+    }
+
     pub fn report(&self) -> DisplayTargetReport {
         DisplayTargetReport {
             process_id: std::process::id(),

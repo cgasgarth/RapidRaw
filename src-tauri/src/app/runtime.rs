@@ -48,7 +48,10 @@ const fn resolve_window_decorations(settings_value: Option<bool>, configured_val
     }
     #[cfg(not(target_os = "macos"))]
     {
-        settings_value.unwrap_or(configured_value)
+        match settings_value {
+            Some(value) => value,
+            None => configured_value,
+        }
     }
 }
 
