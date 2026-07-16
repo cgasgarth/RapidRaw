@@ -28,6 +28,7 @@ enum EditNodeTypeV2 {
     PointColor,
     ColorBalanceRgb,
     SelectiveColorMixer,
+    SkinToneUniformity,
     BlackWhiteMixer,
     ChannelMixer,
     LumaLevels,
@@ -56,6 +57,7 @@ impl EditNodeTypeV2 {
             Self::PointColor => ("point_color", "scene_referred_v2", 1),
             Self::ColorBalanceRgb => ("color_balance_rgb", "scene_referred_v2", 1),
             Self::SelectiveColorMixer => ("selective_color_mixer", "scene_referred_v2", 1),
+            Self::SkinToneUniformity => ("skin_tone_uniformity", "scene_referred_v2", 1),
             Self::BlackWhiteMixer => ("black_white_mixer", "scene_referred_v2", 1),
             Self::ChannelMixer => ("channel_mixer", "scene_referred_v2", 1),
             Self::LumaLevels => ("luma_levels", "scene_referred_v2", 1),
@@ -78,6 +80,7 @@ impl EditNodeTypeV2 {
             | Self::ColorPresence
             | Self::ColorBalanceRgb
             | Self::SelectiveColorMixer
+            | Self::SkinToneUniformity
             | Self::BlackWhiteMixer
             | Self::ChannelMixer
             | Self::LumaLevels
@@ -1097,6 +1100,84 @@ impl SelectiveColorMixerV2 {
         }
         Ok(())
     }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SkinToneUniformitySettingsV1 {
+    enabled: bool,
+    hue_uniformity: f64,
+    luminance_uniformity: f64,
+    max_hue_shift_degrees: f64,
+    saturation_uniformity: f64,
+    target_hue_degrees: f64,
+    target_luminance: f64,
+    target_saturation: f64,
+}
+
+impl SkinToneUniformitySettingsV1 {
+    fn validate(self) -> Result<(), String> {
+        for (field, value, minimum, maximum, exclusive_maximum) in [
+            ("hueUniformity", self.hue_uniformity, 0.0, 0.75, false),
+            (
+                "luminanceUniformity",
+                self.luminance_uniformity,
+                0.0,
+                0.75,
+                false,
+            ),
+            (
+                "maxHueShiftDegrees",
+                self.max_hue_shift_degrees,
+                0.0,
+                30.0,
+                false,
+            ),
+            (
+                "saturationUniformity",
+                self.saturation_uniformity,
+                0.0,
+                0.75,
+                false,
+            ),
+            (
+                "targetHueDegrees",
+                self.target_hue_degrees,
+                0.0,
+                360.0,
+                true,
+            ),
+            ("targetLuminance", self.target_luminance, 0.0, 1.0, false),
+            ("targetSaturation", self.target_saturation, 0.0, 1.0, false),
+        ] {
+            let in_range = value >= minimum
+                && if exclusive_maximum {
+                    value < maximum
+                } else {
+                    value <= maximum
+                };
+            if !value.is_finite() || !in_range {
+                return Err(format!(
+                    "EditDocumentV2 skin_tone_uniformity field '{field}' is outside its supported range"
+                ));
+            }
+        }
+        let _ = self.enabled;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SkinToneUniformityV2 {
+    skin_tone_uniformity: SkinToneUniformitySettingsV1,
+}
+
+fn parse_skin_tone_uniformity(params: &Map<String, Value>) -> Result<SkinToneUniformityV2, String> {
+    let parsed = serde_json::from_value::<SkinToneUniformityV2>(Value::Object(params.clone()))
+        .map_err(|error| format!("EditDocumentV2 skin_tone_uniformity is invalid: {error}"))?;
+    parsed.skin_tone_uniformity.validate()?;
+    Ok(parsed)
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -2422,6 +2503,10 @@ fn compile_node_params(
             parse_selective_color_mixer(&node.params)?;
             Ok(node.params.clone())
         }
+        EditNodeTypeV2::SkinToneUniformity => {
+            parse_skin_tone_uniformity(&node.params)?;
+            Ok(node.params.clone())
+        }
         EditNodeTypeV2::BlackWhiteMixer => {
             parse_black_white_mixer(&node.params)?;
             Ok(node.params.clone())
@@ -2837,7 +2922,7 @@ mod tests {
     };
     use crate::render::cpu_edit_graph::{
         apply_creative_color, apply_hsl_panel, apply_hue_shift, apply_local_contrast,
-        apply_luma_levels,
+        apply_luma_levels, apply_skin_tone_uniformity,
     };
     use crate::render::film_emulation::{
         apply_pixel as apply_film_pixel, parse_node as parse_film_node,
@@ -2965,6 +3050,31 @@ mod tests {
             "params": selective_color_mixer_params(),
             "process": "scene_referred_v2",
             "type": "selective_color_mixer"
+        })
+    }
+
+    fn skin_tone_uniformity_params() -> Value {
+        json!({
+            "skinToneUniformity": {
+                "enabled": true,
+                "hueUniformity": 0.42,
+                "luminanceUniformity": 0.18,
+                "maxHueShiftDegrees": 16,
+                "saturationUniformity": 0.31,
+                "targetHueDegrees": 24,
+                "targetLuminance": 0.56,
+                "targetSaturation": 0.38
+            }
+        })
+    }
+
+    fn skin_tone_uniformity_node() -> Value {
+        json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": skin_tone_uniformity_params(),
+            "process": "scene_referred_v2",
+            "type": "skin_tone_uniformity"
         })
     }
 
@@ -3370,6 +3480,7 @@ mod tests {
         document["nodes"]["color_balance_rgb"] = color_balance_rgb_node();
         document["nodes"]["luma_levels"] = luma_levels_node();
         document["nodes"]["selective_color_mixer"] = selective_color_mixer_node();
+        document["nodes"]["skin_tone_uniformity"] = skin_tone_uniformity_node();
         document
     }
 
@@ -4795,6 +4906,65 @@ mod tests {
             .into_render_adjustments()
             .expect_err("invalid selective-color range control must fail");
         assert!(error.contains("selectiveColorRangeControls.reds.centerHueDegrees"));
+    }
+
+    #[test]
+    fn skin_tone_uniformity_compiler_is_strict_and_drives_native_pixel_output() {
+        let document: EditDocumentV2 = serde_json::from_value(document_with_legacy(json!({})))
+            .expect("valid skin-tone document");
+        let compiled = document
+            .into_render_adjustments()
+            .expect("skin-tone document compiles");
+        let adjustments = get_all_adjustments_from_json(&compiled, false, None);
+        let input = Vec3::new(0.42, 0.12, 0.045);
+        let output = apply_skin_tone_uniformity(input, adjustments.global.skin_tone_uniformity);
+        assert!(
+            output.distance(input) > 1.0e-4,
+            "skin-tone node must alter a representative warm pixel: {output:?}"
+        );
+
+        let mut legacy_document = document_with_legacy(skin_tone_uniformity_params());
+        legacy_document["nodes"]
+            .as_object_mut()
+            .expect("node map")
+            .remove("skin_tone_uniformity");
+        let legacy: EditDocumentV2 = serde_json::from_value(legacy_document)
+            .expect("pre-skin-tone-node v2 document remains parseable");
+        let legacy_compiled = legacy
+            .into_render_adjustments()
+            .expect("legacy skin-tone field compiles");
+        let legacy_adjustments = get_all_adjustments_from_json(&legacy_compiled, false, None);
+        let legacy_output =
+            apply_skin_tone_uniformity(input, legacy_adjustments.global.skin_tone_uniformity);
+        assert!(
+            output.distance(legacy_output) <= 1.0e-6,
+            "node and legacy skin-tone authority must remain pixel-identical"
+        );
+
+        let mut unowned = document_with_legacy(json!({}));
+        unowned["nodes"]["skin_tone_uniformity"]["params"]["futureUniformity"] = json!(true);
+        let error = serde_json::from_value::<EditDocumentV2>(unowned)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("unowned skin-tone field must fail");
+        assert!(error.contains("unknown field `futureUniformity`"));
+
+        let mut out_of_range = document_with_legacy(json!({}));
+        out_of_range["nodes"]["skin_tone_uniformity"]["params"]["skinToneUniformity"]["targetHueDegrees"] =
+            json!(360);
+        let error = serde_json::from_value::<EditDocumentV2>(out_of_range)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("out-of-range skin-tone hue must fail");
+        assert!(error.contains("targetHueDegrees"));
+
+        let mut conflict = document_with_legacy(skin_tone_uniformity_params());
+        conflict["nodes"]["skin_tone_uniformity"] = skin_tone_uniformity_node();
+        let error = serde_json::from_value::<EditDocumentV2>(conflict)
+            .expect("document envelope remains parseable")
+            .into_render_adjustments()
+            .expect_err("mixed skin-tone authority must fail");
+        assert!(error.contains("conflicts with quarantined legacy field 'skinToneUniformity'"));
     }
 
     #[test]

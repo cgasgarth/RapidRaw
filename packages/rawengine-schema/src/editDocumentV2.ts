@@ -20,6 +20,11 @@ import {
   sourceDecodeParamsV1Schema,
 } from './rawProcessingModeSchemas.js';
 import { matchLookApplicationReceiptV1Schema } from './referenceMatchRuntime.js';
+import {
+  SKIN_TONE_UNIFORMITY_PARAMS_V1_DEFAULTS,
+  SKIN_TONE_UNIFORMITY_PARAMS_V1_FIELDS,
+  skinToneUniformityParamsV1Schema,
+} from './skinToneUniformitySchemas.js';
 import { toneEqualizerSettingsV1Schema } from './tone/toneEqualizerSchemas.js';
 
 export const EDIT_DOCUMENT_V2_SCHEMA_VERSION = 2;
@@ -27,6 +32,14 @@ export const EDIT_DOCUMENT_V2_SCHEMA_VERSION = 2;
 export const editDocumentSourceDecodeV2Schema = sourceDecodeParamsV1Schema;
 export const EDIT_DOCUMENT_SOURCE_DECODE_DEFAULTS = SOURCE_DECODE_PARAMS_V1_DEFAULTS;
 export const EDIT_DOCUMENT_SOURCE_DECODE_FIELDS = SOURCE_DECODE_PARAMS_V1_FIELDS;
+
+export const editDocumentSkinToneUniformityV2Schema = z
+  .object({ skinToneUniformity: skinToneUniformityParamsV1Schema })
+  .strict();
+export const EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_DEFAULTS = {
+  skinToneUniformity: SKIN_TONE_UNIFORMITY_PARAMS_V1_DEFAULTS,
+} as const;
+export const EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_FIELDS = SKIN_TONE_UNIFORMITY_PARAMS_V1_FIELDS;
 
 export const EDIT_DOCUMENT_COLOR_PRESENCE_DEFAULTS = {
   hue: 0,
@@ -793,6 +806,16 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
   },
   {
     capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
+    defaultParams: EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_DEFAULTS,
+    editorSection: 'color',
+    legacyFields: EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_FIELDS,
+    nodeType: 'skin_tone_uniformity',
+    process: 'scene_referred_v2',
+    renderStage: 'skin_tone_uniformity',
+    implementationVersion: 1,
+  },
+  {
+    capabilities: { batch: true, copy: true, paste: true, preset: 'creative', provenance: 'strip', reset: true },
     defaultParams: {
       blackWhiteMixer: {
         enabled: false,
@@ -1390,6 +1413,14 @@ const editDocumentNodesV2Schema = z
           context.addIssue({ code: 'custom', message: "Node 'source_decode' cannot be disabled." });
         }
       }
+      if (nodeType === 'skin_tone_uniformity') {
+        const parsed = editDocumentSkinToneUniformityV2Schema.safeParse(node.params);
+        if (!parsed.success) {
+          for (const issue of parsed.error.issues) {
+            context.addIssue({ ...issue, path: [nodeType, 'params', ...issue.path] });
+          }
+        }
+      }
       if (nodeType === 'scene_global_color_tone') {
         const parsed = sceneGlobalColorToneParamsV2Schema.safeParse(node.params);
         if (!parsed.success) {
@@ -1842,6 +1873,17 @@ export const editDocumentV2Schema = z.preprocess((value) => {
     schemas: editDocumentSelectiveColorMixerV2Schema.shape,
   });
   document = normalizeLegacyNodeOwnership(document, {
+    createNode: {
+      enabledFromNodeType: 'channel_mixer',
+      implementationVersion: 1,
+      process: 'scene_referred_v2',
+    },
+    defaults: EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_DEFAULTS,
+    fields: EDIT_DOCUMENT_SKIN_TONE_UNIFORMITY_FIELDS,
+    nodeType: 'skin_tone_uniformity',
+    schemas: editDocumentSkinToneUniformityV2Schema.shape,
+  });
+  document = normalizeLegacyNodeOwnership(document, {
     defaults: EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_DEFAULTS,
     fields: EDIT_DOCUMENT_PERSPECTIVE_CORRECTION_FIELDS,
     nodeType: 'geometry',
@@ -1872,6 +1914,7 @@ export type EditDocumentV2 = z.infer<typeof editDocumentV2Schema>;
 export type EditDocumentMigrationReceiptV2 = z.infer<typeof editDocumentMigrationReceiptV2Schema>;
 export type EditDocumentCameraInputV2 = z.infer<typeof editDocumentCameraInputV2Schema>;
 export type EditDocumentSourceDecodeV2 = z.infer<typeof editDocumentSourceDecodeV2Schema>;
+export type EditDocumentSkinToneUniformityV2 = z.infer<typeof editDocumentSkinToneUniformityV2Schema>;
 export type EditDocumentDetailDenoiseDehazeV2 = z.infer<typeof editDocumentDetailDenoiseDehazeV2Schema>;
 export type EditDocumentDisplayCreativeV2 = z.infer<typeof editDocumentDisplayCreativeV2Schema>;
 export type EditDocumentFilmEmulationV2 = z.infer<typeof editDocumentFilmEmulationV2Schema>;
@@ -1909,6 +1952,7 @@ export const compileEditDocumentNodeV2 = (node: unknown): CompiledEditDocumentNo
     throw new Error(`Node '${envelope.type}' has an unsupported version.`);
   }
   if (envelope.type === 'source_decode') editDocumentSourceDecodeV2Schema.parse(envelope.params);
+  if (envelope.type === 'skin_tone_uniformity') editDocumentSkinToneUniformityV2Schema.parse(envelope.params);
   if (envelope.type === 'scene_global_color_tone') sceneGlobalColorToneParamsV2Schema.parse(envelope.params);
   if (envelope.type === 'scene_curve') editDocumentSceneCurveV2Schema.parse(envelope.params);
   if (envelope.type === 'detail_denoise_dehaze') editDocumentDetailDenoiseDehazeV2Schema.parse(envelope.params);

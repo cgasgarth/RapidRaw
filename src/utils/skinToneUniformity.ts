@@ -16,6 +16,7 @@ export interface SkinToneUniformityInput {
 export interface SkinToneUniformitySettings {
   hueUniformity: number;
   luminanceUniformity: number;
+  maxHueShiftDegrees?: number;
   saturationUniformity: number;
   targetHueDegrees: number;
   targetLuminance: number;
@@ -90,7 +91,10 @@ export const applySkinToneUniformity = (
   const saturationAmount = clamp(settings.saturationUniformity, 0, 1);
   const luminanceAmount = clamp(settings.luminanceUniformity, 0, 1);
 
-  const hueDeltaDegrees = shortestHueDelta(input.hueDegrees, settings.targetHueDegrees) * hueAmount;
+  const maxHueShiftDegrees = clamp(settings.maxHueShiftDegrees ?? 180, 0, 180);
+  const hueDeltaDegrees =
+    clamp(shortestHueDelta(input.hueDegrees, settings.targetHueDegrees), -maxHueShiftDegrees, maxHueShiftDegrees) *
+    hueAmount;
   const saturationDelta = (settings.targetSaturation - input.saturation) * saturationAmount;
   const luminanceDelta = (settings.targetLuminance - input.luminance) * luminanceAmount;
 

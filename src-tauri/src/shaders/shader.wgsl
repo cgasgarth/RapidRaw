@@ -12,6 +12,17 @@ struct HslColor {
     _pad: f32,
 }
 
+struct SkinToneUniformitySettings {
+    enabled: u32,
+    hue_uniformity: f32,
+    luminance_uniformity: f32,
+    max_hue_shift_degrees: f32,
+    saturation_uniformity: f32,
+    target_hue_degrees: f32,
+    target_luminance: f32,
+    target_saturation: f32,
+}
+
 struct ColorGradeSettings {
     hue: f32,
     saturation: f32,
@@ -225,6 +236,7 @@ struct GlobalAdjustments {
     levels: LevelsSettings,
 
     hsl: array<HslColor, 8>,
+    skin_tone_uniformity: SkinToneUniformitySettings,
     luma_curve: array<Point, 16>,
     red_curve: array<Point, 16>,
     green_curve: array<Point, 16>,
@@ -1340,6 +1352,84 @@ fn apply_hsl_panel(color: vec3<f32>, hsl_adjustments: array<HslColor, 8>, coords
     }
     let final_color = hs_shifted_rgb * (target_luma / new_luma);
     return final_color + negative_residual;
+}
+
+fn wrap_degrees(value: f32) -> f32 {
+    return value - floor(value / 360.0) * 360.0;
+}
+
+fn apply_skin_tone_uniformity(color: vec3<f32>, settings: SkinToneUniformitySettings) -> vec3<f32> {
+    if (settings.enabled == 0u) {
+        return color;
+    }
+    let negative_residual = min(color, vec3<f32>(0.0));
+    let ap1 = max(color, vec3<f32>(0.0));
+    let linear_srgb = vec3<f32>(
+        1.7050515 * ap1.r - 0.6217907 * ap1.g - 0.0832584 * ap1.b,
+        -0.1302571 * ap1.r + 1.1408029 * ap1.g - 0.0105485 * ap1.b,
+        -0.0240033 * ap1.r - 0.1289688 * ap1.g + 1.1529717 * ap1.b,
+    );
+    let srgb = linear_to_srgb_extended(linear_srgb);
+    if (min(min(srgb.r, srgb.g), srgb.b) < 0.0 || max(max(srgb.r, srgb.g), srgb.b) > 1.0) {
+        return color;
+    }
+    let maximum = max(max(srgb.r, srgb.g), srgb.b);
+    let minimum = min(min(srgb.r, srgb.g), srgb.b);
+    let luminance = (maximum + minimum) * 0.5;
+    let chroma = maximum - minimum;
+    var hue = 0.0;
+    var saturation = 0.0;
+    if (chroma > 0.000001) {
+        saturation = chroma / max(1.0 - abs(2.0 * luminance - 1.0), 0.000001);
+        if (maximum == srgb.r) {
+            hue = wrap_degrees(60.0 * ((srgb.g - srgb.b) / chroma));
+        } else if (maximum == srgb.g) {
+            hue = 60.0 * ((srgb.b - srgb.r) / chroma + 2.0);
+        } else {
+            hue = 60.0 * ((srgb.r - srgb.g) / chroma + 4.0);
+        }
+        hue = wrap_degrees(hue);
+    }
+    let shortest_delta = wrap_degrees(settings.target_hue_degrees - hue + 180.0) - 180.0;
+    let hue_delta = clamp(
+        shortest_delta,
+        -settings.max_hue_shift_degrees,
+        settings.max_hue_shift_degrees,
+    ) * settings.hue_uniformity;
+    let adjusted_hue = wrap_degrees(hue + hue_delta);
+    let adjusted_saturation = clamp(
+        saturation + (settings.target_saturation - saturation) * settings.saturation_uniformity,
+        0.0,
+        1.0,
+    );
+    let adjusted_luminance = clamp(
+        luminance + (settings.target_luminance - luminance) * settings.luminance_uniformity,
+        0.0,
+        1.0,
+    );
+    let adjusted_chroma = (1.0 - abs(2.0 * adjusted_luminance - 1.0)) * adjusted_saturation;
+    let hue_sector = adjusted_hue / 60.0;
+    let secondary = adjusted_chroma * (1.0 - abs((hue_sector - floor(hue_sector / 2.0) * 2.0) - 1.0));
+    var rgb = vec3<f32>(adjusted_chroma, secondary, 0.0);
+    let sector = u32(floor(hue_sector));
+    if (sector == 1u) {
+        rgb = vec3<f32>(secondary, adjusted_chroma, 0.0);
+    } else if (sector == 2u) {
+        rgb = vec3<f32>(0.0, adjusted_chroma, secondary);
+    } else if (sector == 3u) {
+        rgb = vec3<f32>(0.0, secondary, adjusted_chroma);
+    } else if (sector == 4u) {
+        rgb = vec3<f32>(secondary, 0.0, adjusted_chroma);
+    } else if (sector >= 5u) {
+        rgb = vec3<f32>(adjusted_chroma, 0.0, secondary);
+    }
+    let offset = adjusted_luminance - adjusted_chroma * 0.5;
+    let adjusted_linear_srgb = srgb_to_linear(rgb + vec3<f32>(offset));
+    return vec3<f32>(
+        0.6130974 * adjusted_linear_srgb.r + 0.3395231 * adjusted_linear_srgb.g + 0.0473795 * adjusted_linear_srgb.b,
+        0.0701937 * adjusted_linear_srgb.r + 0.9163539 * adjusted_linear_srgb.g + 0.0134524 * adjusted_linear_srgb.b,
+        0.0206156 * adjusted_linear_srgb.r + 0.1095698 * adjusted_linear_srgb.g + 0.8698146 * adjusted_linear_srgb.b,
+    ) + negative_residual;
 }
 
 fn point_color_ap1_to_oklch(ap1: vec3<f32>) -> vec3<f32> {
@@ -2887,6 +2977,10 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     composite_rgb_linear = apply_color_calibration(composite_rgb_linear, adjustments.global.color_calibration);
     composite_rgb_linear = apply_hsl_panel(composite_rgb_linear, final_hsl, absolute_coord_i);
+    composite_rgb_linear = apply_skin_tone_uniformity(
+        composite_rgb_linear,
+        adjustments.global.skin_tone_uniformity,
+    );
     composite_rgb_linear = apply_point_color(composite_rgb_linear, adjustments.global.point_color);
     for (var i = 0u; i < adjustments.mask_count; i += 1u) {
         let influence = get_mask_influence(i, absolute_coord);
