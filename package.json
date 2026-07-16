@@ -19,7 +19,7 @@
     "install:computer-use": "bun scripts/dev/install-computer-use-app.ts",
     "start:native-qa": "bun scripts/dev/start-native-qa-app.ts",
     "test": "bun run test:unit && bun run test:e2e",
-    "test:unit": "bun test --no-orphans --dots --parallel tests/pure-ts",
+    "test:unit": "bun scripts/ci/run-bun-unit.ts",
     "test:coverage": "bun test --no-orphans --dots --parallel --coverage tests/pure-ts && bun scripts/ci/check-bun-coverage.ts",
     "test:randomized": "bun scripts/ci/run-bun-randomized-tests.ts",
     "test:e2e": "bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library && bun run check:browser-harness",

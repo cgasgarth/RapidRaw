@@ -82,15 +82,21 @@ if (allLaneCommands.filter((command) => command === 'bun run check:bundle').leng
   throw new Error('The production Vite bundle must be built and validated exactly once.');
 if (allLaneCommands.some((command) => command === 'bun scripts/ci/generate-vite-bundle-report.ts'))
   throw new Error('Bundle reporting must consume the report already produced by check:bundle.');
-if (!packageScripts['test:unit']?.startsWith('bun test ') || !packageScripts['test:unit'].includes('--parallel'))
-  throw new Error('The unit lane must delegate directly to Bun test with native parallel scheduling.');
+if (packageScripts['test:unit'] !== 'bun scripts/ci/run-bun-unit.ts')
+  throw new Error('The unit lane must use the maintained actionable Bun failure boundary.');
+const unitRunner = readFileSync('scripts/ci/run-bun-unit.ts', 'utf8');
+for (const token of ["['bun', 'test'", "'--only-failures'", "'--parallel'"]) {
+  if (!unitRunner.includes(token)) throw new Error(`The Bun unit boundary lost native runner token ${token}.`);
+}
+if (/run-resource-coordinated|run-pure-ts-unit|--parallel=1|--shard/u.test(unitRunner))
+  throw new Error('The Bun unit boundary introduced a scheduler, shard, or forced serial execution.');
 if (
   !packageScripts['test:coverage']?.startsWith('bun test ') ||
   !packageScripts['test:coverage'].includes('--coverage') ||
   !packageScripts['test:coverage'].includes('bun scripts/ci/check-bun-coverage.ts')
 )
   throw new Error('The coverage lane must delegate directly to Bun native coverage.');
-if (packageScripts['test:coverage']?.includes('turbo') || packageScripts['test:unit']?.includes('turbo'))
+if (packageScripts['test:coverage']?.includes('turbo') || unitRunner.includes('turbo'))
   throw new Error('Bun unit and coverage suites must not use a third-party scheduler.');
 if (packageScripts['test:randomized'] !== 'bun scripts/ci/run-bun-randomized-tests.ts')
   throw new Error('The randomized lane must use the maintained seed-emitting Bun wrapper.');
