@@ -13,8 +13,8 @@ North star: `RAW_EDITOR_PLAN.md` drives a macOS-first, Capture One/Lightroom-cla
 
 - Use the repo-scoped roles declared in `.codex/config.toml`; do not spawn an unprofiled general subagent.
 - Use `luna_low` (GPT-5.6 Luna, low reasoning) only for polling, PR/check queue observation, bounded data gathering, and lightweight status work. It must not own implementation or architecture decisions.
-- Use `luna_xhigh` (GPT-5.6 Luna, xhigh reasoning) as the default generalist for well-scoped implementation, testing, review fixes, and PR delivery.
-- Use `sol_high` (GPT-5.6 Sol, high reasoning) for UI implementation or visible validation, complex or algorithmic changes, architecture, and high-risk cross-system work.
+- Use `luna_xhigh` (GPT-5.6 Luna, xhigh reasoning) for all implementation, testing, review fixes, PR delivery, UI work, architecture, and complex or high-risk changes.
+- Do not use Sol subagents. `sol_high` remains configured only for an explicit future owner opt-in; the current routing policy is Luna-only.
 - Route by the hardest material part of the assignment. Re-route or split work when its actual complexity no longer matches the selected profile.
 - Use programmatic tool calling or compact local scripts when tool-heavy work needs filtering, progress checks, or intermediate-data reduction without flooding model context.
 - Subagents may implement, validate, and open PRs when issue context is sufficient. Orchestrator still reviews scope, validation evidence, issue linkage, and merge safety.
