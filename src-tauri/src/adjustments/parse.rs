@@ -3,7 +3,7 @@ use crate::adjustments::abi::{
     ColorBalanceRgbSettings, ColorCalibrationSettings, ColorGradeSettings, GlobalAdjustments,
     GpuMat3, HslColor, LevelsSettings, MAX_MASKS, MAX_POINT_COLOR_POINTS, MaskAdjustments,
     PerceptualGradingGpuSettings, Point, PointColorGpuPoint, PointColorGpuSettings,
-    ToneEqualizerGpuSettings,
+    SkinToneUniformitySettings, ToneEqualizerGpuSettings,
 };
 use crate::adjustments::scales::SCALES;
 use crate::color::perceptual_grading::{PerceptualGradingPlanV1, PerceptualGradingSettingsV1};
@@ -102,6 +102,19 @@ fn parse_hsl_adjustments(js_hsl: &JsonValue) -> [HslColor; 8] {
         }
     }
     hsl_array
+}
+
+fn parse_skin_tone_uniformity(value: &JsonValue) -> SkinToneUniformitySettings {
+    SkinToneUniformitySettings {
+        enabled: u32::from(value["enabled"].as_bool().unwrap_or(false)),
+        hue_uniformity: value["hueUniformity"].as_f64().unwrap_or(0.42) as f32,
+        luminance_uniformity: value["luminanceUniformity"].as_f64().unwrap_or(0.18) as f32,
+        max_hue_shift_degrees: value["maxHueShiftDegrees"].as_f64().unwrap_or(16.0) as f32,
+        saturation_uniformity: value["saturationUniformity"].as_f64().unwrap_or(0.31) as f32,
+        target_hue_degrees: value["targetHueDegrees"].as_f64().unwrap_or(24.0) as f32,
+        target_luminance: value["targetLuminance"].as_f64().unwrap_or(0.56) as f32,
+        target_saturation: value["targetSaturation"].as_f64().unwrap_or(0.38) as f32,
+    }
 }
 
 fn parse_color_grade_settings(js_cg: &JsonValue) -> ColorGradeSettings {
@@ -768,6 +781,16 @@ fn get_global_adjustments_from_json(
             parse_hsl_adjustments(&js_adjustments.get("hsl").cloned().unwrap_or_default())
         } else {
             [HslColor::default(); 8]
+        },
+        skin_tone_uniformity: if section_is_visible(js_adjustments, "color") {
+            parse_skin_tone_uniformity(
+                &js_adjustments
+                    .get("skinToneUniformity")
+                    .cloned()
+                    .unwrap_or_default(),
+            )
+        } else {
+            SkinToneUniformitySettings::default()
         },
         luma_curve: convert_points_to_aligned(luma_points.clone()),
         red_curve: convert_points_to_aligned(red_points.clone()),

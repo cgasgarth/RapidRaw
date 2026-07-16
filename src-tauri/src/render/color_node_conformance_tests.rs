@@ -117,6 +117,16 @@ fn node_adjustments(id: &str) -> AllAdjustments {
             value.global.hsl[4].saturation = 0.25;
             value.global.hsl[4].luminance = -0.08;
         }
+        "skin_tone_uniformity" => {
+            value.global.skin_tone_uniformity.enabled = 1;
+            value.global.skin_tone_uniformity.hue_uniformity = 0.42;
+            value.global.skin_tone_uniformity.luminance_uniformity = 0.18;
+            value.global.skin_tone_uniformity.max_hue_shift_degrees = 16.0;
+            value.global.skin_tone_uniformity.saturation_uniformity = 0.31;
+            value.global.skin_tone_uniformity.target_hue_degrees = 24.0;
+            value.global.skin_tone_uniformity.target_luminance = 0.56;
+            value.global.skin_tone_uniformity.target_saturation = 0.38;
+        }
         "rgb_curves" => {
             value.global.luma_curve_count = 3;
             value.global.luma_curve[0].x = 0.0;
@@ -314,7 +324,7 @@ fn registry_is_ordered_unique_and_every_node_has_an_executable_adapter() {
     }
     assert_eq!(
         ids.len(),
-        24,
+        25,
         "new or removed production nodes require a contract and adapter"
     );
 }
@@ -480,6 +490,83 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
         raw_trace: raw_trace_association(),
     };
     write_report(&report);
+}
+
+#[test]
+fn skin_tone_uniformity_has_cpu_wgpu_and_preview_export_pixel_parity() {
+    let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 8, |x, y| {
+        let red = 0.16 + x as f32 * 0.025;
+        let green = 0.055 + y as f32 * 0.009;
+        let blue = 0.025 + (x + y) as f32 * 0.002;
+        Rgba([red, green, blue, 0.81])
+    }));
+    let recipe = serde_json::json!({
+        "rawEngineEditGraphVersion": 2,
+        "skinToneUniformity": {
+            "enabled": true,
+            "hueUniformity": 0.42,
+            "luminanceUniformity": 0.18,
+            "maxHueShiftDegrees": 16,
+            "saturationUniformity": 0.31,
+            "targetHueDegrees": 24,
+            "targetLuminance": 0.56,
+            "targetSaturation": 0.38
+        }
+    });
+    let plan = crate::render::render_plan::compile_render_plan(
+        &recipe,
+        crate::render::render_plan::CompileRenderPlanContext {
+            revision: crate::render::render_plan::content_revision(&recipe, 1, 53, 6),
+            is_raw: true,
+            tonemapper_override: Some(0),
+        },
+        None,
+    )
+    .expect("skin-tone render plan compiles");
+    let cpu = crate::render::cpu_edit_graph::execute_cpu_edit_graph(
+        &source,
+        &plan.adjustments,
+        &[],
+        None,
+        &plan.edit_graph,
+    )
+    .expect("skin-tone CPU graph executes");
+    let app = tauri::test::mock_builder()
+        .manage(AppState::new())
+        .build(tauri::test::mock_context(tauri::test::noop_assets()))
+        .expect("mock Tauri app builds");
+    let state = app.state::<AppState>();
+    let context = get_or_init_compute_gpu_context_for_tests(&state)
+        .expect("compute-only GPU context initializes");
+    let render = |consumer| {
+        process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "skin_tone_uniformity_parity"),
+            RenderRequest {
+                adjustments: plan.adjustments.clone(),
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
+            },
+            consumer,
+        )
+        .expect("skin-tone WGPU graph executes")
+    };
+    let preview = render("skin_tone_uniformity_preview");
+    let export = render("skin_tone_uniformity_export");
+
+    assert!(
+        max_delta(&source, &preview) > 1.0e-4,
+        "enabled node must alter pixels"
+    );
+    assert!(
+        max_delta(&cpu, &preview) <= 3.0e-3,
+        "skin-tone CPU/WGPU output diverged"
+    );
+    assert_eq!(max_delta(&preview, &export), 0.0);
 }
 
 #[test]
@@ -750,6 +837,7 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         black_white_mixer,
         levels,
         hsl,
+        skin_tone_uniformity,
         luma_curve,
         red_curve,
         green_curve,
@@ -847,6 +935,7 @@ fn global_abi_coverage_tripwire(global: GlobalAdjustments) {
         black_white_mixer,
         levels,
         hsl,
+        skin_tone_uniformity,
         luma_curve,
         red_curve,
         green_curve,

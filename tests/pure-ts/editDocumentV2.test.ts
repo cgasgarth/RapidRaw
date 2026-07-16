@@ -87,6 +87,7 @@ describe('EditDocumentV2 legacy adapter', () => {
       'point_color',
       'color_balance_rgb',
       'selective_color_mixer',
+      'skin_tone_uniformity',
       'black_white_mixer',
       'channel_mixer',
       'luma_levels',
@@ -481,6 +482,35 @@ describe('EditDocumentV2 legacy adapter', () => {
       };
     }
     expect(() => editDocumentV2Schema.parse(invalidControl)).toThrow();
+  });
+
+  test('owns strict skin-tone uniformity state outside legacy extensions', () => {
+    const skinToneUniformity = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.skinToneUniformity),
+      enabled: true,
+      hueUniformity: 0.6,
+      maxHueShiftDegrees: 12,
+      targetHueDegrees: 31,
+    };
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      skinToneUniformity,
+    });
+
+    expect(document.nodes.skin_tone_uniformity?.params).toEqual({ skinToneUniformity });
+    expect(document.extensions.legacyAdjustments).not.toHaveProperty('skinToneUniformity');
+    expect(document.migration?.mapped).toContain('skin_tone_uniformity.skinToneUniformity');
+    expect(compileEditDocumentNodeV2(document.nodes.skin_tone_uniformity).params).toEqual({ skinToneUniformity });
+
+    const unknown = structuredClone(document);
+    if (unknown.nodes.skin_tone_uniformity) unknown.nodes.skin_tone_uniformity.params.futureUniformity = true;
+    expect(() => editDocumentV2Schema.parse(unknown)).toThrow();
+
+    const outOfRange = structuredClone(document);
+    if (outOfRange.nodes.skin_tone_uniformity) {
+      outOfRange.nodes.skin_tone_uniformity.params.skinToneUniformity.targetHueDegrees = 360;
+    }
+    expect(() => editDocumentV2Schema.parse(outOfRange)).toThrow();
   });
 
   test('lens correction owns strict profile identity, coefficients, and integer amounts', () => {
