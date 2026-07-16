@@ -65,7 +65,7 @@ test('Detail inspector commits chromatic aberration through lens node authority'
     await flushPromises();
   });
 
-  expect(useEditorStore.getState().adjustments.chromaticAberrationRedCyan).toBe(23);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.chromaticAberrationRedCyan).toBe(23);
   expect(useEditorStore.getState().editDocumentV2.nodes.lens_correction.params.chromaticAberrationRedCyan).toBe(23);
   expect(useEditorStore.getState().editDocumentV2.nodes.detail_denoise_dehaze.params).not.toHaveProperty(
     'chromaticAberrationRedCyan',
@@ -94,7 +94,7 @@ test('Detail mask controls keep local denoise values outside the global transact
 });
 
 function DenoiseControlsHarness() {
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   return createElement(
     'div',
     null,
@@ -160,10 +160,7 @@ function installEditorSession() {
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: createEditorImageSession({ generation: 1, path, source: 'cache' }),
@@ -180,6 +177,7 @@ function installEditorSession() {
       thumbnailUrl: '',
       width: 4000,
     },
+    history: [editDocumentV2],
   });
 }
 

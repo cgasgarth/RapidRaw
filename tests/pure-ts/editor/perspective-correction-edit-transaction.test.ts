@@ -73,15 +73,13 @@ describe('perspective correction edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -99,7 +97,7 @@ describe('perspective correction edit transaction', () => {
     expect(request.operations).toEqual([
       {
         nodeType: 'geometry',
-        patch: { perspectiveCorrection: { ...state.adjustments.perspectiveCorrection, resolvedPlan } },
+        patch: { perspectiveCorrection: { ...state.adjustmentSnapshot.value.perspectiveCorrection, resolvedPlan } },
         type: 'patch-edit-document-node',
       },
     ]);
@@ -130,7 +128,7 @@ describe('perspective correction edit transaction', () => {
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 1, historyIndex: 1 });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.perspectiveCorrection.resolvedPlan).toBeNull();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.perspectiveCorrection.resolvedPlan).toBeNull();
     expect(
       useEditorStore.getState().editDocumentV2.nodes.geometry.params.perspectiveCorrection.resolvedPlan,
     ).toBeNull();
@@ -150,7 +148,7 @@ describe('perspective correction edit transaction', () => {
       storeEmissions += 1;
     });
     const noOp = state.applyEditTransaction(
-      build(identity(), { amount: state.adjustments.perspectiveCorrection.amount }),
+      build(identity(), { amount: state.adjustmentSnapshot.value.perspectiveCorrection.amount }),
     );
     unsubscribe();
     expect(noOp.noOp).toBe(true);
@@ -197,7 +195,7 @@ describe('perspective correction edit transaction', () => {
       buildPerspectiveCorrectionEditTransaction(
         state,
         fallbackIdentity,
-        { amount: state.adjustments.perspectiveCorrection.amount },
+        { amount: state.adjustmentSnapshot.value.perspectiveCorrection.amount },
         'fallback-perspective-no-op',
       ),
     );
@@ -223,7 +221,7 @@ describe('perspective correction edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.perspectiveCorrection.amount).toBe(
+    expect(useEditorStore.getState().adjustmentSnapshot.value.perspectiveCorrection.amount).toBe(
       INITIAL_ADJUSTMENTS.perspectiveCorrection.amount,
     );
 

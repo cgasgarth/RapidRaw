@@ -45,16 +45,13 @@ describe('raw processing mode override edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
-      editDocumentHistory: [editDocumentV2],
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -83,9 +80,9 @@ describe('raw processing mode override edit transaction', () => {
     );
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.rawProcessingModeOverride).toBeNull();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.rawProcessingModeOverride).toBeNull();
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustments.rawProcessingModeOverride).toBe('maximum');
+    expect(useEditorStore.getState().adjustmentSnapshot.value.rawProcessingModeOverride).toBe('maximum');
   });
 
   test('supports inherit/reset but excludes source-decode state from copy and presets', () => {

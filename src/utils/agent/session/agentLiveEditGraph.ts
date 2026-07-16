@@ -30,7 +30,7 @@ const adjustmentPathPattern = /^\/adjustments\/([A-Za-z0-9_]+)$/u;
 const currentGraphRevision = (): string => `history_${useEditorStore.getState().historyIndex}`;
 
 const isAdjustmentKey = (key: string): key is Extract<keyof Adjustments, string> =>
-  key in useEditorStore.getState().adjustments;
+  key in useEditorStore.getState().adjustmentSnapshot.value;
 
 const assertSelectedImageTarget = (command: EditGraphCommandEnvelopeV1): void => {
   const selectedImage = useEditorStore.getState().selectedImage;
@@ -141,7 +141,10 @@ export const applyEditGraphCommandToLiveEditor = async (
   const state = useEditorStore.getState();
   const commitIdentity = captureAgentEditGraphCommitIdentity(state);
   if (commitIdentity === null) throw new Error('Live editor editGraph apply requires a selected image session.');
-  const nextAdjustments = applyEditGraphOperationsToAdjustments(state.adjustments, command.parameters.operations);
+  const nextAdjustments = applyEditGraphOperationsToAdjustments(
+    state.adjustmentSnapshot.value,
+    command.parameters.operations,
+  );
   const bridgeResult = await dispatchEditGraphBridgeCommand(bridge, command, requestId);
   const mutation = editGraphMutationResultV1Schema.parse(bridgeResult);
   const currentState = useEditorStore.getState();

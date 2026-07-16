@@ -416,7 +416,7 @@ export default function TransformLens({
     const identity = capturePerspectiveCorrectionCommitIdentity(state);
     if (identity === null) return;
     const requestGeneration = ++perspectiveRequestGenerationRef.current;
-    const analysisAdjustments = structuredClone(state.adjustments);
+    const analysisAdjustments = structuredClone(state.adjustmentSnapshot.value);
     setPerspectiveStatus('analyzing');
     try {
       const result = await invokeWithSchema(
@@ -468,7 +468,7 @@ export default function TransformLens({
   };
 
   const addGuide = (className: 'horizontal' | 'vertical') => {
-    const current = useEditorStore.getState().adjustments.perspectiveCorrection;
+    const current = useEditorStore.getState().adjustmentSnapshot.value.perspectiveCorrection;
     const familyCount = current.guides.filter((guide) => guide.class === className).length;
     if (familyCount >= 2) return;
     const position = familyCount === 0 ? 0.25 : 0.75;
@@ -498,7 +498,7 @@ export default function TransformLens({
 
   const updateGuideCoordinate = (id: string, endpoint: 0 | 1, axis: 0 | 1, value: number) => {
     if (!Number.isFinite(value)) return;
-    const current = useEditorStore.getState().adjustments.perspectiveCorrection;
+    const current = useEditorStore.getState().adjustmentSnapshot.value.perspectiveCorrection;
     updatePerspective({
       guides: current.guides.map((guide) => {
         if (guide.id !== id) return guide;

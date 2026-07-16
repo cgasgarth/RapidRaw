@@ -44,7 +44,7 @@ test('routes every compact zoom mode through the canonical zoom command callback
 
 test('keyboard pan updates only the canonical viewer transform', async () => {
   const transforms: number[][] = [];
-  const adjustments = useEditorStore.getState().adjustments;
+  const adjustments = useEditorStore.getState().adjustmentSnapshot.value;
   const history = useEditorStore.getState().history;
   const controller: EditorTransformController = {
     instance: { transformState: { positionX: -400, positionY: -300, scale: 2 } },
@@ -59,7 +59,7 @@ test('keyboard pan updates only the canonical viewer transform', async () => {
   });
 
   expect(transforms.at(-1)).toEqual([-440, -300, 2]);
-  expect(useEditorStore.getState().adjustments).toBe(adjustments);
+  expect(useEditorStore.getState().adjustmentSnapshot.value).toBe(adjustments);
   expect(useEditorStore.getState().history).toBe(history);
 });
 
@@ -86,7 +86,10 @@ test('does not reload a coherent artifact when equivalent adjustments are reallo
 
   await act(async () => {
     useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
-      adjustments: { ...state.adjustments },
+      editDocumentV2: structuredClone(state.editDocumentV2),
+      history: state.history.map((entry, index) =>
+        index === state.historyIndex ? structuredClone(state.editDocumentV2) : entry,
+      ),
     }));
     await flushPromises();
   });

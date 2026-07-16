@@ -49,12 +49,9 @@ describe('agent lens profile EditTransaction bridge', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:agent-lens-profile-current',
       hasRenderedFirstFrame: true,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -73,6 +70,7 @@ describe('agent lens profile EditTransaction bridge', () => {
         width: 4000,
       },
       uncroppedAdjustedPreviewUrl: 'blob:agent-lens-profile-uncropped',
+      history: [editDocumentV2],
     });
   });
 
@@ -104,8 +102,8 @@ describe('agent lens profile EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustments.exposure).toBe(0.2);
-    expect(after.adjustments.lensDistortionAmount).toBe(INITIAL_ADJUSTMENTS.lensDistortionAmount);
+    expect(after.adjustmentSnapshot.value.exposure).toBe(0.2);
+    expect(after.adjustmentSnapshot.value.lensDistortionAmount).toBe(INITIAL_ADJUSTMENTS.lensDistortionAmount);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-lens-profile-edit');
   });
 

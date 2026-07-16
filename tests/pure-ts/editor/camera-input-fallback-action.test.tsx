@@ -23,10 +23,7 @@ test('camera input hook dispatches from a selected-image fallback session', () =
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
@@ -44,6 +41,7 @@ test('camera input hook dispatches from a selected-image fallback session', () =
       thumbnailUrl: '',
       width: 4000,
     },
+    history: [editDocumentV2],
   });
   let commitCameraInput: ReturnType<typeof useCameraInputEditCommit>['commitCameraInput'] | null = null;
   const Harness = () => {
@@ -56,7 +54,7 @@ test('camera input hook dispatches from a selected-image fallback session', () =
   act(() => root?.render(createElement(Harness)));
 
   act(() => commitCameraInput?.({ cameraProfile: 'camera_neutral', cameraProfileAmount: 74 }));
-  expect(useEditorStore.getState().adjustments).toMatchObject({
+  expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
     cameraProfile: 'camera_neutral',
     cameraProfileAmount: 74,
     exposure: 0.35,

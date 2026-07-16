@@ -27,11 +27,8 @@ describe('history navigation edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: null,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: createEditorImageSession({ generation: 42, path, source: 'cache' }),
@@ -41,6 +38,7 @@ describe('history navigation edit transaction', () => {
       selectedImage: null,
       transformedOriginalUrl: null,
       uncroppedAdjustedPreviewUrl: null,
+      history: [editDocumentV2],
     });
   });
 
@@ -67,8 +65,8 @@ describe('history navigation edit transaction', () => {
     expect(state.adjustmentRevision).toBe(3);
     expect(state.history).toHaveLength(3);
     expect(state.historyIndex).toBe(1);
-    expect(state.adjustments.exposure).toBe(0.75);
-    expect(state.adjustments.contrast).toBe(0);
+    expect(state.adjustmentSnapshot.value.exposure).toBe(0.75);
+    expect(state.adjustmentSnapshot.value.contrast).toBe(0);
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 3,
       baseAdjustmentRevision: 2,
@@ -85,7 +83,7 @@ describe('history navigation edit transaction', () => {
     state = useEditorStore.getState();
     expect(state.adjustmentRevision).toBe(4);
     expect(state.historyIndex).toBe(2);
-    expect(state.adjustments.contrast).toBe(18);
+    expect(state.adjustmentSnapshot.value.contrast).toBe(18);
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 4,
       baseAdjustmentRevision: 3,
@@ -96,8 +94,8 @@ describe('history navigation edit transaction', () => {
     state = useEditorStore.getState();
     expect(state.adjustmentRevision).toBe(5);
     expect(state.historyIndex).toBe(0);
-    expect(state.adjustments.exposure).toBe(0);
-    expect(state.adjustments.contrast).toBe(0);
+    expect(state.adjustmentSnapshot.value.exposure).toBe(0);
+    expect(state.adjustmentSnapshot.value.contrast).toBe(0);
     expect(state.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 5,
       baseAdjustmentRevision: 4,
@@ -107,14 +105,14 @@ describe('history navigation edit transaction', () => {
   });
 
   test('moves across duplicate history entries as an exact no-op without persistence authority or pixel invalidation', () => {
-    const adjustments = useEditorStore.getState().adjustments;
+    const editDocumentV2 = useEditorStore.getState().editDocumentV2;
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: useEditorStore.getState().adjustments,
       adjustmentRevision: 7,
+      editDocumentV2,
       finalPreviewUrl: 'blob:current-preview',
-      history: [adjustments, structuredClone(adjustments)],
       historyIndex: 1,
       lastEditApplicationReceipt: null,
+      history: [editDocumentV2, structuredClone(editDocumentV2)],
     });
 
     useEditorStore.getState().undo();

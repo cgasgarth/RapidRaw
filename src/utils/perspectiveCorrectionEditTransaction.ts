@@ -10,7 +10,7 @@ export interface PerspectiveCorrectionCommitIdentity {
 
 export interface PerspectiveCorrectionEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Pick<Adjustments, 'perspectiveCorrection'>;
+  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'perspectiveCorrection'> };
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -74,7 +74,7 @@ export const buildPerspectiveCorrectionEditTransaction = (
 ): EditTransactionRequest => {
   assertCurrentPerspectiveCorrectionIdentity(state, identity);
   const perspectiveCorrection = perspectiveCorrectionSettingsSchema.parse({
-    ...state.adjustments.perspectiveCorrection,
+    ...state.adjustmentSnapshot.value.perspectiveCorrection,
     ...structuredClone(patch),
   });
   return {

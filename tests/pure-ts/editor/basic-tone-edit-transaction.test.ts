@@ -39,15 +39,13 @@ describe('basic tone edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -76,8 +74,8 @@ describe('basic tone edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
-    expect(useEditorStore.getState().adjustments.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
   });
 
   test('supports every Basic field, exact no-ops, and stale source/session/revision rejection', () => {
@@ -129,8 +127,8 @@ describe('basic tone edit transaction', () => {
   test('commits Color Presence as one persistent node across reopen and Undo/Redo', () => {
     const state = useEditorStore.getState();
     const beforeGeometry = state.editDocumentV2.nodes.geometry;
-    const next = { ...state.adjustments, hue: 32, vibrance: 44 };
-    const operations = buildAdjustmentMutationOperations(state.adjustments, next);
+    const next = { ...state.adjustmentSnapshot.value, hue: 32, vibrance: 44 };
+    const operations = buildAdjustmentMutationOperations(state.adjustmentSnapshot.value, next);
     expect(operations).toEqual([
       {
         nodeType: 'color_presence',
@@ -217,7 +215,7 @@ describe('basic tone edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
     expect(() =>
       buildBasicToneEditTransaction(
         { ...state, imageSessionId: 38 },

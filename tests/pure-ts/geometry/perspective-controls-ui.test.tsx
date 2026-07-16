@@ -31,10 +31,7 @@ test('guided perspective controls create source-normalized horizontal and vertic
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: createEditorImageSession({ generation: 1, path: '/fixture/guided.ARW', source: 'cache' }),
@@ -47,6 +44,7 @@ test('guided perspective controls create source-normalized horizontal and vertic
       thumbnailUrl: '',
       width: 4000,
     },
+    history: [editDocumentV2],
   });
   const container = document.createElement('div');
   document.body.append(container);
@@ -79,7 +77,7 @@ test('guided perspective controls create source-normalized horizontal and vertic
 });
 
 function PerspectiveHarness() {
-  const adjustments = useEditorStore((state) => state.adjustments);
+  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
   const selectedImage = useEditorStore((state) => state.selectedImage);
   return createElement(
     'div',

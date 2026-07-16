@@ -18,11 +18,9 @@ describe('decoded image-open hydration edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 8,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:pre-hydration-preview',
-      history: [structuredClone(INITIAL_ADJUSTMENTS), adjustments],
+      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
       historyCheckpoints: [{ createdAt: '2026-07-15T00:00:00.000Z', historyIndex: 1, id: 'old', label: 'Old' }],
       historyIndex: 1,
       imageSession: session,
@@ -51,15 +49,15 @@ describe('decoded image-open hydration edit transaction', () => {
     const request = buildImageOpenHydrationEditTransaction(
       state,
       identity,
-      { ...decoded, aspectRatio: 1.5 },
+      legacyAdjustmentsToEditDocumentV2({ ...decoded, aspectRatio: 1.5 }),
       'decoded-hydration',
     );
 
     state.applyEditTransaction(request);
     const after = useEditorStore.getState();
-    expect(after.adjustments).toMatchObject({ aspectRatio: 1.5, contrast: 18, exposure: 0.35 });
+    expect(after.adjustmentSnapshot.value).toMatchObject({ aspectRatio: 1.5, contrast: 18, exposure: 0.35 });
     expect(after.adjustmentRevision).toBe(9);
-    expect(after.history).toEqual([after.adjustments]);
+    expect(after.history).toEqual([after.editDocumentV2]);
     expect(after.historyIndex).toBe(0);
     expect(after.historyCheckpoints).toEqual([]);
     expect(after.lastEditApplicationReceipt).toMatchObject({
@@ -89,12 +87,17 @@ describe('decoded image-open hydration edit transaction', () => {
     });
     const newer = useEditorStore.getState();
     const staleDecoded = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: -1.5 };
-    expect(() => buildImageOpenHydrationEditTransaction(newer, staleIdentity, staleDecoded, 'stale-decoded')).toThrow(
-      'image_open_hydration.stale_identity',
-    );
-    expect(useEditorStore.getState().adjustments.exposure).toBe(2.1);
+    expect(() =>
+      buildImageOpenHydrationEditTransaction(
+        newer,
+        staleIdentity,
+        legacyAdjustmentsToEditDocumentV2(staleDecoded),
+        'stale-decoded',
+      ),
+    ).toThrow('image_open_hydration.stale_identity');
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(2.1);
     expect(canContinueImageOpenHydration(useEditorStore.getState(), staleIdentity)).toBeFalse();
-    expect(useEditorStore.getState().adjustments.aspectRatio).toBeNull();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.aspectRatio).toBeNull();
     expect(useEditorStore.getState().history).toHaveLength(3);
   });
 
@@ -111,7 +114,7 @@ describe('decoded image-open hydration edit transaction', () => {
       imageSessionId: session.id,
       operations: [
         {
-          adjustments: { ...metadataState.adjustments, contrast: 9 },
+          adjustments: { ...metadataState.adjustmentSnapshot.value, contrast: 9 },
           type: 'replace-adjustments',
         },
       ],
@@ -131,11 +134,15 @@ describe('decoded image-open hydration edit transaction', () => {
     const aspectOnly = buildImageOpenHydrationEditTransaction(
       current,
       { ...originalIdentity, adjustmentRevision: current.adjustmentRevision },
-      { ...current.adjustments, aspectRatio: 1.5 },
+      legacyAdjustmentsToEditDocumentV2({ ...current.adjustmentSnapshot.value, aspectRatio: 1.5 }),
       'fresh-aspect',
     );
     current.applyEditTransaction(aspectOnly);
-    expect(useEditorStore.getState().adjustments).toMatchObject({ aspectRatio: 1.5, contrast: 9, exposure: 1.2 });
-    expect(useEditorStore.getState().history).toEqual([useEditorStore.getState().adjustments]);
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+      aspectRatio: 1.5,
+      contrast: 9,
+      exposure: 1.2,
+    });
+    expect(useEditorStore.getState().history).toEqual([useEditorStore.getState().editDocumentV2]);
   });
 });

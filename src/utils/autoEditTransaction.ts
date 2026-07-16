@@ -1,11 +1,17 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { AdjustmentSnapshot } from './adjustmentSnapshots';
 import { publishAdjustmentSnapshot } from './adjustmentSnapshots';
 import type { Adjustments } from './adjustments';
-import type { EditTransactionRequest } from './editTransaction';
+import {
+  buildAdjustmentMutationOperations,
+  type EditTransactionRequest,
+  reduceEditTransaction,
+} from './editTransaction';
 
 export interface AutoEditProposalBase {
   adjustmentRevision: number;
   adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   graphRevision: string;
   imageSessionId: string;
   path: string;
@@ -13,7 +19,8 @@ export interface AutoEditProposalBase {
 
 export interface AutoEditProposalState {
   adjustmentRevision: number;
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
+  editDocumentV2: EditDocumentV2;
   historyIndex: number;
   imageSession: { id: string } | null;
   imageSessionId: number;
@@ -27,7 +34,8 @@ export const captureAutoEditProposalBase = (state: AutoEditProposalState): AutoE
   state.selectedImage?.isReady === true
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        adjustments: state.adjustments,
+        adjustments: state.adjustmentSnapshot.value,
+        editDocumentV2: state.editDocumentV2,
         graphRevision: `history_${String(state.historyIndex)}`,
         imageSessionId: currentAutoEditImageSessionId(state),
         path: state.selectedImage.path,
@@ -50,7 +58,7 @@ export const isCurrentAutoEditProposalRequest = (
 export interface AutoEditPreviewSession {
   baseAdjustmentRevision: number;
   baseGraphRevision: string;
-  baseSnapshotAdjustmentRevision: number;
+  baseSnapshotRenderRevision: number;
   bypassed: boolean;
   imageSessionId: string;
   key: string;
@@ -96,19 +104,35 @@ export const createAutoEditPreviewSession = ({
   return {
     ...identity,
     baseGraphRevision: base.graphRevision,
-    baseSnapshotAdjustmentRevision: committedSnapshot.adjustmentRevision,
+    baseSnapshotRenderRevision: committedSnapshot.renderRevision,
     bypassed: false,
     key: autoEditPreviewSessionKey(identity),
     previewIdentity,
-    snapshot: publishAdjustmentSnapshot(committedSnapshot, adjustments),
+    snapshot: publishAdjustmentSnapshot(
+      committedSnapshot,
+      reduceEditTransaction(
+        structuredClone(committedSnapshot.editDocumentV2),
+        base.adjustmentRevision,
+        {
+          baseAdjustmentRevision: base.adjustmentRevision,
+          history: 'none',
+          imageSessionId: base.imageSessionId,
+          operations: buildAdjustmentMutationOperations(base.adjustments, adjustments, base.editDocumentV2),
+          persistence: 'preview-only',
+          source: 'auto-edit',
+          transactionId: `auto-edit-preview:${proposalId}`,
+        },
+        base.imageSessionId,
+      ).afterEditDocumentV2,
+    ),
   };
 };
 
 const isCurrentAutoEditPreviewSession = (
   session: AutoEditPreviewSession,
-  current: { imageSessionId: string | null; path: string | null; snapshotAdjustmentRevision: number },
+  current: { imageSessionId: string | null; path: string | null; snapshotRenderRevision: number },
 ): boolean =>
-  session.baseSnapshotAdjustmentRevision === current.snapshotAdjustmentRevision &&
+  session.baseSnapshotRenderRevision === current.snapshotRenderRevision &&
   session.imageSessionId === current.imageSessionId &&
   session.targetPath === current.path;
 
@@ -122,7 +146,7 @@ export const resolveAutoEditRenderSnapshot = (
   isCurrentAutoEditPreviewSession(session, {
     imageSessionId: current.imageSessionId,
     path: current.path,
-    snapshotAdjustmentRevision: committedSnapshot.adjustmentRevision,
+    snapshotRenderRevision: committedSnapshot.renderRevision,
   })
     ? session.snapshot
     : committedSnapshot;
@@ -147,7 +171,7 @@ export const buildAutoEditTransactionRequest = (
   baseAdjustmentRevision: base.adjustmentRevision,
   history: 'single-entry',
   imageSessionId: base.imageSessionId,
-  operations: [{ adjustments, type: 'replace-adjustments' }],
+  operations: buildAdjustmentMutationOperations(base.adjustments, adjustments, base.editDocumentV2),
   persistence: 'commit',
   source: 'auto-edit',
   transactionId,

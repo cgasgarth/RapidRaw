@@ -15,6 +15,7 @@ import {
   agentCurveLevelsApplyRequestSchema,
   applyAgentCurveLevels,
 } from '../../../../src/utils/agent/tools/agentCurveLevelsApplyTool.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
@@ -50,8 +51,8 @@ const curveLevelsResultSchema = z
   })
   .passthrough();
 
+const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
 useEditorStore.getState().hydrateEditorRenderAuthority({
-  adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-curve-levels-before',
   hasRenderedFirstFrame: true,
@@ -61,7 +62,8 @@ useEditorStore.getState().hydrateEditorRenderAuthority({
     [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
     [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
   },
-  history: [INITIAL_ADJUSTMENTS],
+  editDocumentV2,
+  history: [editDocumentV2],
   historyIndex: 0,
   selectedImage: {
     exif: { ISO: '800', LensModel: 'FE 24-70mm F2.8 GM II' },
@@ -185,11 +187,11 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustments.curveMode !== 'parametric' ||
-  state.adjustments.toneCurve !== 'soft_contrast' ||
-  state.adjustments.levels.gamma !== 0.94 ||
-  state.adjustments.parametricCurve?.luma.shadows !== 8 ||
-  state.adjustments.pointCurves?.red[1]?.y !== 134
+  state.adjustmentSnapshot.value.curveMode !== 'parametric' ||
+  state.adjustmentSnapshot.value.toneCurve !== 'soft_contrast' ||
+  state.adjustmentSnapshot.value.levels.gamma !== 0.94 ||
+  state.adjustmentSnapshot.value.parametricCurve?.luma.shadows !== 8 ||
+  state.adjustmentSnapshot.value.pointCurves?.red[1]?.y !== 134
 ) {
   throw new Error('agent.curve_levels.apply did not mutate curves/levels adjustments.');
 }

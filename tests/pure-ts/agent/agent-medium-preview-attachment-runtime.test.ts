@@ -11,15 +11,15 @@ import {
   decodeAgentJpegDimensions,
   sha256ForAgentPreviewBytes,
 } from '../../../src/utils/agent/context/agentMediumPreviewAttachmentRuntime';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const fixturePath = new URL('../../../docs/baseline/render/rapidraw-vite-empty-root-2026-06-10.jpg', import.meta.url);
 const selectedPath = '/fixtures/agent-medium-preview-attachment/DSC_5015.ARW';
 
 const seedEditor = () => {
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:agent-medium-preview-attachment',
-    history: [INITIAL_ADJUSTMENTS, INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -32,6 +32,8 @@ const seedEditor = () => {
       width: 6000,
     },
     uncroppedAdjustedPreviewUrl: null,
+    editDocumentV2,
+    history: [editDocumentV2],
   });
 };
 
@@ -105,19 +107,20 @@ describe('agent medium preview attachment runtime', () => {
           resolveRender = resolve;
         }),
     );
-    const initialHistory = useEditorStore.getState().history;
     const snapshot = buildAgentImageContextSnapshot();
     const stale = manager.acquire({ deadlineAt: Date.now() + 5_000, snapshot });
+    const currentDocument = useEditorStore.getState().editDocumentV2;
+    const driftedHistory = [currentDocument, currentDocument];
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: useEditorStore.getState().adjustments,
-      history: initialHistory,
+      editDocumentV2: currentDocument,
+      history: driftedHistory,
       historyIndex: 1,
     });
     resolveRender?.(bytes);
     await expect(stale).rejects.toMatchObject({
       outcome: 'stale',
     } satisfies Partial<AgentMediumPreviewAttachmentError>);
-    expect(useEditorStore.getState().history).toBe(initialHistory);
+    expect(useEditorStore.getState().history).toBe(driftedHistory);
 
     seedEditor();
     const timedOut = new AgentMediumPreviewAttachmentManager(() => new Promise<Uint8Array>(() => undefined));

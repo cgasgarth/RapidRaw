@@ -37,15 +37,13 @@ describe('point color edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -67,7 +65,7 @@ describe('point color edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.pointColor.enabled).toBe(false);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.pointColor.enabled).toBe(false);
   });
 
   test('rejects stale source, session, and revision before constructing a node transaction', () => {
@@ -130,7 +128,7 @@ describe('point color edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.pointColor.enabled).toBeFalse();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.pointColor.enabled).toBeFalse();
 
     expect(isCurrentPointColorIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

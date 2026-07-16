@@ -40,15 +40,13 @@ describe('camera input edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -83,7 +81,7 @@ describe('camera input edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments).toMatchObject({
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
       cameraProfile: 'camera_standard',
       cameraProfileAmount: 100,
       exposure: 0.45,
@@ -103,7 +101,7 @@ describe('camera input edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.whiteBalanceTechnical.mode).toBe('as_shot');
+    expect(useEditorStore.getState().adjustmentSnapshot.value.whiteBalanceTechnical.mode).toBe('as_shot');
   });
 
   test('captures identity, rejects stale commits and malformed values, and preserves exact no-ops', () => {
@@ -221,7 +219,7 @@ describe('camera input edit transaction', () => {
       transactionId: 'fallback-camera',
     });
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.cameraProfile).toBe('camera_standard');
+    expect(useEditorStore.getState().adjustmentSnapshot.value.cameraProfile).toBe('camera_standard');
 
     expect(() =>
       buildCameraInputEditTransaction(

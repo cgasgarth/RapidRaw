@@ -49,12 +49,9 @@ describe('agent detail/effects EditTransaction bridge', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:agent-detail-effects-current',
       hasRenderedFirstFrame: true,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -73,6 +70,7 @@ describe('agent detail/effects EditTransaction bridge', () => {
         width: 4000,
       },
       uncroppedAdjustedPreviewUrl: 'blob:agent-detail-effects-uncropped',
+      history: [editDocumentV2],
     });
   });
 
@@ -104,8 +102,8 @@ describe('agent detail/effects EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustments.exposure).toBe(0.2);
-    expect(after.adjustments.clarity).toBe(INITIAL_ADJUSTMENTS.clarity);
+    expect(after.adjustmentSnapshot.value.exposure).toBe(0.2);
+    expect(after.adjustmentSnapshot.value.clarity).toBe(INITIAL_ADJUSTMENTS.clarity);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-detail-effects-edit');
   });
 

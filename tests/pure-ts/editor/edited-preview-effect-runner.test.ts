@@ -53,7 +53,7 @@ const buildRequest = (overrides: BuildRequestOverrides = {}): EditedPreviewReque
   const targetResolution = overrides.targetResolution ?? 1200;
   const proofRevision = overrides.viewerScope?.proofRevision ?? overrides.session?.proofRevision ?? 1;
   const graphRevision = fingerprintPreviewGraphRevision({
-    adjustmentRevision: snapshot.adjustmentRevision,
+    adjustmentRevision: snapshot.renderRevision,
     geometryRevision: snapshot.geometryRevision,
     imageSessionId,
     maskRevision: snapshot.maskRevision,
@@ -62,7 +62,7 @@ const buildRequest = (overrides: BuildRequestOverrides = {}): EditedPreviewReque
     proposalFingerprint: 'committed',
   });
   const viewerScope: InteractivePreviewScope = {
-    adjustmentRevision: snapshot.adjustmentRevision,
+    adjustmentRevision: snapshot.renderRevision,
     backend: 'cpu',
     basePreviewUrl: 'blob:base',
     devicePixelRatio: 2,
@@ -142,7 +142,7 @@ const buildRequest = (overrides: BuildRequestOverrides = {}): EditedPreviewReque
     roi: overrides.roi ?? null,
     scopeRecovery: overrides.scopeRecovery ?? false,
     session: {
-      adjustmentRevision: snapshot.adjustmentRevision,
+      adjustmentRevision: snapshot.renderRevision,
       backend: 'cpu',
       displayGeneration: 1,
       geometryRevision: snapshot.geometryRevision,
@@ -390,9 +390,9 @@ describe('edited preview effect runner', () => {
     const presented: number[] = [];
     const { runner } = harness<number>({
       execute: async (request) => {
-        calls.push(request.snapshot.adjustmentRevision);
+        calls.push(request.snapshot.renderRevision);
         if (calls.length === 1) return running.promise;
-        return execution(request.snapshot.adjustmentRevision);
+        return execution(request.snapshot.renderRevision);
       },
       onPresented: (value) => presented.push(value),
     });

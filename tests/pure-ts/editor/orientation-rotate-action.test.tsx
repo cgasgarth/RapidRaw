@@ -24,10 +24,7 @@ test('useEditorActions routes rotate through one geometry transaction', () => {
   const session = createEditorImageSession({ generation: 51, path: sourcePath, source: 'cache' });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: session,
@@ -45,6 +42,7 @@ test('useEditorActions routes rotate through one geometry transaction', () => {
       thumbnailUrl: '',
       width: 4000,
     },
+    history: [editDocumentV2],
   });
   let handleRotate: ReturnType<typeof useEditorActions>['handleRotate'] | null = null;
   const Harness = () => {
@@ -58,7 +56,12 @@ test('useEditorActions routes rotate through one geometry transaction', () => {
 
   act(() => handleRotate?.(90));
   const after = useEditorStore.getState();
-  expect(after.adjustments).toMatchObject({ aspectRatio: 3 / 4, exposure: 0.25, orientationSteps: 1, rotation: 0 });
+  expect(after.adjustmentSnapshot.value).toMatchObject({
+    aspectRatio: 3 / 4,
+    exposure: 0.25,
+    orientationSteps: 1,
+    rotation: 0,
+  });
   expect(after.history).toHaveLength(2);
   expect(after.lastEditApplicationReceipt).toMatchObject({
     adjustmentRevision: 1,

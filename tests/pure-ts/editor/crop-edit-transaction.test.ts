@@ -46,15 +46,13 @@ describe('crop edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -85,20 +83,19 @@ describe('crop edit transaction', () => {
     expect(useEditorStore.getState().adjustmentSnapshot.editDocumentV2).toBe(useEditorStore.getState().editDocumentV2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.crop).toBeNull();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.crop).toBeNull();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
   });
 
   test('preserves exact no-ops and rejects stale source, session, graph, generation, tool, and revision', () => {
     useEditorStore.getState().hydrateEditorRenderAuthority((state) => {
-      const adjustments = { ...state.adjustments, crop };
+      const adjustments = { ...state.adjustmentSnapshot.value, crop };
       const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
       return {
         adjustmentRevision: state.adjustmentRevision,
-        adjustmentSnapshot: publishAdjustmentSnapshot(state.adjustmentSnapshot, adjustments, editDocumentV2),
-        adjustments,
         editDocumentV2,
-        history: [adjustments],
+        history: [editDocumentV2],
+        historyIndex: 0,
       };
     });
     const state = useEditorStore.getState();

@@ -38,11 +38,8 @@ describe('skin-tone uniformity edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:skin-before',
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -56,6 +53,7 @@ describe('skin-tone uniformity edit transaction', () => {
       },
       selectedImage,
       transformedOriginalUrl: 'blob:skin-transformed-before',
+      history: [editDocumentV2],
     });
   });
 

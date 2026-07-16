@@ -10,7 +10,9 @@ export interface OrientationRotateCommitIdentity {
 
 export interface OrientationRotateEditTransactionState {
   adjustmentRevision: number;
-  adjustments: Pick<Adjustments, 'aspectRatio' | 'crop' | 'orientationSteps' | 'rotation'>;
+  adjustmentSnapshot: {
+    readonly value: Pick<Adjustments, 'aspectRatio' | 'crop' | 'orientationSteps' | 'rotation'>;
+  };
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { height?: number | null; path: string; width?: number | null } | null;
@@ -60,7 +62,7 @@ export const buildOrientationRotateEditTransaction = (
 ): EditTransactionRequest => {
   assertCurrentIdentity(state, identity);
   const quarterTurns = normalizeQuarterTurns(degrees);
-  const currentOrientationSteps = state.adjustments.orientationSteps || 0;
+  const currentOrientationSteps = state.adjustmentSnapshot.value.orientationSteps || 0;
   if (quarterTurns === 0) {
     return {
       baseAdjustmentRevision: identity.adjustmentRevision,
@@ -70,10 +72,10 @@ export const buildOrientationRotateEditTransaction = (
         {
           nodeType: 'geometry',
           patch: {
-            aspectRatio: state.adjustments.aspectRatio,
-            crop: state.adjustments.crop,
+            aspectRatio: state.adjustmentSnapshot.value.aspectRatio,
+            crop: state.adjustmentSnapshot.value.crop,
             orientationSteps: currentOrientationSteps,
-            rotation: state.adjustments.rotation,
+            rotation: state.adjustmentSnapshot.value.rotation,
           },
           type: 'patch-edit-document-node',
         },
@@ -86,9 +88,11 @@ export const buildOrientationRotateEditTransaction = (
 
   const orientationSteps = (currentOrientationSteps + quarterTurns) % 4;
   const aspectRatio =
-    quarterTurns % 2 === 1 && state.adjustments.aspectRatio && state.adjustments.aspectRatio !== 0
-      ? 1 / state.adjustments.aspectRatio
-      : state.adjustments.aspectRatio;
+    quarterTurns % 2 === 1 &&
+    state.adjustmentSnapshot.value.aspectRatio &&
+    state.adjustmentSnapshot.value.aspectRatio !== 0
+      ? 1 / state.adjustmentSnapshot.value.aspectRatio
+      : state.adjustmentSnapshot.value.aspectRatio;
   const width = state.selectedImage?.width;
   const height = state.selectedImage?.height;
   const crop = width && height ? calculateCenteredCrop(width, height, orientationSteps, aspectRatio) : null;

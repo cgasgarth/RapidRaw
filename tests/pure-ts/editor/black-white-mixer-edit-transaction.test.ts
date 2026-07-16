@@ -37,15 +37,13 @@ describe('black-and-white mixer edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -76,8 +74,10 @@ describe('black-and-white mixer edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.blackWhiteMixer).toEqual(INITIAL_ADJUSTMENTS.blackWhiteMixer);
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.4);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.blackWhiteMixer).toEqual(
+      INITIAL_ADJUSTMENTS.blackWhiteMixer,
+    );
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
   });
 
   test('rejects stale source, session, and revision identities', () => {
@@ -152,7 +152,9 @@ describe('black-and-white mixer edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.blackWhiteMixer).toEqual(INITIAL_ADJUSTMENTS.blackWhiteMixer);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.blackWhiteMixer).toEqual(
+      INITIAL_ADJUSTMENTS.blackWhiteMixer,
+    );
 
     expect(isCurrentBlackWhiteMixerIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

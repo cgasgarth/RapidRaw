@@ -161,7 +161,7 @@ const validateRequestIdentity = (request: EditedPreviewRequest): void => {
     session.sourceImagePath !== viewerScope.sourceImagePath ||
     session.graphRevision !== viewerScope.graphIdentity ||
     session.imageSessionId !== viewerScope.imageSessionId ||
-    session.adjustmentRevision !== snapshot.adjustmentRevision ||
+    session.adjustmentRevision !== snapshot.renderRevision ||
     session.geometryRevision !== snapshot.geometryRevision ||
     session.geometryRevision !== viewerScope.geometryIdentity ||
     session.maskRevision !== snapshot.maskRevision ||
@@ -374,7 +374,7 @@ export class EditedPreviewEffectRunner<T> {
     if (identity === undefined) throw new Error('PreviewCoordinator did not create an edited preview operation.');
 
     const filmRenderIdentity = buildFilmPreviewRenderIdentity({
-      adjustmentRevision: request.snapshot.adjustmentRevision,
+      adjustmentRevision: request.snapshot.renderRevision,
       adjustments: request.snapshot.value,
       backend: request.viewerScope.backend,
       displayGeneration: request.session.displayGeneration,

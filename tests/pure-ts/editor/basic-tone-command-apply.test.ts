@@ -34,8 +34,6 @@ const seedEditor = () => {
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
     exportSoftProofTransform: {
       blackPointCompensation: 'enabled',
@@ -61,7 +59,6 @@ const seedEditor = () => {
       transformFingerprint: 'fingerprint-before-basic-tone',
       warningCodes: [],
     },
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: createEditorImageSession({ generation: 23, path: imagePath, source: 'cache' }),
@@ -108,6 +105,7 @@ const seedEditor = () => {
     },
     transformedOriginalUrl: 'blob:basic-tone-before-transformed',
     uncroppedAdjustedPreviewUrl: 'blob:basic-tone-before-uncropped',
+    history: [editDocumentV2],
   });
 };
 
@@ -144,8 +142,8 @@ describe('basic tone command apply path', () => {
     expect(dryRun.parameterDiff.some((diff) => diff.path === '/parameters/exposureEv')).toBe(true);
 
     const after = useEditorStore.getState();
-    expect(after.adjustments).toBe(before.adjustments);
-    expect(after.history).toEqual([INITIAL_ADJUSTMENTS]);
+    expect(after.adjustmentSnapshot.value).toBe(before.adjustmentSnapshot.value);
+    expect(after.history).toEqual([before.editDocumentV2]);
     expect(after.historyIndex).toBe(0);
     expect(after.lastBasicToneCommand).toBeNull();
     expect(after.uncroppedAdjustedPreviewUrl).toBe('blob:basic-tone-before-uncropped');
@@ -165,12 +163,12 @@ describe('basic tone command apply path', () => {
     expect(mutation.commandId).toBe(applyCommand.commandId);
 
     const applied = useEditorStore.getState();
-    expect(applied.adjustments.exposure).toBe(0.65);
-    expect(applied.adjustments.highlights).toBe(-31);
-    expect(applied.adjustments.whites).toBe(27);
+    expect(applied.adjustmentSnapshot.value.exposure).toBe(0.65);
+    expect(applied.adjustmentSnapshot.value.highlights).toBe(-31);
+    expect(applied.adjustmentSnapshot.value.whites).toBe(27);
     expect(applied.history).toHaveLength(2);
     expect(applied.historyIndex).toBe(1);
-    expect(applied.history[1]).toEqual(applied.adjustments);
+    expect(applied.history[1]).toEqual(applied.editDocumentV2);
     expect(applied.lastBasicToneCommand?.commandId).toBe(applyCommand.commandId);
     expect(applied.adjustmentRevision).toBe(1);
     expect(applied.lastEditApplicationReceipt).toMatchObject({
@@ -193,14 +191,14 @@ describe('basic tone command apply path', () => {
 
     applied.undo();
     const undone = useEditorStore.getState();
-    expect(undone.adjustments).toEqual(INITIAL_ADJUSTMENTS);
+    expect(undone.adjustmentSnapshot.value).toEqual(publishAdjustmentSnapshot(null, undone.history[0]!).value);
     expect(undone.historyIndex).toBe(0);
     expect(undone.history).toHaveLength(2);
     expect(undone.finalPreviewUrl).toBeNull();
 
     undone.redo();
     const redone = useEditorStore.getState();
-    expect(redone.adjustments.exposure).toBe(0.65);
+    expect(redone.adjustmentSnapshot.value.exposure).toBe(0.65);
     expect(redone.historyIndex).toBe(1);
     expect(redone.uncroppedAdjustedPreviewUrl).toBeNull();
   });
@@ -235,8 +233,8 @@ describe('basic tone command apply path', () => {
     );
 
     const state = useEditorStore.getState();
-    expect(state.adjustments).toEqual(INITIAL_ADJUSTMENTS);
-    expect(state.history).toEqual([INITIAL_ADJUSTMENTS]);
+    expect(state.adjustmentSnapshot.editDocumentV2).toEqual(state.history[0]);
+    expect(state.history).toEqual([state.editDocumentV2]);
     expect(state.lastBasicToneCommand).toBeNull();
   });
 

@@ -47,11 +47,8 @@ describe('selective color edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:selective-color-before',
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -65,6 +62,7 @@ describe('selective color edit transaction', () => {
       },
       selectedImage,
       transformedOriginalUrl: 'blob:transformed-before',
+      history: [editDocumentV2],
     });
   });
 
@@ -108,8 +106,10 @@ describe('selective color edit transaction', () => {
       transformedOriginalUrl: null,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().adjustments.hsl.oranges.saturation).toBe(28);
-    expect(useEditorStore.getState().adjustments.selectiveColorRangeControls.oranges.widthDegrees).toBe(52);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.oranges.saturation).toBe(28);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls.oranges.widthDegrees).toBe(
+      52,
+    );
     expect(result.afterEditDocumentV2.nodes.selective_color_mixer.params).toEqual(next);
     expect(result.afterEditDocumentV2.nodes.selective_color_mixer).not.toBe(beforeNode);
     expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
@@ -117,8 +117,8 @@ describe('selective color edit transaction', () => {
     expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('selectiveColorRangeControls');
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.hsl.oranges.saturation).toBe(0);
-    expect(useEditorStore.getState().adjustments.selectiveColorRangeControls.oranges).toEqual(
+    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.oranges.saturation).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls.oranges).toEqual(
       INITIAL_ADJUSTMENTS.selectiveColorRangeControls.oranges,
     );
     expect(useEditorStore.getState().editDocumentV2.nodes.selective_color_mixer.params).toEqual(initialMixer());
@@ -223,14 +223,16 @@ describe('selective color edit transaction', () => {
       noOp: false,
     });
     expect(useEditorStore.getState().history).toHaveLength(3);
-    expect(useEditorStore.getState().adjustments.hsl).toEqual(INITIAL_ADJUSTMENTS.hsl);
-    expect(useEditorStore.getState().adjustments.selectiveColorRangeControls).toEqual(
+    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl).toEqual(INITIAL_ADJUSTMENTS.hsl);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls).toEqual(
       INITIAL_ADJUSTMENTS.selectiveColorRangeControls,
     );
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.hsl.blues).toEqual(edited.hsl.blues);
-    expect(useEditorStore.getState().adjustments.selectiveColorRangeControls.reds.centerHueDegrees).toBe(18);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.blues).toEqual(edited.hsl.blues);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls.reds.centerHueDegrees).toBe(
+      18,
+    );
   });
 
   test('rejects stale path, explicit/fallback session, revision, and same-path reopen identities', () => {

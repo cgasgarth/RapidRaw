@@ -124,7 +124,7 @@ const schedulingInputHarness = () => {
     const adjustmentSnapshot = snapshot(exposure, advanceAdjustment);
     currentDisplayGeneration = displayGeneration;
     const source: PreviewRequestScopeInput = {
-      adjustmentRevision: adjustmentSnapshot.adjustmentRevision,
+      adjustmentRevision: adjustmentSnapshot.renderRevision,
       adjustmentSnapshot,
       autoEditPreviewSession: null,
       baseRenderSize: {

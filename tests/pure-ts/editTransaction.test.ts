@@ -29,13 +29,11 @@ afterEach(() => {
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initial);
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: initial,
     editDocumentV2,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, initial, editDocumentV2),
     adjustmentRevision: 0,
-    history: [initial],
     historyCheckpoints: [],
     historyIndex: 0,
+    history: [editDocumentV2],
   });
 });
 
@@ -289,7 +287,7 @@ describe('reduceEditTransaction', () => {
     expect(operations).toHaveLength(11);
     expect(result.nextAdjustmentRevision).toBe(5);
     expect(result.noOp).toBeFalse();
-    expect(result.after).toBe(INITIAL_ADJUSTMENTS);
+    expect(result.after).toEqual(INITIAL_ADJUSTMENTS);
     expect(result.changedKeys).toEqual(
       operations.map((operation) =>
         operation.type === 'set-edit-document-node-enabled' ? `nodes.${operation.nodeType}.enabled` : 'unexpected',
@@ -336,9 +334,8 @@ describe('reduceEditTransaction', () => {
       request({
         operations: [
           {
-            adjustments: INITIAL_ADJUSTMENTS,
             editDocumentV2: afterDocument,
-            type: 'replace-edit-authority',
+            type: 'replace-edit-document',
           },
         ],
       }),
@@ -436,7 +433,7 @@ describe('reduceEditTransaction', () => {
       contrast: 12,
       glowAmount: 16,
     };
-    const staleDocument = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const document = legacyAdjustmentsToEditDocumentV2(before);
     const afterReset = {
       ...before,
       brightness: INITIAL_ADJUSTMENTS.brightness,
@@ -447,13 +444,13 @@ describe('reduceEditTransaction', () => {
       4,
       request({ operations: buildAdjustmentMutationOperations(before, afterReset) }),
       undefined,
-      staleDocument,
+      document,
     );
 
     expect(result.changedKeys).toEqual(['brightness', 'contrast']);
     expect(result.after).toMatchObject({ brightness: 0, clarity: 18, contrast: 0, glowAmount: 16 });
-    expect(result.after.masks).toBe(before.masks);
-    expect(result.after.levels).toBe(before.levels);
+    expect(result.after.masks).toEqual(before.masks);
+    expect(result.after.levels).toEqual(before.levels);
     expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.params).toMatchObject({
       brightness: 0,
       contrast: 0,
@@ -468,24 +465,33 @@ describe('reduceEditTransaction', () => {
       contrast: 12,
       glowAmount: 16,
     };
-    useEditorStore.getState().hydrateEditorRenderAuthority({ adjustments: hydratedAdjustments });
+    const hydratedDocument = legacyAdjustmentsToEditDocumentV2(hydratedAdjustments);
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      editDocumentV2: hydratedDocument,
+      historyIndex: 0,
+      history: [hydratedDocument],
+    });
     const hydrated = useEditorStore.getState();
 
     expect(hydrated.adjustmentSnapshot.editDocumentV2).toBe(hydrated.editDocumentV2);
     expect(hydrated.editDocumentV2.nodes.detail_denoise_dehaze?.params.clarity).toBe(18);
     expect(hydrated.adjustmentSnapshot.value.glowAmount).toBe(16);
 
-    const afterReset = { ...hydrated.adjustments, brightness: 0, contrast: 0 };
+    const afterReset = { ...hydrated.adjustmentSnapshot.value, brightness: 0, contrast: 0 };
     hydrated.applyEditTransaction(
       request({
         baseAdjustmentRevision: hydrated.adjustmentRevision,
         imageSessionId: 'editor-image-session:1',
-        operations: buildAdjustmentMutationOperations(hydrated.adjustments, afterReset),
+        operations: buildAdjustmentMutationOperations(
+          hydrated.adjustmentSnapshot.value,
+          afterReset,
+          hydrated.editDocumentV2,
+        ),
       }),
     );
     const reset = useEditorStore.getState();
 
-    expect(reset.adjustments).toMatchObject({ brightness: 0, clarity: 18, contrast: 0, glowAmount: 16 });
+    expect(reset.adjustmentSnapshot.value).toMatchObject({ brightness: 0, clarity: 18, contrast: 0, glowAmount: 16 });
     expect(reset.adjustmentSnapshot.editDocumentV2).toBe(reset.editDocumentV2);
   });
 
@@ -590,7 +596,7 @@ describe('reduceEditTransaction', () => {
     const state = useEditorStore.getState();
 
     expect(result.changedKeys).toEqual(['exposure']);
-    expect(state.adjustments.exposure).toBe(0.5);
+    expect(state.adjustmentSnapshot.value.exposure).toBe(0.5);
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
@@ -647,7 +653,7 @@ describe('reduceEditTransaction', () => {
     const state = useEditorStore.getState();
 
     expect(result.applicationReceipt.source).toBe('layer-command');
-    expect(state.adjustments.masks).toEqual(next.masks);
+    expect(state.adjustmentSnapshot.value.masks).toEqual(next.masks);
     expect(state.history).toHaveLength(2);
   });
 
@@ -671,7 +677,8 @@ describe('reduceEditTransaction', () => {
     const request = buildLayerEditTransactionRequest(
       {
         adjustmentRevision: 7,
-        adjustments: INITIAL_ADJUSTMENTS,
+        adjustmentSnapshot: { value: INITIAL_ADJUSTMENTS },
+        editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
         imageSessionId: 4,
         imageSession: { id: 'session-layer' },
       },
@@ -729,9 +736,9 @@ describe('reduceEditTransaction', () => {
 
     expect(reset.source).toBe('reset');
     expect(reset.changedKeys).toEqual(['exposure']);
-    expect(state.adjustments).toEqual(INITIAL_ADJUSTMENTS);
+    expect(state.adjustmentSnapshot.value).toEqual(INITIAL_ADJUSTMENTS);
     expect(state.adjustmentRevision).toBe(2);
-    expect(state.history).toEqual([INITIAL_ADJUSTMENTS]);
+    expect(state.history).toEqual([legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS)]);
     expect(state.historyIndex).toBe(0);
     expect(state.historyCheckpoints).toEqual([]);
     expect(() =>

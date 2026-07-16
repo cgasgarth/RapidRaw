@@ -56,15 +56,13 @@ describe('reference match edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -96,7 +94,7 @@ describe('reference match edit transaction', () => {
     expect(useEditorStore.getState()).toMatchObject({ historyIndex: 1, adjustmentRevision: 1 });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments).toMatchObject({
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
       exposure: 0,
       referenceMatchApplicationReceipt: null,
     });
@@ -111,9 +109,10 @@ describe('reference match edit transaction', () => {
       },
     };
     const state = useEditorStore.getState();
+    const lockedDocument = legacyAdjustmentsToEditDocumentV2(lockedAdjustments);
     state.hydrateEditorRenderAuthority({
-      adjustments: lockedAdjustments,
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(lockedAdjustments),
+      editDocumentV2: lockedDocument,
+      history: [lockedDocument],
     });
     const wbProposal = matchLookProposalV1Schema.parse({
       ...proposal,

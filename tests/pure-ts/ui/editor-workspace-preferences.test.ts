@@ -238,12 +238,10 @@ describe('editor workspace preferences', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 7,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyIndex: 0,
       lastEditApplicationReceipt: null,
+      history: [editDocumentV2],
     });
     const before = useEditorStore.getState();
 

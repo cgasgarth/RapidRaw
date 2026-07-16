@@ -22,7 +22,7 @@ export type AgentEditRecipePlan = Omit<z.infer<typeof agentEditRecipePlanSchema>
 };
 
 export const planAgentEditRecipe = (prompt: string): AgentEditRecipePlan => {
-  const base = useEditorStore.getState().adjustments;
+  const base = useEditorStore.getState().adjustmentSnapshot.value;
   const intent = classifyAgentEditIntent(prompt);
   const { brightenIntent, recipeKind, warmToneIntent } = intent;
 

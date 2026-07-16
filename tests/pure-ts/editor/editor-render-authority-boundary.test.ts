@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../../src/utils/editDocumentV2';
 
 const reset = () => {
-  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustments,
-    editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
-    editDocumentHistory: [legacyAdjustmentsToEditDocumentV2(adjustments)],
-    history: [adjustments],
+    editDocumentV2,
     historyCheckpoints: [],
     historyIndex: 0,
+    history: [editDocumentV2],
+    imageSession: null,
+    selectedImage: null,
   });
 };
 
@@ -21,68 +21,91 @@ beforeEach(reset);
 afterEach(reset);
 
 describe('editor render-authority boundary', () => {
-  test('generic editor and Zustand setters fail closed for structural authority updates', () => {
+  test('exposes one document, revision, and document-history authority', () => {
     const state = useEditorStore.getState();
-    const adjustmentUpdate = { adjustments: { ...state.adjustments, exposure: 0.75 } };
-    const historyUpdate = { history: [state.adjustments] };
-    const typedHistoryUpdate = { editDocumentHistory: [state.editDocumentV2] };
-    const adjustmentUpdater = () => adjustmentUpdate;
-    const historyUpdater = () => historyUpdate;
 
-    expect(() => Reflect.apply(state.setEditor, undefined, [adjustmentUpdate])).toThrow(
+    expect(Object.hasOwn(state, 'adjustments')).toBeFalse();
+    expect(Object.hasOwn(state, 'editDocumentHistory')).toBeFalse();
+    expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
+    expect(state.history).toEqual([state.editDocumentV2]);
+
+    const storeSource = readFileSync(new URL('../../../src/store/useEditorStore.ts', import.meta.url), 'utf8');
+    const editorStateSource = storeSource.slice(
+      storeSource.indexOf('interface EditorState {'),
+      storeSource.indexOf('const editorRenderAuthorityKeys'),
+    );
+    expect(storeSource).not.toContain('legacyAdjustmentsToEditDocumentV2');
+    expect(editorStateSource).not.toMatch(/^\s*adjustments:\s*Adjustments/m);
+    expect(editorStateSource).not.toMatch(/^\s*editDocumentHistory:/m);
+  });
+
+  test('rejects flat and structural authority injection through every generic setter', () => {
+    const state = useEditorStore.getState();
+    const removedAdjustmentUpdate = { adjustments: { exposure: 0.75 } };
+    const removedHistoryUpdate = { editDocumentHistory: [state.editDocumentV2] };
+    const historyUpdate = { history: [state.editDocumentV2] };
+
+    expect(() => Reflect.apply(state.setEditor, undefined, [removedAdjustmentUpdate])).toThrow(
       'editor.setEditor.render_authority_forbidden:adjustments',
     );
-    expect(() => Reflect.apply(useEditorStore.setState, useEditorStore, [historyUpdate])).toThrow(
-      'editor.setState.render_authority_forbidden:history',
+    expect(() => Reflect.apply(state.hydrateEditorRenderAuthority, undefined, [removedAdjustmentUpdate])).toThrow(
+      'editor.setEditor.render_authority_forbidden:adjustments',
     );
-    expect(() => Reflect.apply(state.setEditor, undefined, [typedHistoryUpdate])).toThrow(
+    expect(() => Reflect.apply(state.hydrateEditorRenderAuthority, undefined, [removedHistoryUpdate])).toThrow(
       'editor.setEditor.render_authority_forbidden:editDocumentHistory',
     );
-    expect(() => Reflect.apply(state.setEditor, undefined, [adjustmentUpdater])).toThrow(
-      'editor.setEditor.render_authority_forbidden:adjustments',
-    );
-    expect(() => Reflect.apply(useEditorStore.setState, useEditorStore, [historyUpdater])).toThrow(
+    expect(() => Reflect.apply(useEditorStore.setState, useEditorStore, [historyUpdate])).toThrow(
       'editor.setState.render_authority_forbidden:history',
     );
     expect(() => Reflect.apply(useEditorStore.setState, useEditorStore, [state, true])).toThrow(
       'editor.setState.replace_forbidden',
     );
-    expect(useEditorStore.getState().adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
-    expect(useEditorStore.getState().history).toHaveLength(1);
   });
 
-  test('typed hydration preserves disabled-node authority in the published snapshot', () => {
-    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4 };
-    const editDocumentV2 = setEditDocumentV2NodeEnabled(
-      legacyAdjustmentsToEditDocumentV2(adjustments),
-      'tone_equalizer',
-      false,
-    );
+  test('requires hydration history to contain the exact current document', () => {
+    const current = createDefaultEditDocumentV2();
+    const mismatched = setEditDocumentV2NodeEnabled(current, 'tone_equalizer', false);
 
-    useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustmentRevision: 7,
-      adjustments,
-      editDocumentV2,
-      editDocumentHistory: [editDocumentV2],
-      history: [adjustments],
-      historyIndex: 0,
+    expect(() =>
+      useEditorStore.getState().hydrateEditorRenderAuthority({
+        adjustmentRevision: 7,
+        editDocumentV2: current,
+        historyIndex: 0,
+        history: [mismatched],
+      }),
+    ).toThrow('editor.hydration.inconsistent_history');
+  });
+
+  test('publishes, navigates, and resets the same immutable document stream', () => {
+    const initialState = useEditorStore.getState();
+    const original = initialState.editDocumentV2;
+    const result = initialState.applyEditTransaction({
+      baseAdjustmentRevision: 0,
+      history: 'single-entry',
+      imageSessionId: `editor-image-session:${String(initialState.imageSessionId)}`,
+      operations: [
+        { type: 'patch-edit-document-node', nodeType: 'scene_global_color_tone', patch: { exposure: 1.25 } },
+      ],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'sole-authority-proof',
     });
-    const hydrated = useEditorStore.getState();
+    const committed = useEditorStore.getState();
 
-    expect(hydrated.adjustmentRevision).toBe(7);
-    expect(hydrated.editDocumentV2.nodes.tone_equalizer?.enabled).toBe(false);
-    expect(hydrated.editDocumentHistory[0]?.nodes.tone_equalizer?.enabled).toBe(false);
-    expect(hydrated.adjustmentSnapshot.editDocumentV2).toBe(hydrated.editDocumentV2);
-    expect(hydrated.adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(result.afterEditDocumentV2).toBe(committed.editDocumentV2);
+    expect(committed.adjustmentRevision).toBe(1);
+    expect(committed.history).toEqual([original, committed.editDocumentV2]);
+    expect(committed.adjustmentSnapshot.value.exposure).toBe(1.25);
+    expect(Object.isFrozen(committed.adjustmentSnapshot.value)).toBeTrue();
+    expect(Reflect.set(committed.adjustmentSnapshot.value, 'exposure', 99)).toBeFalse();
+    expect(committed.adjustmentSnapshot.value.exposure).toBe(1.25);
+    expect(useEditorStore.getState().editDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
 
-    useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustmentRevision: 8,
-      adjustments,
-      editDocumentV2,
-      history: [adjustments],
-      historyIndex: 0,
-    });
-    expect(useEditorStore.getState().editDocumentHistory[0]?.nodes.tone_equalizer?.enabled).toBe(false);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().editDocumentV2).toEqual(original);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState().editDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
   });
 
   test('generic non-render UI updates remain available', () => {

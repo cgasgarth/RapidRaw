@@ -434,7 +434,7 @@ export const buildAgentToneColorDryRunExpertEdit = async ({
   const selectedImage = editor.selectedImage;
   if (selectedImage === null) throw new Error('Cannot dry-run tone/color expert edit without a selected image.');
   const graphRevisionBefore = snapshot.graphRevision;
-  const basicPayload = buildBasicTonePayload(editor.adjustments, intents);
+  const basicPayload = buildBasicTonePayload(editor.adjustmentSnapshot.value, intents);
   const selectivePayload = buildSelectiveColorPayload(intents);
   const basicToneCommand = buildBasicToneCommandEnvelope(
     basicPayload,

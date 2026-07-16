@@ -89,7 +89,7 @@ export const runAgentCoreEditCommandBundle = async ({
 
   const dryRuns: ToneColorDryRunResultV1[] = [];
   const mutations: ToneColorMutationResultV1[] = [];
-  let nextAdjustments = initialState.adjustments;
+  let nextAdjustments = initialState.adjustmentSnapshot.value;
   let outputPixels = [...PREVIEW_PIXELS];
   let currentGraphRevision = `history_${initialState.historyIndex}`;
 

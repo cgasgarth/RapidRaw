@@ -42,15 +42,13 @@ describe('LUT edit transaction', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
+      history: [editDocumentV2],
     });
   });
 
@@ -93,13 +91,17 @@ describe('LUT edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments).toMatchObject({ lutName: null, lutPath: null, lutSize: 0 });
-    expect(useEditorStore.getState().adjustments.effectsEnabled).toBeFalse();
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+      lutName: null,
+      lutPath: null,
+      lutSize: 0,
+    });
+    expect(useEditorStore.getState().adjustmentSnapshot.value.effectsEnabled).toBeFalse();
   });
 
   test('clears complete LUT identity in one node revision and Undo restores it', () => {
     const loaded = {
-      ...useEditorStore.getState().adjustments,
+      ...useEditorStore.getState().adjustmentSnapshot.value,
       lutIntensity: 47,
       lutName: 'loaded.cube',
       lutPath: '/luts/loaded.cube',
@@ -107,10 +109,9 @@ describe('LUT edit transaction', () => {
     };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(loaded);
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, loaded, editDocumentV2),
-      adjustments: loaded,
       editDocumentV2,
-      history: [loaded],
+      history: [editDocumentV2],
+      historyIndex: 0,
     });
 
     const state = useEditorStore.getState();
@@ -126,7 +127,7 @@ describe('LUT edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments).toMatchObject({
+    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
       lutIntensity: 47,
       lutName: 'loaded.cube',
       lutPath: '/luts/loaded.cube',

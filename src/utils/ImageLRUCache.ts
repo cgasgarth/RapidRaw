@@ -1,10 +1,12 @@
 import QuickLRU from 'quick-lru';
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ChannelConfig } from '../components/adjustments/Curves';
 import type { SelectedImage, WaveformData } from '../components/ui/AppProperties';
 import type { Adjustments } from './adjustments';
 
 export interface ImageCacheEntry {
   adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   histogram: ChannelConfig | null;
   waveform: WaveformData | null;
   finalPreviewUrl: string | null;
@@ -18,7 +20,8 @@ export interface ImageCacheEntry {
 }
 
 export interface ImageCacheEditorSnapshot {
-  adjustments: Adjustments;
+  adjustmentSnapshot: { readonly value: Adjustments };
+  editDocumentV2: EditDocumentV2;
   finalPreviewUrl: string | null;
   hasRenderedFirstFrame: boolean;
   histogram: ChannelConfig | null;
@@ -43,7 +46,8 @@ export const buildImageCacheEntry = (state: ImageCacheEditorSnapshot): ImageCach
     return null;
   }
   return {
-    adjustments: state.adjustments,
+    adjustments: state.adjustmentSnapshot.value,
+    editDocumentV2: state.editDocumentV2,
     backendReady: state.hasRenderedFirstFrame,
     finalPreviewUrl: state.finalPreviewUrl,
     histogram: state.histogram,

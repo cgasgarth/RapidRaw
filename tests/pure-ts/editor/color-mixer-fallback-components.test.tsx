@@ -70,31 +70,31 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
     container.querySelector('[data-testid="black-white-mixer-controls"]')?.getAttribute('data-commit-image-session'),
   ).toBe('editor-image-session:91');
   act(() => getButton(container, 'black-white-mixer-toggle').click());
-  expect(useEditorStore.getState().adjustments.blackWhiteMixer.enabled).toBeTrue();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.blackWhiteMixer.enabled).toBeTrue();
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:91',
     source: 'manual-control',
   });
 
   act(() => getButton(container, 'color-balance-toggle').click());
-  expect(useEditorStore.getState().adjustments.colorBalanceRgb).toMatchObject({
+  expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toMatchObject({
     enabled: true,
     midtones: { red: 10 },
   });
   expect(useEditorStore.getState().editDocumentV2.nodes.color_balance_rgb.params.colorBalanceRgb).toEqual(
-    useEditorStore.getState().adjustments.colorBalanceRgb,
+    useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb,
   );
   expect(useEditorStore.getState().editDocumentV2.nodes.channel_mixer.params).not.toHaveProperty('colorBalanceRgb');
 
   act(() => getButton(container, 'channel-mixer-toggle').click());
-  expect(useEditorStore.getState().adjustments.channelMixer.enabled).toBeTrue();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer.enabled).toBeTrue();
   const hslHue = container.querySelector('[data-testid="selective-color-range-controls"] input[type="range"]');
   if (!(hslHue instanceof window.HTMLInputElement)) throw new Error('missing selective-color HSL slider');
   act(() => {
     hslHue.value = '21';
     hslHue.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
-  expect(useEditorStore.getState().adjustments.hsl.reds.hue).toBe(21);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.reds.hue).toBe(21);
   expect(useEditorStore.getState().editDocumentV2.nodes.selective_color_mixer.params.hsl.reds.hue).toBe(21);
   expect(useEditorStore.getState().editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('hsl');
   expect(useEditorStore.getState().history).toHaveLength(5);
@@ -131,7 +131,7 @@ test('ColorAdvancedControls slider commits calibration through fallback authorit
     tint.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
 
-  expect(useEditorStore.getState().adjustments.colorCalibration.shadowsTint).toBe(24);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.colorCalibration.shadowsTint).toBe(24);
   expect(useEditorStore.getState().history).toHaveLength(2);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:92',
@@ -157,7 +157,7 @@ test('ColorAdvancedControls Levels actions commit through the luma Levels node',
   );
 
   act(() => getButton(container, 'color-levels-toggle').click());
-  expect(useEditorStore.getState().adjustments.levels.enabled).toBeTrue();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.levels.enabled).toBeTrue();
   expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels.enabled).toBeTrue();
   expect(useEditorStore.getState().editDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('levels');
 
@@ -168,7 +168,7 @@ test('ColorAdvancedControls Levels actions commit through the luma Levels node',
     inputBlack.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
 
-  expect(useEditorStore.getState().adjustments.levels.inputBlack).toBe(0.08);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.levels.inputBlack).toBe(0.08);
   expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels).toMatchObject({
     enabled: true,
     inputBlack: 0.08,
@@ -187,16 +187,14 @@ function initializeFallbackStore(imageSessionId: number): Adjustments {
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
     imageSessionId,
     lastEditApplicationReceipt: null,
     selectedImage,
+    history: [editDocumentV2],
   });
   return adjustments;
 }

@@ -43,10 +43,8 @@ const seedSelectedImage = () => {
   });
 
   useEditorStore.getState().hydrateEditorRenderAuthority({
-    adjustments: INITIAL_ADJUSTMENTS,
     finalPreviewUrl: 'blob:rawengine-agent-tone-color-before',
     hasRenderedFirstFrame: true,
-    history: [INITIAL_ADJUSTMENTS],
     historyIndex: 0,
     lastBasicToneCommand: null,
     selectedImage: {
@@ -59,6 +57,8 @@ const seedSelectedImage = () => {
       thumbnailUrl: 'blob:rawengine-agent-tone-color-thumb',
       width: 6000,
     },
+    editDocumentV2: useEditorStore.getState().editDocumentV2,
+    history: [useEditorStore.getState().editDocumentV2],
   });
 };
 
@@ -94,7 +94,7 @@ describe('agent tone/color dry-run expert edit', () => {
       'tonecolor.dry_run_command',
     );
     expect(useEditorStore.getState().historyIndex).toBe(0);
-    expect(useEditorStore.getState().adjustments.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(INITIAL_ADJUSTMENTS.exposure);
   });
 
   test('validates unsupported prompt requests', async () => {

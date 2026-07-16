@@ -90,11 +90,8 @@ describe('agent EditGraph EditTransaction bridge', () => {
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:agent-editgraph-current',
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: session,
@@ -112,6 +109,7 @@ describe('agent EditGraph EditTransaction bridge', () => {
         thumbnailUrl: '',
         width: 4000,
       },
+      history: [editDocumentV2],
     });
   });
 
@@ -135,8 +133,8 @@ describe('agent EditGraph EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_editgraph_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustments.contrast).toBe(12);
-    expect(after.adjustments.exposure).toBe(0);
+    expect(after.adjustmentSnapshot.value.contrast).toBe(12);
+    expect(after.adjustmentSnapshot.value.exposure).toBe(0);
     expect(after.history).toHaveLength(2);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-manual-edit');
   });
@@ -168,7 +166,7 @@ describe('agent EditGraph EditTransaction bridge', () => {
     const state = useEditorStore.getState();
     const identity = captureAgentEditGraphCommitIdentity(state);
     if (identity === null) throw new Error('Expected seeded EditGraph identity.');
-    const nextAdjustments = { ...state.adjustments, exposure: 0.6 };
+    const nextAdjustments = { ...state.adjustmentSnapshot.value, exposure: 0.6 };
     expect(() =>
       buildAgentEditGraphEditTransaction(
         { ...state, selectedImage: { path: '/fixtures/other.ARW' } },
@@ -202,15 +200,17 @@ describe('agent EditGraph EditTransaction bridge', () => {
         transactionId: 'agent-editgraph-apply',
       },
     });
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0.6);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.6);
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustments.exposure).toBe(0);
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustments: useEditorStore.getState().adjustments,
       adjustmentRevision: 0,
       imageSessionId: 81,
+      editDocumentV2: useEditorStore.getState().editDocumentV2,
+      history: [useEditorStore.getState().editDocumentV2],
+      historyIndex: 0,
     });
     const fallbackState = useEditorStore.getState();
     const identity = captureAgentEditGraphCommitIdentity(fallbackState);

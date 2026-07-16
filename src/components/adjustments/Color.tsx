@@ -163,9 +163,9 @@ export default function ColorPanel({
   const isGamutWarningOverlayVisible = useEditorStore((state) => state.isGamutWarningOverlayVisible);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const setEditor = useEditorStore((state) => state.setEditor);
-  const authoritativeHsl = useEditorStore((state) => state.adjustments.hsl);
+  const authoritativeHsl = useEditorStore((state) => state.adjustmentSnapshot.value.hsl);
   const authoritativeSelectiveColorRangeControls = useEditorStore(
-    (state) => state.adjustments.selectiveColorRangeControls,
+    (state) => state.adjustmentSnapshot.value.selectiveColorRangeControls,
   );
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const isColorCalibrationVisible = (adjustmentVisibility as { colorCalibration?: boolean }).colorCalibration !== false;
@@ -350,8 +350,8 @@ export default function ColorPanel({
     const currentImage = currentState.selectedImage;
     if (isForMask || currentImage === null) return;
 
-    const rangeControl = currentState.adjustments.selectiveColorRangeControls[activeColor];
-    const currentHsl = currentState.adjustments.hsl[activeColor];
+    const rangeControl = currentState.adjustmentSnapshot.value.selectiveColorRangeControls[activeColor];
+    const currentHsl = currentState.adjustmentSnapshot.value.hsl[activeColor];
     const rangeLabel = t(getSelectiveColorRange(activeColor).labelKey);
     const layerId = crypto.randomUUID();
     const maskId = `${layerId}_color_range_mask`;
@@ -385,7 +385,7 @@ export default function ColorPanel({
       }),
       parameters: colorRangeParameters,
     });
-    const result = applyColorRangeLocalAdjustmentLayerFlow(currentState.adjustments.masks, {
+    const result = applyColorRangeLocalAdjustmentLayerFlow(currentState.adjustmentSnapshot.value.masks, {
       colorRangeParameters,
       context: {
         graphRevision: `history_${currentState.historyIndex}`,
@@ -400,7 +400,7 @@ export default function ColorPanel({
       toneColor,
     });
     const nextAdjustments = persistLayerStackSidecarInAdjustments(
-      { ...currentState.adjustments, masks: result.masks },
+      { ...currentState.adjustmentSnapshot.value, masks: result.masks },
       result.toneResult.sidecar,
     );
     const transaction = buildLayerEditTransactionRequest(currentState, nextAdjustments, operationId);

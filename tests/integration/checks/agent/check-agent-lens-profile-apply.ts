@@ -15,6 +15,7 @@ import {
   agentLensProfileApplyRequestSchema,
   applyAgentLensProfile,
 } from '../../../../src/utils/agent/tools/agentLensProfileApplyTool.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
@@ -62,8 +63,8 @@ const lensProfileResultSchema = z
   })
   .passthrough();
 
+const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
 useEditorStore.getState().hydrateEditorRenderAuthority({
-  adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-lens-before',
   hasRenderedFirstFrame: true,
@@ -73,7 +74,8 @@ useEditorStore.getState().hydrateEditorRenderAuthority({
     [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
     [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
   },
-  history: [INITIAL_ADJUSTMENTS],
+  editDocumentV2,
+  history: [editDocumentV2],
   historyIndex: 0,
   selectedImage: {
     exif: { ISO: '400', LensModel: 'FE 24-70mm F2.8 GM II' },
@@ -171,13 +173,13 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustments.lensCorrectionMode !== 'manual' ||
-  state.adjustments.lensDistortionAmount !== 87 ||
-  state.adjustments.lensMaker !== 'Sony' ||
-  state.adjustments.lensModel !== 'FE 24-70mm F2.8 GM II' ||
-  state.adjustments.lensTcaAmount !== 94 ||
-  state.adjustments.lensVignetteAmount !== 112 ||
-  state.adjustments.lensDistortionParams?.k1 !== 0.12
+  state.adjustmentSnapshot.value.lensCorrectionMode !== 'manual' ||
+  state.adjustmentSnapshot.value.lensDistortionAmount !== 87 ||
+  state.adjustmentSnapshot.value.lensMaker !== 'Sony' ||
+  state.adjustmentSnapshot.value.lensModel !== 'FE 24-70mm F2.8 GM II' ||
+  state.adjustmentSnapshot.value.lensTcaAmount !== 94 ||
+  state.adjustmentSnapshot.value.lensVignetteAmount !== 112 ||
+  state.adjustmentSnapshot.value.lensDistortionParams?.k1 !== 0.12
 ) {
   throw new Error('agent.lens_profile.apply did not mutate representative lens/profile adjustments.');
 }

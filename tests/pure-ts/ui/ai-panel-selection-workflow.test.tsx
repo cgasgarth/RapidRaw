@@ -53,15 +53,13 @@ afterEach(() => {
     activeAiPatchContainerId: null,
     activeAiSubMaskId: null,
     adjustmentRevision: 0,
-    adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-    adjustments,
     editDocumentV2,
-    history: [adjustments],
     historyCheckpoints: [],
     historyIndex: 0,
     imageSession: null,
     lastEditApplicationReceipt: null,
     selectedImage: null,
+    history: [editDocumentV2],
   });
 });
 
@@ -76,10 +74,7 @@ describe('AI panel command-owned selection', () => {
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: null,
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
-      history: [adjustments],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession,
@@ -95,6 +90,7 @@ describe('AI panel command-owned selection', () => {
         thumbnailUrl: '',
         width: 1200,
       },
+      history: [editDocumentV2],
     });
 
     let passiveStoreWrites = 0;
@@ -133,7 +129,7 @@ describe('AI panel command-owned selection', () => {
     await click(deleteButton);
 
     const state = useEditorStore.getState();
-    expect(state.adjustments.aiPatches[0]?.subMasks.map((subMask) => subMask.id)).toEqual(['one', 'last']);
+    expect(state.adjustmentSnapshot.value.aiPatches[0]?.subMasks.map((subMask) => subMask.id)).toEqual(['one', 'last']);
     expect(state.activeAiPatchContainerId).toBe('first');
     expect(state.activeAiSubMaskId).toBe('last');
     expect(required<HTMLElement>(container, '[data-testid="inpaint-target-last"]').getAttribute('aria-pressed')).toBe(

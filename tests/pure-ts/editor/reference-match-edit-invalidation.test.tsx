@@ -7,6 +7,7 @@ import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine
 import { useEditorActions } from '../../../src/hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -40,9 +41,13 @@ test('manual fitted-node edit clears the receipt and undo/redo restores exact pr
     exposure: 0.75,
     referenceMatchApplicationReceipt: receipt,
   };
-  useEditorStore
-    .getState()
-    .hydrateEditorRenderAuthority({ adjustments: applied, history: [applied], historyIndex: 0, selectedImage: null });
+  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(applied);
+  useEditorStore.getState().hydrateEditorRenderAuthority({
+    historyIndex: 0,
+    selectedImage: null,
+    editDocumentV2,
+    history: [editDocumentV2],
+  });
   let setAdjustments: ReturnType<typeof useEditorActions>['setAdjustments'] | null = null;
   const Harness = () => {
     setAdjustments = useEditorActions().setAdjustments;
@@ -54,12 +59,12 @@ test('manual fitted-node edit clears the receipt and undo/redo restores exact pr
   act(() => root?.render(createElement(Harness)));
 
   act(() => setAdjustments?.({ exposure: 1 }));
-  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toBeNull();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toBeNull();
   expect(useEditorStore.getState().historyIndex).toBe(1);
   act(() => useEditorStore.getState().undo());
-  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toEqual(receipt);
+  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toEqual(receipt);
   act(() => useEditorStore.getState().redo());
-  expect(useEditorStore.getState().adjustments.referenceMatchApplicationReceipt).toBeNull();
+  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toBeNull();
 });
 
 function installDom() {

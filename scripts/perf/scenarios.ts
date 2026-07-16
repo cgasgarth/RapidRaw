@@ -29,6 +29,7 @@ fixture.masks = Array.from({ length: 16 }, (_, index) => ({
   visible: true,
 }));
 const snapshot = publishAdjustmentSnapshot(null, fixture);
+const adjustmentRevision = 0;
 const fixtureDigest = `sha256:${createHash('sha256').update(JSON.stringify(fixture)).digest('hex')}` as const;
 
 const previewScheduling: PerformanceScenario = {
@@ -58,20 +59,19 @@ const previewScheduling: PerformanceScenario = {
     let controlSink = 0;
     const controlStarted = performance.now();
     for (let index = 0; index < DISPATCHES; index += 1)
-      controlSink += snapshot.adjustmentRevision + index + snapshot.patchRevision;
+      controlSink += adjustmentRevision + index + snapshot.patchRevision;
     const controlDispatchMs = performance.now() - controlStarted;
     let sink = 0;
     const started = performance.now();
     for (let index = 0; index < DISPATCHES; index += 1) {
       const request = {
         snapshot,
-        scope: [run, snapshot.adjustmentRevision, snapshot.geometryRevision, index, 2048, 'wgpu'] as const,
+        scope: [run, adjustmentRevision, snapshot.geometryRevision, index, 2048, 'wgpu'] as const,
       };
       sink += request.scope[1] + request.scope[3] + request.snapshot.patchRevision;
     }
     const interactionDispatchMs = performance.now() - started;
-    const expected =
-      DISPATCHES * (snapshot.adjustmentRevision + snapshot.patchRevision) + (DISPATCHES * (DISPATCHES - 1)) / 2;
+    const expected = DISPATCHES * (adjustmentRevision + snapshot.patchRevision) + (DISPATCHES * (DISPATCHES - 1)) / 2;
     if (sink !== expected || controlSink !== expected)
       throw new Error(`Preview scheduling correctness sink mismatch: ${sink}/${controlSink} != ${expected}.`);
     const snapshotInstrumentationOverheadMs = Math.max(0, interactionDispatchMs - controlDispatchMs);
