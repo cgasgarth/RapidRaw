@@ -91,7 +91,7 @@ const stochasticOpticalMarker = stdout
 if (stochasticOpticalMarker === undefined)
   throw new Error('Native Film release gate did not emit stochastic/optical production evidence.');
 const stochasticOpticalReport = filmNativeStochasticOpticalReportV1Schema.parse(JSON.parse(stochasticOpticalMarker));
-const result = evaluateFilmNativeReleaseGate(fixture, nativeReport);
+const result = evaluateFilmNativeReleaseGate(fixture, vectors, nativeReport);
 if (!result.passed) throw new Error(`Film release gate failed: ${result.failures.join(',')}`);
 const stochasticOpticalResult = evaluateFilmStochasticOpticalReleaseGate(fixture, stochasticOpticalReport);
 if (!stochasticOpticalResult.passed)
@@ -100,7 +100,13 @@ const outputGamutReport = await buildFilmOutputGamutReport(fixture, nativeReport
 const outputGamutResult = evaluateFilmOutputGamutGate(fixture, nativeReport, outputGamutReport);
 if (!outputGamutResult.passed)
   throw new Error(`Film output gamut gate failed: ${outputGamutResult.failures.join(',')}`);
-const baselineResult = evaluateFilmBaselineApprovalGate(fixture, nativeReport, stochasticOpticalReport, approval);
+const baselineResult = evaluateFilmBaselineApprovalGate(
+  fixture,
+  nativeReport,
+  stochasticOpticalReport,
+  outputGamutReport,
+  approval,
+);
 if (!baselineResult.passed) throw new Error(`Film baseline approval gate failed: ${baselineResult.failures.join(',')}`);
 
 console.error(
@@ -115,6 +121,8 @@ console.log(
     grainDeterministicHash: stochasticOpticalReport.grain.deterministicHash,
     maxIdentityDeltaE00: result.maxIdentityDeltaE00,
     maxReferenceDeltaE00: result.maxReferenceDeltaE00,
+    previewExportMaxAbs: nativeReport.previewExportMaxAbs,
+    previewExportRmse: nativeReport.previewExportRmse,
     outputGamutHashes: Object.fromEntries(
       outputGamutReport.targets.map(({ outputHash, target }) => [target, outputHash]),
     ),
