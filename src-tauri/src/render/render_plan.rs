@@ -1084,11 +1084,32 @@ mod tests {
 
     #[test]
     fn object_order_and_negative_zero_are_canonical() {
-        let a = json!({"rotation": -0.0, "exposure": 1, "crop": {"x":0.0,"y":0.0,"width":1.0,"height":1.0}});
-        let b = json!({"crop": {"height":1.0,"width":1.0,"y":-0.0,"x":-0.0}, "exposure": 1, "rotation": 0.0});
+        let a = json!({"rotation": -0.0, "exposure": 1, "crop": {"unit":"normalized","x":0.0,"y":0.0,"width":1.0,"height":1.0}});
+        let b = json!({"crop": {"height":1.0,"width":1.0,"y":-0.0,"x":-0.0,"unit":"normalized"}, "exposure": 1, "rotation": 0.0});
         let a = compile_render_plan(&a, context(1), None).unwrap();
         let b = compile_render_plan(&b, context(2), None).unwrap();
         assert_eq!(a.fingerprints, b.fingerprints);
+    }
+
+    #[test]
+    fn crop_requires_explicit_current_unit_before_render_plan() {
+        for (obsolete, expected_message) in [
+            (
+                json!({"x":0.1,"y":0.2,"width":0.8,"height":0.7}),
+                "missing field `unit`",
+            ),
+            (
+                json!({"unit":"px","x":10,"y":20,"width":80,"height":70}),
+                "unknown variant `px`",
+            ),
+        ] {
+            let error = compile_render_plan(&json!({"crop": obsolete}), context(2), None)
+                .err()
+                .expect("obsolete crop identity must fail before render");
+            assert_eq!(error.code, "render_plan.invalid_field");
+            assert_eq!(error.field, "crop");
+            assert!(error.message.contains(expected_message));
+        }
     }
 
     #[test]
@@ -1114,7 +1135,7 @@ mod tests {
             cpu_color.fingerprints.pre_gpu_base
         );
         let crop = compile_render_plan(
-            &json!({"crop":{"x":0.1,"y":0.0,"width":0.9,"height":1.0}}),
+            &json!({"crop":{"unit":"normalized","x":0.1,"y":0.0,"width":0.9,"height":1.0}}),
             context(3),
             None,
         )
@@ -2006,7 +2027,7 @@ mod tests {
     fn compiled_gpu_abi_matches_direct_parser() {
         let raw = current_render_adjustments(json!({
             "exposure": 25, "sharpness": 12,
-            "crop":{"x":0.1,"y":0.2,"width":0.8,"height":0.7},
+            "crop":{"unit":"normalized","x":0.1,"y":0.2,"width":0.8,"height":0.7},
             "masks":[{"id":"m1","name":"Local","visible":true,"invert":false,"opacity":80,
                 "blendMode":"multiply","adjustments":{"contrast":15},"subMasks":[]}]
         }));
