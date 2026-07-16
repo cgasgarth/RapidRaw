@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
@@ -77,8 +76,8 @@ describe('LUT edit transaction', () => {
     ]);
     expect(result.after).toMatchObject({ lutName: 'warm.cube', lutPath: '/luts/warm.cube', lutSize: 33 });
     expect(result.after.effectsEnabled).toBeFalse();
-    expect(result.afterEditDocumentV2.nodes.display_creative.enabled).toBeFalse();
-    expect(result.afterEditDocumentV2.nodes.display_creative.params).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['display_creative']?.enabled).toBeFalse();
+    expect(result.afterEditDocumentV2.nodes['display_creative']?.params).toMatchObject({
       lutIntensity: 100,
       lutName: 'warm.cube',
       lutPath: '/luts/warm.cube',
@@ -117,7 +116,7 @@ describe('LUT edit transaction', () => {
     const state = useEditorStore.getState();
     const result = state.applyEditTransaction(buildLutClearEditTransaction(state, identity(), 'lut-clear'));
     expect(result.after).toMatchObject({ lutData: null, lutIntensity: 100, lutName: null, lutPath: null, lutSize: 0 });
-    expect(result.afterEditDocumentV2.nodes.display_creative.params).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['display_creative']?.params).toMatchObject({
       lutData: null,
       lutIntensity: 100,
       lutName: null,
