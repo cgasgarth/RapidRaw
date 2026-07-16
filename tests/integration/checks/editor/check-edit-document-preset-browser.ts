@@ -245,17 +245,28 @@ try {
   await page.waitForTimeout(300);
   if ((await saveCount(page)) !== saves) throw new Error('Exact no-op preset apply persisted a second revision.');
 
+  const selectedImagePath = await page
+    .getByRole('main', { name: 'Editor workspace' })
+    .getAttribute('data-selected-image-path');
   const previewCall = await page.evaluate(
     () =>
       window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
         .filter(({ command }) => command === 'generate_preset_preview')
-        .at(-1)?.args.jsAdjustments ?? null,
+        .at(-1)?.args.request ?? null,
   );
+  const previewAdjustments = Reflect.get(previewCall, 'jsAdjustments');
+  const previewIdentity = Reflect.get(previewCall, 'previewIdentity');
   if (
-    Reflect.get(previewCall, 'exposure') !==
-    configuredPreset.editDocumentV2.nodes.scene_global_color_tone?.params.exposure
+    Reflect.get(previewAdjustments, 'exposure') !==
+      configuredPreset.editDocumentV2.nodes.scene_global_color_tone?.params.exposure ||
+    selectedImagePath === null ||
+    Reflect.get(previewCall, 'expectedImagePath') !== selectedImagePath ||
+    Reflect.get(previewIdentity, 'sourceImagePath') !== Reflect.get(previewCall, 'expectedImagePath') ||
+    Reflect.get(previewIdentity, 'presetId') !== configuredPreset.id ||
+    typeof Reflect.get(previewIdentity, 'imageSessionId') !== 'number' ||
+    typeof Reflect.get(previewIdentity, 'requestId') !== 'number'
   ) {
-    throw new Error('Native preset preview lowering diverged from the saved edit-document node output.');
+    throw new Error('Native preset preview request diverged from the saved edit-document and source authority.');
   }
 
   await presetsPanel.getByRole('button', { name: 'Revert', exact: true }).click();

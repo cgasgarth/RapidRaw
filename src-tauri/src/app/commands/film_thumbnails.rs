@@ -237,6 +237,7 @@ fn render_film_profile_thumbnail_blocking(
         request.adjustments,
         &state,
         &app_handle,
+        None,
         request.width.max(request.height).max(64),
         Some((request.width, request.height)),
         Some(&cancellation),
