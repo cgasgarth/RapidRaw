@@ -259,8 +259,20 @@ const isBrowserTauriEventCallback = (value: unknown): value is BrowserTauriEvent
 
 const roundTripTauriJson = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
 
+interface BrowserTauriBootstrapInternals {
+  __rawengineBrowserBootstrap: true;
+  __rawengineQueuedCalls: Array<BrowserTauriInvokeCall>;
+}
+
+const isBrowserTauriBootstrapInternals = (value: unknown): value is BrowserTauriBootstrapInternals =>
+  typeof value === 'object' &&
+  value !== null &&
+  Reflect.get(value, '__rawengineBrowserBootstrap') === true &&
+  Array.isArray(Reflect.get(value, '__rawengineQueuedCalls'));
+
 export const installBrowserTauriHarness = (): void => {
-  if (window.__TAURI_INTERNALS__ !== undefined) return;
+  const startupInternals = window.__TAURI_INTERNALS__;
+  if (startupInternals !== undefined && !isBrowserTauriBootstrapInternals(startupInternals)) return;
 
   const requestedImageCount = Number.parseInt(new URL(window.location.href).searchParams.get('qaImages') ?? '', 10);
   if (Number.isInteger(requestedImageCount) && requestedImageCount >= 1 && requestedImageCount <= 100_000) {
@@ -278,7 +290,10 @@ export const installBrowserTauriHarness = (): void => {
     }));
   }
 
-  const calls: Array<BrowserTauriInvokeCall> = [];
+  const calls: Array<BrowserTauriInvokeCall> =
+    startupInternals !== undefined && isBrowserTauriBootstrapInternals(startupInternals)
+      ? startupInternals.__rawengineQueuedCalls.map((call) => ({ ...call }))
+      : [];
   const emitEvent = (event: string, payload: unknown) => {
     for (const callbackId of eventListeners.get(event) ?? [])
       callbacks.get(callbackId)?.({ event, id: callbackId, payload });

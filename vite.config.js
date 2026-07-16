@@ -20,6 +20,7 @@ export default defineConfig(async () => ({
   ...(process.env.RAWENGINE_VITE_CACHE_DIR === undefined ? {} : { cacheDir: process.env.RAWENGINE_VITE_CACHE_DIR }),
   plugins: [
     createViteProductBundleGuardPlugin(),
+    browserTauriHarnessPrebootPlugin(),
     startupPrebootOrderingPlugin(),
     browserTauriHarnessEntryPlugin(),
     tailwindcss(),
@@ -79,6 +80,54 @@ function browserTauriHarnessEntryPlugin() {
         'installBrowserTauriHarness();',
         source,
       ].join('\n');
+    },
+  };
+}
+
+function browserTauriHarnessPrebootPlugin() {
+  return {
+    name: 'rapidraw-browser-tauri-harness-preboot',
+    apply: 'serve',
+    enforce: 'pre',
+    transformIndexHtml: {
+      order: 'pre',
+      handler(html) {
+        const marker = '<script data-rawengine-startup-preboot>';
+        if (!html.includes(marker)) return html;
+        const bootstrap = `<script data-rawengine-browser-tauri-bootstrap>
+      (() => {
+        if (window.__TAURI_INTERNALS__ !== undefined) return;
+        const trace = {
+          criticalPathOrderValid: true,
+          firstPaintBudgetMet: true,
+          firstPaintBudgetMs: 750,
+          processId: 12345,
+          traceId: "startup:browser-harness",
+          phases: [],
+        };
+        const queuedCalls = [];
+        window.isTauri = true;
+        window.__TAURI_INTERNALS__ = {
+          __rawengineBrowserBootstrap: true,
+          __rawengineQueuedCalls: queuedCalls,
+          convertFileSrc: (path) => path,
+          invoke: (command, args, options) => {
+            const startedAtMs = performance.now();
+            queuedCalls.push({ args, command, endedAtMs: performance.now(), options, startedAtMs });
+            if (command === "frontend_ready") return Promise.resolve(null);
+            if (command === "get_startup_trace") return Promise.resolve(trace);
+            if (command === "record_frontend_startup_phase") {
+              return Promise.resolve({ ...trace, phases: [{ ...args, elapsedMs: 0 }] });
+            }
+            return Promise.reject(new Error("browser_tauri_harness_not_ready:" + command));
+          },
+          transformCallback: () => 0,
+          unregisterCallback: () => {},
+        };
+      })();
+    </script>`;
+        return html.replace(marker, `${bootstrap}\n    ${marker}`);
+      },
     },
   };
 }
