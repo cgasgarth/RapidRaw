@@ -571,7 +571,7 @@ mod tests {
         let app = tauri::test::mock_builder()
             .manage(crate::app_state::AppState::new())
             .invoke_handler(tauri::generate_handler![
-                super::super::cancel_panorama_alignment
+                crate::computational::commands::cancellation::cancel_panorama_alignment
             ])
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .unwrap();
