@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
@@ -25,7 +25,7 @@ const request = (overrides: Partial<EditTransactionRequest> = {}): EditTransacti
   ...overrides,
 });
 
-afterEach(() => {
+beforeEach(() => {
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initial);
   useEditorStore.getState().hydrateEditorRenderAuthority({
