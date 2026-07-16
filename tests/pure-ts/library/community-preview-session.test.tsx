@@ -1,7 +1,6 @@
 import { afterEach, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act } from 'react';
-import { createRoot } from 'react-dom/client';
+import { act, render as testingRender } from '@testing-library/react';
+import { createElement, Fragment } from 'react';
 
 interface Invocation {
   args: Record<string, unknown>;
@@ -34,7 +33,6 @@ afterEach(async () => {
   cleanup = null;
   invocations.length = 0;
   invoke.mockClear();
-  document?.body.replaceChildren();
 });
 
 test('rejects stale folder and preset generations, revokes their URLs, and owns the final map until unmount', async () => {
@@ -131,33 +129,22 @@ test('preserves the Save Community Preset payload contract', () => {
 });
 
 function installRuntime(fetchImplementation?: () => Promise<Response>) {
-  const window = new Window({ url: 'http://localhost' });
   const revoked: string[] = [];
   let objectUrl = 0;
-  Object.assign(globalThis, {
-    Blob: window.Blob,
-    document: window.document,
-    fetch: fetchImplementation ?? globalThis.fetch,
-    HTMLElement: window.HTMLElement,
-    navigator: window.navigator,
-    Node: window.Node,
-    window,
-  });
-  Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-  Object.assign(URL, {
-    createObjectURL: () => `blob:${++objectUrl}`,
-    revokeObjectURL: (url: string) => revoked.push(url),
-  });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  const originalFetch = globalThis.fetch;
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  if (fetchImplementation) Reflect.set(globalThis, 'fetch', fetchImplementation);
+  URL.createObjectURL = () => `blob:${++objectUrl}`;
+  URL.revokeObjectURL = (url: string | URL) => revoked.push(String(url));
+  const view = testingRender(createElement(Fragment));
   let mounted = true;
   return {
-    container,
+    container: view.container,
     revoked,
     render: async (sessionId: string, localPaths: string[], presets: CommunityPreset[]) => {
       await act(async () => {
-        root.render(
+        view.rerender(
           <CommunityPreviewSession key={sessionId} localPaths={localPaths} presets={presets} sessionId={sessionId}>
             {(previews: Record<string, string | null>) => JSON.stringify(previews)}
           </CommunityPreviewSession>,
@@ -167,7 +154,10 @@ function installRuntime(fetchImplementation?: () => Promise<Response>) {
     unmount: async () => {
       if (!mounted) return;
       mounted = false;
-      await act(async () => root.unmount());
+      view.unmount();
+      Reflect.set(globalThis, 'fetch', originalFetch);
+      URL.createObjectURL = originalCreateObjectURL;
+      URL.revokeObjectURL = originalRevokeObjectURL;
     },
   };
 }

@@ -1,26 +1,11 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import AdjustmentSlider from '../../../src/components/adjustments/AdjustmentSlider.tsx';
 import { getSliderEventNumber } from '../../../src/components/adjustments/adjustmentSliderValue.ts';
-
-Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true, writable: true });
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-});
 
 test('getSliderEventNumber accepts string and numeric slider event values', () => {
   expect(getSliderEventNumber({ target: { value: '12.5' } })).toBe(12.5);
@@ -191,19 +176,10 @@ function AdjustmentSliderHarness({
 async function renderAdjustmentSlider(
   props: Omit<Parameters<typeof AdjustmentSliderHarness>[0], 'changes'> & { changes: number[] },
 ) {
-  installDom();
   const i18n = await createTestI18n();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, createElement(AdjustmentSliderHarness, props)));
-    await flushPromises();
-  });
-
-  renderedRoot = { container, root };
-  return { container, root };
+  const view = render(createElement(I18nextProvider, { i18n }, createElement(AdjustmentSliderHarness, props)));
+  await act(flushPromises);
+  return view;
 }
 
 function getRequiredElement<T extends Element>(container: Element, selector: string): T {
@@ -226,14 +202,6 @@ function createWheelEvent(type: string, init: WheelEventInit): Event {
 
 function createInputEvent(): Event {
   return new window.InputEvent('input', { bubbles: true });
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/adjustment-slider-test' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
 }
 
 async function createTestI18n() {

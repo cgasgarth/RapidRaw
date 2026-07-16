@@ -1,15 +1,12 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
+import { createElement } from 'react';
 
 import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { useEditorActions } from '../../../src/hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
-
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 const fingerprint = (digit: string): `fnv1a64:${string}` => `fnv1a64:${digit.repeat(16)}`;
 const receipt = matchLookApplicationReceiptV1Schema.parse({
@@ -27,15 +24,7 @@ const receipt = matchLookApplicationReceiptV1Schema.parse({
   targetAnalysisFingerprint: fingerprint('3'),
 });
 
-let root: Root | null = null;
-
-afterEach(() => {
-  if (root) act(() => root?.unmount());
-  root = null;
-});
-
 test('manual fitted-node edit clears the receipt and undo/redo restores exact provenance states', () => {
-  installDom();
   const applied = {
     ...structuredClone(INITIAL_ADJUSTMENTS),
     exposure: 0.75,
@@ -53,10 +42,7 @@ test('manual fitted-node edit clears the receipt and undo/redo restores exact pr
     setAdjustments = useEditorActions().setAdjustments;
     return null;
   };
-  const container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-  act(() => root?.render(createElement(Harness)));
+  render(createElement(Harness));
 
   act(() => setAdjustments?.({ exposure: 1 }));
   expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toBeNull();
@@ -66,11 +52,3 @@ test('manual fitted-node edit clears the receipt and undo/redo restores exact pr
   act(() => useEditorStore.getState().redo());
   expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toBeNull();
 });
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/reference-match-edit-invalidation' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
-}

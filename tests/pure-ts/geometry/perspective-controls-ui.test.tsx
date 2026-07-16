@@ -1,29 +1,23 @@
 import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, fireEvent, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import TransformLens from '../../../src/components/adjustments/TransformLens.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-let rendered: { container: HTMLDivElement; root: Root } | null = null;
-
 afterEach(() => {
-  if (rendered !== null) {
-    act(() => rendered?.root.unmount());
-    rendered.container.remove();
-    rendered = null;
-  }
+  Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
 });
 
 test('guided perspective controls create source-normalized horizontal and vertical evidence', async () => {
-  installDom();
+  Object.defineProperty(window, '__TAURI_INTERNALS__', {
+    configurable: true,
+    value: { invoke: async () => [] },
+  });
   const adjustments = {
     ...structuredClone(INITIAL_ADJUSTMENTS),
     perspectiveCorrection: { ...INITIAL_ADJUSTMENTS.perspectiveCorrection, mode: 'guided' as const },
@@ -47,10 +41,6 @@ test('guided perspective controls create source-normalized horizontal and vertic
     },
     history: [editDocumentV2],
   });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  rendered = { container, root };
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
     interpolation: { escapeValue: false },
@@ -58,19 +48,15 @@ test('guided perspective controls create source-normalized horizontal and vertic
     react: { useSuspense: false },
     resources: { en: { translation: en } },
   });
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, createElement(PerspectiveHarness)));
-    await flushPromises();
-  });
+  const { container } = render(createElement(I18nextProvider, { i18n }, createElement(PerspectiveHarness)));
+  await act(flushPromises);
   const buttons = Array.from(container.querySelectorAll('button'));
   const horizontal = buttons.find((button) => button.textContent?.includes('Add horizontal guide'));
   const vertical = buttons.find((button) => button.textContent?.includes('Add vertical guide'));
   if (horizontal === undefined || vertical === undefined) throw new Error('Expected guided line controls');
-  await act(async () => {
-    horizontal.click();
-    vertical.click();
-    await flushPromises();
-  });
+  fireEvent.click(horizontal);
+  fireEvent.click(vertical);
+  await act(flushPromises);
   const state = container.querySelector('[data-testid="perspective-state"]')?.textContent ?? '';
   expect(state).toContain('"horizontal"');
   expect(state).toContain('"vertical"');
@@ -94,18 +80,6 @@ function PerspectiveHarness() {
       JSON.stringify(adjustments.perspectiveCorrection.guides),
     ),
   );
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/perspective-controls-test' });
-  Object.defineProperty(window, '__TAURI_INTERNALS__', {
-    configurable: true,
-    value: { invoke: async () => [] },
-  });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
 }
 
 async function flushPromises() {

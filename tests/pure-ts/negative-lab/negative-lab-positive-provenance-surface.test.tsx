@@ -1,8 +1,7 @@
-import { afterEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { describe, expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { NegativeLabPositiveProvenanceSurface } from '../../../src/components/panel/right/metadata/MetadataPanel.tsx';
@@ -11,20 +10,6 @@ import {
   buildNegativeLabReopenedSavedPositiveArtifactStatus,
   buildNegativeLabReopenedSavedPositiveProvenance,
 } from '../../../src/utils/negative-lab/negativeLabSavedPositiveReopen.ts';
-
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-});
 
 describe('Negative Lab positive provenance surface', () => {
   test('renders persisted source and output paths without modal state', async () => {
@@ -55,7 +40,7 @@ describe('Negative Lab positive provenance surface', () => {
     });
     if (provenance === null) throw new Error('Expected current positive provenance.');
 
-    const { root, badge, container } = await renderSurface(provenance, null);
+    const { badge, container } = await renderSurface(provenance, null);
     expect(badge.dataset['negativeLabPositiveState']).toBe('current');
     expect(badge.textContent).toBe('NL Current');
     expect(
@@ -67,7 +52,6 @@ describe('Negative Lab positive provenance surface', () => {
     expect(container.textContent).toContain('Negative Lab provenance');
     expect(container.textContent).toContain('Source negative path');
     expect(container.textContent).toContain('Positive output path');
-    void root;
   });
 
   test('renders warning details for stale persisted artifacts', async () => {
@@ -132,47 +116,21 @@ async function renderSurface(
   provenance: NonNullable<ReturnType<typeof buildNegativeLabReopenedSavedPositiveProvenance>>,
   status: ReturnType<typeof buildNegativeLabReopenedSavedPositiveArtifactStatus>,
 ) {
-  if (!globalThis.window) {
-    const window = new Window();
-    Object.assign(globalThis, {
-      document: window.document,
-      HTMLDivElement: window.HTMLDivElement,
-      HTMLElement: window.HTMLElement,
-      window,
-    });
-  }
-
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
   const i18n = await createTestI18n();
-
-  await act(async () => {
-    root.render(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        createElement(NegativeLabPositiveProvenanceSurface, {
-          provenance,
-          status,
-        }),
-      ),
-    );
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
-  renderedRoot = { container, root };
+  const { container } = render(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(NegativeLabPositiveProvenanceSurface, {
+        provenance,
+        status,
+      }),
+    ),
+  );
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
   const badge = container.querySelector<HTMLElement>('[data-testid="metadata-negative-lab-positive-status"]');
   if (badge === null) throw new Error('Expected Negative Lab positive status badge to render.');
-  return { badge, container, root };
+  return { badge, container };
 }
 
 async function createTestI18n() {

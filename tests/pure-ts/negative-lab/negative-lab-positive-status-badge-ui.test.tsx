@@ -1,27 +1,12 @@
-import { afterEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { describe, expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { NegativeLabPositiveStatusBadge } from '../../../src/components/panel/right/metadata/MetadataPanel.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import type { NegativeLabReopenedPositiveArtifactStatus } from '../../../src/utils/negative-lab/negativeLabSavedPositiveReopen.ts';
-
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-});
 
 describe('Negative Lab positive status badge UI', () => {
   test('visibly distinguishes current, stale, and missing persisted positive artifacts', async () => {
@@ -63,43 +48,17 @@ const buildStatus = ({
 });
 
 async function renderBadge(status: NegativeLabReopenedPositiveArtifactStatus) {
-  if (!globalThis.window) {
-    const window = new Window();
-    Object.assign(globalThis, {
-      document: window.document,
-      HTMLDivElement: window.HTMLDivElement,
-      HTMLElement: window.HTMLElement,
-      window,
-    });
-  }
-
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  const root = createRoot(container);
   const i18n = await createTestI18n();
-
-  await act(async () => {
-    root.render(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        createElement(NegativeLabPositiveStatusBadge, {
-          status,
-        }),
-      ),
-    );
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  });
-
-  renderedRoot = { container, root };
+  const { container } = render(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(NegativeLabPositiveStatusBadge, {
+        status,
+      }),
+    ),
+  );
+  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
   const badge = container.querySelector<HTMLElement>('[data-testid="metadata-negative-lab-positive-status"]');
   if (badge === null) throw new Error('Expected Negative Lab positive status badge to render.');
   return { badge, container };

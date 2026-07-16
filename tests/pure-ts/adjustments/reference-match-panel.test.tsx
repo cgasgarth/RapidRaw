@@ -1,8 +1,7 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import ReferenceMatchPanel from '../../../src/components/adjustments/ReferenceMatchPanel.tsx';
@@ -13,18 +12,6 @@ import { useLibraryStore } from '../../../src/store/useLibraryStore.ts';
 import { useUIStore } from '../../../src/store/useUIStore.ts';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-let rendered: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (rendered) {
-    act(() => rendered?.root.unmount());
-    rendered.container.remove();
-    rendered = null;
-  }
-});
 
 const image = (path: string): SelectedImage => ({
   exif: null,
@@ -48,12 +35,14 @@ const histogram = (luma: number, red: number, green: number, blue: number) => {
 };
 
 test('reference tray survives navigation, proposal inspection is non-mutating, and Apply is one history entry', async () => {
-  installDom();
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   useEditorStore.getState().hydrateEditorRenderAuthority({
+    adjustmentRevision: 0,
     finalPreviewUrl: null,
     histogram: histogram(180, 200, 170, 120),
     historyIndex: 0,
+    imageSession: null,
+    imageSessionId: 0,
     lastReferenceMatchApplicationReceipt: null,
     proofRevision: 3,
     referenceMatchReferences: [],
@@ -61,10 +50,6 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     editDocumentV2: publishAdjustmentSnapshot(null, initial).editDocumentV2,
     history: [publishAdjustmentSnapshot(null, initial).editDocumentV2],
   });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  rendered = { container, root };
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
     interpolation: { escapeValue: false },
@@ -73,10 +58,8 @@ test('reference tray survives navigation, proposal inspection is non-mutating, a
     resources: { en: { translation: en } },
   });
 
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, createElement(ReferenceMatchPanel)));
-    await flushPromises();
-  });
+  const { container } = render(createElement(I18nextProvider, { i18n }, createElement(ReferenceMatchPanel)));
+  await act(flushPromises);
   await click(container, '[data-testid="reference-match-capture"]');
   expect(useEditorStore.getState().referenceMatchReferences).toHaveLength(1);
 
@@ -300,14 +283,6 @@ async function changeSelect(container: Element, selector: string, value: string)
     element.dispatchEvent(new window.Event('change', { bubbles: true }));
     await flushPromises();
   });
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/reference-match-test' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
 }
 
 async function flushPromises() {

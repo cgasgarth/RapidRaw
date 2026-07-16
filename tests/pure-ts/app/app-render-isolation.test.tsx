@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { act, useRef } from 'react';
+import { beforeEach, describe, expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
+import { useRef } from 'react';
 import { flushSync } from 'react-dom';
-import { createRoot, type Root } from 'react-dom/client';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useLibraryStore } from '../../../src/store/useLibraryStore';
 import { useProcessStore } from '../../../src/store/useProcessStore';
@@ -76,10 +76,7 @@ function IsolationHarness() {
   );
 }
 
-let root: Root;
-
 beforeEach(async () => {
-  document.body.replaceChildren();
   for (const key of Object.keys(counts) as Array<keyof typeof counts>) counts[key] = 0;
   useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
     editDocumentV2: legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure: -1 }),
@@ -88,13 +85,8 @@ beforeEach(async () => {
     selectedImage: null,
   }));
   useProcessStore.getState().setExportState({ progress: { current: -1, total: 100 } });
-  const container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-  await act(async () => root.render(<IsolationHarness />));
+  render(<IsolationHarness />);
 });
-
-afterEach(() => act(() => root.unmount()));
 
 describe('application render islands', () => {
   test('100 adjustment updates commit only the editor domain', async () => {

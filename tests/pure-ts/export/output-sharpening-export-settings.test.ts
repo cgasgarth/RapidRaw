@@ -1,7 +1,6 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
+import { createElement } from 'react';
 import {
   ExportColorProfile,
   type ExportPreset,
@@ -14,20 +13,6 @@ import { parseExportRecipe } from '../../../src/schemas/export/exportRecipeSchem
 import type { OutputSharpeningSettings } from '../../../src/schemas/outputSharpeningSchemas';
 
 type ExportSettingsHookState = ReturnType<typeof useExportSettings>;
-
-Object.defineProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT', { configurable: true, value: true, writable: true });
-
-let renderedHook: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (renderedHook !== null) {
-    act(() => {
-      renderedHook?.root.unmount();
-    });
-    renderedHook.container.remove();
-    renderedHook = null;
-  }
-});
 
 test('export settings preserve output sharpening through defaults, updates, and presets', async () => {
   const hook = await renderExportSettingsHook();
@@ -124,18 +109,9 @@ test('export recipe serialization keeps output sharpening settings instead of dr
 });
 
 async function renderExportSettingsHook(): Promise<{ current: ExportSettingsHookState }> {
-  installDom();
   const latest: { current: ExportSettingsHookState | null } = { current: null };
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(createElement(ExportSettingsHookHarness, { latest }));
-    await flushPromises();
-  });
-
-  renderedHook = { container, root };
+  render(createElement(ExportSettingsHookHarness, { latest }));
+  await act(flushPromises);
   return latest as { current: ExportSettingsHookState };
 }
 
@@ -178,14 +154,6 @@ function buildExportPreset(overrides: Partial<ExportPreset>): ExportPreset {
     watermarkSpacing: 5,
     ...overrides,
   };
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/output-sharpening-export-settings' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
 }
 
 async function flushPromises() {

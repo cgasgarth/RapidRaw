@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
 import {
   completeStaticStartup,
   startApplication,
@@ -9,26 +8,22 @@ import { consumeStartupShellIntent } from '../../../src/product/startupShellHand
 
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
-const installShell = (invoke: Invoke): Window => {
-  const testWindow = new Window({ url: 'http://localhost' });
-  testWindow.document.body.innerHTML = `
+const installShell = (invoke: Invoke): typeof window => {
+  document.body.innerHTML = `
     <div id="root"><div id="startup-shell" role="status" aria-label="RapidRAW library is starting">
       <div id="startup-shell-content"><p>Loading your workspace…</p>
         <button id="startup-add-folder" type="button">Add Folder</button>
         <button id="startup-settings" type="button">Settings</button>
       </div>
     </div></div>`;
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: testWindow });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: testWindow.document });
-  Object.defineProperty(testWindow, '__TAURI_INTERNALS__', { configurable: true, value: { invoke } });
-  return testWindow;
+  Object.defineProperty(window, '__TAURI_INTERNALS__', { configurable: true, value: { invoke } });
+  return window;
 };
 
 const trace = (traceId = 'startup:trace-42') => ({ processId: 4242, traceId });
 
 afterEach(() => {
-  Reflect.deleteProperty(globalThis, 'window');
-  Reflect.deleteProperty(globalThis, 'document');
+  Reflect.deleteProperty(window, '__TAURI_INTERNALS__');
   Reflect.deleteProperty(globalThis, '__RAWENGINE_STATIC_STARTUP__');
   while (consumeStartupShellIntent() !== null) {
     // Drain input state shared with the deferred application chunk.

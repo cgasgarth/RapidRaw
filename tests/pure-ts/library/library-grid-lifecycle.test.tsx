@@ -1,7 +1,7 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act } from 'react';
-import { createRoot } from 'react-dom/client';
+import { expect, test } from 'bun:test';
+import { act, render as testingRender } from '@testing-library/react';
+import i18next from 'i18next';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 import LibraryGrid from '../../../src/components/panel/library/LibraryGrid';
 import {
   type ImageFile,
@@ -10,6 +10,9 @@ import {
   ThumbnailSize,
 } from '../../../src/components/ui/AppProperties';
 import { libraryEntityRepository } from '../../../src/library/LibraryEntityRepository';
+
+const i18n = i18next.createInstance();
+await i18n.use(initReactI18next).init({ lng: 'en', resources: { en: { translation: {} } } });
 
 const images: ImageFile[] = ['/a.raw', '/b.raw', '/c.raw'].map((path) => ({
   path,
@@ -22,7 +25,6 @@ const images: ImageFile[] = ['/a.raw', '/b.raw', '/c.raw'].map((path) => ({
 }));
 
 test('keeps the virtual list and surviving thumbnails mounted through ordinary layout transitions', async () => {
-  const window = new Window({ url: 'http://localhost' });
   const observers: TestResizeObserver[] = [];
   class TestResizeObserver {
     target: Element | null = null;
@@ -37,32 +39,21 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
     unobserve() {}
     disconnect() {}
   }
-  Object.assign(globalThis, {
-    window,
-    document: window.document,
-    DOMRect: window.DOMRect,
-    navigator: window.navigator,
-    HTMLElement: window.HTMLElement,
-    Node: window.Node,
-    ResizeObserver: TestResizeObserver,
-    IS_REACT_ACT_ENVIRONMENT: true,
-    requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(0), 0),
-    cancelAnimationFrame: (id: number) => clearTimeout(id),
-  });
-  window.HTMLElement.prototype.scrollTo = function scrollTo(xOrOptions, y) {
-    this.scrollTop = typeof xOrOptions === 'number' ? (y ?? this.scrollTop) : (xOrOptions.top ?? this.scrollTop);
+  const originalResizeObserver = globalThis.ResizeObserver;
+  const originalScrollTo = window.HTMLElement.prototype.scrollTo;
+  globalThis.ResizeObserver = TestResizeObserver;
+  window.HTMLElement.prototype.scrollTo = function scrollTo(xOrOptions?: number | ScrollToOptions, y?: number) {
+    this.scrollTop = typeof xOrOptions === 'number' ? (y ?? this.scrollTop) : (xOrOptions?.top ?? this.scrollTop);
   };
   libraryEntityRepository.replaceAll(images);
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  let mountedView: ReturnType<typeof testingRender> | null = null;
   const render = async (
     imageList: ImageFile[],
     thumbnailSize: ThumbnailSize,
     thumbnailAspectRatio: ThumbnailAspectRatio,
   ) => {
-    await act(async () =>
-      root.render(
+    const element = (
+      <I18nextProvider i18n={i18n}>
         <LibraryGrid
           imageList={imageList}
           libraryViewMode={LibraryViewMode.Flat}
@@ -81,9 +72,14 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
           onThumbnailSizeChange={() => {}}
           onClearSelection={() => {}}
           onEmptyAreaContextMenu={() => {}}
-        />,
-      ),
+        />
+      </I18nextProvider>
     );
+    const view = mountedView ?? testingRender(element);
+    if (mountedView === null) mountedView = view;
+    else view.rerender(element);
+    await act(() => Promise.resolve());
+    return view;
   };
   const resize = async (width: number, height: number) => {
     await act(async () => {
@@ -107,7 +103,8 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
     });
   };
 
-  await render(images, ThumbnailSize.Small, ThumbnailAspectRatio.Cover);
+  const view = await render(images, ThumbnailSize.Small, ThumbnailAspectRatio.Cover);
+  const { container } = view;
   await resize(600, 400);
   const list = container.querySelector<HTMLElement>('.custom-scrollbar');
   const thumbnail = container.querySelector<HTMLElement>('[data-image-path="/a.raw"]');
@@ -137,9 +134,7 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
 
   await render(images, ThumbnailSize.List, ThumbnailAspectRatio.Contain);
   expect(container.querySelector('.custom-scrollbar')).toBe(list);
-  await act(async () => root.unmount());
-});
-
-afterEach(() => {
-  document?.body.replaceChildren();
+  view.unmount();
+  globalThis.ResizeObserver = originalResizeObserver;
+  window.HTMLElement.prototype.scrollTo = originalScrollTo;
 });

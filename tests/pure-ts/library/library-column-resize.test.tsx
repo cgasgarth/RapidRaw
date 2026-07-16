@@ -1,7 +1,6 @@
-import { afterEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, memo, useRef } from 'react';
-import { createRoot } from 'react-dom/client';
+import { describe, expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
+import { memo, useRef } from 'react';
 import { CORE_LIBRARY_COLUMN_KEYS } from '../../../src/components/panel/library/libraryColumnWidths';
 import { useLibraryColumnResize } from '../../../src/components/panel/library/useLibraryColumnResize';
 import type { ColumnWidths } from '../../../src/components/panel/MainLibrary';
@@ -18,15 +17,9 @@ const initial: ColumnWidths = {
   focal: 15,
 };
 
-function installDom() {
-  const window = new Window({ url: 'http://localhost' });
-  Object.assign(globalThis, {
-    window,
-    document: window.document,
-    HTMLElement: window.HTMLElement,
-    PointerEvent: window.PointerEvent,
-  });
-  Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
+function installFrameDriver() {
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
   let callbacks = new Map<number, FrameRequestCallback>();
   let nextId = 1;
   globalThis.requestAnimationFrame = (callback) => {
@@ -36,13 +29,16 @@ function installDom() {
   };
   globalThis.cancelAnimationFrame = (id) => callbacks.delete(id);
   return {
-    window,
     flush: () => {
       const pending = callbacks;
       callbacks = new Map();
       pending.forEach((callback) => callback(0));
     },
     pending: () => callbacks.size,
+    restore: () => {
+      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    },
   };
 }
 
@@ -82,19 +78,13 @@ function Harness({
   );
 }
 
-afterEach(() => {
-  document?.body.replaceChildren();
-});
-
 describe('library column resize journey', () => {
   test('coalesces hundreds of moves and commits exactly once on release', async () => {
-    const dom = installDom();
+    const frames = installFrameDriver();
     const commits: ColumnWidths[] = [];
     const renders = { count: 0 };
-    const container = document.createElement('div');
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<Harness commit={(widths) => commits.push(widths)} renders={renders} />));
+    const view = render(<Harness commit={(widths) => commits.push(widths)} renders={renders} />);
+    const { container } = view;
     const grid = container.querySelector('[data-testid="root"]') as HTMLElement;
     const handle = container.querySelector('[data-testid="handle"]') as HTMLElement;
     Object.defineProperty(grid, 'clientWidth', { value: 1_000 });
@@ -104,7 +94,7 @@ describe('library column resize journey', () => {
     handle.releasePointerCapture = (id) => captured.delete(id);
     const fire = (type: string, clientX: number) =>
       handle.dispatchEvent(
-        new PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'mouse', button: 0, clientX }),
+        new window.PointerEvent(type, { bubbles: true, pointerId: 7, pointerType: 'mouse', button: 0, clientX }),
       );
 
     await act(async () => {
@@ -112,24 +102,23 @@ describe('library column resize journey', () => {
       for (let index = 0; index < 500; index++) fire('pointermove', 100 + index);
     });
     expect(commits).toHaveLength(0);
-    expect(dom.pending()).toBe(1);
+    expect(frames.pending()).toBe(1);
     expect(renders.count).toBe(1);
-    await act(async () => dom.flush());
+    await act(async () => frames.flush());
     expect(grid.style.getPropertyValue('--library-col-thumbnail')).not.toBe('');
     await act(async () => fire('pointerup', 599));
     expect(commits).toHaveLength(1);
     expect(renders.count).toBe(1);
     expect(captured.size).toBe(0);
-    await act(async () => root.unmount());
+    view.unmount();
+    frames.restore();
   });
 
   test('Escape restores initial CSS without committing and unmount cancels a frame', async () => {
-    const dom = installDom();
+    const frames = installFrameDriver();
     let commits = 0;
-    const container = document.createElement('div');
-    document.body.append(container);
-    const root = createRoot(container);
-    await act(async () => root.render(<Harness commit={() => commits++} />));
+    const view = render(<Harness commit={() => commits++} />);
+    const { container } = view;
     const grid = container.querySelector('[data-testid="root"]') as HTMLElement;
     const handle = container.querySelector('[data-testid="handle"]') as HTMLElement;
     Object.defineProperty(grid, 'clientWidth', { value: 1_000 });
@@ -138,7 +127,7 @@ describe('library column resize journey', () => {
     handle.releasePointerCapture = () => {};
     await act(async () => {
       handle.dispatchEvent(
-        new PointerEvent('pointerdown', {
+        new window.PointerEvent('pointerdown', {
           bubbles: true,
           pointerId: 2,
           pointerType: 'mouse',
@@ -146,14 +135,15 @@ describe('library column resize journey', () => {
           clientX: 0,
         }),
       );
-      handle.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 2, clientX: 200 }));
+      handle.dispatchEvent(new window.PointerEvent('pointermove', { bubbles: true, pointerId: 2, clientX: 200 }));
     });
-    expect(dom.pending()).toBe(1);
-    await act(async () => dom.window.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Escape' })));
+    expect(frames.pending()).toBe(1);
+    await act(async () => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' })));
     expect(commits).toBe(0);
-    expect(dom.pending()).toBe(0);
+    expect(frames.pending()).toBe(0);
     expect(grid.style.getPropertyValue('--library-col-thumbnail')).toBe(`${(4 / 55) * 100}%`);
-    await act(async () => root.unmount());
+    view.unmount();
+    frames.restore();
     expect(document.documentElement.style.getPropertyValue('user-select')).toBe('');
   });
 });

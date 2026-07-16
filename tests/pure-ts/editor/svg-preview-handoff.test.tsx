@@ -1,29 +1,26 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { flushSync } from 'react-dom';
-import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { act, render as testingRender } from '@testing-library/react';
+import { createElement } from 'react';
 
 import { SvgPreviewHandoff } from '../../../src/components/panel/editor/SvgPreviewHandoff.tsx';
 import type { InteractivePatch } from '../../../src/store/useEditorStore.ts';
-
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
 interface HandoffRenderInput {
   baseSource: string;
   incomingPatch: InteractivePatch | null;
 }
 
+const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+
+beforeEach(() => {
+  globalThis.requestAnimationFrame = (callback) => window.setTimeout(() => callback(Date.now()), 0);
+  globalThis.cancelAnimationFrame = (id) => window.clearTimeout(id);
+});
+
 afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
+  globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+  globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
 });
 
 test('keeps rendered predecessor and successor SVG base layers until successor opacity handoff completes', async () => {
@@ -167,51 +164,46 @@ function renderHandoff({
   onBasePresented?: (url: string) => void;
   reducedMotion?: boolean;
 }) {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
   const failed: string[] = [];
   const presented: string[] = [];
   const released: string[] = [];
 
-  const render = ({
+  const element = ({
     baseSource: nextBaseSource,
     incomingPatch: nextIncomingPatch,
     isCpuPreviewVisible: nextIsCpuPreviewVisible = true,
     reducedMotion: nextReducedMotion = false,
-  }: HandoffRenderInput & { isCpuPreviewVisible?: boolean; reducedMotion?: boolean }) => {
-    act(() => {
-      flushSync(() => {
-        root.render(
-          createElement(
-            'svg',
-            null,
-            createElement(SvgPreviewHandoff, {
-              baseScopeKey: '/photo.ARW',
-              baseSource: nextBaseSource,
-              incomingPatch: nextIncomingPatch,
-              isCpuPreviewVisible: nextIsCpuPreviewVisible,
-              isMaxZoom: false,
-              onBaseFailed: (url: string) => failed.push(url),
-              onBasePresented: (url: string) => {
-                presented.push(url);
-                onBasePresented?.(url);
-              },
-              patchScopeKey: '/photo.ARW:geometry',
-              reducedMotion: nextReducedMotion,
-              releaseUrl: (owner: string, url: string) => released.push(`${owner}:${url}`),
-              retainUrl: () => {},
-            }),
-          ),
-        );
-      });
-    });
-  };
+  }: HandoffRenderInput & { isCpuPreviewVisible?: boolean; reducedMotion?: boolean }) =>
+    createElement(
+      'svg',
+      null,
+      createElement(SvgPreviewHandoff, {
+        baseScopeKey: '/photo.ARW',
+        baseSource: nextBaseSource,
+        incomingPatch: nextIncomingPatch,
+        isCpuPreviewVisible: nextIsCpuPreviewVisible,
+        isMaxZoom: false,
+        onBaseFailed: (url: string) => failed.push(url),
+        onBasePresented: (url: string) => {
+          presented.push(url);
+          onBasePresented?.(url);
+        },
+        patchScopeKey: '/photo.ARW:geometry',
+        reducedMotion: nextReducedMotion,
+        releaseUrl: (owner: string, url: string) => released.push(`${owner}:${url}`),
+        retainUrl: () => {},
+      }),
+    );
 
-  render({ baseSource, incomingPatch, isCpuPreviewVisible, reducedMotion });
-  renderedRoot = { container, root };
-  return { container, failed, presented, released, render };
+  const view = testingRender(element({ baseSource, incomingPatch, isCpuPreviewVisible, reducedMotion }));
+  return {
+    container: view.container,
+    failed,
+    presented,
+    released,
+    render: (input: HandoffRenderInput & { isCpuPreviewVisible?: boolean; reducedMotion?: boolean }) =>
+      view.rerender(element(input)),
+  };
 }
 
 function baseSources(container: Element): string[] {
@@ -262,19 +254,4 @@ function eventForLayer(container: Element, testId: string, href: string, event: 
 async function flushAnimationFrames() {
   await new Promise((resolve) => setTimeout(resolve, 0));
   await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function installDom() {
-  const domWindow = new Window({ url: 'http://localhost/svg-preview-handoff-test' });
-  Object.assign(globalThis, {
-    document: domWindow.document,
-    Element: domWindow.Element,
-    HTMLElement: domWindow.HTMLElement,
-    HTMLDivElement: domWindow.HTMLDivElement,
-    navigator: domWindow.navigator,
-    requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0),
-    cancelAnimationFrame: (id: number) => clearTimeout(id),
-    SVGImageElement: domWindow.SVGImageElement,
-    window: domWindow,
-  });
 }

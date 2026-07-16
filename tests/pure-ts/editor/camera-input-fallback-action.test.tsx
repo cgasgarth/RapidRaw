@@ -1,24 +1,15 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
+import { createElement } from 'react';
 import { useCameraInputEditCommit } from '../../../src/hooks/editor/useCameraInputEditCommit';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 const sourcePath = '/fixture/camera-input-fallback-action.ARW';
-let root: Root | null = null;
-
-afterEach(() => {
-  if (root) act(() => root?.unmount());
-  root = null;
-});
 
 test('camera input hook dispatches from a selected-image fallback session', () => {
-  installDom();
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.35 };
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
   useEditorStore.getState().hydrateEditorRenderAuthority({
@@ -48,10 +39,7 @@ test('camera input hook dispatches from a selected-image fallback session', () =
     commitCameraInput = useCameraInputEditCommit().commitCameraInput;
     return null;
   };
-  const container = document.createElement('div');
-  document.body.append(container);
-  root = createRoot(container);
-  act(() => root?.render(createElement(Harness)));
+  render(createElement(Harness));
 
   act(() => commitCameraInput?.({ cameraProfile: 'camera_neutral', cameraProfileAmount: 74 }));
   expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
@@ -64,11 +52,3 @@ test('camera input hook dispatches from a selected-image fallback session', () =
     source: 'manual-control',
   });
 });
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/camera-input-fallback-action' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
-}

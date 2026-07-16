@@ -1,22 +1,9 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { expect, test } from 'bun:test';
+import { act, render as testingRender } from '@testing-library/react';
+import { createElement } from 'react';
 
 import { LibraryThumbnailImage } from '../../../src/components/panel/library/LibraryItems.tsx';
 import { ThumbnailAspectRatio } from '../../../src/components/ui/AppProperties.tsx';
-
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-let mounted: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (mounted !== null) {
-    act(() => mounted?.root.unmount());
-    mounted.container.remove();
-    mounted = null;
-  }
-});
 
 test('cached URLs render immediately with shared grid/list layer behavior', async () => {
   const view = await renderThumbnail('/library/A.ARW', 'thumb://a', false);
@@ -81,28 +68,24 @@ test('keyed path replacement discards outgoing layers and an unmounted placehold
 });
 
 async function renderThumbnail(path: string, url: string | null, compact: boolean, loads: string[] = []) {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  let mountedView: ReturnType<typeof testingRender> | null = null;
   const render = async (nextPath: string, nextUrl: string | null, nextCompact: boolean) => {
-    await act(async () => {
-      root.render(
-        createElement(LibraryThumbnailImage, {
-          aspectRatio: ThumbnailAspectRatio.Cover,
-          compact: nextCompact,
-          key: nextPath,
-          onLoad: (loadedPath) => loads.push(loadedPath),
-          path: nextPath,
-          url: nextUrl,
-        }),
-      );
-      await Promise.resolve();
+    const element = createElement(LibraryThumbnailImage, {
+      aspectRatio: ThumbnailAspectRatio.Cover,
+      compact: nextCompact,
+      key: nextPath,
+      onLoad: (loadedPath) => loads.push(loadedPath),
+      path: nextPath,
+      url: nextUrl,
     });
+    const view = mountedView ?? testingRender(element);
+    if (mountedView === null) mountedView = view;
+    else view.rerender(element);
+    await act(() => Promise.resolve());
+    return view;
   };
-  await render(path, url, compact);
-  mounted = { container, root };
-  return { container, render };
+  const view = await render(path, url, compact);
+  return { container: view.container, render };
 }
 
 function layerUrls(container: Element) {
@@ -123,12 +106,4 @@ async function flushTimer() {
   await act(async () => {
     await new Promise((resolve) => window.setTimeout(resolve, 5));
   });
-}
-
-function installDom() {
-  const testWindow = new Window({ url: 'http://localhost/library-thumbnail-test' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: testWindow });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: testWindow.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: testWindow.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: testWindow.HTMLElement });
 }

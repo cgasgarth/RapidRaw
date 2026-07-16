@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, render as testingRender } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
+import { createElement } from 'react';
 import { flushSync } from 'react-dom';
-import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import Filmstrip, {
@@ -11,26 +10,21 @@ import Filmstrip, {
   getFilmstripColumnWidth,
   resolveFilmstripThumbnailUrl,
 } from '../../../src/components/panel/Filmstrip.tsx';
-import { DecodedThumbnailReadinessCache } from '../../../src/components/panel/filmstripThumbnailLifecycle.ts';
+import {
+  DecodedThumbnailReadinessCache,
+  filmstripThumbnailReadiness,
+} from '../../../src/components/panel/filmstripThumbnailLifecycle.ts';
 import { type ImageFile, ThumbnailAspectRatio } from '../../../src/components/ui/AppProperties.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { useSettingsStore } from '../../../src/store/useSettingsStore.ts';
 import { thumbnailCache } from '../../../src/thumbnails/thumbnailCacheInstance.ts';
 
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
 afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-  thumbnailCache.clearGeneration();
-  useSettingsStore.setState({ appSettings: null });
+  act(() => {
+    thumbnailCache.clearGeneration();
+    filmstripThumbnailReadiness.clear();
+    useSettingsStore.setState({ appSettings: null });
+  });
 });
 
 test('uses the active selected-image thumbnail as a filmstrip fallback', () => {
@@ -60,6 +54,8 @@ test('bounds decoded readiness entries and refreshes recent revisions', () => {
   expect(cache.has('/validation/two.ARW', 'blob:two')).toBe(false);
   expect(cache.has('/validation/one.ARW', 'blob:one')).toBe(true);
   expect(cache.has('/validation/three.ARW', 'blob:three')).toBe(true);
+  cache.clear();
+  expect(cache.has('/validation/one.ARW', 'blob:one')).toBe(false);
 });
 
 describe('filmstrip thumbnail decode handoff', () => {
@@ -288,47 +284,33 @@ function image(path: string): ImageFile {
 }
 
 async function renderThumbnail(initialImage: ImageFile) {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  installThumbnailBoundaries();
   const i18n = await createTestI18n();
-
+  const element = (imageFile: ImageFile) =>
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(FilmstripThumbnail, {
+        imageFile,
+        imageRatings: null,
+        index: 0,
+        isActive: false,
+        isSelected: false,
+        onRegisterThumbnail: () => {},
+        onThumbnailRovingKeyDown: () => {},
+        tabIndex: 0,
+        thumbnailAspectRatio: ThumbnailAspectRatio.Cover,
+      }),
+    );
+  const view = testingRender(element(initialImage));
   const render = (imageFile: ImageFile) => {
-    act(() => {
-      flushSync(() => {
-        root.render(
-          createElement(
-            I18nextProvider,
-            { i18n },
-            createElement(FilmstripThumbnail, {
-              imageFile,
-              imageRatings: null,
-              index: 0,
-              isActive: false,
-              isSelected: false,
-              onRegisterThumbnail: () => {},
-              onThumbnailRovingKeyDown: () => {},
-              tabIndex: 0,
-              thumbnailAspectRatio: ThumbnailAspectRatio.Cover,
-            }),
-          ),
-        );
-      });
-    });
+    flushSync(() => view.rerender(element(imageFile)));
   };
-
-  render(initialImage);
-  renderedRoot = { container, root };
   return {
-    container,
+    container: view.container,
     render,
     unmount: () => {
-      act(() => {
-        root.unmount();
-      });
-      container.remove();
-      renderedRoot = null;
+      view.unmount();
     },
   };
 }
@@ -338,40 +320,34 @@ async function renderFilmstrip(
   thumbnailAspectRatio: ThumbnailAspectRatio = ThumbnailAspectRatio.Cover,
   initialSelectedPaths: string[] = [],
 ) {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  installThumbnailBoundaries();
   const i18n = await createTestI18n();
-
+  const element = (
+    imageList: ImageFile[],
+    nextThumbnailAspectRatio: ThumbnailAspectRatio = thumbnailAspectRatio,
+    multiSelectedPaths: string[] = initialSelectedPaths,
+  ) =>
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(Filmstrip, {
+        imageList,
+        imageRatings: null,
+        isLoading: false,
+        multiSelectedPaths,
+        thumbnailAspectRatio: nextThumbnailAspectRatio,
+      }),
+    );
+  const view = testingRender(element(initialImages));
   const render = (
     imageList: ImageFile[],
     nextThumbnailAspectRatio: ThumbnailAspectRatio = thumbnailAspectRatio,
     multiSelectedPaths: string[] = initialSelectedPaths,
   ) => {
-    act(() => {
-      flushSync(() => {
-        root.render(
-          createElement(
-            I18nextProvider,
-            { i18n },
-            createElement(Filmstrip, {
-              imageList,
-              imageRatings: null,
-              isLoading: false,
-              multiSelectedPaths,
-              thumbnailAspectRatio: nextThumbnailAspectRatio,
-            }),
-          ),
-        );
-      });
-    });
+    flushSync(() => view.rerender(element(imageList, nextThumbnailAspectRatio, multiSelectedPaths)));
   };
-
-  render(initialImages);
   await settleReact();
-  renderedRoot = { container, root };
-  return { container, render };
+  return { container: view.container, render };
 }
 
 async function setThumbnails(thumbnails: Record<string, string>) {
@@ -528,23 +504,9 @@ async function settleReact() {
   });
 }
 
-function installDom() {
-  const domWindow = new Window({ url: 'http://localhost/filmstrip-thumbnail-test' });
-  Object.assign(globalThis, {
-    DOMRectReadOnly: domWindow.DOMRectReadOnly,
-    document: domWindow.document,
-    HTMLElement: domWindow.HTMLElement,
-    HTMLDivElement: domWindow.HTMLDivElement,
-    HTMLImageElement: domWindow.HTMLImageElement,
-    Image: domWindow.Image,
-    navigator: domWindow.navigator,
-    requestAnimationFrame: (callback: FrameRequestCallback) => setTimeout(() => callback(Date.now()), 0),
-    cancelAnimationFrame: (id: number) => clearTimeout(id),
-    ResizeObserver: TestResizeObserver,
-    window: domWindow,
-  });
-
-  Object.defineProperty(domWindow.HTMLImageElement.prototype, 'decode', {
+function installThumbnailBoundaries() {
+  globalThis.ResizeObserver = TestResizeObserver;
+  Object.defineProperty(window.HTMLImageElement.prototype, 'decode', {
     configurable: true,
     value: () => Promise.resolve(),
   });

@@ -1,8 +1,7 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { beforeEach, expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { ColorGradingControls } from '../../../src/components/adjustments/color/ColorGradingControls';
@@ -11,21 +10,7 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { COLOR_GRADING_PRESETS } from '../../../src/utils/colorGradingPresets';
 
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
 beforeEach(() => useEditorStore.getState().setEditor({ selectedImage: null }));
-
-afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-});
 
 test('three-way navigation keeps one active wheel and does not mutate adjustment history', async () => {
   const rendered = await renderColorGrading();
@@ -176,7 +161,6 @@ async function renderColorGrading({
 }: {
   initialAdjustments?: Adjustments;
 } = {}) {
-  installDom();
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
     fallbackLng: 'en',
@@ -185,32 +169,24 @@ async function renderColorGrading({
     react: { useSuspense: false },
     resources: { en: { translation: en } },
   });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
   let currentAdjustments = initialAdjustments;
   let changeCount = 0;
-
-  await act(async () => {
-    root.render(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        createElement(ColorGradingHarness, {
-          initialAdjustments,
-          onAdjustmentsChange: (adjustments) => {
-            currentAdjustments = adjustments;
-            changeCount += 1;
-          },
-        }),
-      ),
-    );
-    await flushPromises();
-  });
-
-  renderedRoot = { container, root };
+  const view = render(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(ColorGradingHarness, {
+        initialAdjustments,
+        onAdjustmentsChange: (adjustments) => {
+          currentAdjustments = adjustments;
+          changeCount += 1;
+        },
+      }),
+    ),
+  );
+  await act(flushPromises);
   return {
-    container,
+    ...view,
     getAdjustments: () => currentAdjustments,
     getChangeCount: () => changeCount,
   };
@@ -227,22 +203,6 @@ function getRequiredElement<T extends Element>(container: Element, selector: str
   const element = container.querySelector<T>(selector);
   if (element === null) throw new Error(`Expected ${selector} to render.`);
   return element;
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/color-grading-controls-test' });
-  class TestResizeObserver {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
-
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
-  Object.defineProperty(globalThis, 'HTMLInputElement', { configurable: true, value: window.HTMLInputElement });
-  Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: TestResizeObserver });
 }
 
 async function flushPromises() {

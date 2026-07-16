@@ -1,23 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import React, { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { act, render } from '@testing-library/react';
 import { thumbnailCache } from '../../src/thumbnails/thumbnailCacheInstance';
 import { useThumbnail, useThumbnailSmartPreview } from '../../src/thumbnails/useThumbnail';
 
-const window = new Window();
-Object.assign(globalThis, {
-  document: window.document,
-  navigator: window.navigator,
-  window,
-  IS_REACT_ACT_ENVIRONMENT: true,
-});
-
-let root: Root | undefined;
 afterEach(() => {
-  act(() => root?.unmount());
-  root = undefined;
-  thumbnailCache.clearGeneration();
+  act(() => thumbnailCache.clearGeneration());
 });
 
 describe('thumbnail React subscriptions', () => {
@@ -29,15 +16,11 @@ describe('thumbnail React subscriptions', () => {
       renders.set(path, (renders.get(path) ?? 0) + 1);
       return <span>{`${url}:${smartPreview?.stale ?? false}`}</span>;
     };
-    const container = document.createElement('div');
-    root = createRoot(container);
-    await act(async () =>
-      root?.render(
-        <>
-          <Consumer path="a" />
-          <Consumer path="b" />
-        </>,
-      ),
+    render(
+      <>
+        <Consumer path="a" />
+        <Consumer path="b" />
+      </>,
     );
     const baselineA = renders.get('a');
     const baselineB = renders.get('b');

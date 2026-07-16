@@ -1,7 +1,5 @@
-import { afterEach, beforeEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { beforeEach, expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
 import { useLibraryImage } from '../../../src/hooks/library/useLibraryImage';
 import { libraryEntityRepository } from '../../../src/library/LibraryEntityRepository';
 
@@ -22,29 +20,16 @@ function Cell({ path }: { path: string }) {
   return <span>{entity?.rating}</span>;
 }
 
-let root: Root;
 beforeEach(async () => {
-  const window = new Window({ url: 'http://localhost' });
-  Object.assign(globalThis, {
-    document: window.document,
-    window,
-    navigator: window.navigator,
-    IS_REACT_ACT_ENVIRONMENT: true,
-  });
   renders.clear();
   libraryEntityRepository.replaceAll([image('/a.raw'), image('/b.raw')]);
-  const container = document.createElement('div');
-  root = createRoot(container);
-  await act(async () =>
-    root.render(
-      <>
-        <Cell path="/a.raw" />
-        <Cell path="/b.raw" />
-      </>,
-    ),
+  render(
+    <>
+      <Cell path="/a.raw" />
+      <Cell path="/b.raw" />
+    </>,
   );
 });
-afterEach(() => act(() => root.unmount()));
 
 test('metadata patch rerenders only the subscribed image cell', async () => {
   const beforeA = renders.get('/a.raw');

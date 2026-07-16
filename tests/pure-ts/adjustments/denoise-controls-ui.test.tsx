@@ -1,31 +1,16 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { expect, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
 import i18next from 'i18next';
-import { act, createElement, useState } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import DetailsPanel from '../../../src/components/adjustments/Details.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
-Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
-
-let rendered: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (rendered !== null) {
-    act(() => rendered?.root.unmount());
-    rendered.container.remove();
-    rendered = null;
-  }
-});
-
 test('Detail inspector exposes and commits independent professional denoise controls', async () => {
-  installDom();
   installEditorSession();
   const container = await renderHarness(createElement(DenoiseControlsHarness));
 
@@ -53,7 +38,6 @@ test('Detail inspector exposes and commits independent professional denoise cont
 });
 
 test('Detail inspector commits chromatic aberration through lens node authority', async () => {
-  installDom();
   installEditorSession();
   const container = await renderHarness(createElement(DenoiseControlsHarness));
   const redCyan = findSliderByLabel(container, 'Red/Cyan');
@@ -79,7 +63,6 @@ test('Detail inspector commits chromatic aberration through lens node authority'
 });
 
 test('Detail mask controls keep local denoise values outside the global transaction authority', async () => {
-  installDom();
   installEditorSession();
   const container = await renderHarness(createElement(MaskDenoiseControlsHarness));
   const luminance = findSliderByLabel(container, 'Luminance');
@@ -137,7 +120,7 @@ function MaskDenoiseControlsHarness() {
   );
 }
 
-async function renderHarness(child: ReturnType<typeof createElement>): Promise<HTMLDivElement> {
+async function renderHarness(child: ReturnType<typeof createElement>): Promise<HTMLElement> {
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
     interpolation: { escapeValue: false },
@@ -145,15 +128,9 @@ async function renderHarness(child: ReturnType<typeof createElement>): Promise<H
     react: { useSuspense: false },
     resources: { en: { translation: en } },
   });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  rendered = { container, root };
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, child));
-    await flushPromises();
-  });
-  return container;
+  const view = render(createElement(I18nextProvider, { i18n }, child));
+  await act(flushPromises);
+  return view.container;
 }
 
 function installEditorSession() {
@@ -194,14 +171,6 @@ function findSliderByLabel(container: Element, label: string): HTMLInputElement 
     candidate = candidate.parentElement ?? undefined;
   }
   return null;
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/denoise-controls-test' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
 }
 
 async function flushPromises() {
