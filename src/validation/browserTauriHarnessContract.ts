@@ -86,6 +86,8 @@ declare global {
       batchAutoAdjustCommitDelayMs: number;
       batchAutoAdjustPrepareDelayMs: number;
       imageOpenDelayMs: number;
+      holdNextImageOpenCompletion: () => void;
+      releaseHeldImageOpenCompletion: () => boolean;
       lensDistortionResponses: Array<BrowserHarnessInvokeResponse>;
       aiSubjectMaskResponses: Array<BrowserHarnessInvokeResponse>;
       metadataSaveResponses: Array<BrowserHarnessMetadataSaveResponse>;

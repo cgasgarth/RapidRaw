@@ -1,16 +1,26 @@
 import { expect, test } from 'bun:test';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 import { type ImageCacheEntry, ImageLRUCache } from '../../../src/utils/ImageLRUCache.ts';
 import { PreviewUrlReleaseAuthority } from '../../../src/utils/previewUrlReleaseAuthority.ts';
 
 const makeEntry = (finalPreviewUrl: string | null, uncroppedPreviewUrl: string | null): ImageCacheEntry => ({
-  adjustments: {},
+  adjustments: structuredClone(INITIAL_ADJUSTMENTS),
   editDocumentV2: createDefaultEditDocumentV2(),
   histogram: null,
   waveform: null,
   finalPreviewUrl,
   uncroppedPreviewUrl,
-  selectedImage: { path: '/tmp/image.raw' },
+  selectedImage: {
+    exif: null,
+    height: 80,
+    isRaw: true,
+    isReady: true,
+    originalUrl: null,
+    path: '/tmp/image.raw',
+    thumbnailUrl: 'blob:image-thumbnail',
+    width: 100,
+  },
   originalSize: { width: 100, height: 80 },
   previewSize: { width: 50, height: 40 },
 });
