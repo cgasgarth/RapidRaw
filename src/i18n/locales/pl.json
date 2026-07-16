@@ -1943,7 +1943,7 @@
         "exportAllTitle": "Eksportuj wszystkie presety",
         "exportTitle": "Eksportuj {{type}}",
         "importPresetsTitle": "Importuj presety",
-        "legacyPreset": "Przestarzały preset",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Plik presetu",
         "rapidRawPreset": "Preset RapidRAW"
       },

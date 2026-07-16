@@ -1831,7 +1831,7 @@
         "exportAllTitle": "Exportar Todas as Predefinições",
         "exportTitle": "Exportar {{type}}",
         "importPresetsTitle": "Importar Predefinições",
-        "legacyPreset": "Predefinição Legada",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Arquivo de Predefinição",
         "rapidRawPreset": "Predefinição RapidRAW"
       },

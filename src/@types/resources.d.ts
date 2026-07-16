@@ -1638,7 +1638,7 @@ export default interface Resources {
           exportAllTitle: 'Export All Presets';
           exportTitle: 'Export {{type}}';
           importPresetsTitle: 'Import Presets';
-          legacyPreset: 'Legacy Preset';
+          lightroomPreset: 'Lightroom/XMP Preset';
           presetFile: 'Preset File';
           rapidRawPreset: 'RapidRAW Preset';
         };
