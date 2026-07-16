@@ -976,7 +976,7 @@ mod tests {
             false,
             None
         ));
-        assert!(is_image_edited(
+        assert!(!is_image_edited(
             &crate::render_plan::current_render_adjustments(
                 json!({"rawEngineEditGraphVersion": 2})
             ),

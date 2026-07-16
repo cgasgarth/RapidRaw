@@ -4018,7 +4018,7 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn scene_referred_v2_preserves_extended_values_and_has_an_explicit_pixel_delta() {
+    fn current_scene_referred_graph_preserves_extended_values_with_cpu_gpu_parity() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
         use tauri::Manager;
@@ -4033,91 +4033,85 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let recipe = |version| {
-            crate::render_plan::current_render_adjustments(json!({
-                "rawEngineEditGraphVersion": version,
-                "channelMixer": {
-                    "enabled": true,
-                    "preserveLuminance": false,
-                    "red": { "red": 100, "green": 0, "blue": 0, "constant": 100 },
-                    "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
-                    "blue": { "red": 0, "green": 0, "blue": 100, "constant": -100 }
-                },
-                "curves": {
-                    "luma": [
-                        { "x": 0, "y": 0 },
-                        { "x": 128, "y": 140 },
-                        { "x": 255, "y": 255 }
-                    ]
-                }
-            }))
-        };
-        let render = |version| {
-            let raw = recipe(version);
-            let plan = crate::render_plan::compile_render_plan(
-                &raw,
-                crate::render_plan::CompileRenderPlanContext {
-                    revision: crate::render_plan::content_revision(&raw, 1, 2, version),
-                    is_raw: false,
-                    tonemapper_override: Some(0),
-                },
-                None,
-            )
-            .unwrap();
-            assert_eq!(plan.adjustments.global.edit_graph_version, version as f32);
-            let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
-                &source,
-                &plan.adjustments,
-                &[],
-                None,
-                &plan.edit_graph,
-            )
-            .unwrap()
-            .to_rgba32f()
-            .get_pixel(1, 1)
-            .0;
-            let gpu = process_and_get_unclamped_dynamic_image(
-                &context,
-                &state,
-                &source,
-                PreGpuImageIdentity::for_source(&source, &format!("v{version}")),
-                RenderRequest {
-                    adjustments: plan.adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-                },
-                "scene_referred_v2_delta",
-            )
-            .unwrap()
-            .to_rgba32f()
-            .get_pixel(1, 1)
-            .0;
-            for channel in 0..3 {
-                assert!(
-                    (cpu[channel] - gpu[channel]).abs() <= 0.01,
-                    "CPU/GPU v{version} channel {channel}: cpu={cpu:?} gpu={gpu:?}"
-                );
+        let raw = crate::render_plan::current_render_adjustments(json!({
+            "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
+            "channelMixer": {
+                "enabled": true,
+                "preserveLuminance": false,
+                "red": { "red": 100, "green": 0, "blue": 0, "constant": 100 },
+                "green": { "red": 0, "green": 100, "blue": 0, "constant": 0 },
+                "blue": { "red": 0, "green": 0, "blue": 100, "constant": -100 }
+            },
+            "curves": {
+                "luma": [
+                    { "x": 0, "y": 0 },
+                    { "x": 128, "y": 140 },
+                    { "x": 255, "y": 255 }
+                ]
             }
-            gpu
-        };
-
-        let legacy = render(1);
-        let v2 = render(2);
-        assert!(
-            legacy[..3]
-                .iter()
-                .all(|channel| (0.0..=1.01).contains(channel))
+        }));
+        let plan = crate::render_plan::compile_render_plan(
+            &raw,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&raw, 1, 2, 3),
+                is_raw: false,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            plan.adjustments.global.edit_graph_version,
+            crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION as f32
         );
-        assert!(v2[0] > 1.0, "v2 red should retain over-range: {v2:?}");
-        assert!(v2[2] < 0.0, "v2 blue should retain negative values: {v2:?}");
-        assert_ne!(legacy, v2);
+        let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .unwrap()
+        .to_rgba32f()
+        .get_pixel(1, 1)
+        .0;
+        let gpu = process_and_get_unclamped_dynamic_image(
+            &context,
+            &state,
+            &source,
+            PreGpuImageIdentity::for_source(&source, "current-scene-referred"),
+            RenderRequest {
+                adjustments: plan.adjustments,
+                mask_bitmaps: &[],
+                lut: None,
+                roi: None,
+                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            },
+            "current_scene_referred_extended_values",
+        )
+        .unwrap()
+        .to_rgba32f()
+        .get_pixel(1, 1)
+        .0;
+        for channel in 0..3 {
+            assert!(
+                (cpu[channel] - gpu[channel]).abs() <= 0.01,
+                "CPU/GPU current channel {channel}: cpu={cpu:?} gpu={gpu:?}"
+            );
+        }
+        assert!(
+            gpu[0] > 1.0,
+            "current red should retain over-range: {gpu:?}"
+        );
+        assert!(
+            gpu[2] < 0.0,
+            "current blue should retain negative values: {gpu:?}"
+        );
     }
 
     #[cfg(feature = "tauri-test")]
     #[test]
-    fn current_monochrome_uses_ap1_luminance_across_graph_versions() {
+    fn current_monochrome_uses_ap1_luminance_and_warm_cache_identity() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
         use tauri::Manager;
@@ -4132,9 +4126,9 @@ mod blur_pass_tests {
         let state = app.state::<AppState>();
         let context = get_or_init_compute_gpu_context_for_tests(&state)
             .expect("compute-only GPU context initializes");
-        let render = |version: u64| {
+        let render = || {
             let raw = crate::render_plan::current_render_adjustments(json!({
-                "rawEngineEditGraphVersion": version,
+                "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
                 "blackWhiteMixer": {
                     "enabled": true,
                     "process": "neutral_panchromatic_v1",
@@ -4147,7 +4141,7 @@ mod blur_pass_tests {
             let plan = crate::render_plan::compile_render_plan(
                 &raw,
                 crate::render_plan::CompileRenderPlanContext {
-                    revision: crate::render_plan::content_revision(&raw, 1, 2, version),
+                    revision: crate::render_plan::content_revision(&raw, 1, 2, 3),
                     is_raw: false,
                     tonemapper_override: Some(0),
                 },
@@ -4169,7 +4163,7 @@ mod blur_pass_tests {
                 &context,
                 &state,
                 &source,
-                PreGpuImageIdentity::for_source(&source, &format!("luma-v{version}")),
+                PreGpuImageIdentity::for_source(&source, "luma-current"),
                 RenderRequest {
                     adjustments: plan.adjustments,
                     mask_bitmaps: &[],
@@ -4183,25 +4177,16 @@ mod blur_pass_tests {
             .to_rgba32f()
             .get_pixel(1, 1)
             .0[0];
-            assert!((cpu - gpu).abs() <= 0.01, "v{version}: cpu={cpu} gpu={gpu}");
+            assert!((cpu - gpu).abs() <= 0.01, "current: cpu={cpu} gpu={gpu}");
             gpu
         };
 
-        let graph_v1 = render(1);
-        let scene_referred = render(2);
-        let scene_referred_warm = render(2);
+        let scene_referred = render();
+        let scene_referred_warm = render();
         let encode = |linear: f32| 1.055 * linear.powf(1.0 / 2.4) - 0.055;
-        assert!(
-            (graph_v1 - encode(0.272_228_72)).abs() <= 0.01,
-            "graph_v1={graph_v1}"
-        );
         assert!(
             (scene_referred - encode(0.272_228_72)).abs() <= 0.01,
             "scene_referred={scene_referred}"
-        );
-        assert!(
-            (scene_referred - graph_v1).abs() <= 0.001,
-            "graph versions must agree within one RGBA16F quantization step: graph_v1={graph_v1}, scene_referred={scene_referred}"
         );
         assert_eq!(scene_referred, scene_referred_warm);
         let processor = state
