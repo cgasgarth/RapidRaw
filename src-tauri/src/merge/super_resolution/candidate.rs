@@ -9,9 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::merge::{
-    computational_job::{
-        ComputationalMergeCancellationToken, ComputationalMergeJobId, ComputationalMergeJobRegistry,
-    },
+    computational_job::{ComputationalMergeCancellationToken, ComputationalMergeJobId},
     derived_output_provenance::stable_hash,
     tile_runtime::AcceptedTilePlan,
 };
@@ -123,7 +121,7 @@ pub(crate) fn prepare(
     plan: &AcceptedTilePlan,
     job_id: &ComputationalMergeJobId,
     token: &ComputationalMergeCancellationToken,
-    registry: &ComputationalMergeJobRegistry,
+    registry: &crate::app::services::JobCoordinator,
 ) -> Result<CandidateOutput, String> {
     if accepted.paths.len() != accepted.identity.source_hashes.len() {
         return Err("sr_candidate_source_identity_mismatch".into());
