@@ -6,6 +6,7 @@ import {
   acquireResourceLease,
   acquireResourceLeaseGroup,
   type ResourceLease,
+  type ResourceLeaseOptions,
   resolveResourceCoordinatorRoot,
 } from '../lib/ci/resource-coordinator';
 import type { ResourceClass, ValidationMode, ValidationNode } from './manifest';
@@ -191,10 +192,10 @@ export const nodeCacheKey = async (
     Bun.version,
     snapshot?.toolchainIdentity ?? 'toolchain-unmeasured',
     `${process.platform}:${process.arch}`,
-    process.env.RUSTFLAGS ?? '',
-    process.env.CARGO_FEATURES ?? '',
-    process.env.RAWENGINE_VALIDATION_FEATURES ?? '',
-    process.env.CI ?? '',
+    process.env['RUSTFLAGS'] ?? '',
+    process.env['CARGO_FEATURES'] ?? '',
+    process.env['RAWENGINE_VALIDATION_FEATURES'] ?? '',
+    process.env['CI'] ?? '',
     ...dependencyKeys,
   ];
   for (const path of relevant) {
@@ -256,7 +257,8 @@ const parseTimeMetrics = (stderr: string): NodeMetrics => {
 };
 
 const cacheRoot = async (root: string): Promise<string> => {
-  if (process.env.RAWENGINE_VALIDATION_CACHE_ROOT) return resolve(root, process.env.RAWENGINE_VALIDATION_CACHE_ROOT);
+  if (process.env['RAWENGINE_VALIDATION_CACHE_ROOT'])
+    return resolve(root, process.env['RAWENGINE_VALIDATION_CACHE_ROOT']);
   const command = Bun.spawnSync(['git', 'rev-parse', '--git-common-dir'], {
     cwd: root,
     env: isolatedGitEnvironment(),
@@ -273,8 +275,8 @@ const cacheRoot = async (root: string): Promise<string> => {
 };
 
 const pruneCacheDirectory = async (directory: string): Promise<void> => {
-  const maxEntries = Number(process.env.RAWENGINE_VALIDATION_CACHE_MAX_ENTRIES ?? 256);
-  const maxBytes = Number(process.env.RAWENGINE_VALIDATION_CACHE_MAX_BYTES ?? 512 * 1024 * 1024);
+  const maxEntries = Number(process.env['RAWENGINE_VALIDATION_CACHE_MAX_ENTRIES'] ?? 256);
+  const maxBytes = Number(process.env['RAWENGINE_VALIDATION_CACHE_MAX_BYTES'] ?? 512 * 1024 * 1024);
   const entries = (await readdir(directory, { withFileTypes: true }).catch(() => [])).filter(
     (entry) => entry.isFile() && entry.name.endsWith('.json'),
   );
@@ -296,7 +298,7 @@ const pruneCacheDirectory = async (directory: string): Promise<void> => {
 };
 
 const assertFreeSpace = async (root: string): Promise<void> => {
-  const minimumBytes = Number(process.env.RAWENGINE_VALIDATION_MIN_FREE_BYTES ?? 512 * 1024 * 1024);
+  const minimumBytes = Number(process.env['RAWENGINE_VALIDATION_MIN_FREE_BYTES'] ?? 512 * 1024 * 1024);
   const filesystem = await statfs(root).catch(() => undefined);
   if (!filesystem) return;
   const availableBytes = Number(filesystem.bavail) * Number(filesystem.bsize);
@@ -348,8 +350,8 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
   const capacities = options.mode === 'commit' ? commitCapacities : standardCapacities;
   const coordinateHeavyResources = options.mode !== 'commit';
   const resourceCoordinatorRoot = resolveResourceCoordinatorRoot(options.resourceCoordinatorRoot);
-  const inheritedOwnerId = Bun.env.RAWENGINE_RESOURCE_OWNER_ID;
-  const inheritedOwnerRoot = Bun.env.RAWENGINE_RESOURCE_OWNER_ROOT;
+  const inheritedOwnerId = Bun.env['RAWENGINE_RESOURCE_OWNER_ID'];
+  const inheritedOwnerRoot = Bun.env['RAWENGINE_RESOURCE_OWNER_ROOT'];
   const runOwnerId =
     options.resourceOwnerId ??
     (inheritedOwnerId !== undefined && inheritedOwnerRoot === resourceCoordinatorRoot
@@ -472,7 +474,7 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
               root: resourceCoordinatorRoot,
               ownerId: runOwnerId,
               signal: queueAbortController.signal,
-              timeoutMs: node.queueTimeoutMs,
+              ...(node.queueTimeoutMs === undefined ? {} : { timeoutMs: node.queueTimeoutMs }),
             });
       let cached = !options.noCache && node.cachePolicy !== 'none' ? await readCacheRecord(recordPath, key) : undefined;
       if (cached && JSON.stringify(cached.artifacts) !== JSON.stringify(await artifactDigests(node)))
@@ -484,31 +486,31 @@ export const runValidation = async (manifest: readonly ValidationNode[], options
       }
       if (interrupted) throw new Error('validation_interrupted');
       if (options.explainCache) console.log(`${cached ? 'VERIFY' : 'MISS'} ${node.id} key=${key}`);
-      const executionResources = [
+      const executionResources: ResourceLeaseOptions[] = [
         ...(coordinatedClass
           ? [
               {
                 capacity: capacities[node.resourceClass],
                 label: `validation-class-${node.resourceClass}:${node.id}`,
-                hostBudgetCapacity: options.hostBudgetCapacity,
+                ...(options.hostBudgetCapacity === undefined ? {} : { hostBudgetCapacity: options.hostBudgetCapacity }),
                 hostBudgetOwnerId: nodeHostBudgetOwnerId,
                 resource: `validation-class-${node.resourceClass}`,
                 root: resourceCoordinatorRoot,
                 ownerId: runOwnerId,
                 signal: queueAbortController.signal,
-                timeoutMs: node.queueTimeoutMs,
+                ...(node.queueTimeoutMs === undefined ? {} : { timeoutMs: node.queueTimeoutMs }),
               },
             ]
           : []),
         ...(coordinateHeavyResources ? [...(node.queueResources ?? [])] : []).sort().map((resource) => ({
           label: `validation-resource-${resource}:${node.id}`,
-          hostBudgetCapacity: options.hostBudgetCapacity,
+          ...(options.hostBudgetCapacity === undefined ? {} : { hostBudgetCapacity: options.hostBudgetCapacity }),
           hostBudgetOwnerId: nodeHostBudgetOwnerId,
           resource,
           root: resourceCoordinatorRoot,
           ownerId: runOwnerId,
           signal: queueAbortController.signal,
-          timeoutMs: node.queueTimeoutMs,
+          ...(node.queueTimeoutMs === undefined ? {} : { timeoutMs: node.queueTimeoutMs }),
         })),
       ];
       executionLease = executionResources.length > 0 ? await acquireResourceLeaseGroup(executionResources) : undefined;

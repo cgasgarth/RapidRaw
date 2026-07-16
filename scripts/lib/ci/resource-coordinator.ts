@@ -24,6 +24,16 @@ interface LeaseWaiter extends LeaseOwner {
   ticket: number;
 }
 
+interface ResourceSlot {
+  lockPath: string;
+  ownerPath: string;
+  priorOwner: LeaseOwner | null;
+}
+
+type ResourceAcquisition =
+  | { acquired: false; priorOwner: LeaseOwner | null }
+  | { acquired: true; priorOwner: LeaseOwner | null; slots: ResourceSlot[] };
+
 export interface ResourceLeaseOptions {
   capacity?: number;
   hostBudgetCapacity?: number;
@@ -46,7 +56,7 @@ export interface ResourceLease {
   updateOwnerPid: (pid: number) => Promise<void>;
 }
 
-const processOwnerId = Bun.env.RAWENGINE_RESOURCE_OWNER_ID ?? crypto.randomUUID();
+const processOwnerId = Bun.env['RAWENGINE_RESOURCE_OWNER_ID'] ?? crypto.randomUUID();
 
 const compactOwner = (owner: LeaseOwner | null): string =>
   owner
@@ -83,16 +93,15 @@ const detectedCgroupLimits = async (): Promise<{ cpuCount?: number; memoryBytes?
   const quota = positiveNumber(quotaText === 'max' ? undefined : quotaText);
   const period = positiveNumber(periodText);
   const memoryText = (await readFile('/sys/fs/cgroup/memory.max', 'utf8').catch(() => '')).trim();
+  const memoryBytes = memoryText === 'max' ? undefined : positiveNumber(memoryText);
   return {
     ...(quota !== undefined && period !== undefined ? { cpuCount: Math.max(1, Math.floor(quota / period)) } : {}),
-    ...(memoryText !== 'max' && positiveNumber(memoryText) !== undefined
-      ? { memoryBytes: positiveNumber(memoryText) }
-      : {}),
+    ...(memoryBytes === undefined ? {} : { memoryBytes }),
   };
 };
 
 export const resolveValidationHostBudgetCapacity = async (explicitCapacity?: number): Promise<number> => {
-  const override = explicitCapacity ?? positiveNumber(Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_CAPACITY);
+  const override = explicitCapacity ?? positiveNumber(Bun.env['RAWENGINE_VALIDATION_HOST_BUDGET_CAPACITY']);
   if (override !== undefined) {
     if (!Number.isSafeInteger(override) || override < 1) throw new Error(`invalid host budget capacity: ${override}`);
     return override;
@@ -109,7 +118,7 @@ const hostBudgetClass = (options: ResourceLeaseOptions): HostBudgetClass | undef
   if (resource === 'native-heavy')
     return options.hostBudgetCapacity !== undefined ||
       options.hostBudgetOwnerId !== undefined ||
-      Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_DIRECT === '1'
+      Bun.env['RAWENGINE_VALIDATION_HOST_BUDGET_DIRECT'] === '1'
       ? 'native-heavy'
       : undefined;
   if (resource === 'validation-class-native-heavy') return 'native-heavy';
@@ -129,7 +138,7 @@ const processIsAlive = (pid: number): boolean => {
 };
 
 export const resolveResourceCoordinatorRoot = (explicitRoot?: string): string => {
-  const override = explicitRoot ?? Bun.env.RAWENGINE_RESOURCE_COORDINATOR_ROOT;
+  const override = explicitRoot ?? Bun.env['RAWENGINE_RESOURCE_COORDINATOR_ROOT'];
   if (override) return resolve(override);
   const result = Bun.spawnSync(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'], {
     env: isolatedGitEnvironment(),
@@ -234,8 +243,8 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
   const weight = options.weight ?? 1;
   if (!Number.isSafeInteger(weight) || weight < 1 || weight > capacity)
     throw new Error(`invalid resource weight: ${weight}/${capacity}`);
-  const timeoutMs = options.timeoutMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS ?? 30 * 60_000);
-  const pollMs = options.pollMs ?? Number(Bun.env.RAWENGINE_RESOURCE_WAIT_POLL_MS ?? 250);
+  const timeoutMs = options.timeoutMs ?? Number(Bun.env['RAWENGINE_RESOURCE_WAIT_TIMEOUT_MS'] ?? 30 * 60_000);
+  const pollMs = options.pollMs ?? Number(Bun.env['RAWENGINE_RESOURCE_WAIT_POLL_MS'] ?? 250);
   const ownerId = options.ownerId ?? processOwnerId;
   const leaseFrame: LeaseFrame = { id: crypto.randomUUID(), label: options.label, pid: process.pid };
   const root = resolveResourceCoordinatorRoot(options.root);
@@ -346,11 +355,11 @@ async function acquireSingleResourceLease(options: ResourceLeaseOptions): Promis
     while (true) {
       if (options.signal?.aborted) throw new Error('resource_wait_cancelled');
       try {
-        const acquired = await withQueueMutex(queueMutexPath, pollMs, async () => {
+        const acquired = await withQueueMutex<ResourceAcquisition>(queueMutexPath, pollMs, async () => {
           const queue = await liveWaiters(queuePath);
           const queuePosition = queue.findIndex((entry) => entry.waiter.ticket === waiter.value.ticket);
           if (queuePosition !== 0) return { acquired: false, priorOwner: queue[0]?.waiter ?? null };
-          const slots: Array<{ lockPath: string; ownerPath: string; priorOwner: LeaseOwner | null }> = [];
+          const slots: ResourceSlot[] = [];
           for (let slot = 0; slot < capacity; slot += 1) {
             const lockPath = lockPaths[slot];
             const ownerPath = ownerPaths[slot];
@@ -496,8 +505,8 @@ export async function acquireResourceLeaseGroup(options: readonly ResourceLeaseO
   );
   if (explicitOwners.size > 1) throw new Error('resource lease group requires one resource owner');
 
-  const inheritedHostOwner = Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ID;
-  const inheritedHostRoot = Bun.env.RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ROOT;
+  const inheritedHostOwner = Bun.env['RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ID'];
+  const inheritedHostRoot = Bun.env['RAWENGINE_VALIDATION_HOST_BUDGET_OWNER_ROOT'];
   const effectiveOwnerId =
     [...explicitHostOwners][0] ??
     (inheritedHostOwner !== undefined && inheritedHostRoot === root
@@ -546,11 +555,11 @@ export async function acquireResourceLeaseGroup(options: readonly ResourceLeaseO
         label: `host-budget:${options.map((entry) => entry.label).join('+')}`,
         onQueued: notifyQueued,
         ownerId: effectiveOwnerId,
-        pollMs: hostSource?.pollMs,
+        ...(hostSource?.pollMs === undefined ? {} : { pollMs: hostSource.pollMs }),
         resource: HOST_BUDGET_RESOURCE,
         root,
-        signal: hostSource?.signal,
-        timeoutMs: hostSource?.timeoutMs,
+        ...(hostSource?.signal === undefined ? {} : { signal: hostSource.signal }),
+        ...(hostSource?.timeoutMs === undefined ? {} : { timeoutMs: hostSource.timeoutMs }),
         weight: Math.max(
           ...resourceClasses.map((resourceClass) => validationHostBudgetWeight(resourceClass, capacity)),
         ),

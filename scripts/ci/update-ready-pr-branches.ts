@@ -426,7 +426,7 @@ export class GitBranchUpdater implements ReadyPrUpdatePort {
 const writeSummary = async (results: readonly UpdateResult[]): Promise<void> => {
   const counts = new Map<UpdateDisposition, number>();
   for (const result of results) counts.set(result.disposition, (counts.get(result.disposition) ?? 0) + 1);
-  const summary = process.env.GITHUB_STEP_SUMMARY;
+  const summary = process.env['GITHUB_STEP_SUMMARY'];
   if (summary) {
     const lines = [...counts.entries()].map(([key, value]) => `- ${key}: ${value}`).join('\n');
     await Bun.write(summary, `## Ready PR freshness\n\n${lines || '- no open PRs'}\n`);
@@ -442,11 +442,11 @@ if (import.meta.main) {
   const repository = z
     .string()
     .regex(/^[^/]+\/[^/]+$/u)
-    .parse(process.env.GITHUB_REPOSITORY);
+    .parse(process.env['GITHUB_REPOSITORY']);
   const token = z
     .string({ error: 'READY_PR_UPDATE_TOKEN must be a GitHub App installation token or fine-grained user token' })
     .min(1, 'READY_PR_UPDATE_TOKEN must not be empty')
-    .parse(process.env.READY_PR_UPDATE_TOKEN);
+    .parse(process.env['READY_PR_UPDATE_TOKEN']);
   const api = new GitHubApi(repository, token);
   const gitEnvironment = Object.fromEntries(
     Object.entries(process.env).filter(

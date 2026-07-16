@@ -41,7 +41,7 @@ function parseTarget(args: string[]): string {
 }
 
 if (import.meta.main) {
-  const seed = resolveRandomizedTestSeed(process.env.RAWENGINE_BUN_TEST_SEED ?? process.env.GITHUB_RUN_ID);
+  const seed = resolveRandomizedTestSeed(process.env['RAWENGINE_BUN_TEST_SEED'] ?? process.env['GITHUB_RUN_ID']);
   const target = parseTarget(process.argv.slice(2));
   console.log(`Bun randomized isolation seed: ${seed}`);
   console.log(`Reproduce: ${randomizedTestReproduction(seed)}`);

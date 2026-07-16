@@ -48,7 +48,7 @@ if (import.meta.main) {
   console.log(message);
   enforceCoverageFloors(summary);
 
-  const stepSummaryPath = process.env.GITHUB_STEP_SUMMARY;
+  const stepSummaryPath = process.env['GITHUB_STEP_SUMMARY'];
   if (stepSummaryPath !== undefined) {
     await Bun.write(stepSummaryPath, `## Bun native coverage\n\n${message}\n`);
   }
