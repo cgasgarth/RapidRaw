@@ -80,6 +80,14 @@ import {
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
+import {
+  buildOrientationFlipEditTransaction,
+  type OrientationFlipAxis,
+} from '../../utils/orientationFlipEditTransaction';
+import {
+  buildOrientationRotateEditTransaction,
+  captureOrientationRotateCommitIdentity,
+} from '../../utils/orientationRotateEditTransaction';
 import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
 import { resolveReferenceMatchRenderDocument } from '../../utils/referenceMatch';
 import { buildRetouchHandleEditTransaction } from '../../utils/retouchHandleEditTransaction';
@@ -380,6 +388,39 @@ export default function Editor({
   const handleExitLightsOut = useCallback(() => {
     setEditorLightsOutLevel('off');
   }, [setEditorLightsOutLevel]);
+
+  const handleViewerRotate = useCallback(
+    (degrees: number) => {
+      const state = useEditorStore.getState();
+      const identity = captureOrientationRotateCommitIdentity(state);
+      if (identity === null) return;
+      applyEditTransaction(buildOrientationRotateEditTransaction(state, identity, degrees, crypto.randomUUID()));
+    },
+    [applyEditTransaction],
+  );
+
+  const handleViewerFlip = useCallback(
+    (axis: OrientationFlipAxis) => {
+      const state = useEditorStore.getState();
+      if (state.selectedImage === null || state.imageSession === null) return;
+      const geometry = selectEditDocumentGeometry(state.editDocumentV2);
+      const enabled = axis === 'horizontal' ? !geometry.flipHorizontal : !geometry.flipVertical;
+      applyEditTransaction(
+        buildOrientationFlipEditTransaction(
+          state,
+          {
+            adjustmentRevision: state.adjustmentRevision,
+            imageSessionId: state.imageSession.id,
+            sourceIdentity: state.selectedImage.path,
+          },
+          axis,
+          enabled,
+          crypto.randomUUID(),
+        ),
+      );
+    },
+    [applyEditTransaction],
+  );
 
   useEffect(() => {
     const previousLevel = previousLightsOutLevelRef.current;
@@ -2528,6 +2569,8 @@ export default function Editor({
           resolvedZoom={resolvedZoom}
           samplerState={viewerSamplerState}
           zoomResolutionState={zoomResolutionState}
+          onFlip={handleViewerFlip}
+          onRotate={handleViewerRotate}
         />
       </div>
     </div>
