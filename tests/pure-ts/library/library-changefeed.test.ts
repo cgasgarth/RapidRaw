@@ -6,6 +6,7 @@ import {
   catalogChangeAppliedSchema,
   libraryChangeBatchSchema,
 } from '../../../src/hooks/library/useSelectedFolderRefreshWatcher';
+import { libraryFolderAggregateListSchema } from '../../../src/schemas/library/libraryCatalogSchemas';
 
 const row = (path: string, rating = 0): ImageFile => ({
   exif: null,
@@ -18,6 +19,26 @@ const row = (path: string, rating = 0): ImageFile => ({
 });
 
 describe('library filesystem changefeed', () => {
+  test('accepts and retains the exact native folder aggregate payload', () => {
+    const parsed = libraryFolderAggregateListSchema.parse([
+      {
+        path: '/library/alaska',
+        directImageCount: 1,
+        recursiveImageCount: 4,
+        childFolderCount: 2,
+        catalogRevision: 12,
+      },
+    ]);
+
+    expect(parsed[0]).toEqual({
+      path: '/library/alaska',
+      directImageCount: 1,
+      recursiveImageCount: 4,
+      childFolderCount: 2,
+      catalogRevision: 12,
+    });
+  });
+
   test('accepts and retains the exact revisioned native catalog projection', () => {
     const parsed = catalogChangeAppliedSchema.parse({
       catalogRevision: 12,

@@ -8,6 +8,7 @@ import { type AlbumItem, type AppSettings, type ImageFile, LibraryViewMode } fro
 import { Status } from '../../components/ui/ExportImportProperties';
 import { isCurrentCatalogIndexingAuthority } from '../../schemas/catalogIndexingSchemas';
 import { parseLoadedMetadata } from '../../schemas/imageLoaderSchemas';
+import { libraryFolderAggregateListSchema } from '../../schemas/library/libraryCatalogSchemas';
 import { createEditorImageSession, isEditorImageSessionCurrent, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
@@ -40,6 +41,7 @@ import {
   consumePendingNegativeConversionSavedPositiveHandoff,
 } from '../../utils/negative-lab/negativeLabEditorHandoff';
 import { metadataWithNegativeLabReopenedSavedPositiveHandoff } from '../../utils/negative-lab/negativeLabSavedPositiveReopen';
+import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { debouncedSave, debouncedSetHistory } from '../editor/useEditorActions';
 import { reconcileSelectedFolderRefresh } from '../library/selectedFolderRefreshReconciliation';
 
@@ -700,9 +702,10 @@ export function useAppNavigation({
               showImageCounts: appSettings?.enableFolderImageCounts ?? false,
             });
             if (appSettings?.enableFolderImageCounts) {
-              const aggregates = await invoke<Array<{ path: string; recursiveImageCount: number }>>(
+              const aggregates = await invokeWithSchema(
                 Invokes.GetLibraryFolderAggregates,
                 { paths: folderTreePaths(newTree) },
+                libraryFolderAggregateListSchema,
               );
               newTree = applyCatalogCounts(
                 newTree,

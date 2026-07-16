@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
 import type { FolderTree } from '../../components/panel/FolderTree';
 import type { ImageFile, LibraryViewMode } from '../../components/ui/AppProperties';
+import { libraryFolderAggregateListSchema } from '../../schemas/library/libraryCatalogSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { Invokes } from '../../tauri/commands';
@@ -59,10 +60,6 @@ export const catalogChangeAppliedSchema = z
     removedImageIds: z.array(z.string().min(1)),
   })
   .strict();
-
-const libraryFolderAggregateListSchema = z.array(
-  z.object({ path: z.string().min(1), recursiveImageCount: z.number().int().nonnegative() }).strict(),
-);
 
 const libraryChangefeedGenerationSchema = z.number().int().nonnegative();
 

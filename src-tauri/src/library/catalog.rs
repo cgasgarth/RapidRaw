@@ -1198,6 +1198,28 @@ mod tests {
     }
 
     #[test]
+    fn folder_aggregate_serializes_the_exact_frontend_contract() {
+        let aggregate = CatalogFolderAggregate {
+            path: "/library/alaska".to_string(),
+            direct_image_count: 1,
+            recursive_image_count: 4,
+            child_folder_count: 2,
+            catalog_revision: 12,
+        };
+        let value = serde_json::to_value(aggregate).expect("serialize folder aggregate");
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "path": "/library/alaska",
+                "directImageCount": 1,
+                "recursiveImageCount": 4,
+                "childFolderCount": 2,
+                "catalogRevision": 12,
+            })
+        );
+    }
+
+    #[test]
     fn image_open_uses_entity_revision_across_unrelated_catalog_deltas() {
         let connection = Connection::open_in_memory().expect("memory catalog");
         connection.execute_batch(schema_sql()).expect("schema");
