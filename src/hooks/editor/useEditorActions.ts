@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import type { EditDocumentEditorSection } from '../../../packages/rawengine-schema/src/editDocumentV2';
 
+import { createDefaultCopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import { loadedMetadataSchema } from '../../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -39,7 +40,6 @@ import {
 } from '../../utils/copyPasteEditTransaction';
 import {
   copyEditDocumentV2Nodes,
-  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
   lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
   selectEditDocumentV2CopyPayload,
 } from '../../utils/editDocumentV2';
@@ -378,14 +378,11 @@ export function useEditorActions() {
 
       if (!copiedEditDocumentV2 || !appSettings) return;
 
-      const { mode, includedAdjustments } = appSettings.copyPasteSettings ?? {
-        mode: PasteMode.Merge,
-        includedAdjustments: EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
-      };
+      const { pasteMode, selectedNodeIds } = appSettings.copyPasteSettings ?? createDefaultCopyPasteSettings();
       const selectedPayload = selectEditDocumentV2CopyPayload(
         copiedEditDocumentV2,
-        includedAdjustments,
-        mode === PasteMode.Merge,
+        selectedNodeIds,
+        pasteMode === PasteMode.Merge,
       );
       const adjustmentsToApply = bindTypedCurveGraphVersion(
         acceptReferenceMatchAdjustmentTransfer({

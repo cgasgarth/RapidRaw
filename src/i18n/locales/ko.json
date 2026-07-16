@@ -1329,7 +1329,7 @@
         "vignette": "비네트",
         "whiteBalance": "화이트 밸런스"
       },
-      "includedAdjustments": "포함된 조정값",
+      "selectedNodes": "포함된 조정값",
       "modeMerge": "병합",
       "modeReplace": "교체",
       "pasteMode": "붙여넣기 모드",

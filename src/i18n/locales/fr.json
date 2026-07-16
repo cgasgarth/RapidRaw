@@ -2798,12 +2798,12 @@
         "vignette": "Vignettage",
         "whiteBalance": "Balance des blancs"
       },
-      "includedAdjustments": "Ajustements inclus",
       "modeMerge": "Fusionner",
       "modeReplace": "Remplacer",
       "pasteMode": "Mode de collage",
       "save": "Enregistrer",
       "selectAll": "Tout sélectionner",
+      "selectedNodes": "Ajustements inclus",
       "selectNone": "Ne rien sélectionner",
       "title": "Copier & Coller les paramètres"
     },
