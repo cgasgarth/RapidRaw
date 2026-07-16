@@ -183,22 +183,13 @@ async function setInputValue(container: HTMLDivElement, testId: string, value: s
 
 async function setElementValue(input: HTMLInputElement, value: string) {
   await act(async () => {
-    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    await Bun.sleep(50);
   });
-  const user = userEvent.setup({ delay: 1 });
-  await user.click(input);
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    await user.clear(input);
-    await act(async () => {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-    });
-    if (input.value === '') break;
-  }
-  expect(input).toHaveValue('');
-  for (const character of value) {
-    input.setSelectionRange(input.value.length, input.value.length);
-    await user.type(input, character, { skipClick: true });
-  }
+  input.focus();
+  input.select();
+  const user = userEvent.setup();
+  await user.type(input, value, { skipClick: true });
+  expect(input).toHaveValue(value);
 }
 
 async function createTestI18n() {

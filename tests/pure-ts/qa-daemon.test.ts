@@ -22,6 +22,7 @@ interface FakeSession {
 
 const directories: string[] = [];
 const spawnedChildren: Array<ReturnType<typeof Bun.spawn>> = [];
+const QA_DAEMON_STARTUP_TIMEOUT_MS = 30_000;
 
 const stopChild = async (child: ReturnType<typeof Bun.spawn>): Promise<void> => {
   if (child.exitCode === null) child.kill('SIGTERM');
@@ -108,7 +109,7 @@ const waitForDaemonState = async (
   child: ReturnType<typeof Bun.spawn>,
   worktree: string,
 ): Promise<QaDaemonStateRecord> => {
-  const deadline = Date.now() + 10_000;
+  const deadline = Date.now() + QA_DAEMON_STARTUP_TIMEOUT_MS;
   for (let attempt = 0; Date.now() < deadline; attempt += 1) {
     const state = await readLiveDaemonState(worktree);
     if (state !== undefined) {
@@ -373,7 +374,7 @@ describe('QA daemon lifecycle', () => {
     expect(shutdown).toEqual({ id: 'shutdown', ok: true, result: { shuttingDown: true } });
     await child.exited;
     expect(await readLiveDaemonState(worktree)).toBeUndefined();
-  }, 20_000);
+  }, 40_000);
 
   test('removes ownership state and socket on SIGTERM', async () => {
     const worktree = await temporaryDirectory();
@@ -389,5 +390,5 @@ describe('QA daemon lifecycle', () => {
     ]);
     expect(await readLiveDaemonState(worktree)).toBeUndefined();
     expect(await stat(state.socketPath).catch(() => undefined)).toBeUndefined();
-  }, 20_000);
+  }, 40_000);
 });

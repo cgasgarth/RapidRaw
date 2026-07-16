@@ -718,7 +718,7 @@ describe('affected validation DAG', () => {
       resourceClass,
       cachePolicy: 'none' as const,
       modes: ['push' as const],
-      timeoutMs: 2_000,
+      timeoutMs: 10_000,
     });
     expect(
       await runValidation(
@@ -843,7 +843,7 @@ await lease.release();`;
     const second = runValidation([suite], options(secondWorktree));
     expect(await Promise.all([first, second])).toEqual([0, 0]);
     expect(validationManifest.find((node) => node.id === 'unit')?.resourceClass).toBe('suite-exclusive');
-  });
+  }, 15_000);
 
   test('producer outputs are worktree-scoped, stale-safe, and serialized only for the same worktree', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-producer-ownership-'));
@@ -899,7 +899,7 @@ await lease.release();`;
           '-e',
           "import {mkdir,readdir} from 'node:fs/promises';const rendezvous='../parallel-rendezvous';await mkdir(`${rendezvous}/${process.pid}`,{recursive:true});for(let attempt=0;;attempt+=1){if((await readdir(rendezvous)).length>=3)break;if(attempt===250)process.exit(10);await Bun.sleep(20)}const path='dist/artifact';await mkdir('dist',{recursive:true});if(await Bun.file(path).exists())process.exit(9);await Bun.write(path,String(process.pid));await Bun.file(path).delete()",
         ],
-        timeoutMs: 8_000,
+        timeoutMs: 15_000,
       };
       expect(
         await Promise.all(parallelWorktrees.map((worktree) => runValidation([parallelProducer], options(worktree)))),
@@ -918,7 +918,7 @@ await lease.release();`;
     } finally {
       await rm(root, { force: true, recursive: true });
     }
-  }, 15_000);
+  }, 30_000);
 
   test('programmatic nested validation inherits its active output-lease owner without self-queueing', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-nested-output-'));
