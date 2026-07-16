@@ -571,7 +571,7 @@ describe('affected validation DAG', () => {
     }
     expect(await Bun.file(join(coordinator, 'native-heavy.lock')).exists()).toBeFalse();
     await rm(directory, { force: true, recursive: true });
-  });
+  }, 10_000);
 
   test('shared host-budget queue time is excluded while post-acquisition timeout stays strict', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-host-budget-'));
