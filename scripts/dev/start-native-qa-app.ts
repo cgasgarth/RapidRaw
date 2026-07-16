@@ -5,6 +5,13 @@ import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { processStartToken } from '../qa/identity';
 import {
+  NATIVE_QA_APP_NAME,
+  NATIVE_QA_BUNDLE_IDENTIFIER,
+  nativeQaRuntimeBundleIsReady,
+  removeNativeQaBuildBundle,
+  resolveNativeQaAppDeploymentPaths,
+} from '../qa/native-app-deployment';
+import {
   nativeQaReadinessStatus,
   readLiveNativeQaControlRecord,
   readNativeQaControlRecord,
@@ -18,11 +25,11 @@ import {
   planNativeQaDeployment,
 } from '../qa/native-identity';
 
-const sourceAppPath = 'src-tauri/target/debug/bundle/macos/RapidRAW.app';
-const qaAppPath = 'src-tauri/target/debug/bundle/macos/RawEngine QA Current.app';
-const qaAppName = 'RawEngine QA Current';
-const qaBundleIdentifier = 'dev.rawengine.RapidRAW.qa-current';
-const qaExecutablePath = `${qaAppPath}/Contents/MacOS/RapidRAW`;
+const worktree = resolve('.');
+const appPaths = resolveNativeQaAppDeploymentPaths(worktree);
+const { identityPath, qaAppPath, qaExecutablePath, sourceAppPath } = appPaths;
+const qaAppName = NATIVE_QA_APP_NAME;
+const qaBundleIdentifier = NATIVE_QA_BUNDLE_IDENTIFIER;
 const startedAt = performance.now();
 const args = process.argv.slice(2);
 const shouldBuild = !args.includes('--no-build');
@@ -31,15 +38,16 @@ const clean = args.includes('--clean');
 const devServer = args.includes('--dev-server');
 const validationHarness = args.includes('--validation-harness');
 const buildFeatures = validationHarness ? 'required-ci,validation-harness' : 'required-ci';
-const identityPath = 'src-tauri/target/debug/bundle/macos/rawengine-qa-identity.json';
 const controlRecordPath = resolve('private-artifacts/qa/native-control.json');
 const deploymentReportPath = resolve('private-artifacts/qa/native-deployment.json');
 const identity = await computeNativeQaIdentity(buildFeatures);
-const previousIdentity = await readFile(identityPath, 'utf8')
-  .then((value) => JSON.parse(value) as NativeQaIdentity)
-  .catch(() => undefined);
+const runtimeBundleReady = await nativeQaRuntimeBundleIsReady(appPaths);
+const previousIdentity = runtimeBundleReady
+  ? await readFile(identityPath, 'utf8')
+      .then((value) => JSON.parse(value) as NativeQaIdentity)
+      .catch(() => undefined)
+  : undefined;
 const deployment = planNativeQaDeployment(previousIdentity, identity, { clean, devServer });
-assertNativeQaBuildAvailability(deployment, shouldBuild);
 
 async function run(command: string, commandArgs: string[], label: string, allowedExitCodes = [0]): Promise<void> {
   const proc = Bun.spawn([command, ...commandArgs], {
@@ -57,154 +65,174 @@ async function run(command: string, commandArgs: string[], label: string, allowe
 
   console.error(`${label} failed`);
   const output = `${stdout}\n${stderr}`.trim();
-  console.error(output.split('\n').slice(-40).join('\n'));
-  process.exit(exitCode);
+  const excerpt = output.split('\n').slice(-40).join('\n');
+  throw new Error(`${label} failed (exit ${exitCode})${excerpt.length > 0 ? `:\n${excerpt}` : ''}`);
 }
 
-if (shouldBuild && deployment.build) {
-  await run(
-    'bun',
-    [
-      'scripts/ci/run-resource-coordinated.ts',
-      '--resource',
-      'native-heavy',
-      '--label',
-      'native-qa-build',
-      '--',
+const launchServicesRegister =
+  '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
+
+const unregisterGeneratedBundle = async (bundlePath: string): Promise<void> => {
+  await run(launchServicesRegister, ['-u', bundlePath], `unregister generated app ${bundlePath}`, [0, 1]);
+};
+
+try {
+  assertNativeQaBuildAvailability(deployment, shouldBuild);
+  if (shouldBuild && deployment.build) {
+    await run(
       'bun',
-      'tauri',
-      'build',
-      '--debug',
-      '--ci',
-      '--bundles',
-      'app',
-      '--features',
-      buildFeatures,
-    ],
-    'native qa app build',
-  );
-}
-
-if (deployment.copy || shouldLaunch) {
-  const previousControl = await readLiveNativeQaControlRecord(controlRecordPath, identity.worktree);
-  if (previousControl !== undefined) {
-    await requestNativeQaControl(previousControl, 'shutdown').catch(() => undefined);
-    for (
-      let attempt = 0;
-      attempt < 100 && Bun.spawnSync(['kill', '-0', String(previousControl.pid)]).exitCode === 0;
-      attempt += 1
-    )
-      await Bun.sleep(25);
-  }
-  if (previousControl === undefined || Bun.spawnSync(['kill', '-0', String(previousControl.pid)]).exitCode === 0)
-    await run('pkill', ['-f', `${qaAppName}.app/Contents/MacOS/RapidRAW`], 'native qa stale app quit', [0, 1]);
-}
-
-if (deployment.copy) {
-  await rm(qaAppPath, { force: true, recursive: true });
-  await mkdir(dirname(qaAppPath), { recursive: true });
-  await run('cp', ['-R', sourceAppPath, qaAppPath], 'native qa app copy');
-
-  const plistPath = `${qaAppPath}/Contents/Info.plist`;
-  for (const [key, value] of [
-    ['CFBundleName', qaAppName],
-    ['CFBundleDisplayName', qaAppName],
-    ['CFBundleIdentifier', qaBundleIdentifier],
-  ]) {
-    await run('/usr/libexec/PlistBuddy', ['-c', `Set :${key} ${value}`, plistPath], `native qa app plist ${key}`);
-  }
-
-  if (deployment.sign)
-    await run('codesign', ['--force', '--deep', '--sign', '-', qaAppPath], 'native qa app ad-hoc codesign');
-  await writeFile(identityPath, `${JSON.stringify(identity, null, 2)}\n`);
-}
-
-if (shouldLaunch) {
-  if (!validationHarness) {
-    await run('open', ['-n', qaAppPath], 'native qa app launch');
-  } else {
-    await mkdir(dirname(controlRecordPath), { recursive: true });
-    const buildIdentity = createHash('sha256')
-      .update(identity.native)
-      .update(identity.frontend)
-      .update(identity.bundle)
-      .digest('hex');
-    const socketPath = `/tmp/rawengine-native-qa-${createHash('sha256').update(identity.worktree).digest('hex').slice(0, 16)}.sock`;
-    const token = randomBytes(32).toString('hex');
-    const logPath = resolve('private-artifacts/qa/native-control-stderr.log');
-    await rm(socketPath, { force: true });
-    await rm(logPath, { force: true });
-    const process = Bun.spawn([resolve(qaExecutablePath)], {
-      cwd: identity.worktree,
-      detached: true,
-      env: {
-        ...Bun.env,
-        RAWENGINE_QA_BUILD_IDENTITY: buildIdentity,
-        RAWENGINE_QA_CONTROL_SOCKET: socketPath,
-        RAWENGINE_QA_CONTROL_TOKEN: token,
-        RAWENGINE_QA_WORKTREE_IDENTITY: identity.worktree,
-      },
-      stderr: Bun.file(logPath),
-      stdout: 'ignore',
-    });
-    process.unref();
-    const startToken = await processStartToken(process.pid);
-    if (startToken === undefined) {
-      process.kill('SIGTERM');
-      throw new Error('Cannot determine native QA app process identity.');
-    }
-    await writeFile(
-      controlRecordPath,
-      `${JSON.stringify({ schemaVersion: 1, pid: process.pid, processStartToken: startToken, socketPath, token, logPath, identity: { worktree: identity.worktree, build: buildIdentity } }, null, 2)}\n`,
-      { mode: 0o600 },
+      [
+        'scripts/ci/run-resource-coordinated.ts',
+        '--resource',
+        'native-heavy',
+        '--label',
+        'native-qa-build',
+        '--',
+        'bun',
+        'tauri',
+        'build',
+        '--debug',
+        '--ci',
+        '--bundles',
+        'app',
+        '--features',
+        buildFeatures,
+      ],
+      'native qa app build',
     );
-    await chmod(controlRecordPath, 0o600);
-    let frontendReady = false;
-    for (let attempt = 0; attempt < 200; attempt += 1) {
-      const processAlive = (await processStartToken(process.pid)) === startToken;
-      const control = await readNativeQaControlRecord(controlRecordPath);
-      const response =
-        control === undefined ? undefined : await requestNativeQaControl(control, 'health').catch(() => undefined);
-      const health =
-        response?.ok && typeof response.result === 'object' && response.result !== null && 'ready' in response.result
-          ? { ready: response.result.ready === true }
-          : undefined;
-      const readiness = nativeQaReadinessStatus(health, processAlive);
-      if (readiness === 'ready') {
-        frontendReady = true;
-        break;
-      }
-      if (readiness === 'exited') {
-        const log = await readFile(logPath, 'utf8').catch(() => 'native control log unavailable');
-        throw new Error(
-          `Native QA app exited before frontend/window readiness:\n${log.split('\n').slice(-30).join('\n')}`,
-        );
-      }
-      await Bun.sleep(50);
-      if (attempt === 199) {
-        const log = await readFile(logPath, 'utf8').catch(() => 'native control log unavailable');
-        throw new Error(`Native QA control channel did not become ready:\n${log.split('\n').slice(-30).join('\n')}`);
-      }
-    }
-    if (!frontendReady) throw new Error('Native QA app did not report frontend/window readiness.');
   }
+
+  if (deployment.copy || shouldLaunch) {
+    const previousControl = await readLiveNativeQaControlRecord(controlRecordPath, identity.worktree);
+    if (previousControl !== undefined) {
+      await requestNativeQaControl(previousControl, 'shutdown').catch(() => undefined);
+      for (
+        let attempt = 0;
+        attempt < 100 && Bun.spawnSync(['kill', '-0', String(previousControl.pid)]).exitCode === 0;
+        attempt += 1
+      )
+        await Bun.sleep(25);
+    }
+    if (previousControl === undefined || Bun.spawnSync(['kill', '-0', String(previousControl.pid)]).exitCode === 0)
+      await run('pkill', ['-f', `${qaAppName}.app/Contents/MacOS/RapidRAW`], 'native qa stale app quit', [0, 1]);
+  }
+
+  if (deployment.copy) {
+    await rm(qaAppPath, { force: true, recursive: true });
+    await mkdir(dirname(qaAppPath), { recursive: true });
+    try {
+      await run('ditto', [sourceAppPath, qaAppPath], 'native qa app copy');
+
+      const plistPath = `${qaAppPath}/Contents/Info.plist`;
+      for (const [key, value] of [
+        ['CFBundleName', qaAppName],
+        ['CFBundleDisplayName', qaAppName],
+        ['CFBundleIdentifier', qaBundleIdentifier],
+      ]) {
+        await run('/usr/libexec/PlistBuddy', ['-c', `Set :${key} ${value}`, plistPath], `native qa app plist ${key}`);
+      }
+
+      if (deployment.sign)
+        await run('codesign', ['--force', '--deep', '--sign', '-', qaAppPath], 'native qa app ad-hoc codesign');
+      await writeFile(identityPath, `${JSON.stringify(identity, null, 2)}\n`);
+      await unregisterGeneratedBundle(qaAppPath);
+    } catch (error) {
+      await rm(qaAppPath, { force: true, recursive: true });
+      throw error;
+    }
+  }
+
+  if (shouldLaunch) {
+    if (!validationHarness) {
+      await run('open', ['-n', qaAppPath], 'native qa app launch');
+      await unregisterGeneratedBundle(qaAppPath);
+    } else {
+      await mkdir(dirname(controlRecordPath), { recursive: true });
+      const buildIdentity = createHash('sha256')
+        .update(identity.native)
+        .update(identity.frontend)
+        .update(identity.bundle)
+        .digest('hex');
+      const socketPath = `/tmp/rawengine-native-qa-${createHash('sha256').update(identity.worktree).digest('hex').slice(0, 16)}.sock`;
+      const token = randomBytes(32).toString('hex');
+      const logPath = resolve('private-artifacts/qa/native-control-stderr.log');
+      await rm(socketPath, { force: true });
+      await rm(logPath, { force: true });
+      const process = Bun.spawn([resolve(qaExecutablePath)], {
+        cwd: identity.worktree,
+        detached: true,
+        env: {
+          ...Bun.env,
+          RAWENGINE_QA_BUILD_IDENTITY: buildIdentity,
+          RAWENGINE_QA_CONTROL_SOCKET: socketPath,
+          RAWENGINE_QA_CONTROL_TOKEN: token,
+          RAWENGINE_QA_WORKTREE_IDENTITY: identity.worktree,
+        },
+        stderr: Bun.file(logPath),
+        stdout: 'ignore',
+      });
+      process.unref();
+      const startToken = await processStartToken(process.pid);
+      if (startToken === undefined) {
+        process.kill('SIGTERM');
+        throw new Error('Cannot determine native QA app process identity.');
+      }
+      await writeFile(
+        controlRecordPath,
+        `${JSON.stringify({ schemaVersion: 1, pid: process.pid, processStartToken: startToken, socketPath, token, logPath, identity: { worktree: identity.worktree, build: buildIdentity } }, null, 2)}\n`,
+        { mode: 0o600 },
+      );
+      await chmod(controlRecordPath, 0o600);
+      let frontendReady = false;
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        const processAlive = (await processStartToken(process.pid)) === startToken;
+        const control = await readNativeQaControlRecord(controlRecordPath);
+        const response =
+          control === undefined ? undefined : await requestNativeQaControl(control, 'health').catch(() => undefined);
+        const health =
+          response?.ok && typeof response.result === 'object' && response.result !== null && 'ready' in response.result
+            ? { ready: response.result.ready === true }
+            : undefined;
+        const readiness = nativeQaReadinessStatus(health, processAlive);
+        if (readiness === 'ready') {
+          frontendReady = true;
+          break;
+        }
+        if (readiness === 'exited') {
+          const log = await readFile(logPath, 'utf8').catch(() => 'native control log unavailable');
+          throw new Error(
+            `Native QA app exited before frontend/window readiness:\n${log.split('\n').slice(-30).join('\n')}`,
+          );
+        }
+        await Bun.sleep(50);
+        if (attempt === 199) {
+          const log = await readFile(logPath, 'utf8').catch(() => 'native control log unavailable');
+          throw new Error(`Native QA control channel did not become ready:\n${log.split('\n').slice(-30).join('\n')}`);
+        }
+      }
+      if (!frontendReady) throw new Error('Native QA app did not report frontend/window readiness.');
+    }
+  }
+
+  await mkdir(dirname(deploymentReportPath), { recursive: true });
+  await writeFile(
+    deploymentReportPath,
+    `${JSON.stringify(
+      createNativeQaDeploymentReport(identity, deployment, {
+        shouldBuild,
+        durationMs: Math.round(performance.now() - startedAt),
+        completedAt: new Date().toISOString(),
+      }),
+      null,
+      2,
+    )}\n`,
+    { mode: 0o600 },
+  );
+
+  console.log(
+    `native qa app ok (${deployment.reason}; ${identity.native.slice(0, 12)}; ${qaAppName}; ${qaBundleIdentifier}; ${qaAppPath}; control=${shouldLaunch && validationHarness ? controlRecordPath : 'disabled'}; report=${deploymentReportPath})`,
+  );
+} finally {
+  await unregisterGeneratedBundle(sourceAppPath).catch(() => undefined);
+  await removeNativeQaBuildBundle(appPaths);
 }
-
-await mkdir(dirname(deploymentReportPath), { recursive: true });
-await writeFile(
-  deploymentReportPath,
-  `${JSON.stringify(
-    createNativeQaDeploymentReport(identity, deployment, {
-      shouldBuild,
-      durationMs: Math.round(performance.now() - startedAt),
-      completedAt: new Date().toISOString(),
-    }),
-    null,
-    2,
-  )}\n`,
-  { mode: 0o600 },
-);
-
-console.log(
-  `native qa app ok (${deployment.reason}; ${identity.native.slice(0, 12)}; ${qaAppName}; ${qaBundleIdentifier}; ${qaAppPath}; control=${shouldLaunch && validationHarness ? controlRecordPath : 'disabled'}; report=${deploymentReportPath})`,
-);
