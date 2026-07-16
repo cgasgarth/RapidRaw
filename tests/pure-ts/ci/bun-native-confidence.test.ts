@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { BUN_COVERAGE_FLOORS, enforceCoverageFloors, summarizeLcov } from '../../../scripts/ci/check-bun-coverage.ts';
@@ -23,6 +23,21 @@ async function temporaryDirectory(prefix: string): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), prefix));
   temporaryDirectories.push(directory);
   return directory;
+}
+
+async function processIsExecuting(pid: number): Promise<boolean> {
+  if (process.platform === 'linux') {
+    try {
+      const stat = await readFile(`/proc/${String(pid)}/stat`, 'utf8');
+      return stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3) !== 'Z';
+    } catch {
+      return false;
+    }
+  }
+  const ps = Bun.spawnSync(['ps', '-o', 'state=', '-p', String(pid)]);
+  if (ps.exitCode !== 0) return false;
+  const state = ps.stdout.toString().trim();
+  return state !== '' && !state.startsWith('Z');
 }
 
 async function captured(command: string[], options: { cwd: string; env?: Record<string, string>; timeoutMs?: number }) {
@@ -147,16 +162,12 @@ describe('Bun native confidence gates', () => {
     expect(result.output).toContain('Bun randomized isolation seed: 314159');
     expect(result.output).toContain('Reproduce: RAWENGINE_BUN_TEST_SEED=314159 bun run test:randomized');
     const descendantPid = Number(await Bun.file(pidFile).text());
-    let descendantAlive = true;
-    for (let attempt = 0; attempt < 100 && descendantAlive; attempt += 1) {
-      try {
-        process.kill(descendantPid, 0);
-        await Bun.sleep(10);
-      } catch {
-        descendantAlive = false;
-      }
+    let descendantExecuting = await processIsExecuting(descendantPid);
+    for (let attempt = 0; attempt < 100 && descendantExecuting; attempt += 1) {
+      await Bun.sleep(10);
+      descendantExecuting = await processIsExecuting(descendantPid);
     }
-    expect(descendantAlive).toBeFalse();
+    expect(descendantExecuting).toBeFalse();
   }, 8_000);
 
   test('clears the pass watchdog after a successful native run', async () => {

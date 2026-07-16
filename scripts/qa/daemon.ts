@@ -95,6 +95,7 @@ try {
     server.listen(state.socketPath, () => ready());
   });
   await chmod(state.socketPath, 0o600);
+  console.log(JSON.stringify({ event: 'ready', pid: state.pid, socketPath: state.socketPath }));
   await new Promise<void>((done) => server.once('close', () => done()));
 } finally {
   if (forcedShutdownTimer !== undefined) clearTimeout(forcedShutdownTimer);

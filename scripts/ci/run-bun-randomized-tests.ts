@@ -55,6 +55,40 @@ async function waitForChildExit(
   }
 }
 
+async function processGroupExists(pid: number): Promise<boolean> {
+  if (process.platform === 'win32') return false;
+  try {
+    process.kill(-pid, 0);
+    return true;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ESRCH') return false;
+    throw error;
+  }
+}
+
+async function terminateWorkerTree(child: ReturnType<typeof Bun.spawn>): Promise<void> {
+  if (process.platform === 'win32') {
+    if (child.exitCode === null) child.kill('SIGTERM');
+    await child.exited;
+    return;
+  }
+
+  try {
+    process.kill(-child.pid, 'SIGTERM');
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error;
+  }
+  for (let attempt = 0; attempt < 100 && (await processGroupExists(child.pid)); attempt += 1) await Bun.sleep(10);
+  if (await processGroupExists(child.pid)) {
+    try {
+      process.kill(-child.pid, 'SIGKILL');
+    } catch (error) {
+      if (!(error instanceof Error && 'code' in error && error.code === 'ESRCH')) throw error;
+    }
+  }
+  await child.exited;
+}
+
 function parseTarget(args: string[]): string {
   if (args.length === 0) return DEFAULT_RANDOMIZED_TEST_TARGET;
   if (args.length === 2 && args[0] === '--target' && args[1] !== undefined) return args[1];
@@ -73,17 +107,17 @@ if (import.meta.main) {
   for (let run = 1; run <= RANDOMIZED_SUITE_RUN_COUNT; run += 1) {
     console.log(`Bun randomized isolation pass ${run}/${RANDOMIZED_SUITE_RUN_COUNT}`);
     const child = Bun.spawn(['bun', ...buildRandomizedTestArgs(seed, target)], {
+      detached: true,
       env: process.env,
       stderr: 'inherit',
       stdin: 'inherit',
       stdout: 'inherit',
     });
     const result = await waitForChildExit(child, passTimeoutMs);
+    if (result.exitCode !== 0) {
+      await terminateWorkerTree(child);
+    }
     if (result.timedOut) {
-      child.kill('SIGTERM');
-      const exited = await Promise.race([child.exited.then(() => true), Bun.sleep(1_000).then(() => false)]);
-      if (!exited) child.kill('SIGKILL');
-      await child.exited;
       console.error(`Bun randomized isolation pass ${run} exceeded ${String(passTimeoutMs)}ms and was terminated.`);
     }
     const exitCode = result.exitCode;
