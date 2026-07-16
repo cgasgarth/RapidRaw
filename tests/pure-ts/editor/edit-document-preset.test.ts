@@ -164,6 +164,19 @@ describe('current RapidRaw preset envelope', () => {
     expect(parsed).toEqual({ items: [], quarantinedCount: 1 });
   });
 
+  test('mixed current and obsolete native values retain current presets and quarantine obsolete entries', () => {
+    const current = envelope(
+      createEditDocumentPresetPayload(legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), false, 'style'),
+      { id: 'current', name: 'Current' },
+    );
+    const obsolete = { preset: { adjustments: { exposure: 0.75 }, id: 'obsolete', name: 'Alaska Proof Look' } };
+
+    const parsed = parsePresetLibrary([{ preset: current }, obsolete]);
+
+    expect(parsed.items).toEqual([{ preset: current }]);
+    expect(parsed.quarantinedCount).toBe(1);
+  });
+
   test('compiles every built-in color style into the same strict current envelope', () => {
     const destination = useEditorStore.getState().editDocumentV2;
     for (const builtIn of BUILT_IN_COLOR_STYLE_PRESETS) {

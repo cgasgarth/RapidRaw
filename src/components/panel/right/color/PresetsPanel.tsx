@@ -822,24 +822,30 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   );
 
   const selectedPreset = selectedPresetId ? (allPresetMap.get(selectedPresetId) ?? null) : null;
-  const notice = loadError
-    ? { kind: 'error' as const, label: t('editor.presets.errors.loadFailed') }
-    : storageError
-      ? { kind: 'error' as const, label: t('editor.presets.errors.storageFailed') }
-      : isLoading
-        ? { kind: 'loading' as const, label: t('editor.presets.status.loading') }
-        : undefined;
+  const quarantineNotice = loadError?.startsWith('Quarantined ') === true ? loadError : null;
+  const fatalLoadError = loadError !== null && quarantineNotice === null ? loadError : null;
+  const notice = quarantineNotice
+    ? { kind: 'warning' as const, label: quarantineNotice }
+    : fatalLoadError
+      ? { kind: 'error' as const, label: t('editor.presets.errors.loadFailed') }
+      : storageError
+        ? { kind: 'error' as const, label: t('editor.presets.errors.storageFailed') }
+        : isLoading
+          ? { kind: 'loading' as const, label: t('editor.presets.status.loading') }
+          : undefined;
   const status =
-    actionError || loadError || storageError
+    actionError || fatalLoadError || storageError
       ? { label: t('editor.presets.states.error'), tone: 'danger' as const }
-      : appliedPreset
-        ? {
-            label: isEditedAfterApply ? t('editor.presets.states.appliedEdited') : t('editor.presets.states.applied'),
-            tone: isEditedAfterApply ? ('warning' as const) : ('success' as const),
-          }
-        : previewedPreset
-          ? { label: t('editor.presets.states.previewing'), tone: 'info' as const }
-          : { label: t('editor.presets.states.ready'), tone: 'neutral' as const };
+      : quarantineNotice
+        ? { label: quarantineNotice, tone: 'warning' as const }
+        : appliedPreset
+          ? {
+              label: isEditedAfterApply ? t('editor.presets.states.appliedEdited') : t('editor.presets.states.applied'),
+              tone: isEditedAfterApply ? ('warning' as const) : ('success' as const),
+            }
+          : previewedPreset
+            ? { label: t('editor.presets.states.previewing'), tone: 'info' as const }
+            : { label: t('editor.presets.states.ready'), tone: 'neutral' as const };
 
   return (
     <DndContext
@@ -1042,7 +1048,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
               label={t('editor.presets.status.loading')}
             />
           ) : null}
-          {!isLoading && loadError ? (
+          {!isLoading && fatalLoadError ? (
             <EmptyState
               actionLabel={t('editor.presets.discovery.retry')}
               icon={<CircleAlert size={18} />}
@@ -1050,7 +1056,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
               onAction={() => void refreshPresets()}
             />
           ) : null}
-          {!isLoading && !loadError && !hasUserPresets && BUILT_IN_COLOR_STYLE_PRESETS.length === 0 ? (
+          {!isLoading && !fatalLoadError && !hasUserPresets && BUILT_IN_COLOR_STYLE_PRESETS.length === 0 ? (
             <EmptyState
               actionLabel={t('editor.presets.status.getCommunity')}
               icon={<Folder size={18} />}
@@ -1059,12 +1065,12 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
             />
           ) : null}
           {!isLoading &&
-          !loadError &&
+          !fatalLoadError &&
           (hasUserPresets || BUILT_IN_COLOR_STYLE_PRESETS.length > 0) &&
           !hasDiscoveryResults ? (
             <EmptyState icon={<Search size={18} />} label={t('editor.presets.status.emptySearch')} />
           ) : null}
-          {!isLoading && !loadError && hasDiscoveryResults ? (
+          {!isLoading && !fatalLoadError && hasDiscoveryResults ? (
             <div className="pb-2">
               {displayBuiltInStyles.length > 0 ? (
                 <section
