@@ -168,6 +168,7 @@ test('supersession stops a real process group and its descendant promptly', asyn
       }
     }
     expect(descendantAlive).toBeFalse();
+    descendantPid = undefined;
   } catch (error) {
     bodyError = error;
   } finally {
