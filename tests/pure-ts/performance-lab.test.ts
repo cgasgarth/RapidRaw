@@ -3,7 +3,11 @@ import { capturePerformanceIdentity } from '../../scripts/perf/identity';
 import type { PerformanceIdentity, PerformanceScenario } from '../../scripts/perf/model';
 import { performanceRunReceiptSchema } from '../../scripts/perf/model';
 import { bisectExitCode, comparePerformanceReceipts, runPerformanceScenario } from '../../scripts/perf/runner';
-import { performanceScenarios } from '../../scripts/perf/scenarios';
+import {
+  assertLightInstrumentationOverhead,
+  MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS,
+  performanceScenarios,
+} from '../../scripts/perf/scenarios';
 import {
   assertComparableReceipts,
   assertStableMetric,
@@ -41,6 +45,19 @@ const scenario = (values: readonly number[], assertions = 1): PerformanceScenari
 });
 
 describe('performance lab statistics', () => {
+  test('tolerates a single timing outlier without hiding sustained instrumentation regression', () => {
+    expect(assertLightInstrumentationOverhead([0.2, 0.3, 40, 0.4, 0.5])).toBe(0.4);
+    expect(() =>
+      assertLightInstrumentationOverhead([
+        0.2,
+        0.3,
+        MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS + 0.1,
+        MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS + 0.2,
+        MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS + 0.3,
+      ]),
+    ).toThrow('exceeded 5ms');
+  });
+
   test('captures privacy-filtered hardware and runtime identity', () => {
     const captured = capturePerformanceIdentity('test');
     expect(captured.hardware).toMatchObject({

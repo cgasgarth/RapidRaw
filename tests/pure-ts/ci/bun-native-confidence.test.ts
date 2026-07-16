@@ -143,31 +143,54 @@ describe('Bun native confidence gates', () => {
 
   test('prints reproduction and exits bounded while killing a failed worker descendant', async () => {
     const directory = await temporaryDirectory('rapidraw-bun-randomized-gate-');
-    const pidFile = join(directory, 'descendant-pid');
     const failingTest = join(directory, 'failure.test.ts');
+    const readiness = Promise.withResolvers<number>();
+    const readinessServer = Bun.listen({
+      hostname: '127.0.0.1',
+      port: 0,
+      socket: {
+        data(socket, data) {
+          const pid = Number(new TextDecoder().decode(data));
+          if (Number.isInteger(pid) && pid > 0) readiness.resolve(pid);
+          socket.end();
+        },
+      },
+    });
     await Bun.write(
       failingTest,
-      `import { expect, test } from "bun:test";\ntest("fails with a live descendant", async () => { const child = Bun.spawn(["bun", "-e", "await Bun.sleep(60_000)"], { stderr: "ignore", stdout: "ignore" }); await Bun.write(${JSON.stringify(pidFile)}, String(child.pid)); expect(1).toBe(2); }, 3_000);\n`,
+      `import { expect, test } from "bun:test";\ntest("fails with a live descendant", async () => { const child = Bun.spawn(["bun", "-e", "await Bun.sleep(60_000)"], { stderr: "ignore", stdout: "ignore" }); const readyPort = Number(process.env["RAWENGINE_TEST_READY_PORT"]); if (!Number.isInteger(readyPort)) throw new Error("missing readiness port"); const socket = await Bun.connect({ hostname: "127.0.0.1", port: readyPort, socket: { data() {} } }); socket.write(String(child.pid)); socket.end(); expect(1).toBe(2); }, 3_000);\n`,
     );
     const runner = resolve('scripts/ci/run-bun-randomized-tests.ts');
     const startedAt = performance.now();
-    const result = await captured(['bun', runner, '--target', directory], {
+    const resultPromise = captured(['bun', runner, '--target', directory], {
       cwd: process.cwd(),
-      env: { RAWENGINE_BUN_TEST_SEED: '314159', RAWENGINE_BUN_TEST_TIMEOUT_MS: '5000' },
+      env: {
+        RAWENGINE_BUN_TEST_SEED: '314159',
+        RAWENGINE_BUN_TEST_TIMEOUT_MS: '5000',
+        RAWENGINE_TEST_READY_PORT: String(readinessServer.port),
+      },
       timeoutMs: 12_000,
     });
+    const observeRun = async () => {
+      try {
+        const descendantPid = await Promise.race([
+          readiness.promise,
+          resultPromise.then(({ output }) => {
+            throw new Error(`Randomized worker exited before publishing descendant readiness.\n${output}`);
+          }),
+        ]);
+        return { descendantPid, result: await resultPromise };
+      } finally {
+        readinessServer.stop(true);
+      }
+    };
+    const { descendantPid, result } = await observeRun();
     expect(result.timedOut, result.output).toBeFalse();
     expect(result.exitCode).not.toBe(0);
     expect(performance.now() - startedAt).toBeLessThan(12_000);
     expect(result.output).toContain('Bun randomized isolation seed: 314159');
     expect(result.output).toContain('Reproduce: RAWENGINE_BUN_TEST_SEED=314159 bun run test:randomized');
-    const descendantPid = Number(await Bun.file(pidFile).text());
-    let descendantExecuting = await processIsExecuting(descendantPid);
-    for (let attempt = 0; attempt < 100 && descendantExecuting; attempt += 1) {
-      await Bun.sleep(10);
-      descendantExecuting = await processIsExecuting(descendantPid);
-    }
-    expect(descendantExecuting).toBeFalse();
+    expect(await processIsExecuting(descendantPid)).toBeFalse();
   }, 15_000);
 
   test('clears the pass watchdog after a successful native run', async () => {
