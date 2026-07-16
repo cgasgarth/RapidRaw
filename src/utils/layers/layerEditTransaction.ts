@@ -4,7 +4,7 @@ import {
   editDocumentLayersV2Schema,
   editDocumentSourceArtifactsV2Schema,
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from '../adjustments';
+import type { AiPatch, MaskContainer } from '../adjustments';
 import type { EditTransactionRequest } from '../editTransaction';
 
 export interface LayerEditTransactionState {
@@ -25,12 +25,12 @@ export const buildLayerEditTransactionRequest = (
   next: LayerEditTransactionCandidate,
   transactionId: string,
 ): EditTransactionRequest => {
-  const layers = editDocumentLayersV2Schema.parse({ masks: structuredClone(nextAdjustments.masks) });
+  const layers = editDocumentLayersV2Schema.parse({ masks: structuredClone(next.masks) });
   const sourceArtifacts = editDocumentSourceArtifactsV2Schema.parse({
-    aiPatches: structuredClone(nextAdjustments.aiPatches),
+    aiPatches: structuredClone(next.aiPatches),
   });
   const artifactsEnvelope = layerStackSidecarPersistenceEnvelopeV1Schema.safeParse({
-    rawEngineArtifacts: nextAdjustments['rawEngineArtifacts'],
+    rawEngineArtifacts: next.rawEngineArtifacts,
   });
   const operations: EditTransactionRequest['operations'] = [
     {

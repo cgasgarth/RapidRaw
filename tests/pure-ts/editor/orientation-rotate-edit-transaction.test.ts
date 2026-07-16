@@ -203,7 +203,7 @@ describe('orientation rotate edit transaction', () => {
       ],
       noOp: false,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+    expect(useEditorStore.getState().editDocumentV2.geometry).toMatchObject({
       aspectRatio: 3 / 4,
       orientationSteps: 3,
     });

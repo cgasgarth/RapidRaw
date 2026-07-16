@@ -60,14 +60,6 @@ type ReplaceEditDocumentNodeOperation = {
 /** Every operation targets one typed node/domain or replaces the complete typed authority. */
 export type EditNodeOperation =
   | PatchEditDocumentNodeOperation
-  | {
-      type: 'patch-dust-spot-editor-settings';
-      patch: Readonly<{
-        dustSpotMinRadiusPx: number;
-        dustSpotOverlayEnabled: boolean;
-        dustSpotSensitivity: number;
-      }>;
-    }
   | { type: 'set-edit-document-node-enabled'; nodeType: EditDocumentNodeTypeV2; enabled: boolean }
   | {
       type: 'set-reference-match-application-receipt';
@@ -257,20 +249,6 @@ export const reduceEditTransaction = (
         else extensions['rawEngineArtifacts'] = rawEngineArtifacts;
         afterEditDocumentV2 = { ...afterEditDocumentV2, extensions };
       }
-      continue;
-    }
-    if (operation.type === 'patch-dust-spot-editor-settings') {
-      const legacyAdjustments = afterEditDocumentV2.extensions['legacyAdjustments'];
-      afterEditDocumentV2 = {
-        ...afterEditDocumentV2,
-        extensions: {
-          ...afterEditDocumentV2.extensions,
-          legacyAdjustments: {
-            ...(legacyAdjustments !== null && typeof legacyAdjustments === 'object' ? legacyAdjustments : {}),
-            ...operation.patch,
-          },
-        },
-      };
       continue;
     }
     if (operation.type === 'replace-edit-document-node') {

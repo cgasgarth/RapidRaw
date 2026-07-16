@@ -290,6 +290,8 @@ describe('current RapidRaw preset envelope', () => {
         'exposure'
       ],
     ).toBe(0.8);
-    expect(buildPresetPreviewAdjustments(imported)?.exposure).toBe(0.8);
+    const preview = buildPresetPreviewAdjustments(imported);
+    if (preview === null) throw new Error('Expected imported preset preview.');
+    expect(selectEditDocumentNode(preview, 'scene_global_color_tone').params['exposure']).toBe(0.8);
   });
 });

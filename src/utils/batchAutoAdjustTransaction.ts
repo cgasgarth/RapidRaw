@@ -1,8 +1,7 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { BatchAutoAdjustPathResultV1 } from '../schemas/batchAutoAdjustSchemas';
-import type { Adjustments } from './adjustments';
-import { areAdjustmentsEqual } from './adjustmentsSnapshot';
-import { buildAutoEditTransactionRequest } from './autoEditTransaction';
+import { areEditDocumentsEqual } from './adjustmentsSnapshot';
+import { buildAutoEditTransactionRequest, selectAutoEditAdjustmentProposal } from './autoEditTransaction';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface BatchAutoAdjustSelectionIdentity {
@@ -136,13 +135,12 @@ export const buildSelectedBatchAutoAdjustTransaction = ({
     ...buildAutoEditTransactionRequest(
       {
         adjustmentRevision: current.adjustmentRevision,
-        adjustments: currentAdjustments,
         editDocumentV2: currentEditDocumentV2,
         graphRevision: `batch:${result.receipt.transactionId}`,
         imageSessionId: current.imageSessionId,
         path: current.path,
       },
-      acceptedAdjustments,
+      selectAutoEditAdjustmentProposal(acceptedEditDocumentV2),
       result.receipt.transactionId,
     ),
     persistence: 'native-committed',

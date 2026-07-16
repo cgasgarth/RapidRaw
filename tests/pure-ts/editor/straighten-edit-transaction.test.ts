@@ -80,7 +80,7 @@ describe('straighten edit transaction', () => {
     });
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.rotation).toBe(-5.5);
+    expect(useEditorStore.getState().editDocumentV2.geometry.rotation).toBe(-5.5);
     const geometry = editDocumentGeometryV2Schema.parse(result.after.nodes['geometry']?.params);
     expect(result.after.nodes['geometry']).not.toBe(beforeGeometry);
     expect(geometry).toMatchObject({
@@ -88,15 +88,7 @@ describe('straighten edit transaction', () => {
       rotation: -5.5,
     });
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('crop');
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('rotation');
-    const reopened = hydrateImageOpenEditDocumentV2(
-      {
-        adjustments: structuredClone(useEditorStore.getState().adjustmentSnapshot.value),
-        editDocumentV2: structuredClone(result.after),
-      },
-      structuredClone(useEditorStore.getState().adjustmentSnapshot.value),
-    );
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: structuredClone(result.after) });
     expect(editDocumentGeometryV2Schema.parse(reopened.nodes['geometry']?.params)).toEqual(geometry);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,

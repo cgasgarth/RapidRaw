@@ -58,7 +58,7 @@ const transactionFor = (masks: readonly MaskContainer[], transactionId: string) 
   operations: [
     {
       nodeType: 'layers' as const,
-      patch: editDocumentLayersV2Schema.parse({ masks: adjustments.masks }),
+      patch: editDocumentLayersV2Schema.parse({ masks }),
       type: 'patch-edit-document-node' as const,
     },
   ],
@@ -90,7 +90,7 @@ describe('mask Tone Equalizer EditTransaction boundary', () => {
       transactionId: 'mask-tone-enable',
     });
     expect(result.changedKeys).toEqual(['nodes.layers.params.masks']);
-    expect(committed.adjustmentSnapshot.value.masks[0]?.adjustments.toneEqualizer.enabled).toBe(true);
+    expect(selectEditDocumentMasks(committed.editDocumentV2)[0]?.adjustments.toneEqualizer.enabled).toBe(true);
     expect(committed.adjustmentRevision).toBe(1);
     expect(committed.history).toHaveLength(2);
     expect(committed.historyIndex).toBe(1);

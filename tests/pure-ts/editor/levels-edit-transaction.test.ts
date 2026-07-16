@@ -94,11 +94,10 @@ describe('Levels edit transaction', () => {
       transformedOriginalUrl: null,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.levels).toEqual(next);
+    expect(useEditorStore.getState().editDocumentV2.nodes['luma_levels']!.params['levels']).toEqual(next);
     expect(editDocumentLumaLevelsV2Schema.parse(result.after.nodes['luma_levels']?.params).levels).toEqual(next);
     expect(result.after.nodes['luma_levels']).not.toBe(beforeNode);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('levels');
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().editDocumentV2.nodes['luma_levels']!.params['levels']).toEqual(

@@ -1,12 +1,11 @@
 import { useCallback } from 'react';
 import { toast } from 'react-toastify';
 import { z } from 'zod';
-
 import {
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentEditorSection,
+  type EditDocumentV2,
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
-
 import { createDefaultCopyPasteSettings } from '../../schemas/copyPasteSettingsSchemas';
 import { loadedMetadataSchema } from '../../schemas/imageLoaderSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -37,8 +36,6 @@ import {
 import { selectEditDocumentGeometry } from '../../utils/editDocumentSelectors';
 import {
   copyEditDocumentV2Nodes,
-  legacyAdjustmentsToEditDocumentV2,
-  lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
   selectEditDocumentV2CopyPayload,
   setEditDocumentV2NodeEnabled,
 } from '../../utils/editDocumentV2';
@@ -142,22 +139,6 @@ export function useEditorActions() {
       });
     },
     [applyEditTransaction],
-  );
-
-  const setAdjustments = useCallback(
-    (value: Partial<Adjustments> | ((previous: Adjustments) => Adjustments)) => {
-      const state = useEditorStore.getState();
-      const current = state.adjustmentSnapshot.value;
-      const next = typeof value === 'function' ? value(current) : { ...current, ...value };
-      let document = legacyAdjustmentsToEditDocumentV2(reconcileReferenceMatchReceiptsAfterEdit(current, next));
-      for (const { nodeType } of EDIT_DOCUMENT_NODE_DESCRIPTORS) {
-        if (nodeType === 'display_creative') continue;
-        const enabled = state.editDocumentV2.nodes[nodeType]?.enabled;
-        if (enabled !== undefined) document = setEditDocumentV2NodeEnabled(document, nodeType, enabled);
-      }
-      commitEditNodeOperations([{ editDocumentV2: document, type: 'replace-edit-document' }]);
-    },
-    [commitEditNodeOperations],
   );
 
   const setEditorSectionEnabled = useCallback(
@@ -423,7 +404,6 @@ export function useEditorActions() {
 
   return {
     commitEditNodeOperations,
-    setAdjustments,
     setEditorSectionEnabled,
     handleRotate,
     handleAutoAdjustments,

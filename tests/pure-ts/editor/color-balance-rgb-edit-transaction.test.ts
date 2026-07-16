@@ -90,11 +90,12 @@ describe('Color Balance RGB edit transaction', () => {
       transformedOriginalUrl: null,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(next);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
+    ).toEqual(next);
     expect(result.after.nodes['color_balance_rgb']?.params).toMatchObject({ colorBalanceRgb: next });
     expect(result.after.nodes['color_balance_rgb']).not.toBe(beforeNode);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('colorBalanceRgb');
 
     useEditorStore.getState().undo();
     expect(
@@ -204,10 +205,14 @@ describe('Color Balance RGB edit transaction', () => {
       nextAdjustmentRevision: 2,
       noOp: false,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb.shadows).toEqual(
-      INITIAL_ADJUSTMENTS.colorBalanceRgb.shadows,
-    );
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb.highlights.blue).toBe(-19);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb']
+        .shadows,
+    ).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb.shadows);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb']
+        .highlights.blue,
+    ).toBe(-19);
 
     const rangeResetState = useEditorStore.getState();
     rangeResetState.applyEditTransaction(

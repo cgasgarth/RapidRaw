@@ -144,7 +144,7 @@ describe('sub-mask interaction edit transaction', () => {
       nextAdjustmentRevision: 2,
       noOp: false,
     });
-    expect(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters).toMatchObject({
+    expect(state.editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters).toMatchObject({
       centerX: 160,
       centerY: 250,
     });

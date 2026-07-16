@@ -1,13 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import type { EditDocumentNodeTypeV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import {
-  type BatchAutoAdjustPathResultV1,
-  batchAutoAdjustPathResultV1Schema,
-  batchAutoAdjustResultV1Schema,
-} from '../../src/schemas/batchAutoAdjustSchemas';
-import { createEditorImageSession, useEditorStore } from '../../src/store/useEditorStore';
-import { INITIAL_ADJUSTMENTS } from '../../src/utils/adjustments';
+import { batchAutoAdjustPathResultV1Schema } from '../../src/schemas/batchAutoAdjustSchemas';
 import {
   type BatchAutoAdjustSelectionIdentity,
   buildSelectedBatchAutoAdjustTransaction,
@@ -72,168 +65,16 @@ describe('Batch Auto Adjust current-document boundary', () => {
 
   test('fails closed for failed, wrong-path, or missing current selections', () => {
     expect(
-      acceptance(
-        { ...identity, adjustmentRevision: 1, imageSessionId: 'successor-session' },
-        {
-          ...currentAdjustments,
-          exposure: 0.8,
-        },
-      ),
-    ).toBeNull();
-  });
-
-  test('accepts an unchanged A to B to successor-A session and targets its live revision', () => {
-    const capturedAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const successor = { ...identity, adjustmentRevision: 4, imageSessionId: 'successor-a' };
-    const acceptance = resolveBatchAutoAdjustAcceptanceIdentity({
-      captured: identity,
-      capturedAdjustments,
-      current: successor,
-      currentAdjustments: structuredClone(capturedAdjustments),
-    });
-    expect(acceptance).toEqual(successor);
-    const transaction = buildSelectedBatchAutoAdjustTransaction({
-      acceptedAdjustments: { ...INITIAL_ADJUSTMENTS, exposure: 0.65 },
-      captured: identity,
-      current: acceptance,
-      currentAdjustments: capturedAdjustments,
-      currentEditDocumentV2: legacyAdjustmentsToEditDocumentV2(capturedAdjustments),
-      result: applied,
-    });
-    expect(transaction).toMatchObject({ baseAdjustmentRevision: 4, imageSessionId: 'successor-a' });
-  });
-
-  test('reconciles an already-hydrated native result into one undoable successor boundary', () => {
-    const capturedAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.55 };
-    const acceptedAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.65 };
-    const successorSession = createEditorImageSession({ generation: 5, path, source: 'cold-load' });
-    const successor = { ...identity, adjustmentRevision: 4, imageSessionId: successorSession.id };
-    const historyBaseline = resolveBatchAutoAdjustReconciledHistoryBaseline({
-      acceptedAdjustments,
-      captured: identity,
-      capturedAdjustments,
-      current: successor,
-      currentAdjustments: acceptedAdjustments,
-    });
-    expect(historyBaseline).toEqual(capturedAdjustments);
-    const historyEditDocumentBaseline = setEditDocumentV2NodeEnabled(
-      legacyAdjustmentsToEditDocumentV2(capturedAdjustments),
-      'scene_curve',
-      false,
-    );
-    const acceptedEditDocument = setEditDocumentV2NodeEnabled(
-      legacyAdjustmentsToEditDocumentV2(acceptedAdjustments),
-      'scene_curve',
-      false,
-    );
-
-    useEditorStore.getState().hydrateEditorRenderAuthority({
-      adjustmentRevision: successor.adjustmentRevision,
-      editDocumentV2: acceptedEditDocument,
-      historyCheckpoints: [],
-      historyIndex: 0,
-      imageSession: successorSession,
-      imageSessionId: successorSession.generation,
-      history: [acceptedEditDocument],
-    });
-    const transaction = buildSelectedBatchAutoAdjustTransaction({
-      acceptedAdjustments,
-      captured: identity,
-      current: successor,
-      currentAdjustments: acceptedAdjustments,
-      currentEditDocumentV2: acceptedEditDocument,
-      ...(historyBaseline === null ? {} : { historyBaseline }),
-      historyEditDocumentBaseline,
-      result: applied,
-    });
-    if (transaction === null) throw new Error('Expected reconciled Batch Auto Adjust transaction.');
-    const result = useEditorStore.getState().applyEditTransaction(transaction);
-    expect(result.noOp).toBe(false);
-    expect(result.before.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.55);
-    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.65);
-    expect(requiredNode(result.after, 'scene_curve').enabled).toBeFalse();
-    expect(
-      useEditorStore.getState().history.map((entry) => entry.nodes['scene_global_color_tone']?.params['exposure']),
-    ).toEqual([0.55, 0.65]);
-    useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.55);
-    expect(requiredNode(useEditorStore.getState().editDocumentV2, 'scene_curve').enabled).toBeFalse();
-  });
-
-  test('does not reconcile a captured session, another path, or a divergent successor edit', () => {
-    const capturedAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.55 };
-    const acceptedAdjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.65 };
-    const resolve = (current: BatchAutoAdjustSelectionIdentity, currentAdjustments = acceptedAdjustments) =>
-      resolveBatchAutoAdjustReconciledHistoryBaseline({
-        acceptedAdjustments,
-        captured: identity,
-        capturedAdjustments,
-        current,
-        currentAdjustments,
-      });
-
-    expect(resolve(identity)).toBeNull();
-    expect(resolve({ ...identity, imageSessionId: 'successor', path: '/fixtures/other.raw' })).toBeNull();
-    expect(resolve({ ...identity, imageSessionId: 'successor' }, { ...acceptedAdjustments, exposure: 0.8 })).toBeNull();
-  });
-
-  test('rejects a deferred legacy history snapshot after newer mixer transactions', () => {
-    const deferred = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 8 };
-    const deferredDocument = legacyAdjustmentsToEditDocumentV2(deferred);
-    useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: deferredDocument,
-      historyIndex: 0,
-      history: [deferredDocument],
-    });
-    const deferredIdentity = {
-      adjustmentRevision: useEditorStore.getState().adjustmentRevision,
-      imageSessionId: session.id,
-    };
-    const enableIdentity = { ...identity, adjustmentRevision: deferredIdentity.adjustmentRevision };
-    const enabled = {
-      ...deferred,
-      blackWhiteMixer: { ...deferred.blackWhiteMixer, enabled: true, process: 'continuous_sensitivity_v1' as const },
-    };
-    useEditorStore.getState().applyEditTransaction(
       buildSelectedBatchAutoAdjustTransaction({
         acceptedEditDocumentV2: accepted,
         captured: identity,
         current: null,
         currentEditDocumentV2: captured,
         result: applied,
-      }) ??
-        (() => {
-          throw new Error('Expected enable transaction.');
-        })(),
-    );
-    const responseState = useEditorStore.getState();
-    const response = {
-      ...responseState.adjustmentSnapshot.value,
-      blackWhiteMixer: {
-        ...responseState.adjustmentSnapshot.value.blackWhiteMixer,
-        weights: { ...responseState.adjustmentSnapshot.value.blackWhiteMixer.weights, reds: 32 },
-      },
-    };
-    responseState.applyEditTransaction({
-      baseAdjustmentRevision: responseState.adjustmentRevision,
-      history: 'single-entry',
-      imageSessionId: session.id,
-      operations: [
-        {
-          nodeType: 'black_white_mixer',
-          patch: { blackWhiteMixer: response.blackWhiteMixer },
-          type: 'patch-edit-document-node',
-        },
-      ],
-      persistence: 'commit',
-      source: 'manual-control',
-      transactionId: 'black-white-response',
-    });
-
-    useEditorStore.getState().pushHistory(deferredIdentity);
-    expect(useEditorStore.getState().history).toHaveLength(3);
-    useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.blackWhiteMixer).toEqual(enabled.blackWhiteMixer);
+      }),
+    ).toBeNull();
+    expect(selectedBatchAutoAdjustDisposition(identity, null)).toBe('commit-target-only');
+    expect(selectedBatchAutoAdjustDisposition(identity, { ...identity, adjustmentRevision: 1 })).toBe('reject-stale');
   });
 
   test('accepts exact current and unchanged successor documents', () => {

@@ -1,6 +1,7 @@
 import { type EditDocumentV2, editDocumentLayersV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { matchLookApplicationReceiptV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { selectEditDocumentNode } from './editDocumentSelectors';
+import { patchEditDocumentV2Node } from './editDocumentV2';
 import type { EditNodeOperation, EditTransactionRequest } from './editTransaction';
 import {
   applyReferenceMatchProposal,
@@ -80,13 +81,43 @@ const assertReferenceMatchIdentity = (
 
 const sortedGroups = (groups: ReadonlySet<ReferenceMatchGroup>): ReferenceMatchGroup[] => [...groups].sort();
 
-const selectReferenceMatchGlobalAdjustments = (document: EditDocumentV2): ReferenceMatchGlobalAdjustments => ({
-  contrast: selectEditDocumentNode(document, 'scene_global_color_tone').params.contrast,
-  exposure: selectEditDocumentNode(document, 'scene_global_color_tone').params.exposure,
-  saturation: selectEditDocumentNode(document, 'color_presence').params.saturation,
-  vibrance: selectEditDocumentNode(document, 'color_presence').params.vibrance,
-  whiteBalanceTechnical: selectEditDocumentNode(document, 'camera_input').params.whiteBalanceTechnical,
+export const selectReferenceMatchGlobalAdjustments = (document: EditDocumentV2): ReferenceMatchGlobalAdjustments => ({
+  contrast: selectEditDocumentNode(document, 'scene_global_color_tone').params['contrast'],
+  exposure: selectEditDocumentNode(document, 'scene_global_color_tone').params['exposure'],
+  saturation: selectEditDocumentNode(document, 'color_presence').params['saturation'],
+  vibrance: selectEditDocumentNode(document, 'color_presence').params['vibrance'],
+  whiteBalanceTechnical: selectEditDocumentNode(document, 'camera_input').params['whiteBalanceTechnical'],
 });
+
+export const applyReferenceMatchProposalToEditDocument = ({
+  document,
+  enabledGroups,
+  impact,
+  proposal,
+}: {
+  document: EditDocumentV2;
+  enabledGroups: ReadonlySet<ReferenceMatchGroup>;
+  impact: number;
+  proposal: ReferenceMatchProposal;
+}): EditDocumentV2 => {
+  const applied = applyReferenceMatchProposal({
+    adjustments: selectReferenceMatchGlobalAdjustments(document),
+    enabledGroups,
+    impact,
+    proposal,
+  });
+  let next = patchEditDocumentV2Node(document, 'scene_global_color_tone', {
+    contrast: applied.contrast,
+    exposure: applied.exposure,
+  });
+  next = patchEditDocumentV2Node(next, 'color_presence', {
+    saturation: applied.saturation,
+    vibrance: applied.vibrance,
+  });
+  return patchEditDocumentV2Node(next, 'camera_input', {
+    whiteBalanceTechnical: applied.whiteBalanceTechnical,
+  });
+};
 
 const buildReferenceMatchGlobalOperations = (
   applied: ReferenceMatchGlobalAdjustments,

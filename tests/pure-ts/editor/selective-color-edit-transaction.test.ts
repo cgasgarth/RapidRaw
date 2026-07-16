@@ -109,15 +109,18 @@ describe('selective color edit transaction', () => {
       transformedOriginalUrl: null,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.oranges.saturation).toBe(28);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.selectiveColorRangeControls.oranges.widthDegrees).toBe(
-      52,
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params['hsl'].oranges
+        .saturation,
+    ).toBe(28);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params[
+        'selectiveColorRangeControls'
+      ].oranges.widthDegrees,
+    ).toBe(52);
     expect(result.after.nodes['selective_color_mixer']?.params).toEqual(next);
     expect(result.after.nodes['selective_color_mixer']).not.toBe(beforeNode);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('hsl');
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('selectiveColorRangeControls');
 
     useEditorStore.getState().undo();
     expect(

@@ -111,14 +111,7 @@ describe('perspective correction edit transaction', () => {
     expect(result.after.nodes['geometry']).not.toBe(beforeGeometry);
     expect(resultGeometry.perspectiveCorrection).toEqual(result.after.geometry.perspectiveCorrection);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('perspectiveCorrection');
-    const reopened = hydrateImageOpenEditDocumentV2(
-      {
-        adjustments: structuredClone(useEditorStore.getState().adjustmentSnapshot.value),
-        editDocumentV2: structuredClone(result.after),
-      },
-      structuredClone(useEditorStore.getState().adjustmentSnapshot.value),
-    );
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: structuredClone(result.after) });
     expect(editDocumentGeometryV2Schema.parse(reopened.nodes['geometry']?.params).perspectiveCorrection).toEqual(
       resultGeometry.perspectiveCorrection,
     );

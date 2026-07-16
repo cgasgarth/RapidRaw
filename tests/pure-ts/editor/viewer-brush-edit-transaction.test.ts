@@ -171,7 +171,7 @@ describe('viewer brush edit transaction', () => {
       nextAdjustmentRevision: 1,
       noOp: false,
     });
-    const storedLines = requireStoredBrushLines(state.adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters);
+    const storedLines = requireStoredBrushLines(state.editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters);
     expect(storedLines).toHaveLength(1);
     const firstLine = storedLines[0];
     const storedPoints =

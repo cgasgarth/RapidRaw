@@ -168,7 +168,9 @@ describe('detail edit transaction', () => {
     ).toBe(42);
     expect(result.after.nodes['detail_denoise_dehaze']).not.toBe(beforeDetail);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.localContrastRadiusPx).toBe(42);
+    expect(
+      useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']!.params['localContrastRadiusPx'],
+    ).toBe(42);
 
     useEditorStore.getState().undo();
     expect(

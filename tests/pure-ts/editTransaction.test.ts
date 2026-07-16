@@ -8,7 +8,11 @@ import {
   selectEditDocumentLayers,
   selectEditDocumentNode,
 } from '../../src/utils/editDocumentSelectors';
-import { legacyAdjustmentsToEditDocumentV2, setEditDocumentV2NodeEnabled } from '../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  setEditDocumentV2NodeEnabled,
+} from '../../src/utils/editDocumentV2';
 import {
   buildEditorSectionNodeEnablementOperations,
   buildEditTransactionPersistenceContext,
@@ -17,7 +21,7 @@ import {
 } from '../../src/utils/editTransaction';
 import { buildLayerEditTransactionRequest } from '../../src/utils/layers/layerEditTransaction';
 
-const defaultDocument = (): EditDocumentV2 => legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS));
+const defaultDocument = (): EditDocumentV2 => createDefaultEditDocumentV2();
 
 const request = (overrides: Partial<EditTransactionRequest> = {}): EditTransactionRequest => ({
   baseAdjustmentRevision: 4,
@@ -55,7 +59,7 @@ describe('reduceEditTransaction typed authority', () => {
     const before = defaultDocument();
     const result = reduceEditTransaction(before, 4, request());
 
-    expect(selectEditDocumentNode(result.after, 'scene_global_color_tone').params.exposure).toBe(0.5);
+    expect(selectEditDocumentNode(result.after, 'scene_global_color_tone').params['exposure']).toBe(0.5);
     expect(result.changedKeys).toEqual(['nodes.scene_global_color_tone.params.exposure']);
     expect(result.nextAdjustmentRevision).toBe(5);
     expect(result.noOp).toBeFalse();
@@ -95,7 +99,7 @@ describe('reduceEditTransaction typed authority', () => {
   });
 
   test('toggles Effects while preserving latent parameters', () => {
-    const before = legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), grainAmount: 42 });
+    const before = patchEditDocumentV2Node(defaultDocument(), 'display_creative', { grainAmount: 42 });
     const result = reduceEditTransaction(
       before,
       4,
@@ -164,32 +168,9 @@ describe('reduceEditTransaction typed authority', () => {
       }),
     );
 
-    expect(selectEditDocumentNode(result.after, 'scene_global_color_tone').params.exposure).toBe(1.25);
+    expect(selectEditDocumentNode(result.after, 'scene_global_color_tone').params['exposure']).toBe(1.25);
     expect(result.after.provenance.referenceMatchApplicationReceipt).toBeNull();
     expect(result.after.nodes['geometry']).toBe(before.nodes['geometry']);
-  });
-
-  test('patches explicit editor-only dust settings without claiming render-node ownership', () => {
-    const before = defaultDocument();
-    const result = reduceEditTransaction(
-      before,
-      4,
-      request({
-        operations: [
-          {
-            patch: { dustSpotMinRadiusPx: 4, dustSpotOverlayEnabled: true, dustSpotSensitivity: 72 },
-            type: 'patch-dust-spot-editor-settings',
-          },
-        ],
-      }),
-    );
-
-    expect(result.after.extensions['legacyAdjustments']).toMatchObject({
-      dustSpotMinRadiusPx: 4,
-      dustSpotOverlayEnabled: true,
-      dustSpotSensitivity: 72,
-    });
-    expect(result.changedKeys).toEqual(['extensions']);
   });
 
   test('exact no-ops preserve document identity and revision', () => {
@@ -254,7 +235,7 @@ describe('typed transaction store integration', () => {
 
     expect(result.after).toBe(state.editDocumentV2);
     expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
-    expect(selectEditDocumentNode(state.editDocumentV2, 'scene_global_color_tone').params.exposure).toBe(0.5);
+    expect(selectEditDocumentNode(state.editDocumentV2, 'scene_global_color_tone').params['exposure']).toBe(0.5);
     expect(state.adjustmentRevision).toBe(1);
     expect(state.history).toHaveLength(2);
     expect(state.historyIndex).toBe(1);
@@ -262,7 +243,7 @@ describe('typed transaction store integration', () => {
 
   test('layer transactions publish typed layers and persistence identity', () => {
     const next = {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
+      aiPatches: [],
       masks: [
         {
           adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
@@ -279,7 +260,6 @@ describe('typed transaction store integration', () => {
     };
     const state = {
       adjustmentRevision: 7,
-      adjustmentSnapshot: { value: INITIAL_ADJUSTMENTS },
       editDocumentV2: defaultDocument(),
       imageSession: { id: 'session-layer' },
       imageSessionId: 4,

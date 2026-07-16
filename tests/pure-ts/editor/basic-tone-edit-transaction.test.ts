@@ -11,7 +11,7 @@ import {
   buildBasicToneEditTransaction,
   captureBasicToneCommitIdentity,
 } from '../../../src/utils/basicToneEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 const sourcePath = '/fixture/basic-tone.ARW';
@@ -163,15 +163,7 @@ describe('basic tone edit transaction', () => {
       vibrance: 44,
     });
     expect(result.after.nodes['geometry']).toBe(beforeGeometry);
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('hue');
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('vibrance');
-    const reopened = hydrateImageOpenEditDocumentV2(
-      {
-        adjustments: structuredClone(useEditorStore.getState().adjustmentSnapshot.value),
-        editDocumentV2: structuredClone(result.after),
-      },
-      structuredClone(useEditorStore.getState().adjustmentSnapshot.value),
-    );
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: structuredClone(result.after) });
     expect(editDocumentColorPresenceV2Schema.parse(reopened.nodes['color_presence']?.params)).toMatchObject({
       hue: 32,
       saturation: 0,

@@ -87,7 +87,6 @@ describe('lens correction edit transaction', () => {
     ).toBe(135);
     expect(result.after.nodes['geometry']).toEqual(result.before.nodes['geometry']);
     expect(result.after.nodes['scene_global_color_tone']).toEqual(result.before.nodes['scene_global_color_tone']);
-    expect(result.after.extensions['legacyAdjustments']).not.toHaveProperty('lensVignetteAmount');
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -160,7 +159,9 @@ describe('lens correction edit transaction', () => {
     ).toBe(22);
     expect(result.after.nodes['lens_correction']).not.toBe(beforeLens);
     expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.chromaticAberrationRedCyan).toBe(22);
+    expect(
+      useEditorStore.getState().editDocumentV2.nodes['lens_correction']!.params['chromaticAberrationRedCyan'],
+    ).toBe(22);
 
     useEditorStore.getState().undo();
     expect(

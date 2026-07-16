@@ -3,7 +3,7 @@ import {
   upsertLayerStackSidecarInSidecar,
 } from '../../../packages/rawengine-schema/src';
 import { type EditDocumentV2, editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from '../adjustments';
+import { selectEditDocumentMasks } from '../editDocumentSelectors';
 import type { EditTransactionRequest } from '../editTransaction';
 import { applyLayerStackCommandBridgeOperation } from './layerStackCommandBridge';
 
@@ -46,10 +46,7 @@ export const buildKeyboardLayerDeleteTransaction = (
       sessionId: 'rapidraw-keyboard-layer-delete',
     },
   );
-  const rawEngineArtifacts = upsertLayerStackSidecarInSidecar(
-    state.adjustmentSnapshot.value,
-    deleted.sidecar,
-  ).rawEngineArtifacts;
+  const rawEngineArtifacts = upsertLayerStackSidecarInSidecar(state.editDocumentV2, deleted.sidecar).rawEngineArtifacts;
   if (rawEngineArtifacts === undefined) throw new Error('keyboard_layer_delete.missing_sidecar_artifacts');
   return {
     graphRevision: deleted.graphRevision,

@@ -31,6 +31,7 @@ import {
   type RetouchCloneSource,
   type RetouchRemoveSource,
 } from '../../../../utils/adjustments';
+import { selectEditDocumentGeometry, selectEditDocumentMasks } from '../../../../utils/editDocumentSelectors';
 import {
   applyBrushLocalAdjustmentLayerFlow,
   createBrushLocalAdjustmentLayerDraft,

@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import type { ViewerPickerCommitResult } from '../../../src/components/panel/editor/viewerPickerInteractionControllers';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import { buildViewerPickerEditTransaction } from '../../../src/utils/viewerPickerEditTransaction';
 
 const sourcePath = '/fixture/viewer-picker.ARW';

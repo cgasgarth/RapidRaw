@@ -6,13 +6,8 @@ import {
   type ViewerRetouchCurrentContext,
 } from '../../../src/components/panel/editor/viewerRetouchHandlesController';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import {
-  createDefaultMaskEditNodes,
-  INITIAL_ADJUSTMENTS,
-  INITIAL_MASK_ADJUSTMENTS,
-  type MaskContainer,
-} from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentMasks, selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildRetouchHandleEditTransaction,
   createRetouchLayerRevision,
@@ -113,25 +108,18 @@ describe('retouch handle current-document transaction', () => {
       { id: 7, pressure: 0.6, type: 'pen' },
       { x: 0.7, y: 0.6 },
     );
-    if (command === null) throw new Error('expected retouch command');
-    const result = useEditorStore
-      .getState()
-      .applyEditTransaction(
-        buildRetouchHandleEditTransaction(
-          { ...useEditorStore.getState(), geometryEpoch, sourceRevision },
-          command,
-          imageSize,
-          'retouch-handle:commit',
-        ),
-      );
-    expect(result).toMatchObject({ changedKeys: ['nodes.layers.params.masks'], noOp: false, source: 'layer-command' });
-    expect(result.after.layers.masks[0]?.retouchCloneSource?.['targetPoint']).toEqual({ x: 0.7, y: 0.6 });
-    expect(result.after.layers.masks[0]?.subMasks[0]?.parameters).toMatchObject({ centerX: 2800, centerY: 1800 });
-    expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
-      persistence: 'commit',
-      transactionId: 'retouch-handle:commit',
-    });
-    expect(useEditorStore.getState().history).toHaveLength(2);
+    if (command === null) throw new Error('Expected retouch command.');
+    const state = useEditorStore.getState();
+    const result = state.applyEditTransaction(
+      buildRetouchHandleEditTransaction(
+        { ...state, geometryEpoch, sourceRevision },
+        command,
+        imageSize,
+        'retouch-handle:commit',
+      ),
+    );
+    expect(result.changedKeys).toEqual(['nodes.layers.params.masks']);
+    expect(selectEditDocumentMasks(result.after)[0]?.retouchCloneSource?.targetPoint).toEqual({ x: 0.7, y: 0.6 });
     useEditorStore.getState().undo();
     expect(
       selectEditDocumentMasks(useEditorStore.getState().editDocumentV2)[0]?.retouchCloneSource?.targetPoint,

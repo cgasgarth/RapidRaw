@@ -75,12 +75,6 @@ class FakeClock {
 const document = (exposure: number) =>
   patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure });
 
-const currentDocument = (exposure: number) =>
-  updateEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', (tone) => ({
-    ...tone,
-    exposure,
-  }));
-
 const receipt = (path: string, revision = 1): EditorPersistenceReceipt => ({
   path,
   sidecarRevision: `sha256:${String(revision).padStart(64, '0')}`,

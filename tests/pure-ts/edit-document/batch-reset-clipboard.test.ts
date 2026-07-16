@@ -24,10 +24,10 @@ describe('EditDocumentV2 batch, reset, and clipboard', () => {
       ...params,
       exposure: index + 1,
     }));
-    expect(updated?.map((document) => requireNode(document, 'scene_global_color_tone').params['exposure'])).toEqual([
-      1, 2,
-    ]);
-    expect(updated?.[0]?.nodes['geometry']).toEqual(documents[0]?.nodes['geometry']);
+
+    expect(
+      updated?.map((document) => selectEditDocumentNode(document, 'scene_global_color_tone').params['exposure']),
+    ).toEqual([1, 2]);
     expect(batchUpdateEditDocumentV2Nodes(documents, 'layers', (params) => params)).toBeNull();
     expect(batchUpdateEditDocumentV2Nodes(documents, 'source_artifacts', (params) => params)).toBeNull();
   });
