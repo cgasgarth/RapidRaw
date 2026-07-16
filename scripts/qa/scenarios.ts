@@ -894,6 +894,11 @@ export const qaScenarios: readonly QaScenario[] = [
       await page.keyboard.press('Escape');
       await guide.waitFor({ state: 'detached' });
       await page.mouse.up();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-testid="editor-right-panel-host"]')?.getAttribute('data-active-panel') ===
+          'adjustments',
+      );
       const callsAfterCancel = await page.evaluate(
         () =>
           (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? []).filter(
@@ -902,6 +907,9 @@ export const qaScenarios: readonly QaScenario[] = [
       );
       if (callsAfterCancel !== callsBeforeCancel)
         throw new Error('Cancelled straighten gesture committed an adjustment.');
+      await openCommandPalette(page);
+      await page.getByRole('button', { name: /Show crop tools/u }).click();
+      await page.getByRole('heading', { name: 'Crop' }).waitFor();
       if ((await straightenToggle.getAttribute('aria-pressed')) !== 'true') await straightenToggle.click();
       await surface.waitFor();
 
