@@ -79,8 +79,14 @@ if (allLaneCommands.filter((command) => command === 'bun run check:bundle').leng
   throw new Error('The production Vite bundle must be built and validated exactly once.');
 if (allLaneCommands.some((command) => command === 'bun scripts/ci/generate-vite-bundle-report.ts'))
   throw new Error('Bundle reporting must consume the report already produced by check:bundle.');
-if (!packageScripts['test:unit']?.startsWith('bun test ') || !packageScripts['test:unit'].includes('--parallel'))
-  throw new Error('The unit lane must delegate directly to Bun test with native parallel scheduling.');
+if (packageScripts['test:unit'] !== 'bun scripts/ci/run-bun-unit.ts')
+  throw new Error('The unit lane must use the maintained actionable Bun failure boundary.');
+const unitRunner = readFileSync('scripts/ci/run-bun-unit.ts', 'utf8');
+for (const token of ["['bun', 'test'", "'--only-failures'", "'--parallel'"]) {
+  if (!unitRunner.includes(token)) throw new Error(`The Bun unit boundary lost native runner token ${token}.`);
+}
+if (/run-resource-coordinated|run-pure-ts-unit|--parallel=1|--shard/u.test(unitRunner))
+  throw new Error('The Bun unit boundary introduced a scheduler, shard, or forced serial execution.');
 for (const command of [
   'bun run build',
   'check-vite-product-bundle-guard.ts',
