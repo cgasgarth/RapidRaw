@@ -3623,6 +3623,8 @@ mod tests {
         expected["hsl"] = selective_color_mixer_params()["hsl"].clone();
         expected["selectiveColorRangeControls"] =
             selective_color_mixer_params()["selectiveColorRangeControls"].clone();
+        expected["skinToneUniformity"] =
+            skin_tone_uniformity_params()["skinToneUniformity"].clone();
         expected["cameraProfileAmount"] = json!(100);
         expected["centré"] = json!(-9);
         expected["localContrastHaloGuard"] = json!(62);

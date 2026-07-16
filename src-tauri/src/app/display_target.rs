@@ -18,6 +18,13 @@ use super::hdr_display_capability::query_edr_headroom;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DisplayColorSpace {
+    #[cfg_attr(
+        not(any(test, target_os = "macos", feature = "validation-harness")),
+        expect(
+            dead_code,
+            reason = "the concrete display color space is resolved only by macOS and validation targets"
+        )
+    )]
     DisplayEncodedSrgb,
 }
 

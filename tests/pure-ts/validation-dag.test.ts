@@ -714,42 +714,66 @@ describe('affected validation DAG', () => {
 
   test('separate worktree processes contend on one stable native-heavy class lease', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-contention-'));
-    const firstWorktree = join(root, 'one');
-    const secondWorktree = join(root, 'two');
-    await mkdir(firstWorktree);
-    await mkdir(secondWorktree);
-    const coordinator = join(root, 'locks');
-    const modulePath = join(import.meta.dir, '../../scripts/lib/ci/resource-coordinator.ts');
-    const script = `import { acquireResourceLease } from ${JSON.stringify(modulePath)};
-const started=Date.now();
+    try {
+      const firstWorktree = join(root, 'one');
+      const secondWorktree = join(root, 'two');
+      await mkdir(firstWorktree);
+      await mkdir(secondWorktree);
+      const coordinator = join(root, 'locks');
+      const firstAcquired = join(root, 'first-acquired');
+      const orderingReceipt = join(root, 'lease-ordering.jsonl');
+      const modulePath = join(import.meta.dir, '../../scripts/lib/ci/resource-coordinator.ts');
+      const script = `import { appendFile, writeFile } from 'node:fs/promises';
+import { acquireResourceLease } from ${JSON.stringify(modulePath)};
 const lease=await acquireResourceLease({resource:'validation-class-native-heavy',label:process.cwd(),pollMs:10});
-console.log(JSON.stringify({waitedMs:Date.now()-started}));
+await appendFile(${JSON.stringify(orderingReceipt)},JSON.stringify({event:Bun.env.LEASE_EVENT})+'\\n');
+if(Bun.env.LEASE_READY)await writeFile(Bun.env.LEASE_READY,'ready');
 await Bun.sleep(180);
+await appendFile(${JSON.stringify(orderingReceipt)},JSON.stringify({event:Bun.env.LEASE_RELEASE_EVENT})+'\\n');
 await lease.release();`;
-    const env = { ...process.env, RAWENGINE_RESOURCE_COORDINATOR_ROOT: coordinator };
-    const first = Bun.spawn(['bun', '-e', script], {
-      cwd: firstWorktree,
-      env: { ...env, RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID() },
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    await Bun.sleep(25);
-    const second = Bun.spawn(['bun', '-e', script], {
-      cwd: secondWorktree,
-      env: { ...env, RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID() },
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    const [firstOutput, secondOutput, firstExit, secondExit] = await Promise.all([
-      new Response(first.stdout).text(),
-      new Response(second.stdout).text(),
-      first.exited,
-      second.exited,
-    ]);
-    expect([firstExit, secondExit]).toEqual([0, 0]);
-    const receipt = JSON.parse(secondOutput.trim().split('\n').at(-1) ?? '{}') as { waitedMs: number };
-    expect(firstOutput).toContain('"waitedMs"');
-    expect(receipt.waitedMs).toBeGreaterThanOrEqual(120);
+      const env = { ...process.env, RAWENGINE_RESOURCE_COORDINATOR_ROOT: coordinator };
+      const first = Bun.spawn(['bun', '-e', script], {
+        cwd: firstWorktree,
+        env: {
+          ...env,
+          LEASE_EVENT: 'first-acquired',
+          LEASE_READY: firstAcquired,
+          LEASE_RELEASE_EVENT: 'first-releasing',
+          RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID(),
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      for (let attempt = 0; !(await Bun.file(firstAcquired).exists()); attempt += 1) {
+        if (attempt >= 200) throw new Error('first process did not publish lease acquisition');
+        await Bun.sleep(10);
+      }
+      const second = Bun.spawn(['bun', '-e', script], {
+        cwd: secondWorktree,
+        env: {
+          ...env,
+          LEASE_EVENT: 'second-acquired',
+          LEASE_RELEASE_EVENT: 'second-releasing',
+          RAWENGINE_RESOURCE_OWNER_ID: crypto.randomUUID(),
+        },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      const [firstExit, secondExit] = await Promise.all([
+        new Response(first.stdout).text(),
+        new Response(second.stdout).text(),
+        first.exited,
+        second.exited,
+      ]).then((results) => [results[2], results[3]] as const);
+      expect([firstExit, secondExit]).toEqual([0, 0]);
+      const events = (await readFile(orderingReceipt, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => (JSON.parse(line) as { event: string }).event);
+      expect(events).toEqual(['first-acquired', 'first-releasing', 'second-acquired', 'second-releasing']);
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
   });
 
   test('full unit suites are exclusive across worktrees while other CPU work stays parallel', async () => {
