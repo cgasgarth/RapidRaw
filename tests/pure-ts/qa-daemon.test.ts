@@ -14,6 +14,7 @@ import type {
 } from '../../scripts/qa/daemon-model';
 import { qaDaemonPaths, readLiveDaemonState } from '../../scripts/qa/daemon-state';
 import { createQaDaemonIdentity } from '../../scripts/qa/identity';
+import { createLazyLifecycleAdapter } from '../../scripts/qa/lazy-lifecycle-adapter';
 
 interface FakeSession {
   generation: number;
@@ -127,6 +128,23 @@ const waitForDaemonState = async (
 };
 
 describe('QA daemon lifecycle', () => {
+  test('does not load the browser lifecycle until the first browser job', async () => {
+    const worktree = await temporaryDirectory();
+    const events: string[] = [];
+    let loads = 0;
+    const lazyAdapter = createLazyLifecycleAdapter(async () => {
+      loads += 1;
+      return fakeAdapter(events);
+    });
+    const engine = new QaDaemonEngine(worktree, lazyAdapter);
+    expect(loads).toBe(0);
+    expect(engine.metrics.serverStarts).toBe(0);
+    await engine.run(identity(worktree), { scenarioIds: ['one'], shard: { index: 0, total: 1 } });
+    await engine.close();
+    expect(loads).toBe(1);
+    expect(events).toEqual(['start:1', 'stop:1']);
+  });
+
   test('only grants shutdown ownership to the process that won daemon publication', () => {
     const state = {
       schemaVersion: 1 as const,

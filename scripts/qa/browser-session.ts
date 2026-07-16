@@ -10,7 +10,7 @@ import type { QaArtifactRecord, QaPerformanceSpan, QaScenarioResult } from './mo
 import { selectScenarios, shardScenarios, validateScenarioArtifacts, validateScenarioCapabilities } from './planner';
 import { qaScenarios } from './scenarios';
 
-interface BrowserSession {
+export interface BrowserSession {
   browser: Browser;
   server: ChildProcess;
   baseUrl: string;

@@ -3,10 +3,11 @@
 import { chmod } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { resolve } from 'node:path';
-import { createBrowserLifecycleAdapter } from './browser-session';
+import type { BrowserJobResult, BrowserSession } from './browser-session';
 import { QaDaemonEngine } from './daemon-engine';
 import { type QaDaemonRequest, type QaDaemonResponse, qaDaemonRequestSchema } from './daemon-model';
 import { claimDaemonState, readLiveDaemonState, releaseDaemonState } from './daemon-state';
+import { createLazyLifecycleAdapter } from './lazy-lifecycle-adapter';
 
 const args = process.argv.slice(2);
 const worktree = resolve(args[args.indexOf('--worktree') + 1] ?? process.cwd());
@@ -15,7 +16,10 @@ if (existing !== undefined) throw new Error(`QA daemon is already live at PID ${
 const state = await claimDaemonState(worktree);
 const engine = new QaDaemonEngine(
   worktree,
-  createBrowserLifecycleAdapter(resolve(worktree, 'private-artifacts/qa/daemon')),
+  createLazyLifecycleAdapter<BrowserSession, BrowserJobResult>(async () => {
+    const { createBrowserLifecycleAdapter } = await import('./browser-session');
+    return createBrowserLifecycleAdapter(resolve(worktree, 'private-artifacts/qa/daemon'));
+  }),
 );
 let closing = false;
 let forcedShutdownTimer: ReturnType<typeof setTimeout> | undefined;
