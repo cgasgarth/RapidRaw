@@ -3,7 +3,12 @@ import { capturePerformanceIdentity } from '../../scripts/perf/identity';
 import type { PerformanceIdentity, PerformanceScenario } from '../../scripts/perf/model';
 import { performanceRunReceiptSchema } from '../../scripts/perf/model';
 import { bisectExitCode, comparePerformanceReceipts, runPerformanceScenario } from '../../scripts/perf/runner';
-import { performanceScenarios } from '../../scripts/perf/scenarios';
+import {
+  assertLightInstrumentationOverhead,
+  MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS,
+  performanceScenarios,
+  runIsolatedLightInstrumentationBenchmark,
+} from '../../scripts/perf/scenarios';
 import {
   assertComparableReceipts,
   assertStableMetric,
@@ -41,6 +46,46 @@ const scenario = (values: readonly number[], assertions = 1): PerformanceScenari
 });
 
 describe('performance lab statistics', () => {
+  test('tolerates a single timing outlier without hiding sustained instrumentation regression', () => {
+    expect(assertLightInstrumentationOverhead([0.2, 0.3, 40, 0.4, 0.5])).toBe(0.4);
+    expect(() =>
+      assertLightInstrumentationOverhead([
+        0.2,
+        0.3,
+        MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS + 0.1,
+        MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS + 0.2,
+        MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS + 0.3,
+      ]),
+    ).toThrow('exceeded 5ms');
+  });
+
+  test('isolates the light instrumentation invariant from concurrent parent CPU threads', async () => {
+    const { Worker } = await import('node:worker_threads');
+    const workers = Array.from(
+      { length: 2 },
+      () =>
+        new Worker(
+          `const { parentPort } = require('node:worker_threads'); parentPort.postMessage('ready'); let sink = 0; while (true) sink = (sink + 1) % 1_000_003;`,
+          { eval: true },
+        ),
+    );
+    try {
+      await Promise.all(
+        workers.map(
+          (worker) =>
+            new Promise<void>((resolve) => {
+              worker.once('message', () => resolve());
+            }),
+        ),
+      );
+      expect(await runIsolatedLightInstrumentationBenchmark()).toBeLessThanOrEqual(
+        MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS,
+      );
+    } finally {
+      await Promise.all(workers.map(async (worker) => await worker.terminate()));
+    }
+  });
+
   test('captures privacy-filtered hardware and runtime identity', () => {
     const captured = capturePerformanceIdentity('test');
     expect(captured.hardware).toMatchObject({
@@ -131,13 +176,19 @@ describe('performance lab runner', () => {
     const preview = performanceScenarios.find(({ id }) => id === 'editor.preview-scheduling');
     if (preview === undefined) throw new Error('preview performance scenario missing');
     const result = await preview.runSample(0);
+    const isolatedOverheadMs = result.metrics['snapshotInstrumentationOverheadMs'];
+    if (isolatedOverheadMs === undefined) throw new Error('Missing isolated instrumentation metric.');
     expect(result.metrics).toMatchObject({
       cpuMs: expect.any(Number),
       dispatches: 20_000,
       filesystemReadOps: expect.any(Number),
       filesystemWriteOps: expect.any(Number),
       residentBytes: expect.any(Number),
+      snapshotInstrumentationOverheadMs: expect.any(Number),
+      snapshotInstrumentationWallOverheadMs: expect.any(Number),
     });
+    expect(Number.isFinite(isolatedOverheadMs)).toBeTrue();
+    expect(isolatedOverheadMs <= MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS).toBeTrue();
   });
 
   test('import throughput and warm last-folder startup declare their terminal metrics', () => {

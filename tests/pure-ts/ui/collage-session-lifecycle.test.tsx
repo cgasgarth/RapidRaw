@@ -25,6 +25,7 @@ afterEach(async () => {
   cleanup = null;
   calls.length = 0;
   invoke.mockClear();
+  invoke.mockImplementation(defaultInvoke);
 });
 
 test('keyed reopen starts clean, owns its URLs, and saves the current session exactly once', async () => {

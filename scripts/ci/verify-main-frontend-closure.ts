@@ -4,6 +4,8 @@ export const MAIN_FRONTEND_LANES = [
   'frontend-static',
   'frontend-contracts',
   'frontend-unit',
+  'frontend-coverage',
+  'frontend-randomized',
   'frontend-browser',
   'frontend-bundle',
 ] as const;

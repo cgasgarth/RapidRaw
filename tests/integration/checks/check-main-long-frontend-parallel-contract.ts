@@ -2,6 +2,10 @@
 
 import { readFileSync } from 'node:fs';
 
+import { BUN_COVERAGE_FLOORS } from '../../../scripts/ci/check-bun-coverage.ts';
+import { buildBunCoverageCommand } from '../../../scripts/ci/run-bun-coverage.ts';
+import { buildRandomizedTestArgs } from '../../../scripts/ci/run-bun-randomized-tests.ts';
+import { buildBunUnitCommand } from '../../../scripts/ci/run-bun-unit.ts';
 import { MAIN_FRONTEND_LANES, mainFrontendClosureFailures } from '../../../scripts/ci/verify-main-frontend-closure.ts';
 
 type Step = {
@@ -38,6 +42,8 @@ const expectedCommands: Readonly<Record<(typeof MAIN_FRONTEND_LANES)[number], re
     'bun run check:docs',
   ],
   'frontend-unit': ['bun run test:unit'],
+  'frontend-coverage': ['bun run test:coverage'],
+  'frontend-randomized': ['bun run test:randomized'],
   'frontend-browser': [
     'bunx playwright install chromium',
     'bun run check:browser-harness',
@@ -79,14 +85,43 @@ if (allLaneCommands.filter((command) => command === 'bun run check:bundle').leng
   throw new Error('The production Vite bundle must be built and validated exactly once.');
 if (allLaneCommands.some((command) => command === 'bun scripts/ci/generate-vite-bundle-report.ts'))
   throw new Error('Bundle reporting must consume the report already produced by check:bundle.');
-if (packageScripts['test:unit'] !== 'bun scripts/ci/run-bun-unit.ts')
-  throw new Error('The unit lane must use the maintained actionable Bun failure boundary.');
-const unitRunner = readFileSync('scripts/ci/run-bun-unit.ts', 'utf8');
-for (const token of ["['bun', 'test'", "'--only-failures'", "'--parallel'"]) {
-  if (!unitRunner.includes(token)) throw new Error(`The Bun unit boundary lost native runner token ${token}.`);
+const unitCommand = buildBunUnitCommand();
+const coverageCommand = buildBunCoverageCommand();
+const randomizedCommand = ['bun', ...buildRandomizedTestArgs(42)];
+for (const [name, command] of [
+  ['unit', unitCommand],
+  ['coverage', coverageCommand],
+  ['randomized', randomizedCommand],
+] as const) {
+  if (!command.includes('--parallel')) throw new Error(`${name} lost Bun-native parallel scheduling.`);
+  if (command.some((argument) => /^--parallel=|^--parallel-delay=|^--shard|^--retry$/u.test(argument)))
+    throw new Error(`${name} introduced worker staging, shards, retries, or a forced worker count.`);
 }
-if (/run-resource-coordinated|run-pure-ts-unit|--parallel=1|--shard/u.test(unitRunner))
-  throw new Error('The Bun unit boundary introduced a scheduler, shard, or forced serial execution.');
+if (!unitCommand.includes('--only-failures')) throw new Error('The Bun unit boundary lost actionable failure output.');
+if (!coverageCommand.includes('--coverage')) throw new Error('The Bun coverage boundary lost native LCOV generation.');
+if (!randomizedCommand.some((argument) => argument === '--seed=42'))
+  throw new Error('The randomized boundary lost its reproducible seed.');
+
+const bunConfig = Bun.TOML.parse(readFileSync('bunfig.toml', 'utf8')) as {
+  test?: {
+    coverageDir?: string;
+    coveragePathIgnorePatterns?: string[];
+    coverageReporter?: string[];
+    coverageSkipTestFiles?: boolean;
+  };
+};
+const coverageConfig = bunConfig.test;
+if (BUN_COVERAGE_FLOORS.lines < 0.66 || BUN_COVERAGE_FLOORS.functions < 0.69)
+  throw new Error('Bun native LCOV coverage thresholds may only ratchet upward from the measured baseline.');
+if (coverageConfig?.coverageSkipTestFiles !== true)
+  throw new Error('Bun native coverage must exclude test files from product coverage.');
+if (coverageConfig?.coverageDir !== 'artifacts/bun-coverage')
+  throw new Error('Bun native coverage must write to the ignored artifact tree.');
+if (coverageConfig?.coverageReporter?.toSorted().join(',') !== 'lcov')
+  throw new Error('Bun native coverage must publish the compact LCOV report consumed by its global summary gate.');
+const allowedCoverageExclusions = ['fixtures/**', 'src/@types/resources.d.ts', 'tests/**'];
+if (coverageConfig?.coveragePathIgnorePatterns?.toSorted().join(',') !== allowedCoverageExclusions.join(','))
+  throw new Error('Bun coverage exclusions must remain limited to documented generated/test-only paths.');
 for (const command of [
   'bun run build',
   'check-vite-product-bundle-guard.ts',
@@ -106,6 +141,22 @@ if (!upload?.uses?.startsWith('actions/upload-artifact@')) throw new Error('Bund
 if (!String(upload.with?.name).includes('github.sha') || upload.with?.['if-no-files-found'] !== 'error')
   throw new Error('Bundle report artifact must be commit-addressed and fail closed when missing.');
 
+const coverage = jobs['frontend-coverage'];
+const coverageUpload = coverage?.steps?.find((step) => step.name === 'Upload Bun coverage report');
+if (!coverageUpload?.uses?.startsWith('actions/upload-artifact@'))
+  throw new Error('Bun coverage upload must stay pinned.');
+if (
+  !String(coverageUpload.with?.name).includes('github.sha') ||
+  coverageUpload.with?.path !== 'artifacts/bun-coverage/lcov.info' ||
+  coverageUpload.with?.['if-no-files-found'] !== 'error'
+)
+  throw new Error('Bun coverage artifact must be commit-addressed, compact, and fail closed when missing.');
+const randomizedStep = jobs['frontend-randomized']?.steps?.find(
+  (step) => step.name === 'Repeat the Bun suite in a reproducible random order',
+);
+if (randomizedStep?.env?.RAWENGINE_BUN_TEST_SEED !== '${{ github.run_id }}')
+  throw new Error('Randomized Bun tests must derive a reproducible seed from the main workflow run.');
+
 const closure = jobs['frontend-full'];
 if (closure?.if !== '${{ always() }}') throw new Error('Frontend closure must run after failures.');
 if (closure.needs?.toSorted().join(',') !== [...MAIN_FRONTEND_LANES].toSorted().join(','))
@@ -123,4 +174,4 @@ const failed = { ...successes, 'frontend-browser': { result: 'failure' } };
 if (mainFrontendClosureFailures(failed).join(',') !== 'frontend-browser=failure')
   throw new Error('Frontend closure did not fail on a failed independent lane.');
 
-console.log('main-long frontend contract ok (five parallel native Bun/GHA lanes, fail-closed aggregate)');
+console.log('main-long frontend contract ok (seven parallel native Bun/GHA lanes, fail-closed aggregate)');

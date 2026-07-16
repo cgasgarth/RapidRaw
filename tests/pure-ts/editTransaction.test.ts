@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
 import type { EditDocumentNodeTypeV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../src/store/useEditorStore';
@@ -32,7 +32,7 @@ const requiredNode = (document: EditDocumentV2, nodeType: EditDocumentNodeTypeV2
   return node;
 };
 
-afterEach(() => {
+const resetEditorState = () => {
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initial);
   useEditorStore.getState().hydrateEditorRenderAuthority({
@@ -42,7 +42,10 @@ afterEach(() => {
     historyIndex: 0,
     history: [editDocumentV2],
   });
-});
+};
+
+beforeEach(resetEditorState);
+afterEach(resetEditorState);
 
 describe('reduceEditTransaction', () => {
   test('routes focused tone, camera, calibration, curve, tone-equalizer, point-color, lens, grading, and geometry', () => {

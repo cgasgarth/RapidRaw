@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
 import { act, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useLibraryStore } from '../../../src/store/useLibraryStore';
@@ -79,13 +79,7 @@ function IsolationHarness() {
 let root: Root;
 
 beforeEach(async () => {
-  const window = new Window({ url: 'http://localhost' });
-  Object.assign(globalThis, {
-    document: window.document,
-    IS_REACT_ACT_ENVIRONMENT: true,
-    navigator: window.navigator,
-    window,
-  });
+  document.body.replaceChildren();
   for (const key of Object.keys(counts) as Array<keyof typeof counts>) counts[key] = 0;
   useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
     editDocumentV2: legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure: -1 }),
@@ -119,18 +113,19 @@ describe('application render islands', () => {
       });
     });
     const baseline = { ...counts };
-    for (let index = 0; index < 100; index += 1) {
-      await act(async () => {
-        useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
-          editDocumentV2: legacyAdjustmentsToEditDocumentV2({
-            ...state.adjustmentSnapshot.value,
-            exposure: index / 100,
-          }),
-          history: [legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure: index / 100 })],
-          historyIndex: 0,
-        }));
-      });
-    }
+    await act(async () => {
+      for (let index = 0; index < 100; index += 1)
+        flushSync(() =>
+          useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
+            editDocumentV2: legacyAdjustmentsToEditDocumentV2({
+              ...state.adjustmentSnapshot.value,
+              exposure: index / 100,
+            }),
+            history: [legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure: index / 100 })],
+            historyIndex: 0,
+          })),
+        );
+    });
 
     expect(counts.library).toBe(baseline.library);
     expect(counts.exportPanel).toBe(baseline.exportPanel);
@@ -154,11 +149,10 @@ describe('application render islands', () => {
 
   test('100 export progress events commit no workspace, folder, or modal boundary', async () => {
     const baseline = { ...counts };
-    for (let index = 0; index < 100; index += 1) {
-      await act(async () => {
-        useProcessStore.getState().setExportState({ progress: { current: index, total: 100 } });
-      });
-    }
+    await act(async () => {
+      for (let index = 0; index < 100; index += 1)
+        flushSync(() => useProcessStore.getState().setExportState({ progress: { current: index, total: 100 } }));
+    });
     expect(counts.exportPanel - baseline.exportPanel).toBe(100);
     expect(counts.editor).toBe(baseline.editor);
     expect(counts.library).toBe(baseline.library);
@@ -168,11 +162,10 @@ describe('application render islands', () => {
 
   test('panel resize commits only its panel boundary and keeps services mounted', async () => {
     const baseline = { ...counts };
-    for (let index = 0; index < 100; index += 1) {
-      await act(async () => {
-        useUIStore.getState().setLibraryFolderTreeWidth(240 + index);
-      });
-    }
+    await act(async () => {
+      for (let index = 0; index < 100; index += 1)
+        flushSync(() => useUIStore.getState().setLibraryFolderTreeWidth(240 + index));
+    });
     expect(counts.folderTree - baseline.folderTree).toBe(100);
     expect(counts.editor).toBe(baseline.editor);
     expect(counts.library).toBe(baseline.library);
