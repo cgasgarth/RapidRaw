@@ -5026,6 +5026,35 @@
         "mode": "",
         "resetHeight": ""
       },
+      "header": {
+        "advancedScopes": "Wykresy",
+        "dimensions": "{{width}} × {{height}}",
+        "highlights": "Światła",
+        "histogramLabel": "Histogram RGB bieżącego zdjęcia",
+        "openOutput": "Otwórz sterowanie wyjściem",
+        "photo": "Zdjęcie",
+        "proofOff": "Próba wyłączona",
+        "proofOn": "Próba włączona: {{coverage}}",
+        "region": "Histogram i metadane zdjęcia",
+        "resizeAdvanced": "Zmień rozmiar zaawansowanych wykresów",
+        "retry": "Ponów histogram",
+        "shadows": "Cienie",
+        "states": {
+          "current": "Histogram aktualny",
+          "degraded": "Aktualizowanie histogramu tego zdjęcia",
+          "empty": "Wybierz zdjęcie, aby zobaczyć histogram",
+          "error": "Nie udało się wczytać histogramu",
+          "loading": "Tworzenie histogramu…",
+          "unavailable": "Histogram niedostępny dla tego podglądu"
+        },
+        "zones": {
+          "blacks": "Czerń",
+          "exposure": "Ekspozycja",
+          "highlights": "Światła",
+          "shadows": "Cienie",
+          "whites": "Biel"
+        }
+      },
       "scopeStatus": {
         "pending": "",
         "ready": "",

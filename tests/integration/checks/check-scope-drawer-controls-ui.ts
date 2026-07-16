@@ -45,7 +45,8 @@ const { Panel, Theme } = await import('../../../src/components/ui/AppProperties.
 const { useEditorStore } = await import('../../../src/store/useEditorStore.ts');
 const { useUIStore } = await import('../../../src/store/useUIStore.ts');
 const { useSettingsStore } = await import('../../../src/store/useSettingsStore.ts');
-const { DisplayMode, INITIAL_ADJUSTMENTS } = await import('../../../src/utils/adjustments.ts');
+const { DisplayMode } = await import('../../../src/utils/adjustments.ts');
+const { createDefaultEditDocumentV2 } = await import('../../../src/utils/editDocumentV2.ts');
 const { PANEL_SCOPES_HEIGHT } = await import('../../../src/utils/waveformSizing.ts');
 
 await validateLocaleContract();
@@ -71,14 +72,15 @@ async function validateLocaleContract() {
 async function validateScopeDrawerControls() {
   useEditorStore.getState().hydrateEditorRenderAuthority({
     activeWaveformChannel: DisplayMode.Luma,
-    adjustments: { ...INITIAL_ADJUSTMENTS, showClipping: false },
+    editDocumentV2: createDefaultEditDocumentV2(),
     histogram: {
       blue: { color: '#4D96FF', data: [0, 1, 0] },
       green: { color: '#6BCB77', data: [0, 1, 0] },
       luma: { color: '#FFFFFF', data: [0, 1, 0] },
       red: { color: '#FF6B6B', data: [0, 1, 0] },
     },
-    isWaveformVisible: true,
+    showClipping: false,
+    isWaveformVisible: false,
     panelScopesLayout: 'stacked',
     previewScopeStatus: {
       displayTransformLabel: 'Display P3',
@@ -123,6 +125,15 @@ async function validateScopeDrawerControls() {
   assert.equal(strip.getAttribute('data-show-clipping'), 'false');
   assert.equal(strip.getAttribute('data-analytics-state'), 'current');
   assert.equal(strip.getAttribute('data-panel-scopes-height'), String(PANEL_SCOPES_HEIGHT.max));
+  assert.equal(strip.getAttribute('data-state'), 'histogram');
+  assert.ok(getByTestId(rendered.container, 'scope-drawer-under-test-histogram'));
+  assert.ok(getByTestId(rendered.container, 'scope-drawer-under-test-metadata'));
+  assert.equal(rendered.container.querySelector('[data-scope-mode]'), null);
+
+  await click(getByTestId(rendered.container, 'scope-drawer-under-test-expand-toggle'));
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  assert.equal(strip.getAttribute('data-state'), 'advanced-open');
+  assert.ok(getByTestId(rendered.container, 'scope-drawer-under-test-advanced-scopes'));
 
   await click(getByTestId(rendered.container, 'scope-drawer-under-test-mode-parade'));
   assert.equal(useEditorStore.getState().activeWaveformChannel, DisplayMode.Parade);
@@ -132,10 +143,10 @@ async function validateScopeDrawerControls() {
   assert.equal(useEditorStore.getState().activeWaveformChannel, DisplayMode.Vectorscope);
 
   await click(getByTestId(rendered.container, 'scope-drawer-under-test-shadow-clipping-toggle'));
-  assert.equal(useEditorStore.getState().adjustments.showClipping, true);
+  assert.equal(useEditorStore.getState().showClipping, true);
   assert.equal(strip.getAttribute('data-show-clipping'), 'true');
   await click(getByTestId(rendered.container, 'scope-drawer-under-test-highlight-clipping-toggle'));
-  assert.equal(useEditorStore.getState().adjustments.showClipping, false);
+  assert.equal(useEditorStore.getState().showClipping, false);
 
   await click(getByTestId(rendered.container, 'scope-drawer-under-test-layout-toggle'));
   assert.equal(useEditorStore.getState().panelScopesLayout, 'overlay');
@@ -170,11 +181,8 @@ async function validateScopeDrawerControls() {
     }));
     await flushPromises();
   });
-  assert.equal(strip.getAttribute('data-analytics-state'), 'stale');
-  assert.equal(
-    getByTestId(rendered.container, 'scope-drawer-under-test-freshness-status').getAttribute('aria-live'),
-    'polite',
-  );
+  assert.equal(strip.getAttribute('data-analytics-state'), 'degraded');
+  assert.equal(getByTestId(rendered.container, 'scope-drawer-under-test-state').getAttribute('aria-live'), 'polite');
   assert.equal(strip.getAttribute('data-preview-scope-diagnostic-code'), 'preview_scope_stale');
 
   const recoveryRequestId = useEditorStore.getState().previewScopeRecoveryRequestId;
@@ -219,7 +227,7 @@ async function validateScopeDrawerControls() {
     }));
     await flushPromises();
   });
-  assert.equal(strip.getAttribute('data-analytics-state'), 'unsupported');
+  assert.equal(strip.getAttribute('data-analytics-state'), 'unavailable');
   assert.equal(strip.getAttribute('data-preview-scope-diagnostic-code'), 'preview_scope_unsupported');
 
   await act(async () => {
@@ -232,8 +240,8 @@ async function validateScopeDrawerControls() {
 
   await click(getByTestId(rendered.container, 'scope-drawer-under-test-expand-toggle'));
   await new Promise((resolve) => setTimeout(resolve, 250));
-  assert.equal(strip.getAttribute('data-state'), 'collapsed');
-  assert.ok(getByTestId(rendered.container, 'scope-drawer-under-test-summary'));
+  assert.equal(strip.getAttribute('data-state'), 'histogram');
+  assert.ok(getByTestId(rendered.container, 'scope-drawer-under-test-histogram-frame'));
 
   rendered.unmount();
 }

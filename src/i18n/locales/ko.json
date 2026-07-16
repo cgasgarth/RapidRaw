@@ -2069,6 +2069,35 @@
       "reset": "초기화"
     },
     "waveform": {
+      "header": {
+        "advancedScopes": "스코프",
+        "dimensions": "{{width}} × {{height}}",
+        "highlights": "밝은 영역",
+        "histogramLabel": "현재 사진 RGB 히스토그램",
+        "openOutput": "출력 컨트롤 열기",
+        "photo": "사진",
+        "proofOff": "교정 끔",
+        "proofOn": "교정 켬: {{coverage}}",
+        "region": "사진 히스토그램 및 메타데이터",
+        "resizeAdvanced": "고급 스코프 크기 조절",
+        "retry": "히스토그램 다시 시도",
+        "shadows": "어두운 영역",
+        "states": {
+          "current": "히스토그램 최신 상태",
+          "degraded": "이 사진의 히스토그램 업데이트 중",
+          "empty": "히스토그램을 보려면 사진을 선택하세요",
+          "error": "히스토그램을 불러올 수 없습니다",
+          "loading": "히스토그램 생성 중…",
+          "unavailable": "이 미리보기에서는 히스토그램을 사용할 수 없습니다"
+        },
+        "zones": {
+          "blacks": "검정",
+          "exposure": "노출",
+          "highlights": "밝은 영역",
+          "shadows": "어두운 영역",
+          "whites": "흰색"
+        }
+      },
       "tooltips": {
         "hideClipping": "클리핑 경고 숨기기",
         "histogram": "히스토그램",

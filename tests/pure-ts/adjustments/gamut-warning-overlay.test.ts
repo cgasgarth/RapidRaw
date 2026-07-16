@@ -8,6 +8,7 @@ import {
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import {
   formatGamutWarningCoverage,
+  getPreviewHistogramFreshnessStatus,
   getPreviewScopeFreshnessStatus,
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -230,6 +231,26 @@ describe('gamut warning overlay defaults', () => {
     expect(getPreviewScopeFreshnessStatus({ ...currentScope, softProofTransformApplied: false }, imagePath).state).toBe(
       'unsupported',
     );
+    expect(getPreviewHistogramFreshnessStatus({ ...currentScope, waveformReady: false }, imagePath)).toEqual({
+      state: 'current',
+      statusLabel: 'Histogram current',
+    });
+    expect(
+      getPreviewHistogramFreshnessStatus(
+        {
+          ...currentScope,
+          warningCodes: ['preview_scope_error:incomplete_advanced_scopes_receipt'],
+          waveformReady: false,
+        },
+        imagePath,
+      ).state,
+    ).toBe('current');
+    expect(
+      getPreviewHistogramFreshnessStatus(
+        { ...currentScope, warningCodes: ['preview_scope_error:incomplete_histogram_receipt'] },
+        imagePath,
+      ).state,
+    ).toBe('error');
   });
 
   test('falls back to loaded RAW proof dimensions when the overlay is not ready yet', () => {

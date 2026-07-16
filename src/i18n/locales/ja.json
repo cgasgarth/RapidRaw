@@ -4605,6 +4605,35 @@
         "mode": "",
         "resetHeight": ""
       },
+      "header": {
+        "advancedScopes": "スコープ",
+        "dimensions": "{{width}} × {{height}}",
+        "highlights": "ハイライト",
+        "histogramLabel": "現在の写真の RGB ヒストグラム",
+        "openOutput": "出力コントロールを開く",
+        "photo": "写真",
+        "proofOff": "校正オフ",
+        "proofOn": "校正オン: {{coverage}}",
+        "region": "写真のヒストグラムとメタデータ",
+        "resizeAdvanced": "詳細スコープのサイズを変更",
+        "retry": "ヒストグラムを再試行",
+        "shadows": "シャドウ",
+        "states": {
+          "current": "ヒストグラムは最新です",
+          "degraded": "この写真のヒストグラムを更新中",
+          "empty": "写真を選択するとヒストグラムが表示されます",
+          "error": "ヒストグラムを読み込めませんでした",
+          "loading": "ヒストグラムを作成中…",
+          "unavailable": "このプレビューではヒストグラムを利用できません"
+        },
+        "zones": {
+          "blacks": "黒レベル",
+          "exposure": "露光量",
+          "highlights": "ハイライト",
+          "shadows": "シャドウ",
+          "whites": "白レベル"
+        }
+      },
       "scopeStatus": {
         "pending": "",
         "ready": "",

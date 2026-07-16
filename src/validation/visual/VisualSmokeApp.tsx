@@ -56,6 +56,10 @@ import ControlsPanel from '../../components/panel/right/color/ControlsPanel';
 import CropPanel from '../../components/panel/right/color/CropPanel';
 import { EditorRightPanelHost } from '../../components/panel/right/EditorRightPanelHost';
 import ExportPanel from '../../components/panel/right/export/ExportPanel';
+import {
+  type HistogramHeaderState,
+  HistogramHeaderSurface,
+} from '../../components/panel/right/inspector/HistogramHeaderSurface';
 import { MaskOverlayReviewControls } from '../../components/panel/right/layers/MaskOverlayReviewControls';
 import { Mask, type SubMask, SubMaskMode, ToolType } from '../../components/panel/right/layers/Masks';
 import { ObjectPromptControls } from '../../components/panel/right/layers/ObjectPromptControls';
@@ -462,17 +466,41 @@ function useAdjustmentPanelSmokeState() {
       },
       sceneGlobalColorTone: { brightness: 0.42, contrast: 12 },
     });
+    const histogramBins = Array.from({ length: 256 }, (_, index) => {
+      const low = Math.exp(-((index - 52) ** 2) / 580) * 54;
+      const middle = Math.exp(-((index - 132) ** 2) / 1_240) * 96;
+      const high = Math.exp(-((index - 214) ** 2) / 420) * 38;
+      return Math.round(low + middle + high);
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       editDocumentV2,
       copiedSectionAdjustments: {
         payload: copyEditDocumentV2Nodes(editDocumentV2, ['scene_global_color_tone']),
         section: 'basic',
       },
-      histogram: null,
+      histogram: {
+        [ActiveChannel.Blue]: { color: '#5c91ff', data: histogramBins.map((value) => Math.round(value * 0.88)) },
+        [ActiveChannel.Green]: { color: '#66d17a', data: histogramBins.map((value) => Math.round(value * 0.94)) },
+        [ActiveChannel.Luma]: { color: '#d8dde5', data: histogramBins },
+        [ActiveChannel.Red]: { color: '#ff625f', data: histogramBins.map((value) => Math.round(value * 0.82)) },
+      },
       history: [editDocumentV2],
       historyIndex: 0,
       isWaveformVisible: false,
-      previewScopeStatus: null,
+      previewScopeStatus: {
+        displayTransformLabel: 'Display P3',
+        exportProfileLabel: null,
+        exportRenderingIntentLabel: null,
+        histogramReady: true,
+        path: adjustmentsPanelRetuneRawImage.path,
+        renderBasis: 'editor_preview',
+        softProofTransformApplied: false,
+        sourceLabel: 'Edited preview',
+        updatedAt: '2026-07-16T18:00:00.000Z',
+        waveformReady: true,
+        workingTransformLabel: 'Working RGB',
+        warningCodes: [],
+      },
       selectedImage: adjustmentsPanelRetuneRawImage,
       waveform: null,
     });
@@ -514,6 +542,85 @@ function AdjustmentsPanelRetuneVisualSmoke() {
           </ContextMenuProvider>
         </div>
       </section>
+    </main>
+  );
+}
+
+const histogramVisualBins = Array.from({ length: 256 }, (_, index) => {
+  const shadows = Math.exp(-((index - 48) ** 2) / 520) * 44;
+  const midtones = Math.exp(-((index - 128) ** 2) / 1_140) * 98;
+  const highlights = Math.exp(-((index - 216) ** 2) / 460) * 36;
+  return Math.round(shadows + midtones + highlights);
+});
+
+const histogramVisualFixture = {
+  [ActiveChannel.Blue]: { color: '#5c91ff', data: histogramVisualBins.map((value) => Math.round(value * 0.86)) },
+  [ActiveChannel.Green]: { color: '#66d17a', data: histogramVisualBins.map((value) => Math.round(value * 0.95)) },
+  [ActiveChannel.Luma]: { color: '#d8dde5', data: histogramVisualBins },
+  [ActiveChannel.Red]: { color: '#ff625f', data: histogramVisualBins.map((value) => Math.round(value * 0.8)) },
+};
+
+const histogramVisualStates: ReadonlyArray<{ label: string; state: HistogramHeaderState }> = [
+  { label: 'Current · narrow Develop inspector', state: 'current' },
+  { label: 'Loading · neutral pending surface', state: 'loading' },
+  { label: 'Error · actionable retry', state: 'error' },
+  { label: 'Unavailable · bounded fallback', state: 'unavailable' },
+];
+
+function LightroomHistogramStatesVisualSmoke() {
+  return (
+    <main
+      className="min-h-screen bg-editor-matte p-4 font-sans text-text-primary max-[520px]:p-2"
+      data-visual-smoke-mode={VISUAL_SMOKE_SCENARIO_IDS.LightroomHistogramStates}
+      data-visual-smoke-ready="true"
+    >
+      <div className="grid grid-cols-4 items-start gap-3 max-[1100px]:grid-cols-2 max-[520px]:grid-cols-1 max-[520px]:gap-2">
+        {histogramVisualStates.map(({ label, state }, index) => (
+          <section
+            className={cx(
+              'mx-auto w-full overflow-hidden rounded border border-editor-border bg-editor-panel shadow-lg',
+              index === 0 ? 'max-w-[250px]' : 'max-w-[360px]',
+            )}
+            data-analytics-state={state}
+            data-histogram-visual-state={state}
+            data-state="histogram"
+            data-visual-smoke-section={`lightroom-histogram-${state}`}
+            key={state}
+          >
+            <div className="border-b border-editor-border px-2 py-1 text-[10px] font-semibold text-text-secondary max-[520px]:sr-only">
+              {label}
+            </div>
+            <HistogramHeaderSurface
+              analyticsState={state}
+              clippingEnabled={false}
+              clippingLabel="Show clipping"
+              clippingSummary={state === 'current' ? { highlightPercent: 0.4, shadowPercent: 0.8 } : null}
+              histogram={histogramVisualFixture}
+              hoverSample={null}
+              isAdvancedOpen={false}
+              onHoverSample={() => {}}
+              onRetry={() => {}}
+              onToggleAdvanced={() => {}}
+              onToggleClipping={() => {}}
+              photoIdentity="SONY ILCE-1"
+              photoSettings="35 mm · 1/250 s · f/2.8 · ISO 100"
+              retryDisabled={state !== 'error'}
+              retryLabel="Retry histogram"
+              stateLabel={
+                state === 'current'
+                  ? 'Histogram current'
+                  : state === 'loading'
+                    ? 'Building histogram…'
+                    : state === 'error'
+                      ? 'Histogram could not be loaded'
+                      : 'Histogram unavailable for this preview'
+              }
+              testId={`lightroom-histogram-${state}`}
+              zoneLabel={null}
+            />
+          </section>
+        ))}
+      </div>
     </main>
   );
 }
@@ -2353,6 +2460,7 @@ const visualSmokeComponents = {
   [VISUAL_SMOKE_SCENARIO_IDS.LayerMaskPrivateRawUi]: LayerMaskPrivateRawVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LayerStackWorkflow]: LayerStackWorkflowVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LensCorrectionSession]: LensCorrectionSessionVisualSmoke,
+  [VISUAL_SMOKE_SCENARIO_IDS.LightroomHistogramStates]: LightroomHistogramStatesVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.NavigatorPreviewArtifact]: NavigatorPreviewArtifactVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.TransformPreviewSession]: TransformPreviewSessionVisualSmoke,
   [VISUAL_SMOKE_SCENARIO_IDS.LibraryWorkflow]: LibraryWorkflowVisualSmoke,

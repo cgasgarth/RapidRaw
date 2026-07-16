@@ -54,6 +54,8 @@ const clearUpdate = (): PreviewAnalyticsUpdate => ({
   waveform: null,
 });
 
+const ANALYTICS_ADVANCED_SCOPE_PRODUCTS = (1 << 2) | (1 << 3) | (1 << 4);
+
 /** Owns analytics listener lifetime, exact artifact presentation binding, and coordinator publication effects. */
 export class PreviewAnalyticsEffectRunner {
   private active = false;
@@ -208,9 +210,10 @@ export class PreviewAnalyticsEffectRunner {
       result.histogram.green.length > 0 &&
       result.histogram.luma.length > 0 &&
       result.histogram.red.length > 0;
+    const advancedScopesRequested = (result.requestedProducts & ANALYTICS_ADVANCED_SCOPE_PRODUCTS) !== 0;
     const terminalError = !histogramComplete
       ? 'Analytics completed without a nonempty histogram.'
-      : !scopesComplete
+      : advancedScopesRequested && !scopesComplete
         ? 'Analytics completed without all current preview scopes.'
         : null;
     this.options.publish({
@@ -229,7 +232,13 @@ export class PreviewAnalyticsEffectRunner {
         updatedAt: (this.options.now?.() ?? new Date()).toISOString(),
         waveformReady: scopesComplete,
         warningCodes: [
-          ...(terminalError === null ? [] : ['preview_scope_error:incomplete_analytics_receipt']),
+          ...(terminalError === null
+            ? []
+            : [
+                histogramComplete
+                  ? 'preview_scope_error:incomplete_advanced_scopes_receipt'
+                  : 'preview_scope_error:incomplete_histogram_receipt',
+              ]),
           ...(exportPreview
             ? [
                 transform.transformApplied ? 'export_profile_transform_applied' : 'export_profile_transform_missing',

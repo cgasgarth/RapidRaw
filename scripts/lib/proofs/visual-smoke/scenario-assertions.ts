@@ -320,8 +320,6 @@ export async function assertAdjustmentsPanelRetune(page) {
     throw new Error(`Adjustments panel retune expected no Color section, found ${colorSectionCount}.`);
   }
 
-  await assertAdjustmentSectionHeaderActions(page, panel);
-
   await panel.locator('[role="status"][aria-label$="edited" i]').first().waitFor({ timeout: 10_000 });
   await panel.getByText('Off', { exact: true }).first().waitFor({ timeout: 10_000 });
 
@@ -329,12 +327,13 @@ export async function assertAdjustmentsPanelRetune(page) {
     throw new Error('The Adjust inspector should not render RAW processing diagnostics.');
   }
 
-  const scopesStrip = await waitForScopesStripState(page, 'adjustments-analytics-header', 'collapsed');
+  const scopesStrip = await waitForScopesStripState(page, 'adjustments-analytics-header', 'histogram');
+  await assertCompactHistogramHeader(scopesStrip, 'Adjustments');
 
   await panel.getByTestId('adjustments-analytics-header-expand-toggle').click();
   await scopesStrip.waitFor({ state: 'visible', timeout: 10_000 });
   const openState = await scopesStrip.getAttribute('data-state');
-  if (openState !== 'open') {
+  if (openState !== 'advanced-open') {
     throw new Error(`Adjustments scopes strip did not open from the shared header action, got ${openState}.`);
   }
   await assertCompactOpenScopesStrip(scopesStrip, 'Adjustments');
@@ -350,6 +349,80 @@ export async function assertAdjustmentsPanelRetune(page) {
     'adjustments-analytics-header-expand-toggle',
     'Adjustments',
   );
+
+  await panel.getByTestId('adjustments-analytics-header-expand-toggle').click();
+  await waitForScopesStripState(page, 'adjustments-analytics-header', 'histogram');
+  await assertAdjustmentSectionHeaderActions(page, panel);
+  await page.evaluate(async () => {
+    const { useEditorStore } = await import(['/src/store', 'useEditorStore.ts'].join('/'));
+    const state = useEditorStore.getState();
+    if (state.selectedImage === null || state.histogram === null) {
+      throw new Error('Visual histogram authority fixture was lost during interaction proof.');
+    }
+    state.hydrateEditorRenderAuthority({
+      editDocumentV2: state.editDocumentV2,
+      histogram: state.histogram,
+      history: state.history,
+      historyIndex: state.historyIndex,
+      showClipping: false,
+      previewScopeStatus: {
+        displayTransformLabel: 'Display P3',
+        exportProfileLabel: null,
+        exportRenderingIntentLabel: null,
+        histogramReady: true,
+        path: state.selectedImage.path,
+        renderBasis: 'editor_preview',
+        softProofTransformApplied: false,
+        sourceLabel: 'Edited preview',
+        updatedAt: '2026-07-16T18:00:00.000Z',
+        waveformReady: true,
+        workingTransformLabel: 'Working RGB',
+        warningCodes: [],
+      },
+      selectedImage: state.selectedImage,
+    });
+  });
+  await assertCompactHistogramHeader(scopesStrip, 'Adjustments');
+}
+
+export async function assertLightroomHistogramStates(page) {
+  for (const state of ['current', 'loading', 'error', 'unavailable']) {
+    const card = page.locator(`[data-histogram-visual-state="${state}"]`);
+    const header = card;
+    await card.waitFor({ timeout: 10_000 });
+    if ((await header.getAttribute('data-analytics-state')) !== state) {
+      throw new Error(`Histogram state fixture ${state} did not preserve its bounded state.`);
+    }
+    if ((await header.getAttribute('data-state')) !== 'histogram') {
+      throw new Error(`Histogram state fixture ${state} exposed advanced scopes by default.`);
+    }
+    const frame = header.getByTestId(`lightroom-histogram-${state}-histogram-frame`);
+    const [cardBounds, frameBounds] = await Promise.all([card.boundingBox(), frame.boundingBox()]);
+    if (!cardBounds || !frameBounds || frameBounds.width > cardBounds.width || frameBounds.height !== 128) {
+      throw new Error(
+        `Histogram state fixture ${state} overflowed or lost its compact plot height: ${JSON.stringify({ cardBounds, frameBounds })}.`,
+      );
+    }
+    const histogramCount = await header.getByTestId(`lightroom-histogram-${state}-histogram`).count();
+    if (histogramCount !== (state === 'current' ? 1 : 0)) {
+      throw new Error(`Histogram state fixture ${state} fabricated or omitted histogram pixels.`);
+    }
+  }
+
+  const narrow = page.locator('[data-histogram-visual-state="current"]');
+  const narrowBounds = await narrow.boundingBox();
+  if (!narrowBounds || narrowBounds.width > 250) {
+    throw new Error(`Narrow Develop histogram exceeded 250px: ${narrowBounds?.width ?? 'none'}.`);
+  }
+  const loading = page.getByTestId('lightroom-histogram-loading');
+  if ((await loading.locator('.animate-spin').count()) !== 0) {
+    throw new Error('Loading histogram snapshot retained nondeterministic animation.');
+  }
+  const errorRetry = page.getByTestId('lightroom-histogram-error-recover-scopes');
+  if (await errorRetry.isDisabled()) throw new Error('Histogram error snapshot did not expose an actionable retry.');
+  if ((await page.getByTestId('lightroom-histogram-unavailable-recover-scopes').count()) !== 0) {
+    throw new Error('Unavailable histogram snapshot exposed an invalid retry action.');
+  }
 }
 
 export async function assertProfessionalAdjustmentsCompactSearchShelf(page) {
@@ -461,6 +534,13 @@ async function assertAdjustmentSectionHeaderActions(page, panel) {
   await page.keyboard.press('Shift+F10');
   await page.getByRole('menuitem', { name: 'Reset Light Settings' }).first().waitFor({ timeout: 10_000 });
   await page.keyboard.press('Escape');
+  await page.getByRole('menu').waitFor({ state: 'hidden', timeout: 10_000 });
+
+  const resetEndpoints = section.getByRole('button', { name: 'Reset endpoints' });
+  if ((await resetEndpoints.count()) > 0) {
+    await resetEndpoints.click();
+    await resetEndpoints.waitFor({ state: 'hidden', timeout: 10_000 });
+  }
 }
 
 async function waitForScopesStripState(page, testId, expectedState) {
@@ -482,7 +562,9 @@ async function assertCompactOpenScopesStrip(strip, label) {
   await strip
     .page()
     .waitForFunction(
-      ({ testId }) => (document.querySelector(`[data-testid="${testId}"]`)?.getBoundingClientRect().height ?? 0) >= 180,
+      ({ testId }) =>
+        (document.querySelector(`[data-testid="${testId}-advanced-scopes"]`)?.getBoundingClientRect().height ?? 0) >=
+        160,
       { testId },
       { timeout: 10_000 },
     );
@@ -490,8 +572,37 @@ async function assertCompactOpenScopesStrip(strip, label) {
   if (!bounds) {
     throw new Error(`${label} scopes strip should be visible when open.`);
   }
-  if (bounds.height < 180 || bounds.height > 260) {
-    throw new Error(`${label} scopes strip should use compact default height, got ${bounds.height}.`);
+  if (bounds.height < 320 || bounds.height > 540) {
+    throw new Error(`${label} histogram plus advanced scopes should stay bounded, got ${bounds.height}.`);
+  }
+}
+
+async function assertCompactHistogramHeader(strip, label) {
+  await strip.waitFor({ state: 'visible', timeout: 10_000 });
+  const testId = await strip.getAttribute('data-testid');
+  if (!testId) throw new Error(`${label} histogram should expose a data-testid.`);
+  const histogram = strip.page().getByTestId(`${testId}-histogram`);
+  if ((await histogram.count()) !== 1) {
+    const authority = await strip.page().evaluate(async () => {
+      const { useEditorStore } = await import(['/src/store', 'useEditorStore.ts'].join('/'));
+      const state = useEditorStore.getState();
+      return {
+        histogram: state.histogram !== null,
+        previewScopeStatus: state.previewScopeStatus,
+        selectedImage: state.selectedImage?.path ?? null,
+      };
+    });
+    throw new Error(
+      `${label} histogram fixture did not render current data: state=${await strip.getAttribute('data-analytics-state')}, freshness=${await strip.getAttribute('data-preview-scope-freshness')}, authority=${JSON.stringify(authority)}.`,
+    );
+  }
+  await histogram.waitFor({ state: 'visible', timeout: 10_000 });
+  const bounds = await strip.boundingBox();
+  if (!bounds || bounds.height < 150 || bounds.height > 220) {
+    throw new Error(`${label} compact histogram header should be 150-220px tall, got ${bounds?.height ?? 'none'}.`);
+  }
+  if ((await strip.getAttribute('data-analytics-state')) !== 'current') {
+    throw new Error(`${label} visual fixture should expose a current histogram.`);
   }
 }
 
@@ -507,7 +618,7 @@ async function assertPanelScopesStripControls(page, panel, strip, toggleTestId, 
     throw new Error(`${label} analytics header should expose a data-testid for scoped controls.`);
   }
 
-  const content = panel.locator(`#${stripTestId}-content`);
+  const content = panel.locator(`#${stripTestId}-advanced-scopes`);
   await content.waitFor({ state: 'visible', timeout: 10_000 });
   const minHeight = Number(await content.getAttribute('data-min-height'));
   const maxHeight = Number(await content.getAttribute('data-max-height'));
@@ -627,10 +738,10 @@ export async function assertWorkflowRailSharedScopes(page) {
   await page.getByTestId('color-workspace-panel').getByRole('heading', { exact: true, name: 'Color' }).waitFor({
     timeout: 10_000,
   });
-  await waitForScopesStripState(page, 'color-analytics-header', 'collapsed');
+  await waitForScopesStripState(page, 'color-analytics-header', 'histogram');
 
   await page.getByTestId('color-analytics-header-expand-toggle').click();
-  const openColorStrip = await waitForScopesStripState(page, 'color-analytics-header', 'open');
+  const openColorStrip = await waitForScopesStripState(page, 'color-analytics-header', 'advanced-open');
   await assertCompactOpenScopesStrip(openColorStrip, 'Color workspace');
   await assertPanelScopesStripControls(
     page,
@@ -641,14 +752,14 @@ export async function assertWorkflowRailSharedScopes(page) {
   );
 
   await page.getByRole('button', { name: 'Adjust' }).first().click();
-  const openAdjustmentsStrip = await waitForScopesStripState(page, 'adjustments-analytics-header', 'open');
+  const openAdjustmentsStrip = await waitForScopesStripState(page, 'adjustments-analytics-header', 'advanced-open');
   await assertCompactOpenScopesStrip(openAdjustmentsStrip, 'Adjustments panel');
 
   await page.getByTestId('adjustments-analytics-header-expand-toggle').click();
-  await waitForScopesStripState(page, 'adjustments-analytics-header', 'collapsed');
+  await waitForScopesStripState(page, 'adjustments-analytics-header', 'histogram');
 
   await page.getByRole('button', { name: 'Color' }).first().click();
-  await waitForScopesStripState(page, 'color-analytics-header', 'collapsed');
+  await waitForScopesStripState(page, 'color-analytics-header', 'histogram');
 }
 
 async function assertProfessionalCropTransformWorkspace(page) {
@@ -967,6 +1078,11 @@ async function assertEditorParityContractFixture(page) {
 }
 
 export async function prepareScenario(page, mode) {
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.LightroomHistogramStates) {
+    await assertLightroomHistogramStates(page);
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalCanvasOverlays) {
     const section = page.locator('[data-visual-smoke-section="professional-canvas-retouch-remove"]');
     let handles = section.getByTestId('image-canvas-retouch-handles');

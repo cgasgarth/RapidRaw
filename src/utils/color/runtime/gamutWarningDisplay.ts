@@ -314,6 +314,37 @@ export const getPreviewScopeFreshnessStatus = (
   return { state: 'current', statusLabel: 'Scopes current' };
 };
 
+export const getPreviewHistogramFreshnessStatus = (
+  previewScopeStatus: PreviewScopeFreshnessInput | null,
+  selectedImagePath: string | null,
+): PreviewScopeFreshnessStatus => {
+  if (previewScopeStatus === null) {
+    return { state: 'unavailable', statusLabel: 'Histogram unavailable' };
+  }
+
+  if (
+    previewScopeStatus.warningCodes?.some(
+      (code) => /error|fail/iu.test(code) && !code.includes('incomplete_advanced_scopes'),
+    )
+  ) {
+    return { state: 'error', statusLabel: 'Histogram error' };
+  }
+
+  if (previewScopeStatus.renderBasis === 'export_preview' && !previewScopeStatus.softProofTransformApplied) {
+    return { state: 'unsupported', statusLabel: 'Soft proof histogram unsupported' };
+  }
+
+  if (previewScopeStatus.path !== selectedImagePath) {
+    return { state: 'stale', statusLabel: 'Histogram stale' };
+  }
+
+  if (!previewScopeStatus.histogramReady) {
+    return { state: 'unavailable', statusLabel: 'Histogram updating' };
+  }
+
+  return { state: 'current', statusLabel: 'Histogram current' };
+};
+
 const shortHash = (value: string | null | undefined): string | null => {
   if (!value) return null;
   const match = /^sha256:([a-f0-9]{64})$/u.exec(value);

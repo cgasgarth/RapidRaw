@@ -4781,6 +4781,35 @@
         "mode": "",
         "resetHeight": ""
       },
+      "header": {
+        "advancedScopes": "Oscilloscopi",
+        "dimensions": "{{width}} × {{height}}",
+        "highlights": "Luci",
+        "histogramLabel": "Istogramma RGB della foto corrente",
+        "openOutput": "Apri controlli output",
+        "photo": "Foto",
+        "proofOff": "Prova disattivata",
+        "proofOn": "Prova attivata: {{coverage}}",
+        "region": "Istogramma e metadati foto",
+        "resizeAdvanced": "Ridimensiona oscilloscopi avanzati",
+        "retry": "Riprova istogramma",
+        "shadows": "Ombre",
+        "states": {
+          "current": "Istogramma aggiornato",
+          "degraded": "Aggiornamento istogramma per questa foto",
+          "empty": "Seleziona una foto per vederne l’istogramma",
+          "error": "Impossibile caricare l’istogramma",
+          "loading": "Creazione istogramma…",
+          "unavailable": "Istogramma non disponibile per questa anteprima"
+        },
+        "zones": {
+          "blacks": "Neri",
+          "exposure": "Esposizione",
+          "highlights": "Luci",
+          "shadows": "Ombre",
+          "whites": "Bianchi"
+        }
+      },
       "scopeStatus": {
         "pending": "",
         "ready": "",

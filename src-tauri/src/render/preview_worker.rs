@@ -153,13 +153,15 @@ fn hash_revision_for_frontend(revision: &str) -> u64 {
 }
 
 fn requested_products(compute_waveform: bool) -> Option<AnalyticsProducts> {
-    compute_waveform.then_some(
+    Some(if compute_waveform {
         AnalyticsProducts::HISTOGRAM
             | AnalyticsProducts::GAMUT_MASK
             | AnalyticsProducts::WAVEFORM
             | AnalyticsProducts::PARADE
-            | AnalyticsProducts::VECTORSCOPE,
-    )
+            | AnalyticsProducts::VECTORSCOPE
+    } else {
+        AnalyticsProducts::HISTOGRAM
+    })
 }
 
 pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8>, String> {
@@ -960,14 +962,15 @@ mod tests {
     }
 
     #[test]
-    fn visible_scopes_request_every_product_from_one_rendered_frame() {
+    fn histogram_is_always_requested_and_visible_scopes_request_every_product() {
         let products = requested_products(true).expect("visible scope request");
         assert!(products.contains(AnalyticsProducts::HISTOGRAM));
         assert!(products.contains(AnalyticsProducts::GAMUT_MASK));
         assert!(products.contains(AnalyticsProducts::WAVEFORM));
         assert!(products.contains(AnalyticsProducts::PARADE));
         assert!(products.contains(AnalyticsProducts::VECTORSCOPE));
-        assert_eq!(requested_products(false), None);
+        let histogram = requested_products(false).expect("always-visible histogram request");
+        assert_eq!(histogram, AnalyticsProducts::HISTOGRAM);
     }
 
     #[test]
