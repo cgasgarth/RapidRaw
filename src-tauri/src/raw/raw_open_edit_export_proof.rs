@@ -19,6 +19,7 @@ use crate::color::view_transform::{
 use crate::export::export_processing::{
     ExportColorProfile, ExportReceiptMetadata, ExportRenderingIntent, ExportSettings,
     export_jpeg_rgb_pixels_and_profile, export_soft_proof_rgb_pixels_and_profile_with_policy,
+    process_image_for_export_pipeline_with_film_tap,
     process_image_for_export_pipeline_with_tonemapper_override, save_image_with_metadata,
 };
 use crate::formats::is_raw_file;
@@ -30,6 +31,7 @@ use crate::image_processing::{
 use crate::raw::color_graph_trace::{
     ColorGraphTrace, ColorGraphTraceInputs, build_color_graph_trace,
 };
+use crate::render::film_emulation::FilmEmulationNodeV1;
 use crate::render_plan::{CompileRenderPlanContext, compile_render_plan, content_revision};
 
 #[derive(Debug, Deserialize)]
@@ -329,6 +331,9 @@ pub struct RawOpenEditExportProofReport {
     pub edit_graph_revision: String,
     pub fixture_id: String,
     pub final_file: RawOpenEditExportFinalFileProof,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub film_runtime_proof_receipt:
+        Option<crate::render::film_runtime_proof::FilmRuntimeProofReceiptV1>,
     pub graph_trace: ColorGraphTrace,
     pub generated_at: String,
     pub metrics: Vec<RawOpenEditExportProofMetric>,
@@ -374,7 +379,12 @@ fn run_raw_open_edit_export_proof_with_context(
     let source_path = resolve_private_relative(&source_root, &request.source_relative_path)?;
     let artifact_dir = resolve_private_relative(&private_root, &request.artifact_dir_relative)?;
     fs::create_dir_all(&artifact_dir).map_err(|error| error.to_string())?;
-    let adjustments = edit_command_adjustments(&request.edit_command)?;
+    let mut adjustments = edit_command_adjustments(&request.edit_command)?;
+    adjustments
+        .as_object_mut()
+        .ok_or_else(|| "proof adjustments must be an object".to_string())?
+        .entry("whiteBalanceTechnical")
+        .or_insert_with(crate::color::white_balance::default_technical_white_balance_json);
 
     let source_hash_before = sha256_file(&source_path)?;
     let source_bytes = fs::read(&source_path).map_err(|error| error.to_string())?;
@@ -390,7 +400,9 @@ fn run_raw_open_edit_export_proof_with_context(
     let raw_development = raw_development
         .ok_or_else(|| "RAW graph trace requires a RawDevelopmentReport".to_string())?;
 
-    let empty_adjustments = json!({});
+    let empty_adjustments = json!({
+        "whiteBalanceTechnical": crate::color::white_balance::default_technical_white_balance_json()
+    });
     let is_raw = is_raw_file(&source_path_string);
     let tm_override = tonemapper_override_for_proof(&request.edit_command.color_pipeline)
         .or_else(|| resolve_tonemapper_override(settings, is_raw));
@@ -407,32 +419,73 @@ fn run_raw_open_edit_export_proof_with_context(
         &[],
     )?;
     let preview_started = Instant::now();
-    let preview_after = process_image_for_export_pipeline_with_tonemapper_override(
-        &source_path_string,
-        &base_image,
-        &adjustments,
-        context,
-        state,
-        is_raw,
-        crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_string),
-        "raw_open_edit_export_preview_after",
-        tm_override,
-        &[],
-    )?;
+    let film_proof_requested = adjustments
+        .get("filmEmulation")
+        .is_some_and(|node| !node.is_null());
+    let (preview_after, preview_film_tap) = if film_proof_requested {
+        let (image, receipt) = process_image_for_export_pipeline_with_film_tap(
+            &source_path_string,
+            &base_image,
+            &adjustments,
+            context,
+            state,
+            is_raw,
+            crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_string),
+            "raw_open_edit_export_preview_after",
+            tm_override,
+            &[],
+        )?;
+        (image, Some(receipt))
+    } else {
+        (
+            process_image_for_export_pipeline_with_tonemapper_override(
+                &source_path_string,
+                &base_image,
+                &adjustments,
+                context,
+                state,
+                is_raw,
+                crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_string),
+                "raw_open_edit_export_preview_after",
+                tm_override,
+                &[],
+            )?,
+            None,
+        )
+    };
     let preview_elapsed_ms = preview_started.elapsed().as_secs_f64() * 1_000.0;
     let export_started = Instant::now();
-    let export_after = process_image_for_export_pipeline_with_tonemapper_override(
-        &source_path_string,
-        &base_image,
-        &adjustments,
-        context,
-        state,
-        is_raw,
-        crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_string),
-        "raw_open_edit_export_export_after",
-        tm_override,
-        &[],
-    )?;
+    let (export_after, export_film_tap) = if film_proof_requested {
+        let (image, receipt) = process_image_for_export_pipeline_with_film_tap(
+            &source_path_string,
+            &base_image,
+            &adjustments,
+            context,
+            state,
+            is_raw,
+            crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_string),
+            "raw_open_edit_export_export_after",
+            tm_override,
+            &[],
+        )?;
+        (image, Some(receipt))
+    } else {
+        (
+            process_image_for_export_pipeline_with_tonemapper_override(
+                &source_path_string,
+                &base_image,
+                &adjustments,
+                context,
+                state,
+                is_raw,
+                crate::gpu_processing::PreGpuImageIdentity::source_revision(&source_path_string),
+                "raw_open_edit_export_export_after",
+                tm_override,
+                &[],
+            )?,
+            None,
+        )
+    };
     let export_elapsed_ms = export_started.elapsed().as_secs_f64() * 1_000.0;
     let source_revision =
         crate::render::artifact_identity::source_fingerprint_for_path(&source_path_string);
@@ -614,25 +667,37 @@ fn run_raw_open_edit_export_proof_with_context(
         .pointer("/rawOpenEditExportProof/editGraphRevision")
         .and_then(Value::as_str)
         == Some(request.edit_command.expected_graph_revision.as_str());
+    let save_reopen_film_node_hash_equal = if let Some(node) = adjustments.get("filmEmulation") {
+        reloaded_sidecar_json
+            .pointer("/adjustments/filmEmulation")
+            .map(|saved_node| {
+                Ok::<_, String>(sha256_serialized(saved_node)? == sha256_serialized(node)?)
+            })
+            .transpose()?
+            .unwrap_or(false)
+    } else {
+        true
+    };
     let source_hash_after = sha256_file(&source_path)?;
     let source_hash_unchanged = source_hash_before == source_hash_after;
 
     let source_raw = hashed_path(
         private_source_evidence_path(&request.source_relative_path)?,
-        source_hash_before,
+        source_hash_before.clone(),
     );
     let preview_before_path = hash_relative_path(&private_root, &preview_before_relative)?;
     let preview_after_path = hash_relative_path(&private_root, &preview_after_relative)?;
     let sidecar_after_path = hash_relative_path(&private_root, &sidecar_after_relative)?;
+    let export_after_artifact = hashed_artifact(
+        &private_root,
+        "export_after_private",
+        &export_after_relative,
+    )?;
     let mut artifacts = vec![
         artifact("source_raw_private", &source_raw),
         artifact("preview_before_private", &preview_before_path),
         artifact("preview_after_private", &preview_after_path),
-        hashed_artifact(
-            &private_root,
-            "export_after_private",
-            &export_after_relative,
-        )?,
+        export_after_artifact.clone(),
         hashed_artifact(
             &private_root,
             "soft_proof_after_private",
@@ -640,6 +705,22 @@ fn run_raw_open_edit_export_proof_with_context(
         )?,
         artifact("sidecar_after_private", &sidecar_after_path),
     ];
+
+    let film_runtime_proof_receipt = build_film_runtime_proof_receipt(
+        &request,
+        &adjustments,
+        &raw_development,
+        preview_film_tap.as_ref(),
+        export_film_tap.as_ref(),
+        &source_hash_before,
+        &preview_after_path.hash,
+        &export_after_artifact.hash,
+        &final_file,
+        changed_pixel_ratio,
+        preview_export_mean_abs_delta,
+        source_hash_unchanged,
+        save_reopen_film_node_hash_equal,
+    )?;
 
     let report_id = raw_open_edit_export_report_id(&request.fixture_id);
     let mut report = RawOpenEditExportProofReport {
@@ -649,6 +730,7 @@ fn run_raw_open_edit_export_proof_with_context(
         edit_graph_revision: request.edit_command.expected_graph_revision,
         fixture_id: request.fixture_id,
         final_file: final_file.clone(),
+        film_runtime_proof_receipt,
         graph_trace,
         generated_at: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
         metrics: vec![
@@ -833,6 +915,126 @@ fn run_raw_open_edit_export_proof_with_context(
     Ok(report)
 }
 
+#[allow(clippy::too_many_arguments)]
+fn build_film_runtime_proof_receipt(
+    request: &RawOpenEditExportProofRequest,
+    adjustments: &Value,
+    raw_development: &crate::raw_processing::RawDevelopmentReport,
+    preview_tap: Option<&crate::gpu_processing::GpuPostFilmTapReceiptV1>,
+    export_tap: Option<&crate::gpu_processing::GpuPostFilmTapReceiptV1>,
+    source_content_sha256: &str,
+    preview_artifact_sha256: &str,
+    export_artifact_sha256: &str,
+    final_file: &RawOpenEditExportFinalFileProof,
+    changed_pixel_ratio: f64,
+    preview_export_mean_abs_delta: f64,
+    source_hash_unchanged: bool,
+    save_reopen_film_node_hash_equal: bool,
+) -> Result<Option<crate::render::film_runtime_proof::FilmRuntimeProofReceiptV1>, String> {
+    let Some(film_node_value) = adjustments.get("filmEmulation") else {
+        return Ok(None);
+    };
+    if film_node_value.is_null() {
+        return Ok(None);
+    }
+
+    let film_node: FilmEmulationNodeV1 = serde_json::from_value(film_node_value.clone())
+        .map_err(|_| "film_runtime_proof_invalid_film_node".to_string())?;
+    film_node.validate().map_err(str::to_string)?;
+    let (input_profile_id, input_profile_sha256) =
+        if let Some(profile) = raw_development.selected_camera_profile.as_ref() {
+            (profile.profile_name.clone(), profile.profile_sha256.clone())
+        } else if let Some(transform) = raw_development.input_transform.as_ref() {
+            (
+                transform.camera_make_model_id.clone(),
+                sha256_serialized(transform)?,
+            )
+        } else {
+            return Err("film_runtime_proof_missing_input_profile_receipt".to_string());
+        };
+
+    let preview_tap =
+        preview_tap.ok_or_else(|| "film_runtime_proof_missing_preview_gpu_tap".to_string())?;
+    let export_tap =
+        export_tap.ok_or_else(|| "film_runtime_proof_missing_export_gpu_tap".to_string())?;
+    if preview_tap.contract != "rapidraw.gpu_post_film_tap.v1"
+        || export_tap.contract != preview_tap.contract
+        || preview_tap.backend != "gpu"
+        || export_tap.backend != preview_tap.backend
+        || preview_tap.implementation_id != "film_emulation_wgsl_v1"
+        || export_tap.implementation_id != preview_tap.implementation_id
+        || preview_tap.compiled_profile_sha256 != export_tap.compiled_profile_sha256
+        || preview_tap.execution_plan_sha256 != export_tap.execution_plan_sha256
+        || preview_tap.compiled_edit_graph_fingerprint != export_tap.compiled_edit_graph_fingerprint
+        || preview_tap.execution_abi_fingerprint != export_tap.execution_abi_fingerprint
+        || preview_tap.wgpu_execution_fingerprint != export_tap.wgpu_execution_fingerprint
+        || preview_tap.graph_fingerprint != export_tap.graph_fingerprint
+        || preview_tap.phase_dispatch_count != export_tap.phase_dispatch_count
+        || preview_tap.compiled_edit_graph_fingerprint == 0
+        || preview_tap.execution_abi_fingerprint == 0
+        || preview_tap.wgpu_execution_fingerprint == 0
+        || preview_tap.graph_fingerprint == 0
+        || preview_tap.phase_dispatch_count == 0
+    {
+        return Err("film_runtime_proof_gpu_execution_identity_mismatch".to_string());
+    }
+    let post_film_pre_view_hash_equal = preview_tap.post_film_sha256 == export_tap.post_film_sha256;
+    let film_node_sha256 = sha256_serialized(&film_node)?;
+    let raw_decode_receipt_sha256 = sha256_serialized(raw_development)?;
+    let color_sync_display_profile_sha256 = crate::display_profile::active_display_profile()
+        .ok()
+        .and_then(|profile| profile.icc_sha256);
+    let limitation_codes = if color_sync_display_profile_sha256.is_some() {
+        Vec::new()
+    } else {
+        vec!["display_transform_unverified".to_string()]
+    };
+
+    let receipt = crate::render::film_runtime_proof::FilmRuntimeProofReceiptV1 {
+        contract: "rapidraw.film_runtime_proof.v1".to_string(),
+        proof_level: "native_private_raw_preview_export".to_string(),
+        source_content_sha256: source_content_sha256.to_string(),
+        raw_decode_receipt_sha256,
+        input_profile_id,
+        input_profile_sha256,
+        working_space: "acescg_linear_v1".to_string(),
+        film_profile_ref: film_node.profile_ref.clone(),
+        film_profile_content_sha256: film_node.profile_ref.content_sha256.clone(),
+        film_node_sha256,
+        compiled_profile_sha256: preview_tap.compiled_profile_sha256.clone(),
+        execution_plan_sha256: preview_tap.execution_plan_sha256.clone(),
+        backend: preview_tap.backend.to_string(),
+        quality: "export_full_v1".to_string(),
+        post_film_pre_view_sha256: preview_tap.post_film_sha256.clone(),
+        view_transform_id: request
+            .edit_command
+            .color_pipeline
+            .scene_to_display_transform
+            .clone(),
+        gamut_mapper_id: ACTIVE_SRGB_OKLAB_CHROMA_REDUCE.to_string(),
+        display_or_output_profile_sha256: final_file.embedded_icc_profile_hash.clone(),
+        color_sync_display_profile_sha256,
+        preview_artifact_sha256: preview_artifact_sha256.to_string(),
+        export_artifact_sha256: export_artifact_sha256.to_string(),
+        preview_export_metrics: crate::render::film_runtime_proof::FilmRuntimeProofMetricsV1 {
+            changed_pixel_ratio: changed_pixel_ratio as f32,
+            preview_export_mean_abs_delta: preview_export_mean_abs_delta as f32,
+            post_film_pre_view_hash_equal,
+            source_hash_unchanged,
+            save_reopen_film_node_hash_equal,
+        },
+        limitation_codes,
+    };
+    crate::render::film_runtime_proof::validate_receipt(&receipt).map_err(str::to_string)?;
+    Ok(Some(receipt))
+}
+
+fn sha256_serialized(value: &impl Serialize) -> Result<String, String> {
+    serde_json::to_vec(value)
+        .map(|bytes| sha256_bytes(&bytes))
+        .map_err(|error| error.to_string())
+}
+
 fn inspect_final_tiff_export(
     output_path: &Path,
     color_profile: &ExportColorProfile,
@@ -976,7 +1178,10 @@ fn film_emulation_adjustments(parameters: &Value) -> Result<Value, String> {
     let node = crate::render::film_emulation::apply_operation_to_node(None, &parameters.operation)
         .map_err(str::to_string)?
         .ok_or_else(|| "film proof command must produce an enabled Film node.".to_string())?;
-    Ok(json!({ "filmEmulation": node }))
+    Ok(json!({
+        "rawEngineEditGraphVersion": crate::edit_graph::SCENE_REFERRED_PIPELINE_VERSION,
+        "filmEmulation": node,
+    }))
 }
 
 fn white_balance_adjustments(parameters: &Value) -> Result<Value, String> {
@@ -2270,6 +2475,7 @@ mod tests {
                         .to_string(),
                 writer_id: "export_processing::save_image_with_metadata".to_string(),
             },
+            film_runtime_proof_receipt: None,
             graph_trace: crate::raw::color_graph_trace::synthetic_color_graph_trace_fixture(),
             generated_at: "2026-06-17T00:00:00Z".to_string(),
             metrics: Vec::new(),
