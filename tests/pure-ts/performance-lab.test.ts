@@ -61,29 +61,33 @@ describe('performance lab statistics', () => {
 
   test('isolates the light instrumentation invariant from concurrent parent CPU threads', async () => {
     const { Worker } = await import('node:worker_threads');
-    const workers = Array.from(
-      { length: 2 },
-      () =>
-        new Worker(
-          `const { parentPort } = require('node:worker_threads'); parentPort.postMessage('ready'); let sink = 0; while (true) sink = (sink + 1) % 1_000_003;`,
-          { eval: true },
-        ),
-    );
-    try {
-      await Promise.all(
-        workers.map(
-          (worker) =>
-            new Promise<void>((resolve) => {
-              worker.once('message', () => resolve());
-            }),
-        ),
+    const control = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT));
+    const workers = Array.from({ length: 2 }, () => {
+      const worker = new Worker(
+        `const { parentPort, workerData } = require('node:worker_threads'); const control = new Int32Array(workerData); parentPort.postMessage('ready'); let sink = 0; while (Atomics.load(control, 0) === 0) sink = (sink + 1) % 1_000_003;`,
+        { eval: true, workerData: control.buffer },
       );
+      const ready = new Promise<void>((resolve, reject) => {
+        worker.once('message', () => resolve());
+        worker.once('error', reject);
+      });
+      const exited = new Promise<number>((resolve, reject) => {
+        worker.once('exit', resolve);
+        worker.once('error', reject);
+      });
+      return { exited, ready };
+    });
+    let exitCodes: number[] = [];
+    try {
+      await Promise.all(workers.map(({ ready }) => ready));
       expect(await runIsolatedLightInstrumentationBenchmark()).toBeLessThanOrEqual(
         MAX_LIGHT_INSTRUMENTATION_OVERHEAD_MS,
       );
     } finally {
-      await Promise.all(workers.map(async (worker) => await worker.terminate()));
+      Atomics.store(control, 0, 1);
+      exitCodes = await Promise.all(workers.map(({ exited }) => exited));
     }
+    expect(exitCodes).toEqual([0, 0]);
   });
 
   test('captures privacy-filtered hardware and runtime identity', () => {
