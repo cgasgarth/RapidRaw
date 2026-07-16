@@ -57,7 +57,7 @@ The first schema candidate should use:
 ```json
 {
   "fixture_format_version": "measured_profile_fixture.v0.1",
-  "profile_algorithm_id": "density_rgb_v1",
+  "profile_algorithm_id": "negative_log_density_v1",
   "measurement_method_id": "manual_target_reduction.v0.1"
 }
 ```

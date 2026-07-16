@@ -5,11 +5,22 @@ import { negativeLabSetConversionRecipeParametersV1Schema } from '../../../packa
 const baseRecipe = {
   baseStrategy: { baseSampleIds: [], mode: 'profile_default_low_confidence' as const },
   conversionModel: {
-    algorithmId: 'density_rgb_v1' as const,
+    algorithmId: 'negative_log_density_v1' as const,
     algorithmVersion: 1 as const,
     densityMax: 4,
     epsilonPolicyId: 'density_epsilon_v1' as const,
     negativeDensityTolerance: 0.01,
+  },
+  densityPrintCurve: {
+    contrastGrade: 1,
+    densityOffset: 0,
+    midtoneShape: 0,
+    outputTag: 'preview_display' as const,
+    schemaVersion: 2 as const,
+    shoulderStrength: 0.25,
+    targetBlackDensity: 1.65,
+    targetWhiteDensity: 0.04,
+    toeStrength: 0.25,
   },
   curveModel: { curveFamily: 'parametric_monotonic_v1' as const },
   frameSelection: {

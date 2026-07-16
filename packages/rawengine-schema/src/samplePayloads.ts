@@ -2524,7 +2524,7 @@ export const sampleNegativeLabProcessProfileV1: NegativeLabProcessProfileV1 = ne
   schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
   touchedParameters: {
     creativeRendering: [],
-    objectiveInversion: ['density_rgb_v1'],
+    objectiveInversion: ['negative_log_density_v1'],
     semiObjectiveNormalization: ['density_normalization_v1'],
   },
   warningCodes: [],
@@ -2590,7 +2590,7 @@ export const sampleNegativeLabBuiltInPresetCatalogV1: NegativeLabBuiltInPresetCa
         schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
         touchedParameters: {
           creativeRendering: [],
-          objectiveInversion: ['density_rgb_v1'],
+          objectiveInversion: ['negative_log_density_v1'],
           semiObjectiveNormalization: ['density_normalization_v1'],
         },
       },
@@ -2623,7 +2623,7 @@ export const sampleNegativeLabBuiltInPresetCatalogV1: NegativeLabBuiltInPresetCa
         schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
         touchedParameters: {
           creativeRendering: [],
-          objectiveInversion: ['density_rgb_v1'],
+          objectiveInversion: ['negative_log_density_v1'],
           semiObjectiveNormalization: ['density_normalization_v1'],
         },
       },
@@ -2656,7 +2656,7 @@ export const sampleNegativeLabBuiltInPresetCatalogV1: NegativeLabBuiltInPresetCa
         schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
         touchedParameters: {
           creativeRendering: [],
-          objectiveInversion: ['density_rgb_v1'],
+          objectiveInversion: ['negative_log_density_v1'],
           semiObjectiveNormalization: ['density_normalization_v1'],
         },
       },
@@ -2689,7 +2689,7 @@ export const sampleNegativeLabBuiltInPresetCatalogV1: NegativeLabBuiltInPresetCa
         schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
         touchedParameters: {
           creativeRendering: [],
-          objectiveInversion: ['density_rgb_v1'],
+          objectiveInversion: ['negative_log_density_v1'],
           semiObjectiveNormalization: ['density_normalization_v1'],
         },
       },
@@ -2722,7 +2722,7 @@ export const sampleNegativeLabBuiltInPresetCatalogV1: NegativeLabBuiltInPresetCa
         schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
         touchedParameters: {
           creativeRendering: [],
-          objectiveInversion: ['density_rgb_v1'],
+          objectiveInversion: ['negative_log_density_v1'],
           semiObjectiveNormalization: ['density_normalization_v1'],
         },
       },
@@ -2755,7 +2755,7 @@ export const sampleNegativeLabBuiltInPresetCatalogV1: NegativeLabBuiltInPresetCa
         schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
         touchedParameters: {
           creativeRendering: [],
-          objectiveInversion: ['density_rgb_v1'],
+          objectiveInversion: ['negative_log_density_v1'],
           semiObjectiveNormalization: ['density_normalization_v1'],
         },
       },
@@ -2788,7 +2788,7 @@ export const sampleNegativeLabBuiltInPresetCatalogV1: NegativeLabBuiltInPresetCa
         schemaVersion: RAW_ENGINE_SCHEMA_VERSION,
         touchedParameters: {
           creativeRendering: [],
-          objectiveInversion: ['density_rgb_v1'],
+          objectiveInversion: ['negative_log_density_v1'],
           semiObjectiveNormalization: ['density_normalization_v1'],
         },
       },
@@ -3285,11 +3285,22 @@ export const sampleNegativeLabCommandEnvelopeV1: NegativeLabCommandEnvelopeV1 =
         mode: 'existing_base_estimate',
       },
       conversionModel: {
-        algorithmId: 'density_rgb_v1',
+        algorithmId: 'negative_log_density_v1',
         algorithmVersion: 1,
         densityMax: 4,
         epsilonPolicyId: 'density_epsilon_v1',
         negativeDensityTolerance: 0.02,
+      },
+      densityPrintCurve: {
+        contrastGrade: 1,
+        densityOffset: 0,
+        midtoneShape: 0,
+        outputTag: 'preview_display',
+        schemaVersion: 2,
+        shoulderStrength: 0.25,
+        targetBlackDensity: 1.65,
+        targetWhiteDensity: 0.04,
+        toeStrength: 0.25,
       },
       curveModel: {
         curveFamily: 'process_profile_monotonic_v1',
@@ -3431,7 +3442,7 @@ export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negati
       warningCodes: ['low_acquisition_confidence'],
     },
     algorithm: {
-      algorithmId: 'density_rgb_v1',
+      algorithmId: 'negative_log_density_v1',
       algorithmVersion: 1,
       densityMax: 3.2,
       epsilonPolicyId: 'density_epsilon_v1',
@@ -3445,7 +3456,17 @@ export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negati
       storageTransition: 'temp_cache_to_sidecar_artifact',
       warningCodes: ['low_acquisition_confidence'],
     },
-    printCurveParams: null,
+    printCurveParams: {
+      contrastGrade: 1,
+      densityOffset: 0,
+      midtoneShape: 0,
+      outputTag: 'preview_display',
+      schemaVersion: 2,
+      shoulderStrength: 0.25,
+      targetBlackDensity: 1.65,
+      targetWhiteDensity: 0.04,
+      toeStrength: 0.25,
+    },
     runtimePreview: {
       baseFogSampleSummary: {
         clippedFraction: 0,
@@ -3487,6 +3508,32 @@ export const sampleNegativeLabDryRunResultV1: NegativeLabDryRunResultV1 = negati
           blue: { max: 1.07, min: -0.02 },
           green: { max: 1.01, min: -0.01 },
           red: { max: 0.96, min: 0 },
+        },
+        boundsReceipt: {
+          algorithmId: 'fixed_grid_block_median_luma_color_v1',
+          analysisBuffer: 0.04,
+          analysisRect: { height: 0.92, width: 0.92, x: 0.04, y: 0.04 },
+          baseBounds: {
+            axisBounds: { color: { max: 0.08, min: -0.08 }, luma: { max: 0.16, min: 0.02 } },
+            channelBounds: {
+              blue: { max: 0.2, min: 0.04 },
+              green: { max: 0.16, min: 0.02 },
+              red: { max: 0.14, min: 0.01 },
+            },
+          },
+          baseFogProvenance: 'automatic_analysis',
+          colorRangeClip: 0.12,
+          finalBounds: {
+            axisBounds: { color: { max: 0.12, min: -0.12 }, luma: { max: 1.08, min: -0.03 } },
+            channelBounds: {
+              blue: { max: 1.08, min: -0.03 },
+              green: { max: 1.02, min: -0.02 },
+              red: { max: 0.98, min: -0.01 },
+            },
+          },
+          lumaRangeClip: 0.08,
+          schemaVersion: 1,
+          warningCodes: ['missing_visible_base'],
         },
         clippedPixelCount: 0,
         densityRangeUnclamped: 1.09,
@@ -3558,6 +3605,32 @@ export const sampleNegativeLabApplyResultV1: NegativeLabApplyResultV1 = negative
       dimensions: {
         height: 1080,
         width: 1620,
+      },
+      boundsReceipt: {
+        algorithmId: 'fixed_grid_block_median_luma_color_v1',
+        analysisBuffer: 0.04,
+        analysisRect: { height: 0.92, width: 0.92, x: 0.04, y: 0.04 },
+        baseBounds: {
+          axisBounds: { color: { max: 0.08, min: -0.08 }, luma: { max: 0.16, min: 0.02 } },
+          channelBounds: {
+            blue: { max: 0.2, min: 0.04 },
+            green: { max: 0.16, min: 0.02 },
+            red: { max: 0.14, min: 0.01 },
+          },
+        },
+        baseFogProvenance: 'automatic_analysis',
+        colorRangeClip: 0.12,
+        finalBounds: {
+          axisBounds: { color: { max: 0.12, min: -0.12 }, luma: { max: 1.08, min: -0.03 } },
+          channelBounds: {
+            blue: { max: 1.08, min: -0.03 },
+            green: { max: 1.02, min: -0.02 },
+            red: { max: 0.98, min: -0.01 },
+          },
+        },
+        lumaRangeClip: 0.08,
+        schemaVersion: 1,
+        warningCodes: ['missing_visible_base'],
       },
       outputArtifact: {
         ...sampleArtifactHandleV1,

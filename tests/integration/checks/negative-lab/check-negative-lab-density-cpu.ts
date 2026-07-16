@@ -34,12 +34,37 @@ const boundsReceiptSchema = z
     warningCodes: z.array(z.string()),
   })
   .strict();
+const currentPrintCurveParamsSchema = z
+  .object({
+    algorithm_version: z.literal(1),
+    anchor_density: z.number().min(0).max(1),
+    d_max: z.number().min(1.1).max(3),
+    d_min: z.number().min(0).max(1),
+    density_offset: z.number().min(-0.5).max(0.5),
+    iso_r_grade: z.number().min(0.5).max(3),
+    midtone_shape: z.number().min(-1).max(1),
+    output_domain: z.literal('scene_linear_print'),
+    schema_version: z.literal(2),
+    shoulder_strength: z.number().min(0).max(1),
+    shoulder_width: z.number().min(0.01).max(0.5),
+    toe_strength: z.number().min(0).max(1),
+    toe_width: z.number().min(0.01).max(0.5),
+  })
+  .strict();
 
 const reportSchema = z
   .object({
-    algorithm: z.literal('density_rgb_v1'),
+    algorithm: z.literal('negative_density_print_v2'),
     artifactHash: z.string().regex(/^fnv1a64:[a-f0-9]{16}$/u),
     changedPixelCount: z.number().int().positive(),
+    currentRecipe: z
+      .object({
+        boundsSchemaVersion: z.literal(1),
+        conversionModel: z.literal('negative_log_density_v1'),
+        printCurveAlgorithm: z.literal('negative_density_print_v2'),
+        printCurveParams: currentPrintCurveParamsSchema,
+      })
+      .strict(),
     densityNormalizationMetrics: z
       .object({
         axisBounds: z
@@ -73,13 +98,6 @@ const reportSchema = z
   })
   .strict()
   .superRefine((report, context) => {
-    if (report.densityNormalizationMetrics.channelBounds.red.min < 0) {
-      context.addIssue({
-        code: 'custom',
-        message: 'Legacy density_rgb_v1 proof should clamp normalized density minima at 0.',
-        path: ['densityNormalizationMetrics', 'channelBounds', 'red', 'min'],
-      });
-    }
     if (report.densityNormalizationMetrics.densityRangeUnclamped <= 0) {
       context.addIssue({
         code: 'custom',

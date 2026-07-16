@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import type { NegativeLabPresetParams } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas.ts';
 import { buildNegativeLabAutoDensitySuggestionRun } from '../../../src/utils/negative-lab/negativeLabAutoDensitySuggestions.ts';
 import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negative-lab/negativeLabFrameHealth.ts';
+import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 import { buildNegativeLabRollNormalizationPlan } from '../../../src/utils/negative-lab/negativeLabRollNormalizationPlan.ts';
 import {
   buildNegativeLabScanMetricsV1,
@@ -9,19 +10,11 @@ import {
 } from '../../../src/utils/negative-lab/negativeLabScanMetrics.ts';
 
 const params: NegativeLabPresetParams = {
-  analysis_buffer: 0.04,
+  ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
   base_fog_strength: 0.72,
   black_point: 0.02,
-  black_point_offset: 0,
-  blue_weight: 1,
-  color_range_clip: 0.12,
   contrast: 1.1,
-  conversion_model: 'density_rgb_v1',
   exposure: 0.1,
-  green_weight: 1,
-  luma_range_clip: 0.08,
-  red_weight: 1,
-  white_point_offset: 0,
   white_point: 0.98,
 };
 

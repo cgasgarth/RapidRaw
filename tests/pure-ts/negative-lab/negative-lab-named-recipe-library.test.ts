@@ -16,7 +16,7 @@ import {
 const input = (overrides: Partial<Parameters<typeof createNegativeLabNamedRecipe>[0]> = {}) => ({
   name: 'Portra daylight',
   params: DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
-  profileSnapshot: { process: 'c41_color_negative', transform: 'density_rgb_v1' },
+  profileSnapshot: { process: 'c41_color_negative', transform: 'negative_log_density_v1' },
   saveOptions: { outputFormat: 'tiff16', suffix: 'Positive', writeConversionBundle: true } as const,
   selectedAcquisitionProfileId: 'camera_raw_linear_v1' as const,
   selectedPresetId: DEFAULT_NEGATIVE_LAB_UI_PRESET.presetId,

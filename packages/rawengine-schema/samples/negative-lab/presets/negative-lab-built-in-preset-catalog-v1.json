@@ -31,7 +31,7 @@
       "schemaVersion": 1,
       "touchedParameters": {
         "creativeRendering": [],
-        "objectiveInversion": ["density_rgb_v1"],
+        "objectiveInversion": ["negative_log_density_v1"],
         "semiObjectiveNormalization": ["density_normalization_v1"]
       }
     },
@@ -64,7 +64,7 @@
       "schemaVersion": 1,
       "touchedParameters": {
         "creativeRendering": [],
-        "objectiveInversion": ["density_rgb_v1"],
+        "objectiveInversion": ["negative_log_density_v1"],
         "semiObjectiveNormalization": ["density_normalization_v1"]
       }
     },
@@ -97,7 +97,7 @@
       "schemaVersion": 1,
       "touchedParameters": {
         "creativeRendering": [],
-        "objectiveInversion": ["density_rgb_v1"],
+        "objectiveInversion": ["negative_log_density_v1"],
         "semiObjectiveNormalization": ["density_normalization_v1"]
       }
     },
@@ -130,7 +130,7 @@
       "schemaVersion": 1,
       "touchedParameters": {
         "creativeRendering": [],
-        "objectiveInversion": ["density_rgb_v1"],
+        "objectiveInversion": ["negative_log_density_v1"],
         "semiObjectiveNormalization": ["density_normalization_v1"]
       }
     },
@@ -163,7 +163,7 @@
       "schemaVersion": 1,
       "touchedParameters": {
         "creativeRendering": [],
-        "objectiveInversion": ["density_rgb_v1"],
+        "objectiveInversion": ["negative_log_density_v1"],
         "semiObjectiveNormalization": ["density_normalization_v1"]
       }
     },
@@ -196,7 +196,7 @@
       "schemaVersion": 1,
       "touchedParameters": {
         "creativeRendering": [],
-        "objectiveInversion": ["density_rgb_v1"],
+        "objectiveInversion": ["negative_log_density_v1"],
         "semiObjectiveNormalization": ["density_normalization_v1"]
       }
     },
@@ -229,7 +229,7 @@
       "schemaVersion": 1,
       "touchedParameters": {
         "creativeRendering": [],
-        "objectiveInversion": ["density_rgb_v1"],
+        "objectiveInversion": ["negative_log_density_v1"],
         "semiObjectiveNormalization": ["density_normalization_v1"]
       }
     }

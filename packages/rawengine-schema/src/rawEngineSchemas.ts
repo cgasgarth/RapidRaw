@@ -4513,7 +4513,7 @@ export const negativeLabSampleRectV1Schema = z
   })
   .strict();
 
-export const negativeLabDensityRgbV1Schema = z
+export const negativeLabDensityTripletV1Schema = z
   .object({
     b: z.number().min(0).max(4),
     g: z.number().min(0).max(4),
@@ -4606,7 +4606,7 @@ export const negativeLabRollSessionArtifactV1Schema = z
         z
           .object({
             confidence: z.number().min(0).max(1),
-            densityRgb: negativeLabDensityRgbV1Schema,
+            densityRgb: negativeLabDensityTripletV1Schema,
             frameId: z.string().trim().min(1).nullable(),
             rect: negativeLabSampleRectV1Schema,
             sampleId: z.string().trim().min(1),
@@ -9024,13 +9024,8 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
       .strict(),
     conversionModel: z
       .object({
-        algorithmId: z.enum([
-          'density_rgb_v1',
-          'negative_log_density_v1',
-          'negative_density_print_v2',
-          'e6_positive_v1',
-        ]),
-        algorithmVersion: z.union([z.literal(1), z.literal(2)]),
+        algorithmId: z.enum(['negative_log_density_v1', 'e6_positive_v1']),
+        algorithmVersion: z.literal(1),
         densityMax: z.number().positive(),
         epsilonPolicyId: z.literal('density_epsilon_v1'),
         negativeDensityTolerance: z.number().nonnegative(),
@@ -9172,14 +9167,13 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
         densityOffset: z.number().min(-0.5).max(0.5),
         midtoneShape: z.number().min(-1).max(1),
         outputTag: z.enum(['preview_display', 'export_linear']),
-        schemaVersion: z.literal(1),
+        schemaVersion: z.literal(2),
         shoulderStrength: z.number().min(0).max(1),
         targetBlackDensity: z.number().min(1.1).max(2.4),
         targetWhiteDensity: z.number().min(0).max(0.25),
         toeStrength: z.number().min(0).max(1),
       })
-      .strict()
-      .optional(),
+      .strict(),
     detailFinish: z
       .object({
         algorithmVersion: z.literal(1).default(1),
@@ -9271,60 +9265,6 @@ export const negativeLabSetConversionRecipeParametersV1Schema = z
   })
   .strict()
   .superRefine((recipe, context) => {
-    if (recipe.conversionModel.algorithmId === 'density_rgb_v1' && recipe.conversionModel.algorithmVersion !== 1) {
-      context.addIssue({
-        code: 'custom',
-        message: 'density_rgb_v1 recipes must declare algorithmVersion 1.',
-        path: ['conversionModel', 'algorithmVersion'],
-      });
-    }
-
-    if (
-      recipe.conversionModel.algorithmId === 'negative_log_density_v1' &&
-      recipe.conversionModel.algorithmVersion !== 1
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'negative_log_density_v1 recipes must declare algorithmVersion 1.',
-        path: ['conversionModel', 'algorithmVersion'],
-      });
-    }
-
-    if (
-      recipe.conversionModel.algorithmId === 'negative_density_print_v2' &&
-      recipe.conversionModel.algorithmVersion !== 2
-    ) {
-      context.addIssue({
-        code: 'custom',
-        message: 'negative_density_print_v2 recipes must declare algorithmVersion 2.',
-        path: ['conversionModel', 'algorithmVersion'],
-      });
-    }
-
-    if (recipe.conversionModel.algorithmId === 'e6_positive_v1' && recipe.conversionModel.algorithmVersion !== 1) {
-      context.addIssue({
-        code: 'custom',
-        message: 'e6_positive_v1 recipes must declare algorithmVersion 1.',
-        path: ['conversionModel', 'algorithmVersion'],
-      });
-    }
-
-    if (recipe.conversionModel.algorithmId === 'negative_density_print_v2' && recipe.densityPrintCurve === undefined) {
-      context.addIssue({
-        code: 'custom',
-        message: 'negative_density_print_v2 recipes require versioned densityPrintCurve params.',
-        path: ['densityPrintCurve'],
-      });
-    }
-
-    if (recipe.conversionModel.algorithmId === 'density_rgb_v1' && recipe.densityPrintCurve !== undefined) {
-      context.addIssue({
-        code: 'custom',
-        message: 'density_rgb_v1 recipes must not carry v2 densityPrintCurve params.',
-        path: ['densityPrintCurve'],
-      });
-    }
-
     const { inversionCurveSet, inversionCurveSetPolicy } = recipe.curveModel;
     if (
       ['use_curve_set_override', 'expert_override'].includes(inversionCurveSetPolicy ?? '') &&
@@ -9592,33 +9532,6 @@ export const negativeLabDensityBoundsSetV1Schema = z
   })
   .strict();
 
-const LEGACY_NEGATIVE_LAB_DENSITY_BOUNDS_RECEIPT_V1 = {
-  algorithmId: 'fixed_grid_block_median_luma_color_v1',
-  analysisBuffer: 0.04,
-  analysisRect: { height: 0.92, width: 0.92, x: 0.04, y: 0.04 },
-  baseBounds: {
-    axisBounds: { color: { max: 0.08, min: -0.08 }, luma: { max: 0.16, min: 0.02 } },
-    channelBounds: {
-      blue: { max: 0.2, min: 0.04 },
-      green: { max: 0.16, min: 0.02 },
-      red: { max: 0.14, min: 0.01 },
-    },
-  },
-  baseFogProvenance: 'automatic_analysis',
-  colorRangeClip: 0.12,
-  finalBounds: {
-    axisBounds: { color: { max: 0.12, min: -0.12 }, luma: { max: 1.08, min: -0.03 } },
-    channelBounds: {
-      blue: { max: 1.08, min: -0.03 },
-      green: { max: 1.02, min: -0.02 },
-      red: { max: 0.98, min: -0.01 },
-    },
-  },
-  lumaRangeClip: 0.08,
-  schemaVersion: 1,
-  warningCodes: ['missing_visible_base'],
-} as const;
-
 export const negativeLabDensityBoundsReceiptV1Schema = z
   .object({
     algorithmId: z.literal('fixed_grid_block_median_luma_color_v1'),
@@ -9632,11 +9545,7 @@ export const negativeLabDensityBoundsReceiptV1Schema = z
     schemaVersion: z.literal(1),
     warningCodes: z.array(negativeWarningCodeSchema),
   })
-  .strict()
-  .default(() => ({
-    ...LEGACY_NEGATIVE_LAB_DENSITY_BOUNDS_RECEIPT_V1,
-    warningCodes: [...LEGACY_NEGATIVE_LAB_DENSITY_BOUNDS_RECEIPT_V1.warningCodes],
-  }));
+  .strict();
 
 export const negativeLabRuntimeProofV1Schema = z
   .object({
@@ -9657,13 +9566,8 @@ export const negativeLabRuntimeProofV1Schema = z
       .strict(),
     algorithm: z
       .object({
-        algorithmId: z.enum([
-          'density_rgb_v1',
-          'negative_log_density_v1',
-          'negative_density_print_v2',
-          'e6_positive_v1',
-        ]),
-        algorithmVersion: z.union([z.literal(1), z.literal(2)]),
+        algorithmId: z.enum(['negative_log_density_v1', 'e6_positive_v1']),
+        algorithmVersion: z.literal(1),
         densityMax: z.number().positive(),
         epsilonPolicyId: z.literal('density_epsilon_v1'),
         negativeDensityTolerance: z.number().nonnegative(),
@@ -9685,14 +9589,13 @@ export const negativeLabRuntimeProofV1Schema = z
         densityOffset: z.number().min(-0.5).max(0.5),
         midtoneShape: z.number().min(-1).max(1),
         outputTag: z.enum(['preview_display', 'export_linear']),
-        schemaVersion: z.literal(1),
+        schemaVersion: z.literal(2),
         shoulderStrength: z.number().min(0).max(1),
         targetBlackDensity: z.number().min(1.1).max(2.4),
         targetWhiteDensity: z.number().min(0).max(0.25),
         toeStrength: z.number().min(0).max(1),
       })
-      .strict()
-      .nullable(),
+      .strict(),
     scanMetricsSummary: z
       .object({
         densityRangeUnclamped: z.number().nonnegative(),
@@ -9720,7 +9623,7 @@ export const negativeLabRuntimeProofV1Schema = z
             clippedFraction: z.number().min(0).max(1),
             confidence: z.number().min(0).max(1),
             densityRange: z.number().min(0),
-            densityRgb: negativeLabDensityRgbV1Schema,
+            densityRgb: negativeLabDensityTripletV1Schema,
             meanRgb: z
               .object({
                 b: z.number().min(0).max(1),
@@ -9860,7 +9763,7 @@ export const negativeLabRuntimeProofV1Schema = z
                 clippedFraction: z.number().min(0).max(1),
                 confidence: z.number().min(0).max(1),
                 densityRange: z.number().min(0),
-                densityRgb: negativeLabDensityRgbV1Schema,
+                densityRgb: negativeLabDensityTripletV1Schema,
                 meanRgb: z
                   .object({
                     b: z.number().min(0).max(1),
@@ -11543,7 +11446,7 @@ export type HdrMergeStaleStateV1 = z.infer<typeof hdrMergeStaleStateV1Schema>;
 export type HdrMergeWarningCodeV1 = z.infer<typeof hdrMergeWarningCodeV1Schema>;
 export type HdrMotionRiskV1 = z.infer<typeof hdrMotionRiskV1Schema>;
 export type HdrRuntimeSidecarReceiptV1 = z.infer<typeof hdrRuntimeSidecarReceiptV1Schema>;
-export type NegativeLabDensityRgbV1 = z.infer<typeof negativeLabDensityRgbV1Schema>;
+export type NegativeLabDensityTripletV1 = z.infer<typeof negativeLabDensityTripletV1Schema>;
 export type NegativeLabRollFrameRoleV1 = z.infer<typeof negativeLabRollFrameRoleV1Schema>;
 export type NegativeLabRollSessionArtifactV1 = z.infer<typeof negativeLabRollSessionArtifactV1Schema>;
 export type NegativeLabSampleRectV1 = z.infer<typeof negativeLabSampleRectV1Schema>;

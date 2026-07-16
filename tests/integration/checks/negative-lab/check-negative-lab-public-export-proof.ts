@@ -38,6 +38,23 @@ const baseFogCandidateSchema = z
     warnings: z.array(z.enum(['low_base_estimate_confidence', 'strong_channel_cast_candidate'])),
   })
   .strict();
+const currentPrintCurveParamsSchema = z
+  .object({
+    algorithm_version: z.literal(1),
+    anchor_density: z.number().min(0).max(1),
+    d_max: z.number().min(1.1).max(3),
+    d_min: z.number().min(0).max(1),
+    density_offset: z.number().min(-0.5).max(0.5),
+    iso_r_grade: z.number().min(0.5).max(3),
+    midtone_shape: z.number().min(-1).max(1),
+    output_domain: z.literal('scene_linear_print'),
+    schema_version: z.literal(2),
+    shoulder_strength: z.number().min(0).max(1),
+    shoulder_width: z.number().min(0.01).max(0.5),
+    toe_strength: z.number().min(0).max(1),
+    toe_width: z.number().min(0.01).max(0.5),
+  })
+  .strict();
 const appliedProfileSchema = z
   .object({
     claimLevel: z.literal('generic_starting_point_only'),
@@ -73,7 +90,15 @@ const appliedProfileSchema = z
 
 const reportSchema = z
   .object({
-    algorithm: z.literal('density_rgb_v1'),
+    algorithm: z.literal('negative_density_print_v2'),
+    currentRecipe: z
+      .object({
+        boundsSchemaVersion: z.literal(1),
+        conversionModel: z.literal('negative_log_density_v1'),
+        printCurveAlgorithm: z.literal('negative_density_print_v2'),
+        printCurveParams: currentPrintCurveParamsSchema,
+      })
+      .strict(),
     appliedProfile: appliedProfileSchema,
     doesNotProve: z
       .array(

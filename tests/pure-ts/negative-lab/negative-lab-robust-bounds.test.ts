@@ -4,6 +4,7 @@ import { negativeLabDensityBoundsReceiptV1Schema } from '../../../packages/rawen
 import { negativeLabPresetParamsSchema } from '../../../src/schemas/negative-lab/negativeLabPresetCatalogSchemas';
 import { buildNegativeLabDustScratchReviewReport } from '../../../src/utils/negative-lab/negativeLabDustScratchReview';
 import { buildNegativeLabFrameHealthReport } from '../../../src/utils/negative-lab/negativeLabFrameHealth';
+import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../src/utils/negative-lab/negativeLabPresetCatalog';
 
 const boundsReceipt = negativeLabDensityBoundsReceiptV1Schema.parse({
   algorithmId: 'fixed_grid_block_median_luma_color_v1',
@@ -33,13 +34,9 @@ const boundsReceipt = negativeLabDensityBoundsReceiptV1Schema.parse({
 });
 
 describe('Negative Lab robust density bounds', () => {
-  test('migrates legacy flat preset params to versioned defaults', () => {
+  test('preserves explicit current density-bound parameters', () => {
     const params = negativeLabPresetParamsSchema.parse({
-      blue_weight: 1,
-      contrast: 1,
-      exposure: 0,
-      green_weight: 1,
-      red_weight: 1,
+      ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
     });
 
     expect(params.bounds_schema_version).toBe(1);

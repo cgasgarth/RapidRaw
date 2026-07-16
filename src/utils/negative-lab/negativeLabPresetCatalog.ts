@@ -3,6 +3,25 @@ import type { NegativeLabBuiltInUiPresetCatalog } from '../../schemas/negative-l
 type NegativeLabBuiltInUiPreset = NegativeLabBuiltInUiPresetCatalog['presets'][number];
 type NegativeLabPresetParams = NegativeLabBuiltInUiPreset['params'];
 
+const CURRENT_DENSITY_PRINT_PARAMS = {
+  algorithm_version: 1,
+  anchor_density: 0.5,
+  contrast_grade: 1,
+  density_offset: 0,
+  d_max: 1.65,
+  d_min: 0.04,
+  iso_r_grade: 1,
+  midtone_shape: 0,
+  output_domain: 'scene_linear_print',
+  schema_version: 2,
+  shoulder_strength: 0.25,
+  shoulder_width: 0.25,
+  target_black_density: 1.65,
+  target_white_density: 0.04,
+  toe_strength: 0.25,
+  toe_width: 0.25,
+} satisfies NegativeLabPresetParams['print_curve_v2'];
+
 const GENERIC_NEGATIVE_LAB_PRESET_METADATA = {
   claimLevel: 'generic_starting_point_only',
   claimPolicy: 'generic_starting_point_no_stock_claim',
@@ -68,11 +87,11 @@ const makeNegativeLabPreset = (
     base_fog_sample: null,
     bounds_schema_version: 1,
     color_range_clip: 0.12,
-    conversion_model: 'density_rgb_v1',
+    conversion_model: 'negative_log_density_v1',
     luma_range_clip: 0.08,
-    print_curve_algorithm: 'density_rgb_v1',
+    print_curve_algorithm: 'negative_density_print_v2',
     print_curve_output_tag: 'preview_display',
-    print_curve_v2: null,
+    print_curve_v2: CURRENT_DENSITY_PRINT_PARAMS,
     process_family: preset.processFamily,
     white_point_offset: 0,
     white_point: 1,

@@ -1,5 +1,25 @@
 {
-  "algorithm": "density_rgb_v1",
+  "algorithm": "negative_density_print_v2",
+  "currentRecipe": {
+    "boundsSchemaVersion": 1,
+    "conversionModel": "negative_log_density_v1",
+    "printCurveAlgorithm": "negative_density_print_v2",
+    "printCurveParams": {
+      "algorithm_version": 1,
+      "anchor_density": 0.5,
+      "d_max": 1.649999976158142,
+      "d_min": 0.03999999910593033,
+      "density_offset": 0,
+      "iso_r_grade": 1,
+      "midtone_shape": 0,
+      "output_domain": "scene_linear_print",
+      "schema_version": 2,
+      "shoulder_strength": 0.25,
+      "shoulder_width": 0.25,
+      "toe_strength": 0.25,
+      "toe_width": 0.25
+    }
+  },
   "appliedProfile": {
     "claimLevel": "generic_starting_point_only",
     "claimPolicy": "generic_starting_point_no_stock_claim",
@@ -71,17 +91,17 @@
       "processFamily": "c41_color_negative"
     }
   },
-  "inputToOutputMeanAbsDelta": 0.3934115767478943,
+  "inputToOutputMeanAbsDelta": 0.41798174381256104,
   "issue": 4398,
   "metrics": {
     "autoBaseConfidence": 1,
     "baseFogSampleSource": "left_edge_border",
     "channelCastRatio": 1,
     "changedPixelRatio": 1,
-    "inputToOutputMeanAbsDelta": 0.3934115767478943,
-    "meanInputOutputDelta": 0.3934115767478943,
-    "previewAfterHash": "fnv1a64:0566cd12630c64e2",
-    "previewBeforeHash": "fnv1a64:2ecd279e073996b9",
+    "inputToOutputMeanAbsDelta": 0.41798174381256104,
+    "meanInputOutputDelta": 0.41798174381256104,
+    "previewAfterHash": "fnv1a64:cbf170af66ff2b1e",
+    "previewBeforeHash": "fnv1a64:c9551f09f0fb2d32",
     "previewChanged": true,
     "rankedBaseFogCandidates": [
       {
@@ -201,7 +221,7 @@
     "warnings": []
   },
   "output": {
-    "contentHash": "fnv1a64:61fcbfe314129111",
+    "contentHash": "fnv1a64:1b50d26571ea80ef",
     "dimensions": {
       "height": 183,
       "width": 330
@@ -212,7 +232,7 @@
   "runtimeStatus": "public_negative_scan_positive_export_rendered",
   "schemaVersion": 1,
   "conversionBundle": {
-    "contentHash": "fnv1a64:3ba343a0edaa16f0",
+    "contentHash": "fnv1a64:ad2f707812bfa1c3",
     "path": "src-tauri/target/negative-lab-public-export-proof/110-format-ericht-negative-cc0-320-Positive.jpg.conversion-bundle.json",
     "schemaVersion": 1
   },

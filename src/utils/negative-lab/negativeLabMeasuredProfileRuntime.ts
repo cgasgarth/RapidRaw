@@ -46,6 +46,14 @@ export const NEGATIVE_LAB_MEASURED_PROFILE_CATALOG = parseNegativeLabMeasuredPro
   negativeLabMeasuredProfileCatalogJson,
 );
 
+const negativeLabUserProfileBaseParams = NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG.presets.find(
+  (preset) => preset.presetId === 'negative_lab.generic.c41.portrait.v1',
+)?.params;
+
+if (negativeLabUserProfileBaseParams === undefined) {
+  throw new Error('Negative Lab user profile requires the current C-41 portrait base recipe.');
+}
+
 export const NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG = {
   genericCatalog: parseNegativeLabBuiltInUiPresetCatalog(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG),
   measuredCatalog: NEGATIVE_LAB_MEASURED_PROFILE_CATALOG,
@@ -72,6 +80,7 @@ export const NEGATIVE_LAB_RUNTIME_PROFILE_CATALOG = {
       isSelectable: true,
       measurementProfileId: 'negative_lab.user.c41.local_warm_proof.v1',
       params: {
+        ...negativeLabUserProfileBaseParams,
         base_fog_sample: null,
         base_fog_strength: 1.04,
         blue_weight: 0.97,
@@ -245,15 +254,6 @@ export const resolveNegativeLabRuntimeProfile = (
 export const buildNegativeLabRuntimeProfileProvenanceHash = (
   profile: NegativeLabResolvedRuntimeProfile,
 ): `fnv1a32:${string}` => {
-  const { conversion_model, print_curve_algorithm, print_curve_output_tag, print_curve_v2, ...legacyCompatibleParams } =
-    profile.params;
-  const params =
-    conversion_model === 'density_rgb_v1' &&
-    print_curve_algorithm === 'density_rgb_v1' &&
-    print_curve_output_tag === 'preview_display' &&
-    print_curve_v2 === null
-      ? legacyCompatibleParams
-      : profile.params;
   const provenancePayload = {
     claimLevel: profile.claimLevel,
     claimPolicy: profile.claimPolicy,
@@ -264,7 +264,7 @@ export const buildNegativeLabRuntimeProfileProvenanceHash = (
     evidenceFixtureIds: profile.evidenceFixtureIds,
     filmClass: profile.filmClass,
     measurementProfileId: profile.measurementProfileId,
-    params,
+    params: profile.params,
     presetId: profile.presetId,
     profileStatus: profile.profileStatus,
     runtimeStatus: profile.runtimeStatus,

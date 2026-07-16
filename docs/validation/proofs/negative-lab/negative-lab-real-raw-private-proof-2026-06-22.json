@@ -8,7 +8,7 @@
     "source_is_actual_film_negative"
   ],
   "fixtureId": "validation.negative-lab-real-raw.alaska.v1",
-  "generatedAt": "2026-07-08T16:07:32.188Z",
+  "generatedAt": "2026-07-15T23:47:12.498Z",
   "issue": 4527,
   "colorManagement": {
     "acquisitionProfileId": "camera_raw_linear_v1",
@@ -18,21 +18,21 @@
     "previewOutputTransfer": "gamma_2_2_display_proof"
   },
   "densityDomainInversion": {
-    "algorithm": "density_rgb_v1",
+    "algorithm": "negative_log_density_v1",
     "baseSample": {
       "height": 0.3499999940395355,
       "width": 0.3499999940395355,
       "x": 0,
       "y": 0,
       "estimatedBaseDensity": [
-        0.6017649173736572,
-        0.5702906250953674,
-        0.5188824534416199
+        0.5870693325996399,
+        0.5697758197784424,
+        0.5256567597389221
       ],
       "estimatedBaseRgb": [
-        0.25016990303993225,
-        0.2689734399318695,
-        0.30277326703071594
+        0.25877997279167175,
+        0.2692924439907074,
+        0.29808714985847473
       ],
       "source": "manual_real_raw_border_sample"
     },
@@ -40,22 +40,37 @@
       "baseFogStrength": 1,
       "channelBounds": {
         "blue": {
-          "max": 0.6952813863754272,
-          "min": 0.5188824534416199
+          "max": 0.7072190642356873,
+          "min": 0.5256567597389221
         },
         "green": {
-          "max": 0.7926551103591919,
-          "min": 0.5702906250953674
+          "max": 0.7916334271430969,
+          "min": 0.5697758197784424
         },
         "red": {
-          "max": 0.8632931113243103,
-          "min": 0.6017649173736572
+          "max": 0.8289089202880859,
+          "min": 0.5870693325996399
         }
       },
       "densityTransform": "-log10(clamp(linear_rgb, 1e-6, 1.0))",
       "epsilonPolicy": "clamp_linear_rgb_min_1e-6",
       "normalization": "subtract_sampled_base_density_then_divide_by_density_range",
-      "printCurve": "sigmoid_density_curve_gamma_2_2_preview",
+      "printCurve": "negative_density_print_v2",
+      "printCurveParams": {
+        "algorithm_version": 1,
+        "anchor_density": 0.5,
+        "d_max": 1.649999976158142,
+        "d_min": 0.03999999910593033,
+        "density_offset": 0,
+        "iso_r_grade": 1,
+        "midtone_shape": 0,
+        "output_domain": "scene_linear_print",
+        "schema_version": 2,
+        "shoulder_strength": 0.25,
+        "shoulder_width": 0.25,
+        "toe_strength": 0.25,
+        "toe_width": 0.25
+      },
       "referenceDownscaleMaxEdge": 1080
     },
     "neutralBalance": {
@@ -64,7 +79,7 @@
       "redWeight": 1.0299999713897705
     },
     "positiveOutput": {
-      "contentHash": "sha256:e194793c6bf625d963df6c5ee0e1d57d76b63f2ebcfdb661bdb6b4304054ecd8",
+      "contentHash": "sha256:e8464ae3953f148760d08e2de34c7da70d61c37396b5d870336d2fe3eeeefc89",
       "dimensions": {
         "height": 4000,
         "width": 6000
@@ -77,7 +92,7 @@
     "artifactRoot": "private-artifacts/validation/negative-lab-real-raw",
     "command": "RAWENGINE_PRIVATE_RAW_ROOT=/tmp/rawengine-negative-lab-alaska-proof RAWENGINE_PRIVATE_RAW_SOURCE=\"/Users/cgas/Pictures/Capture One/Alaska\" bun scripts/private-raw/proofs/raw-workflow/run-negative-lab-real-raw-private-proof.ts -- --require-assets",
     "metrics": {
-      "changedPixelRatio": 0.9999616742134094,
+      "changedPixelRatio": 0.9998524785041809,
       "inputToOutputMeanAbsDelta": 0.23301689326763153,
       "sourceHashUnchanged": true
     },
@@ -113,19 +128,19 @@
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:e194793c6bf625d963df6c5ee0e1d57d76b63f2ebcfdb661bdb6b4304054ecd8",
+      "hash": "sha256:e8464ae3953f148760d08e2de34c7da70d61c37396b5d870336d2fe3eeeefc89",
       "kind": "positive_jpeg_private",
       "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:dfc8c2aac46729968c26728ad2597bd354a0df7529b55486199e9534f5e5e21e",
+      "hash": "sha256:b62040d68d5449843c77456850c3105d5c386a5ce6c86494b086c114dc9dc682",
       "kind": "sidecar_private",
       "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg.rrdata",
       "publicRepoAllowed": false
     },
     {
-      "hash": "sha256:6f3643b5105298a7b3fddaf19f29c80c94fb16f3a61f45b198168d06fbc92674",
+      "hash": "sha256:6a1e2c5b05d06b4f86d450e9ecbcc5bf511ffd91bc24c02ef3ccfb837d5c60f5",
       "kind": "conversion_bundle_private",
       "path": "private-artifacts/validation/negative-lab-real-raw/alaska-negative-lab-v1-Positive.jpg.conversion-bundle.json",
       "publicRepoAllowed": false

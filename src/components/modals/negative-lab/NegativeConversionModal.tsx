@@ -1999,8 +1999,7 @@ function NegativeLabSession({
         }),
       ).slice('fnv1a32:'.length);
       const sampleIds = previewBaseFogEstimate === null ? [] : [`base_sample_${sampleHash}`];
-      const usingPrintCurveV2 = currentParams.print_curve_algorithm === 'negative_density_print_v2';
-      const conversionModelId = usingPrintCurveV2 ? 'negative_density_print_v2' : currentParams.conversion_model;
+      const conversionModelId = currentParams.conversion_model;
       const sessionId = sessionSnapshot.session.sessionId;
       const manualBalanceActive =
         currentParams.red_weight !== 1 || currentParams.green_weight !== 1 || currentParams.blue_weight !== 1;
@@ -2050,7 +2049,7 @@ function NegativeLabSession({
           },
           conversionModel: {
             algorithmId: conversionModelId,
-            algorithmVersion: usingPrintCurveV2 ? 2 : 1,
+            algorithmVersion: 1,
             densityMax: 4,
             epsilonPolicyId: 'density_epsilon_v1',
             negativeDensityTolerance: 0.02,
@@ -2084,21 +2083,17 @@ function NegativeLabSession({
             autoGradeStrength: 1,
             confidenceThreshold: 0.58,
           },
-          ...(usingPrintCurveV2 && currentParams.print_curve_v2 !== null
-            ? {
-                densityPrintCurve: {
-                  contrastGrade: currentParams.print_curve_v2.contrast_grade,
-                  densityOffset: currentParams.print_curve_v2.density_offset,
-                  midtoneShape: currentParams.print_curve_v2.midtone_shape,
-                  outputTag: currentParams.print_curve_output_tag ?? 'preview_display',
-                  schemaVersion: currentParams.print_curve_v2.schema_version,
-                  shoulderStrength: currentParams.print_curve_v2.shoulder_strength,
-                  targetBlackDensity: currentParams.print_curve_v2.target_black_density,
-                  targetWhiteDensity: currentParams.print_curve_v2.target_white_density,
-                  toeStrength: currentParams.print_curve_v2.toe_strength,
-                },
-              }
-            : {}),
+          densityPrintCurve: {
+            contrastGrade: currentParams.print_curve_v2.contrast_grade,
+            densityOffset: currentParams.print_curve_v2.density_offset,
+            midtoneShape: currentParams.print_curve_v2.midtone_shape,
+            outputTag: currentParams.print_curve_output_tag,
+            schemaVersion: currentParams.print_curve_v2.schema_version,
+            shoulderStrength: currentParams.print_curve_v2.shoulder_strength,
+            targetBlackDensity: currentParams.print_curve_v2.target_black_density,
+            targetWhiteDensity: currentParams.print_curve_v2.target_white_density,
+            toeStrength: currentParams.print_curve_v2.toe_strength,
+          },
           curveModel: {
             curveFamily: previewProfile === null ? 'parametric_monotonic_v1' : 'process_profile_monotonic_v1',
           },
@@ -2557,33 +2552,13 @@ function NegativeLabSession({
     updatePreview(buildParamsWithFrameOverrides(newParams));
   };
 
-  const handleSetPrintCurveV2Enabled = (enabled: boolean) => {
-    const newParams: NegativeParams = enabled
-      ? {
-          ...params,
-          print_curve_algorithm: 'negative_density_print_v2',
-          print_curve_output_tag: 'preview_display',
-          print_curve_v2: params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS,
-        }
-      : {
-          ...params,
-          print_curve_algorithm: 'density_rgb_v1',
-          print_curve_output_tag: 'preview_display',
-          print_curve_v2: null,
-        };
-    setSelectedPresetId('');
-    setParams(newParams);
-    updatePreview(buildParamsWithFrameOverrides(newParams));
-  };
-
-  const handlePrintCurveV2ParamChange = (key: keyof NonNullable<NegativeParams['print_curve_v2']>, value: number) => {
-    const currentV2Params = params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS;
+  const handlePrintCurveV2ParamChange = (key: keyof NegativeParams['print_curve_v2'], value: number) => {
     const newParams: NegativeParams = {
       ...params,
       print_curve_algorithm: 'negative_density_print_v2',
       print_curve_output_tag: 'preview_display',
       print_curve_v2: {
-        ...currentV2Params,
+        ...params.print_curve_v2,
         [key]: value,
       },
     };
@@ -3805,8 +3780,7 @@ function NegativeLabSession({
   );
 
   const renderBatchReadiness = () => {
-    const printCurveV2Params = params.print_curve_v2 ?? DEFAULT_NEGATIVE_LAB_PRINT_CURVE_V2_PARAMS;
-    const isPrintCurveV2 = params.print_curve_algorithm === 'negative_density_print_v2';
+    const printCurveV2Params = params.print_curve_v2;
     const detailFinishParams = params.detail_finish ?? {
       algorithm_version: 1 as const,
       enabled: false,
@@ -3894,7 +3868,7 @@ function NegativeLabSession({
           data-crosstalk-state={crosstalkState}
           data-density-range-state={baseFogConfidence === null ? 'pending_base' : 'ready'}
           data-preview-export-parity-state={workspaceProof.exportReady ? 'ready_for_receipt' : 'blocked'}
-          data-print-curve-v2={String(isPrintCurveV2)}
+          data-print-curve-v2="true"
           data-testid="negative-lab-v2-qc-readouts"
           role="region"
         >
@@ -3902,24 +3876,12 @@ function NegativeLabSession({
             <UiText variant={TextVariants.small} className="font-medium text-text-primary">
               {t('modals.negativeConversion.v2QcReadouts')}
             </UiText>
-            <button
-              aria-pressed={isPrintCurveV2}
-              className={cx(
-                'rounded border px-2 py-1 text-[11px] transition-colors',
-                isPrintCurveV2
-                  ? 'border-accent bg-accent/10 text-text-primary'
-                  : 'border-surface bg-bg-primary text-text-secondary hover:bg-surface',
-              )}
-              data-testid="negative-lab-v2-algorithm-toggle"
-              onClick={() => {
-                handleSetPrintCurveV2Enabled(!isPrintCurveV2);
-              }}
-              type="button"
+            <span
+              className="rounded border border-accent bg-accent/10 px-2 py-1 text-[11px] text-text-primary"
+              data-testid="negative-lab-v2-algorithm-current"
             >
-              {isPrintCurveV2
-                ? t('modals.negativeConversion.v2AlgorithmEnabled')
-                : t('modals.negativeConversion.v2AlgorithmDisabled')}
-            </button>
+              {t('modals.negativeConversion.v2AlgorithmEnabled')}
+            </span>
           </div>
           <div className="grid grid-cols-2 gap-2 text-[11px] text-text-secondary">
             <span className="rounded bg-bg-primary px-2 py-1" data-testid="negative-lab-v2-crosstalk-status">
@@ -4029,7 +3991,7 @@ function NegativeLabSession({
             </div>
             <Slider
               defaultValue={1}
-              disabled={!isPrintCurveV2 || isSaving}
+              disabled={isSaving}
               fillOrigin="min"
               label={t('modals.negativeConversion.v2ContrastGrade')}
               max={2}
@@ -4042,7 +4004,7 @@ function NegativeLabSession({
             />
             <Slider
               defaultValue={0.25}
-              disabled={!isPrintCurveV2 || isSaving}
+              disabled={isSaving}
               fillOrigin="min"
               label={t('modals.negativeConversion.v2ToeStrength')}
               max={1}
@@ -4055,7 +4017,7 @@ function NegativeLabSession({
             />
             <Slider
               defaultValue={0.25}
-              disabled={!isPrintCurveV2 || isSaving}
+              disabled={isSaving}
               fillOrigin="min"
               label={t('modals.negativeConversion.v2ShoulderStrength')}
               max={1}
@@ -4068,7 +4030,7 @@ function NegativeLabSession({
             />
             <Slider
               defaultValue={0}
-              disabled={!isPrintCurveV2 || isSaving}
+              disabled={isSaving}
               label={t('modals.negativeConversion.v2DensityOffset')}
               max={0.5}
               min={-0.5}

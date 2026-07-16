@@ -1,4 +1,4 @@
-//! Shared, explicit log-density math for Film and Negative Lab adapters.
+//! Shared, explicit log-density math for Film and Negative Lab.
 
 use anyhow::{Result, anyhow};
 
@@ -90,10 +90,7 @@ pub fn density_to_signal(
     }))
 }
 
-/// Compatibility adapter for the existing Negative Lab `negative_log_density_v1`
-/// path. It keeps the legacy scalar API while routing the equation and floor
-/// through the shared descriptor.
-pub fn negative_log_density_channel(value: f32) -> f32 {
+pub fn linear_negative_channel_to_density(value: f32) -> f32 {
     let descriptor = DensityTransformDescriptorV1::negative_transmittance([1.0; 3], [0.0; 3]);
     signal_to_density([f64::from(value); 3], &descriptor)
         .map(|density| density[0] as f32)

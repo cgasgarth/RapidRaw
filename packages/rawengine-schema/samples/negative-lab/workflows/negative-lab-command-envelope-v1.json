@@ -22,7 +22,7 @@
       "mode": "existing_base_estimate"
     },
     "conversionModel": {
-      "algorithmId": "density_rgb_v1",
+      "algorithmId": "negative_log_density_v1",
       "algorithmVersion": 1,
       "densityMax": 4,
       "epsilonPolicyId": "density_epsilon_v1",
@@ -96,6 +96,17 @@
       "lumaRangeClip": 0.08,
       "schemaVersion": 1,
       "whitePointOffset": 0
+    },
+    "densityPrintCurve": {
+      "contrastGrade": 1,
+      "densityOffset": 0,
+      "midtoneShape": 0,
+      "outputTag": "preview_display",
+      "schemaVersion": 2,
+      "shoulderStrength": 0.25,
+      "targetBlackDensity": 1.65,
+      "targetWhiteDensity": 0.04,
+      "toeStrength": 0.25
     },
     "detailFinish": {
       "algorithmVersion": 1,

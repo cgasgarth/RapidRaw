@@ -35,10 +35,27 @@ const sampleRectSchema = z
     y: z.number().min(0).lt(1),
   })
   .strict();
+const currentPrintCurveParamsSchema = z
+  .object({
+    algorithm_version: z.literal(1),
+    anchor_density: z.number().min(0).max(1),
+    d_max: z.number().min(1.1).max(3),
+    d_min: z.number().min(0).max(1),
+    density_offset: z.number().min(-0.5).max(0.5),
+    iso_r_grade: z.number().min(0.5).max(3),
+    midtone_shape: z.number().min(-1).max(1),
+    output_domain: z.literal('scene_linear_print'),
+    schema_version: z.literal(2),
+    shoulder_strength: z.number().min(0).max(1),
+    shoulder_width: z.number().min(0.01).max(0.5),
+    toe_strength: z.number().min(0).max(1),
+    toe_width: z.number().min(0.01).max(0.5),
+  })
+  .strict();
 
 const densityDomainInversionSchema = z
   .object({
-    algorithm: z.literal('density_rgb_v1'),
+    algorithm: z.literal('negative_log_density_v1'),
     baseSample: sampleRectSchema
       .extend({
         estimatedBaseDensity: z.array(z.number().positive()).length(3),
@@ -59,7 +76,8 @@ const densityDomainInversionSchema = z
         densityTransform: z.literal('-log10(clamp(linear_rgb, 1e-6, 1.0))'),
         epsilonPolicy: z.literal('clamp_linear_rgb_min_1e-6'),
         normalization: z.literal('subtract_sampled_base_density_then_divide_by_density_range'),
-        printCurve: z.literal('sigmoid_density_curve_gamma_2_2_preview'),
+        printCurve: z.literal('negative_density_print_v2'),
+        printCurveParams: currentPrintCurveParamsSchema,
         referenceDownscaleMaxEdge: z.literal(1080),
       })
       .strict(),

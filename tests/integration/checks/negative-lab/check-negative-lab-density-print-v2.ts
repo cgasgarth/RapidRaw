@@ -10,6 +10,7 @@ import {
   type NegativeLabDensityBounds,
   type NegativeLabRgbTriplet,
 } from '../../../../src/utils/negative-lab/negativeLabDensityConversion.ts';
+import { DEFAULT_NEGATIVE_LAB_UI_PRESET } from '../../../../src/utils/negative-lab/negativeLabPresetCatalog.ts';
 
 const EPSILON = 0.0000000001;
 
@@ -20,41 +21,10 @@ const assert = (condition: boolean, message: string): void => {
 const near = (left: number, right: number, epsilon = EPSILON): boolean => Math.abs(left - right) <= epsilon;
 
 const baseV2Params = negativeLabPresetParamsSchema.parse({
-  base_fog_sample: null,
-  base_fog_strength: 1,
+  ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
   black_point: 0,
-  blue_weight: 1,
-  contrast: 1,
-  exposure: 0,
-  green_weight: 1,
-  print_curve_algorithm: NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
-  print_curve_output_tag: 'preview_display',
-  print_curve_v2: {
-    contrast_grade: 1,
-    density_offset: 0,
-    midtone_shape: 0,
-    schema_version: 1,
-    shoulder_strength: 0.25,
-    target_black_density: 1.65,
-    target_white_density: 0.04,
-    toe_strength: 0.25,
-  },
-  red_weight: 1,
   white_point: 1,
 });
-
-const legacyParams = negativeLabPresetParamsSchema.parse({
-  base_fog_sample: null,
-  base_fog_strength: 1,
-  blue_weight: 1,
-  contrast: 1,
-  exposure: 0,
-  green_weight: 1,
-  red_weight: 1,
-});
-
-assert(legacyParams.print_curve_algorithm === 'density_rgb_v1', 'Legacy params must default to density_rgb_v1.');
-assert(legacyParams.print_curve_v2 === null, 'Legacy params must not receive v2 curve params.');
 
 const densityBounds: NegativeLabDensityBounds = [
   { max: 2, min: 0 },
@@ -133,7 +103,6 @@ for (let index = 1; index < ramp.length; index += 1) {
 }
 
 const v2Curve = baseV2Params.print_curve_v2;
-if (v2Curve === null) throw new Error('V2 fixture must provide curve params.');
 assert(
   near(ramp[0].positiveRgb[0], (10 ** -v2Curve.target_black_density) ** (1 / 2.2)),
   'V2 lower endpoint should map to paper D-max in preview output.',
@@ -153,7 +122,7 @@ const deterministicA = convertGray(1.13);
 const deterministicB = convertGray(1.13);
 assert(JSON.stringify(deterministicA) === JSON.stringify(deterministicB), 'V2 conversion must be deterministic.');
 
-const withV2Params = (overrides: Partial<NonNullable<typeof baseV2Params.print_curve_v2>>) =>
+const withV2Params = (overrides: Partial<typeof baseV2Params.print_curve_v2>) =>
   negativeLabPresetParamsSchema.parse({
     ...baseV2Params,
     print_curve_v2: {
@@ -167,9 +136,21 @@ assert(
   'Positive density offset should lift the midpoint.',
 );
 assert(
-  convertGray(1.5, withV2Params({ contrast_grade: 1.35 })).positiveRgb[0] >
-    convertGray(1.5, withV2Params({ contrast_grade: 0.75 })).positiveRgb[0],
-  'Higher contrast grade should lift high-density tones.',
+  convertGray(1, { ...baseV2Params, exposure: 0.5 }).positiveRgb[0] >
+    convertGray(1, { ...baseV2Params, exposure: -0.5 }).positiveRgb[0],
+  'Current exposure must adjust H&D density offset.',
+);
+assert(
+  convertGray(1.5, { ...baseV2Params, contrast: 1.35 }).positiveRgb[0] >
+    convertGray(1.5, { ...baseV2Params, contrast: 0.75 }).positiveRgb[0],
+  'Current contrast must adjust H&D ISO-R response.',
+);
+assert(
+  !negativeLabPresetParamsSchema.safeParse({
+    ...baseV2Params,
+    print_curve_v2: { ...baseV2Params.print_curve_v2, contrast_grade: 1.35 },
+  }).success,
+  'Divergent contrast-grade and ISO-R aliases must be rejected.',
 );
 assert(
   convertGray(0.5, withV2Params({ toe_strength: 0.85 })).positiveRgb[0] <
@@ -187,8 +168,8 @@ assert(
   'Positive midtone shaping should lift the midpoint relative to negative shaping.',
 );
 assert(
-  convertGray(1.4, withV2Params({ schema_version: 2, iso_r_grade: 1.4 })).positiveRgb[0] !==
-    convertGray(1.4, withV2Params({ schema_version: 2, iso_r_grade: 0.7 })).positiveRgb[0],
+  convertGray(1.4, withV2Params({ contrast_grade: 1.4, iso_r_grade: 1.4 })).positiveRgb[0] >
+    convertGray(1.4, withV2Params({ contrast_grade: 0.7, iso_r_grade: 0.7 })).positiveRgb[0],
   'ISO-R grade must change the native-matched sample response.',
 );
 assert(
@@ -219,7 +200,7 @@ assert(
 );
 
 const negativeRgb: NegativeLabRgbTriplet = [10 ** -1, 10 ** -1, 10 ** -1];
-const v2ViaLegacyEntry = convertNegativeLabDensitySample({
+const currentViaRgbEntry = convertNegativeLabDensitySample({
   baseFogRgb: [1, 1, 1],
   densityBounds,
   negativeRgb,
@@ -227,16 +208,7 @@ const v2ViaLegacyEntry = convertNegativeLabDensitySample({
   scanMetrics,
 });
 assert(
-  v2ViaLegacyEntry.algorithmId === NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
-  'RGB entry point must dispatch to v2 when selected.',
+  currentViaRgbEntry.algorithmId === NEGATIVE_LAB_DENSITY_PRINT_V2_ALGORITHM_ID,
+  'RGB sample entry point must dispatch through the current density-print contract.',
 );
-
-const v1ViaLegacyEntry = convertNegativeLabDensitySample({
-  baseFogRgb: [1, 1, 1],
-  densityBounds,
-  negativeRgb,
-  params: legacyParams,
-});
-assert(v1ViaLegacyEntry.algorithmId === 'density_rgb_v1', 'RGB entry point must preserve v1 fallback.');
-
-console.log(`negative lab density print v2 ok (${ramp.length} generated ramp samples)`);
+console.log(`negative lab current density print ok (${ramp.length} generated ramp samples)`);
