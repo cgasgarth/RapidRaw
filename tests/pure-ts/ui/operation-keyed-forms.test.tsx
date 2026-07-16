@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import { Window } from 'happy-dom';
+import { act, type RenderResult, render as testingRender } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, type ReactElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 const invokeCalls: Array<{ args: unknown; command: string }> = [];
@@ -12,8 +12,6 @@ const invokeCommand = (command: string, args?: unknown) => {
   return Promise.resolve(null);
 };
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-installDom();
 const i18n = await createTestI18n();
 const { default: CreateFolderModal } = await import('../../../src/components/modals/library/CreateFolderModal.tsx');
 const { default: RenameFolderModal } = await import('../../../src/components/modals/library/RenameFolderModal.tsx');
@@ -21,7 +19,6 @@ const { default: RenameFileModal } = await import('../../../src/components/modal
 const { TaggingDraft } = await import('../../../src/context/TaggingSubMenu.tsx');
 
 test('create folder cancel/reopen discards the abandoned draft and guards duplicate submission', async () => {
-  const rendered = createRenderedRoot();
   const savedNames: string[] = [];
   const props = {
     isOpen: true,
@@ -29,29 +26,25 @@ test('create folder cancel/reopen discards the abandoned draft and guards duplic
     onSave: (name: string) => savedNames.push(name),
     operationScope: '/Volumes/Photo Library/Ålesund 旅行',
   };
-  await render(rendered.root, createElement(CreateFolderModal, props));
+  const rendered = render(createElement(CreateFolderModal, props));
   await setInputValue(rendered.container, 'create-folder-name', 'Abandoned draft');
-  await render(rendered.root, createElement(CreateFolderModal, { ...props, isOpen: false }));
-  await render(rendered.root, createElement(CreateFolderModal, props));
+  rerender(rendered, createElement(CreateFolderModal, { ...props, isOpen: false }));
+  rerender(rendered, createElement(CreateFolderModal, props));
   const reopenedInput = getInput(rendered.container, 'create-folder-name');
   expect(reopenedInput.value).toBe('');
 
   await setInputValue(rendered.container, 'create-folder-name', '  New selects  ');
   expect(getButton(rendered.container, 'create-folder-submit').disabled).toBe(false);
-  await act(async () => {
-    getButton(rendered.container, 'create-folder-submit').click();
-    getButton(rendered.container, 'create-folder-submit').click();
-  });
+  const user = userEvent.setup({ delay: 1 });
+  await user.click(getButton(rendered.container, 'create-folder-submit'));
+  await user.click(getButton(rendered.container, 'create-folder-submit'));
   expect(savedNames).toEqual(['New selects']);
-  rendered.unmount();
 });
 
 test('rename folder switches A to B synchronously and same-folder reopen gets a new draft', async () => {
-  const rendered = createRenderedRoot();
   let closeCount = 0;
   const baseProps = { isOpen: true, onClose: () => closeCount++, onSave: () => undefined };
-  await render(
-    rendered.root,
+  const rendered = render(
     createElement(RenameFolderModal, {
       ...baseProps,
       currentName: 'Folder A',
@@ -59,8 +52,8 @@ test('rename folder switches A to B synchronously and same-folder reopen gets a 
     }),
   );
   await setInputValue(rendered.container, 'rename-folder-name', 'Abandoned A');
-  await render(
-    rendered.root,
+  rerender(
+    rendered,
     createElement(RenameFolderModal, {
       ...baseProps,
       currentName: 'Følder B',
@@ -69,8 +62,8 @@ test('rename folder switches A to B synchronously and same-folder reopen gets a 
   );
   expect(getInput(rendered.container, 'rename-folder-name').value).toBe('Følder B');
   await setInputValue(rendered.container, 'rename-folder-name', 'Abandoned B');
-  await render(
-    rendered.root,
+  rerender(
+    rendered,
     createElement(RenameFolderModal, {
       ...baseProps,
       currentName: 'Følder B',
@@ -78,8 +71,8 @@ test('rename folder switches A to B synchronously and same-folder reopen gets a 
       operationScope: '/library/Følder B',
     }),
   );
-  await render(
-    rendered.root,
+  rerender(
+    rendered,
     createElement(RenameFolderModal, {
       ...baseProps,
       currentName: 'Følder B',
@@ -87,29 +80,22 @@ test('rename folder switches A to B synchronously and same-folder reopen gets a 
     }),
   );
   expect(getInput(rendered.container, 'rename-folder-name').value).toBe('Følder B');
-  await act(async () => {
-    getInput(rendered.container, 'rename-folder-name').dispatchEvent(
-      new window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }),
-    );
-  });
+  await userEvent.setup().type(getInput(rendered.container, 'rename-folder-name'), '{Escape}');
   expect(closeCount).toBe(1);
-  rendered.unmount();
 });
 
 test('rename file preserves a single-file extension and applies multi-file sequence exactly once', async () => {
-  const rendered = createRenderedRoot();
   const savedTemplates: string[] = [];
   const baseProps = { isOpen: true, onClose: () => undefined, onSave: (value: string) => savedTemplates.push(value) };
-  await render(
-    rendered.root,
+  const rendered = render(
     createElement(RenameFileModal, {
       ...baseProps,
       filesToRename: ['/Photo Library/旅行/Émulsion scan 01.CR3'],
     }),
   );
   expect(getInput(rendered.container, 'rename-file-template').value).toBe('Émulsion scan 01');
-  await render(
-    rendered.root,
+  rerender(
+    rendered,
     createElement(RenameFileModal, {
       ...baseProps,
       filesToRename: ['/Photo Library/one.CR3', '/Photo Library/two.CR3'],
@@ -118,17 +104,12 @@ test('rename file preserves a single-file extension and applies multi-file seque
   expect(getInput(rendered.container, 'rename-file-template').value).toBe('{original_filename}');
   await setInputValue(rendered.container, 'rename-file-template', 'Roll selects');
   expect(getButton(rendered.container, 'rename-file-submit').disabled).toBe(false);
-  await act(async () => {
-    const input = getInput(rendered.container, 'rename-file-template');
-    input.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    input.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-  });
+  const input = getInput(rendered.container, 'rename-file-template');
+  await userEvent.setup().type(input, '{Enter}{Enter}');
   expect(savedTemplates).toEqual(['Roll selects_{sequence}']);
-  rendered.unmount();
 });
 
 test('tagging keeps edits across equivalent tag-array allocation and resets only for a new keyed invocation', async () => {
-  const rendered = createRenderedRoot();
   const changedTags: string[][] = [];
   let hideCount = 0;
   const baseProps = {
@@ -138,8 +119,7 @@ test('tagging keeps edits across equivalent tag-array allocation and resets only
     onTagsChanged: (_paths: string[], tags: Array<{ tag: string }>) => changedTags.push(tags.map(({ tag }) => tag)),
     paths: ['/Photo Library/旅行/scan one.CR3'],
   };
-  await render(
-    rendered.root,
+  const rendered = render(
     createElement(TaggingDraft, {
       ...baseProps,
       initialTags: [{ isUser: true, tag: 'alpha' }],
@@ -149,20 +129,15 @@ test('tagging keeps edits across equivalent tag-array allocation and resets only
   const tagInput = rendered.container.querySelector('input');
   if (!(tagInput instanceof HTMLInputElement)) throw new Error('Expected tagging input.');
   await setElementValue(tagInput, 'beta');
-  await act(async () => {
-    tagInput.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    tagInput.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    await flush();
-  });
+  const user = userEvent.setup();
+  await user.type(tagInput, '{Enter}{Enter}');
   expect(invokeCalls).toHaveLength(1);
   expect(changedTags).toEqual([['alpha', 'beta']]);
-  await act(async () => {
-    tagInput.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-  });
+  await user.type(tagInput, '{Escape}');
   expect(hideCount).toBe(1);
 
-  await render(
-    rendered.root,
+  rerender(
+    rendered,
     createElement(TaggingDraft, {
       ...baseProps,
       initialTags: [{ isUser: true, tag: 'alpha' }],
@@ -170,8 +145,8 @@ test('tagging keeps edits across equivalent tag-array allocation and resets only
     }),
   );
   expect(rendered.container.textContent).toContain('beta');
-  await render(
-    rendered.root,
+  rerender(
+    rendered,
     createElement(TaggingDraft, {
       ...baseProps,
       initialTags: [{ isUser: true, tag: 'gamma' }],
@@ -180,28 +155,14 @@ test('tagging keeps edits across equivalent tag-array allocation and resets only
   );
   expect(rendered.container.textContent).toContain('gamma');
   expect(rendered.container.textContent).not.toContain('beta');
-  rendered.unmount();
 });
 
-function createRenderedRoot(): { container: HTMLDivElement; root: Root; unmount: () => void } {
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  return {
-    container,
-    root,
-    unmount: () => {
-      act(() => root.unmount());
-      container.remove();
-    },
-  };
+function render(child: ReactElement): RenderResult {
+  return testingRender(createElement(I18nextProvider, { i18n }, child));
 }
 
-async function render(root: Root, child: ReturnType<typeof createElement>) {
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, child));
-    await flush();
-  });
+function rerender(rendered: RenderResult, child: ReactElement) {
+  rendered.rerender(createElement(I18nextProvider, { i18n }, child));
 }
 
 function getInput(container: HTMLDivElement, testId: string): HTMLInputElement {
@@ -222,39 +183,22 @@ async function setInputValue(container: HTMLDivElement, testId: string, value: s
 
 async function setElementValue(input: HTMLInputElement, value: string) {
   await act(async () => {
-    const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-    if (valueSetter === undefined) throw new Error('Expected input value setter.');
-    valueSetter.call(input, value);
-    input.dispatchEvent(new window.Event('input', { bubbles: true }));
-    input.dispatchEvent(new window.Event('change', { bubbles: true }));
-    const reactPropsKey = Object.keys(input).find((key) => key.startsWith('__reactProps$'));
-    if (reactPropsKey === undefined) throw new Error('Expected React input props.');
-    const reactProps = Reflect.get(input, reactPropsKey) as {
-      onChange?: (event: { currentTarget: HTMLInputElement; target: HTMLInputElement }) => void;
-    };
-    reactProps.onChange?.({ currentTarget: input, target: input });
-    await flush();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   });
-}
-
-async function flush() {
-  await new Promise((resolve) => setTimeout(resolve, 20));
-}
-
-function installDom() {
-  const testWindow = new Window({ pretendToBeVisual: true, url: 'http://localhost/' });
-  Object.assign(globalThis, {
-    document: testWindow.document,
-    Element: testWindow.Element,
-    HTMLElement: testWindow.HTMLElement,
-    HTMLButtonElement: testWindow.HTMLButtonElement,
-    HTMLInputElement: testWindow.HTMLInputElement,
-    KeyboardEvent: testWindow.KeyboardEvent,
-    MouseEvent: testWindow.MouseEvent,
-    navigator: testWindow.navigator,
-    requestAnimationFrame: testWindow.requestAnimationFrame.bind(testWindow),
-    window: testWindow,
-  });
+  const user = userEvent.setup({ delay: 1 });
+  await user.click(input);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await user.clear(input);
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    });
+    if (input.value === '') break;
+  }
+  expect(input).toHaveValue('');
+  for (const character of value) {
+    input.setSelectionRange(input.value.length, input.value.length);
+    await user.type(input, character, { skipClick: true });
+  }
 }
 
 async function createTestI18n() {

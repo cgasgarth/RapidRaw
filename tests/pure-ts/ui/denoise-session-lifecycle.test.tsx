@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
-import { createRoot } from 'react-dom/client';
+import { act, render as testingRender } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { createElement } from 'react';
 
 type ProgressListener = (event: { payload: unknown }) => void;
 const progressListeners: ProgressListener[] = [];
@@ -25,7 +25,7 @@ afterEach(async () => {
   progressListeners.length = 0;
   listen.mockClear();
   unlisten.mockClear();
-  globalThis.document?.body.replaceChildren();
+  document.body.replaceChildren();
 });
 
 test('pure defaults and identity distinguish source mode, ordering, and same-target reopen', () => {
@@ -182,41 +182,35 @@ function props(overrides: Partial<React.ComponentProps<typeof DenoiseSession>> =
 }
 
 function installRuntime() {
-  const window = new Window({ url: 'http://localhost' });
-  Object.assign(globalThis, {
-    document: window.document,
-    HTMLElement: window.HTMLElement,
-    IS_REACT_ACT_ENVIRONMENT: true,
-    navigator: window.navigator,
-    Node: window.Node,
-    window,
-  });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  const rendered = testingRender(
+    createElement(DenoiseSession, { ...props({ isActive: false, show: false }), key: 'initial', sessionId: 'initial' }),
+  );
+  const user = userEvent.setup();
   let mounted = true;
   return {
     button: (text: string) => {
-      const button = [...container.querySelectorAll('button')].find((candidate) =>
+      const button = [...rendered.container.querySelectorAll('button')].find((candidate) =>
         candidate.textContent?.includes(text),
       );
       if (!button) throw new Error(`Missing button ${text}`);
       return button;
     },
-    click: async (element: Element) =>
-      act(async () => element.dispatchEvent(new window.MouseEvent('click', { bubbles: true }))),
-    container,
-    render: async (key: string, sessionProps: React.ComponentProps<typeof DenoiseSession>) =>
-      act(async () => root.render(createElement(DenoiseSession, { ...sessionProps, key, sessionId: key }))),
+    click: (element: Element) => user.click(element),
+    container: rendered.container,
+    render: async (key: string, sessionProps: React.ComponentProps<typeof DenoiseSession>) => {
+      rendered.rerender(createElement(DenoiseSession, { ...sessionProps, key, sessionId: key }));
+      await Promise.resolve();
+    },
     summary: () => {
-      const summary = container.querySelector<HTMLElement>('[data-testid="denoise-setup-summary"]');
+      const summary = rendered.container.querySelector<HTMLElement>('[data-testid="denoise-setup-summary"]');
       if (!summary) throw new Error('Missing denoise summary');
       return summary;
     },
     unmount: async () => {
       if (!mounted) return;
       mounted = false;
-      await act(async () => root.unmount());
+      rendered.unmount();
+      await Promise.resolve();
     },
   };
 }

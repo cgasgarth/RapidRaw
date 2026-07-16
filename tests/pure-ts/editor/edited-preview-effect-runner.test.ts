@@ -39,7 +39,10 @@ const deferred = <T>() => {
   return { promise, reject, resolve };
 };
 
-const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+const tick = async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  for (let depth = 0; depth < 8; depth += 1) await Promise.resolve();
+};
 const execution = (marker = 1): ExecutedEditedPreview => ({
   buffer: new Uint8Array([marker]).buffer,
   newlySentPatchIds: new Set(),

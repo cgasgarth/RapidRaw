@@ -1,11 +1,9 @@
-import { afterEach, describe, expect, test } from 'bun:test';
-import { ClerkProvider } from '@clerk/react';
-import { Window } from 'happy-dom';
+import { afterEach, describe, expect, mock, test } from 'bun:test';
+import { act, render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { AIPanel } from '../../../src/components/panel/right/ai/AIPanel.tsx';
 import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
@@ -14,7 +12,13 @@ import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshot
 import { type AiPatch, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+const invoke = mock(async () => null);
+mock.module('@tauri-apps/api/core', () => ({ invoke }));
+mock.module('@clerk/react', () => ({
+  useAuth: () => ({ getToken: async () => null }),
+  useUser: () => ({ isSignedIn: false, user: null }),
+}));
+const { AIPanel } = await import('../../../src/components/panel/right/ai/AIPanel.tsx');
 
 const target = (id: string): SubMask => ({
   id,
@@ -36,31 +40,27 @@ const edit = (id: string, targets: Array<string>): AiPatch => ({
   visible: true,
 });
 
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
 const sourcePath = '/test/image.jpg';
 const imageSession = createEditorImageSession({ generation: 8, path: sourcePath, source: 'cache' });
 
 afterEach(() => {
-  if (renderedRoot) {
-    act(() => renderedRoot?.root.unmount());
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
-  useEditorStore.getState().hydrateEditorRenderAuthority({
-    activeAiPatchContainerId: null,
-    activeAiSubMaskId: null,
-    adjustmentRevision: 0,
-    editDocumentV2,
-    historyCheckpoints: [],
-    historyIndex: 0,
-    imageSession: null,
-    lastEditApplicationReceipt: null,
-    selectedImage: null,
-    history: [editDocumentV2],
+  act(() => {
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      activeAiPatchContainerId: null,
+      activeAiSubMaskId: null,
+      adjustmentRevision: 0,
+      editDocumentV2,
+      historyCheckpoints: [],
+      historyIndex: 0,
+      imageSession: null,
+      lastEditApplicationReceipt: null,
+      selectedImage: null,
+      history: [editDocumentV2],
+    });
   });
+  invoke.mockClear();
 });
 
 describe('AI panel command-owned selection', () => {
@@ -97,36 +97,35 @@ describe('AI panel command-owned selection', () => {
     const unsubscribe = useEditorStore.subscribe(() => {
       passiveStoreWrites += 1;
     });
-    const { container } = await renderAiPanel();
+    const { container, user } = await renderAiPanel();
     unsubscribe();
     expect(passiveStoreWrites).toBe(0);
     const first = required<HTMLElement>(container, '[data-testid="inpaint-edit-first"]');
     expect(container.querySelector('[data-testid="inpaint-target-middle"]')).toBeNull();
 
-    await click(required<HTMLButtonElement>(first, 'button'));
+    await user.click(required<HTMLButtonElement>(first, 'button'));
     const middle = required<HTMLElement>(container, '[data-testid="inpaint-target-middle"]');
-    await click(middle);
+    await user.click(middle);
     expect(useEditorStore.getState().activeAiSubMaskId).toBe('middle');
 
-    await click(required<HTMLButtonElement>(first, 'button'));
+    await user.click(required<HTMLButtonElement>(first, 'button'));
     expect(required<HTMLButtonElement>(first, 'button').getAttribute('aria-label')).toBe('Expand edit targets');
 
-    await act(async () => {
+    act(() => {
       useEditorStore.getState().applyAiEditCommand(({ aiPatches, selection }) => ({
         aiPatches: aiPatches.map((candidate) =>
           candidate.id === 'second' ? { ...candidate, visible: !candidate.visible } : candidate,
         ),
         selection,
       }));
-      await flush();
     });
     expect(required<HTMLButtonElement>(first, 'button').getAttribute('aria-label')).toBe('Expand edit targets');
     expect(useEditorStore.getState().activeAiSubMaskId).toBe('middle');
 
-    await click(required<HTMLButtonElement>(first, 'button'));
+    await user.click(required<HTMLButtonElement>(first, 'button'));
     const reopenedMiddle = required<HTMLElement>(container, '[data-testid="inpaint-target-middle"]');
     const deleteButton = required<HTMLButtonElement>(reopenedMiddle, 'button:last-of-type');
-    await click(deleteButton);
+    await user.click(deleteButton);
 
     const state = useEditorStore.getState();
     expect(state.adjustmentSnapshot.value.aiPatches[0]?.subMasks.map((subMask) => subMask.id)).toEqual(['one', 'last']);
@@ -139,68 +138,18 @@ describe('AI panel command-owned selection', () => {
 });
 
 async function renderAiPanel() {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
   const i18n = await createTestI18n();
-
-  await act(async () => {
-    root.render(
-      createElement(
-        ClerkProvider,
-        { publishableKey: 'pk_test_Y2xlcmsuZXhhbXBsZS5jb20k' },
-        createElement(I18nextProvider, { i18n }, createElement(ContextMenuProvider, null, createElement(AIPanel))),
-      ),
-    );
-    await flush();
-    await flush();
-  });
-  renderedRoot = { container, root };
-  return { container };
-}
-
-async function click(element: HTMLElement) {
-  await act(async () => {
-    element.click();
-    await flush();
-    await flush();
-  });
+  const user = userEvent.setup();
+  const { container } = render(
+    createElement(I18nextProvider, { i18n }, createElement(ContextMenuProvider, null, createElement(AIPanel))),
+  );
+  return { container, user };
 }
 
 function required<T extends Element>(container: Element, selector: string): T {
   const element = container.querySelector<T>(selector);
   if (!element) throw new Error(`Expected ${selector} to render.`);
   return element;
-}
-
-async function flush() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/ai-panel-test' });
-  Object.defineProperty(window, '__TAURI_INTERNALS__', {
-    value: { invoke: async () => null },
-  });
-  Object.assign(globalThis, {
-    document: window.document,
-    Element: window.Element,
-    HTMLElement: window.HTMLElement,
-    HTMLInputElement: window.HTMLInputElement,
-    KeyboardEvent: window.KeyboardEvent,
-    MouseEvent: window.MouseEvent,
-    Node: window.Node,
-    navigator: window.navigator,
-    window,
-  });
-  Object.assign(globalThis, { ResizeObserver: TestResizeObserver });
-}
-
-class TestResizeObserver {
-  disconnect() {}
-  observe(_target: Element, _options?: ResizeObserverOptions) {}
-  unobserve(_target: Element) {}
 }
 
 async function createTestI18n() {

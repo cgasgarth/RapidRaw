@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, fireEvent, render } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import CropPanel from '../../../src/components/panel/right/color/CropPanel.tsx';
@@ -13,8 +13,6 @@ import { createEditorImageSession, useEditorStore } from '../../../src/store/use
 import { useUIStore } from '../../../src/store/useUIStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const selectedImage: SelectedImage = {
   exif: null,
@@ -29,17 +27,8 @@ const selectedImage: SelectedImage = {
   width: 4000,
 };
 
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
 afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-  resetStores();
+  act(resetStores);
 });
 
 describe('crop panel workflow', () => {
@@ -59,7 +48,7 @@ describe('crop panel workflow', () => {
     });
     useUIStore.setState({ activeRightPanel: Panel.Crop, renderedRightPanel: Panel.Crop });
 
-    const { container } = await renderCropPanel();
+    const { container, user } = await renderCropPanel();
     const panel = required<HTMLElement>(container, '[data-testid="crop-panel-status"]');
     expect(panel.dataset.cropDirty).toBe('false');
     expect(required<HTMLElement>(container, '[data-crop-panel-density="compact"]')).not.toBeNull();
@@ -70,22 +59,16 @@ describe('crop panel workflow', () => {
     expect(container.querySelector('[data-testid="crop-panel-transform-entry"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="crop-panel-lens-entry"]')).not.toBeNull();
 
-    await act(async () => {
-      required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-5-4"]').click();
-      await flush();
-    });
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-5-4"]'));
 
     expect(useEditorStore.getState().adjustmentSnapshot.value.aspectRatio).toBe(5 / 4);
     expect(required<HTMLElement>(container, '[data-testid="crop-panel-status"]').dataset.cropDirty).toBe('true');
 
-    await act(async () => {
-      const cancel = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
-        (button) => button.textContent === 'Cancel',
-      );
-      if (cancel === undefined) throw new Error('Expected Crop cancel action.');
-      cancel.click();
-      await flush();
-    });
+    const cancel = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'Cancel',
+    );
+    if (cancel === undefined) throw new Error('Expected Crop cancel action.');
+    await user.click(cancel);
 
     expect(useEditorStore.getState().adjustmentSnapshot.value.aspectRatio).toBe(3 / 2);
     expect(useEditorStore.getState().history).toHaveLength(3);
@@ -104,23 +87,13 @@ describe('crop panel workflow', () => {
       history: [editDocumentV2],
     });
 
-    const { container } = await renderCropPanel();
-    await act(async () => {
-      required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-custom"]').click();
-      await flush();
-    });
+    const { container, user } = await renderCropPanel();
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-custom"]'));
     const width = required<HTMLInputElement>(container, 'input[name="customW"]');
     const height = required<HTMLInputElement>(container, 'input[name="customH"]');
-    await act(async () => {
-      height.focus();
-      await flush();
-    });
-    await setElementValue(width, '');
-    await setElementValue(height, '');
-    await act(async () => {
-      height.blur();
-      await flush();
-    });
+    await user.clear(width);
+    await user.clear(height);
+    await user.tab();
 
     expect(required<HTMLElement>(container, '#crop-custom-ratio-error').textContent).toContain('greater than zero');
     expect(required<HTMLInputElement>(container, 'input[name="customW"]').getAttribute('aria-invalid')).toBe('true');
@@ -144,18 +117,14 @@ describe('crop panel workflow', () => {
     });
     useUIStore.setState({ activeRightPanel: Panel.Crop, renderedRightPanel: Panel.Crop });
 
-    const { container } = await renderCropPanel();
+    const { container, user } = await renderCropPanel();
 
-    await clickControl(container, '[data-testid="crop-panel-ratio-orientation-toggle"]');
-    await clickControl(container, '[data-testid="crop-panel-flip-horizontal"]');
-    await clickControl(container, '[data-testid="crop-panel-rotate-right"]');
-    await clickControl(container, '[data-testid="crop-panel-straighten-toggle"]');
-    await clickControl(container, '[data-testid="crop-panel-overlay-rotate"]');
-    await act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'o' }));
-      await flush();
-      await flush();
-    });
+    await clickControl(user, container, '[data-testid="crop-panel-ratio-orientation-toggle"]');
+    await clickControl(user, container, '[data-testid="crop-panel-flip-horizontal"]');
+    await clickControl(user, container, '[data-testid="crop-panel-rotate-right"]');
+    await clickControl(user, container, '[data-testid="crop-panel-straighten-toggle"]');
+    await clickControl(user, container, '[data-testid="crop-panel-overlay-rotate"]');
+    fireEvent.keyDown(window, { key: 'o' });
 
     expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
       aspectRatio: 3 / 2,
@@ -177,28 +146,22 @@ describe('crop panel workflow', () => {
       editDocumentV2,
       history: [editDocumentV2],
     });
-    const { container } = await renderCropPanel();
+    const { container, user } = await renderCropPanel();
     const width = required<HTMLInputElement>(container, 'input[name="customW"]');
     expect(width.value).toBe('170');
 
-    await act(async () => {
-      width.focus();
-      await flush();
-    });
-    await setElementValue(width, '200');
-    await act(async () => {
+    await user.clear(width);
+    await user.type(width, '200');
+    act(() => {
       useEditorStore.setState({ overlayRotation: 2 });
-      await flush();
     });
     expect(required<HTMLInputElement>(container, 'input[name="customW"]').value).toBe('200');
 
-    await act(async () => {
-      width.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
-      await flush();
-    });
+    width.focus();
+    await user.keyboard('{Escape}');
     expect(required<HTMLInputElement>(container, 'input[name="customW"]').value).toBe('170');
 
-    await act(async () => {
+    act(() => {
       const switchedDocument = legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, aspectRatio: 0.83 });
       useEditorStore.getState().hydrateEditorRenderAuthority({
         selectedImage: { ...selectedImage, path: '/validation/crop-workflow-b.ARW' },
@@ -206,7 +169,6 @@ describe('crop panel workflow', () => {
         history: [switchedDocument],
         historyIndex: 0,
       });
-      await flush();
     });
     expect(required<HTMLInputElement>(container, 'input[name="customW"]').value).toBe('83');
     expect(required<HTMLInputElement>(container, 'input[name="customH"]').value).toBe('100');
@@ -223,41 +185,30 @@ describe('crop panel workflow', () => {
       editDocumentV2: initialDocument,
       history: [initialDocument],
     });
-    const { container, root } = await renderCropPanel();
-    await clickControl(container, '[data-testid="crop-panel-straighten-toggle"]');
+    const { container, unmount, user } = await renderCropPanel();
+    await clickControl(user, container, '[data-testid="crop-panel-straighten-toggle"]');
     expect(useEditorStore.getState().adjustmentSnapshot.value.rotation).toBe(0);
-    await clickControl(container, '[data-testid="crop-ratio-preset-original"]');
+    await clickControl(user, container, '[data-testid="crop-ratio-preset-original"]');
     const historyBeforeRotate = useEditorStore.getState().history.length;
-    await clickControl(container, '[data-testid="crop-panel-rotate-right"]');
+    await clickControl(user, container, '[data-testid="crop-panel-rotate-right"]');
     expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
       aspectRatio: 3 / 4,
       orientationSteps: 1,
     });
     expect(useEditorStore.getState().history).toHaveLength(historyBeforeRotate + 1);
 
-    act(() => root.unmount());
-    container.remove();
-    renderedRoot = null;
+    unmount();
     expect(useEditorStore.getState().liveRotation).toBeNull();
   });
 });
 
 async function renderCropPanel() {
-  installDom();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
   const i18n = await createTestI18n();
-
-  await act(async () => {
-    root.render(
-      createElement(I18nextProvider, { i18n }, createElement(ContextMenuProvider, null, createElement(CropPanel))),
-    );
-    await flush();
-  });
-
-  renderedRoot = { container, root };
-  return { container, root };
+  const user = userEvent.setup();
+  const rendered = render(
+    createElement(I18nextProvider, { i18n }, createElement(ContextMenuProvider, null, createElement(CropPanel))),
+  );
+  return { ...rendered, user };
 }
 
 function resetStores() {
@@ -282,44 +233,8 @@ function required<T extends Element>(container: Element, selector: string): T {
   return element;
 }
 
-async function flush() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-async function clickControl(container: Element, selector: string) {
-  await act(async () => {
-    required<HTMLButtonElement>(container, selector).click();
-    await flush();
-    await flush();
-  });
-}
-
-async function setElementValue(input: HTMLInputElement, value: string) {
-  const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-  if (valueSetter === undefined) throw new Error('Expected input value setter.');
-  await act(async () => {
-    valueSetter.call(input, value);
-    const reactPropsKey = Object.keys(input).find((key) => key.startsWith('__reactProps$'));
-    if (reactPropsKey === undefined) throw new Error('Expected React input props.');
-    const reactProps = Reflect.get(input, reactPropsKey) as {
-      onChange?: (event: { currentTarget: HTMLInputElement; target: HTMLInputElement }) => void;
-    };
-    reactProps.onChange?.({ currentTarget: input, target: input });
-    await flush();
-  });
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/crop-panel-test' });
-  Object.assign(globalThis, {
-    document: window.document,
-    Event: window.Event,
-    HTMLElement: window.HTMLElement,
-    HTMLInputElement: window.HTMLInputElement,
-    KeyboardEvent: window.KeyboardEvent,
-    navigator: window.navigator,
-    window,
-  });
+async function clickControl(user: UserEvent, container: Element, selector: string) {
+  await user.click(required<HTMLButtonElement>(container, selector));
 }
 
 async function createTestI18n() {
