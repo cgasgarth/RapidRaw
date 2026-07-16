@@ -63,8 +63,39 @@ test('smart preview completion has an independent revision-safe event', () => {
     },
     sourceRevision: 'source-revision-7',
     state: 'current',
+    storage: {
+      artifactCount: 12,
+      retainedBytes: 4096,
+    },
   });
 
   expect(payload.resource.generation).toBe(9);
   expect(payload.smartPreview.width).toBe(2560);
+  expect(payload.storage).toEqual({ artifactCount: 12, retainedBytes: 4096 });
+});
+
+test('smart preview completion rejects undeclared storage fields', () => {
+  expect(() =>
+    parseSmartPreviewGeneratedPayload({
+      generation: 7,
+      path: '/photos/a.raf',
+      resource: { ...resource, generation: 9, source: 'smartPreview' },
+      smartPreview: {
+        colorProfile: 'srgb',
+        height: 1707,
+        source: 'rendered',
+        sourceAvailable: true,
+        sourceRevision: 'source-revision-7',
+        stale: false,
+        width: 2560,
+      },
+      sourceRevision: 'source-revision-7',
+      state: 'current',
+      storage: {
+        artifactCount: 12,
+        retainedBytes: 4096,
+        unownedBytes: 1,
+      },
+    }),
+  ).toThrow();
 });

@@ -191,6 +191,12 @@ const smartPreviewGeneratedPayloadSchema = z
     smartPreview: thumbnailSmartPreviewPayloadSchema,
     sourceRevision: z.string(),
     state: z.literal('current'),
+    storage: z
+      .object({
+        artifactCount: nonnegativeIntegerSchema,
+        retainedBytes: nonnegativeIntegerSchema,
+      })
+      .strict(),
   })
   .strict();
 
