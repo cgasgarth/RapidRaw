@@ -20,6 +20,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { useShallow } from 'zustand/react/shallow';
+import type { EditDocumentV2 } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
 import {
   exportColorCapabilityCatalogV1Schema,
   MOXCMS_EXPORT_COLOR_CAPABILITIES_V1,
@@ -400,6 +401,7 @@ export default function ExportPanel({
 
   const {
     adjustments,
+    editDocumentV2,
     exportSoftProofTransform,
     exportSoftProofRecipeId,
     gamutWarningOverlay,
@@ -410,6 +412,7 @@ export default function ExportPanel({
   } = useEditorStore(
     useShallow((state) => ({
       adjustments: state.adjustmentSnapshot.value,
+      editDocumentV2: state.editDocumentV2,
       exportSoftProofTransform: state.exportSoftProofTransform,
       exportSoftProofRecipeId: state.exportSoftProofRecipeId,
       gamutWarningOverlay: state.gamutWarningOverlay,
@@ -1101,7 +1104,7 @@ export default function ExportPanel({
       debounce(
         async (
           paths: string[],
-          currentAdj: Adjustments | null,
+          currentEditDocumentV2: EditDocumentV2 | null,
           currentPath: string | undefined,
           exportSettings: ExportSettings,
           format: string,
@@ -1119,7 +1122,7 @@ export default function ExportPanel({
                 exportSettings,
                 outputFormat: format,
                 currentEditPath: currentPath || null,
-                currentEditAdjustments: currentAdj || null,
+                currentEditDocumentV2,
               },
               exportSizeEstimateSchema,
             );
@@ -1161,13 +1164,14 @@ export default function ExportPanel({
           : null,
     };
     const format = availableFileFormats.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
-    debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
+    debouncedEstimateSize(pathsToExport, editDocumentV2, selectedImage?.path, exportSettings, format);
     return () => {
       debouncedEstimateSize.cancel();
     };
   }, [
     pathsToExport,
     adjustments,
+    editDocumentV2,
     selectedImage?.path,
     availableFileFormats,
     fileFormat,
@@ -1307,7 +1311,7 @@ export default function ExportPanel({
           exportSettings,
           outputFormat: selectedFormat.extensions[0],
           currentEditPath: selectedImage?.path || null,
-          currentEditAdjustments: adjustments,
+          currentEditDocumentV2: editDocumentV2,
         });
         logAppOperationSuccess(operation, {
           count: numImages,

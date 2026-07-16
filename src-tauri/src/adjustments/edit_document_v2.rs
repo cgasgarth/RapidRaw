@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::color::perceptual_grading::{PerceptualGradingPlanV1, PerceptualGradingSettingsV1};
+use crate::color::view_transform::{
+    ViewTransformPlanV1, ViewTransformProcess, ViewTransformSettingsV1,
+};
 use crate::geometry::perspective::{
     PERSPECTIVE_IMPLEMENTATION_VERSION_V1, PerspectiveCorrectionSettingsV1,
 };
@@ -18,6 +21,7 @@ const LEGACY_SOURCE_SCHEMA_VERSION: u8 = 1;
 enum EditNodeTypeV2 {
     SourceDecode,
     SceneGlobalColorTone,
+    SceneToViewTransform,
     ColorPresence,
     SceneCurve,
     ToneEqualizer,
@@ -46,6 +50,7 @@ impl EditNodeTypeV2 {
             Self::SourceDecode => ("source_decode", "scene_referred_v2", 1),
             Self::Geometry => ("geometry", "legacy_pipeline_v1", 1),
             Self::SceneGlobalColorTone => ("scene_global_color_tone", "scene_referred_v2", 1),
+            Self::SceneToViewTransform => ("scene_to_view_transform", "scene_referred_v2", 1),
             Self::ColorPresence => ("color_presence", "scene_referred_v2", 1),
             Self::SceneCurve => ("scene_curve", "scene_referred_v2", 1),
             Self::ToneEqualizer => ("tone_equalizer", "scene_referred_v2", 1),
@@ -70,7 +75,9 @@ impl EditNodeTypeV2 {
 
     fn editor_section(self) -> Option<&'static str> {
         match self {
-            Self::SceneGlobalColorTone | Self::ToneEqualizer => Some("basic"),
+            Self::SceneGlobalColorTone | Self::SceneToViewTransform | Self::ToneEqualizer => {
+                Some("basic")
+            }
             Self::SceneCurve => Some("curves"),
             Self::DetailDenoiseDehaze => Some("details"),
             Self::DisplayCreative => Some("effects"),
@@ -136,6 +143,54 @@ struct SceneGlobalColorToneParamsV2 {
     // Optional only for V2 documents persisted before the Color Presence node.
     vibrance: Option<f64>,
     whites: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+enum ToneMapperV2 {
+    Agx,
+    Basic,
+    RapidView,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ViewTransformControlsV2 {
+    chroma_compression: f64,
+    contrast: f64,
+    latitude: f64,
+    middle_grey: f64,
+    shoulder: f64,
+    source_black_ev: f64,
+    source_white_ev: f64,
+    toe: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SceneToViewTransformV2 {
+    tone_mapper: ToneMapperV2,
+    view_transform: ViewTransformControlsV2,
+}
+
+impl SceneToViewTransformV2 {
+    fn compile(self) -> Result<ViewTransformPlanV1, String> {
+        let controls = self.view_transform;
+        let settings = ViewTransformSettingsV1 {
+            chroma_compression: controls.chroma_compression,
+            contrast: controls.contrast,
+            latitude: controls.latitude,
+            middle_grey: controls.middle_grey,
+            process: ViewTransformProcess::RapidViewV1,
+            shoulder: controls.shoulder,
+            source_black_ev: controls.source_black_ev,
+            source_white_ev: controls.source_white_ev,
+            toe: controls.toe,
+            ..ViewTransformSettingsV1::default()
+        };
+        let _ = self.tone_mapper;
+        ViewTransformPlanV1::compile(settings)
+    }
 }
 
 impl SceneGlobalColorToneParamsV2 {
@@ -2374,6 +2429,12 @@ pub(crate) fn validate_edit_document_v2(value: &Value) -> Result<(), String> {
     document.validate_document_contract()
 }
 
+pub(crate) fn compile_edit_document_v2(value: &Value) -> Result<Value, String> {
+    let document: EditDocumentV2 = serde_json::from_value(value.clone())
+        .map_err(|error| format!("EditDocumentV2 render payload is invalid: {error}"))?;
+    document.into_render_adjustments()
+}
+
 /// Resolve the single source-decode projection persisted beside a V2 document.
 /// Mixed flat/node authority fails closed instead of silently decoding different
 /// pixels on preview, reopen, and export paths.
@@ -2436,6 +2497,16 @@ fn compile_node_params(
             ))
             .map_err(|error| {
                 format!("EditDocumentV2 node 'scene_global_color_tone' has invalid params: {error}")
+            })?;
+            params.compile()?;
+            Ok(node.params.clone())
+        }
+        EditNodeTypeV2::SceneToViewTransform => {
+            let params = serde_json::from_value::<SceneToViewTransformV2>(Value::Object(
+                node.params.clone(),
+            ))
+            .map_err(|error| {
+                format!("EditDocumentV2 node 'scene_to_view_transform' has invalid params: {error}")
             })?;
             params.compile()?;
             Ok(node.params.clone())
@@ -3453,6 +3524,30 @@ mod tests {
         document
     }
 
+    fn document_with_scene_to_view_transform(contrast: f64) -> Value {
+        let mut document = document_with_legacy(json!({ "rawEngineEditGraphVersion": 2 }));
+        document["nodes"]["scene_to_view_transform"] = json!({
+            "enabled": true,
+            "implementationVersion": 1,
+            "params": {
+                "toneMapper": "rapidView",
+                "viewTransform": {
+                    "chromaCompression": 0.25,
+                    "contrast": contrast,
+                    "latitude": 0.55,
+                    "middleGrey": 0.18,
+                    "shoulder": 0.8,
+                    "sourceBlackEv": -10,
+                    "sourceWhiteEv": 6.5,
+                    "toe": 0.7
+                }
+            },
+            "process": "scene_referred_v2",
+            "type": "scene_to_view_transform"
+        });
+        document
+    }
+
     fn layer() -> Value {
         json!({
             "adjustments": { "exposure": 0.4 },
@@ -3539,6 +3634,49 @@ mod tests {
                 .unwrap_err()
                 .contains("domain disagrees")
         );
+    }
+
+    #[test]
+    fn scene_to_view_node_compiles_into_the_native_render_projection_and_fails_closed() {
+        let document = document_with_scene_to_view_transform(1.6);
+        let compiled = super::compile_edit_document_v2(&document)
+            .expect("scene-to-view document compiles through preview/export authority");
+
+        assert_eq!(compiled["toneMapper"], json!("rapidView"));
+        assert_eq!(compiled["viewTransform"]["contrast"], json!(1.6));
+        assert_eq!(compiled["viewTransform"]["shoulder"], json!(0.8));
+        let rendered = get_all_adjustments_from_json(&compiled, true, None);
+        let defaults =
+            get_all_adjustments_from_json(&json!({ "toneMapper": "rapidView" }), true, None);
+        assert_eq!(rendered.global.tonemapper_mode, 2);
+        assert_eq!(rendered.global.rapid_view_parameters0[0], 0.18);
+        assert_ne!(
+            rendered.global.rapid_view_parameters1,
+            defaults.global.rapid_view_parameters1
+        );
+        assert_ne!(
+            rendered.global.rapid_view_parameters2[2].to_bits(),
+            defaults.global.rapid_view_parameters2[2].to_bits()
+        );
+
+        let mut malformed = document_with_scene_to_view_transform(1.6);
+        malformed["nodes"]["scene_to_view_transform"]["params"]["viewTransform"]["sourceBlackEv"] =
+            json!(-4);
+        malformed["nodes"]["scene_to_view_transform"]["params"]["viewTransform"]["sourceWhiteEv"] =
+            json!(1.5);
+        let malformed_error = serde_json::from_value::<EditDocumentV2>(malformed)
+            .expect("envelope deserializes before parameter validation")
+            .into_render_adjustments()
+            .expect_err("invalid EV span must fail");
+        assert!(malformed_error.contains("view_transform_invalid_source_ev_bounds"));
+
+        let mut split_authority = document_with_scene_to_view_transform(1.6);
+        split_authority["extensions"]["legacyAdjustments"]["toneMapper"] = json!("basic");
+        let conflict = serde_json::from_value::<EditDocumentV2>(split_authority)
+            .expect("split authority deserializes")
+            .into_render_adjustments()
+            .expect_err("flat scene-to-view authority must be rejected");
+        assert!(conflict.contains("conflicts with quarantined legacy field 'toneMapper'"));
     }
 
     #[test]
