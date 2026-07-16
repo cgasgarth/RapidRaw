@@ -43,10 +43,10 @@ const loadedRawSelectedImage = {
   ...selectedImage,
   rawDevelopmentReport: {
     cameraProfile: {
-      algorithmId: 'rawengine.camera_profile.v1',
+      algorithmId: 'dual_illuminant_camera_neutral_mired_v2',
       candidateCount: 1,
       illuminantEstimateConfidence: 'high',
-      illuminantEstimateMethod: 'metadata_only_fallback',
+      illuminantEstimateMethod: 'fallback',
       status: 'fallback',
       warningCodes: [],
     },
@@ -69,6 +69,7 @@ const loadedRawSelectedImage = {
       warningCodes: [],
     },
     processingProfile: 'balanced',
+    stageSamples: [],
     runtime: {
       cacheHit: false,
       outputDimensions: [4000, 3000] as const,
