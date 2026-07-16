@@ -495,6 +495,7 @@ fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
 
 #[test]
 fn skin_tone_uniformity_has_cpu_wgpu_and_preview_export_pixel_parity() {
+    let _gpu_test_guard = acquire_gpu_test_lock();
     let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(12, 8, |x, y| {
         let red = 0.16 + x as f32 * 0.025;
         let green = 0.055 + y as f32 * 0.009;
@@ -572,6 +573,7 @@ fn skin_tone_uniformity_has_cpu_wgpu_and_preview_export_pixel_parity() {
 
 #[test]
 fn production_wgpu_nodes_satisfy_metamorphic_color_properties() {
+    let _gpu_test_guard = acquire_gpu_test_lock();
     let source = DynamicImage::ImageRgba32F(ImageBuffer::from_fn(32, 8, |x, _| {
         let value = 0.02 + x as f32 / 31.0 * 0.45;
         Rgba([value, value, value, 1.0])
