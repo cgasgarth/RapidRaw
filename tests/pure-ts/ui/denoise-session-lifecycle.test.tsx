@@ -15,7 +15,9 @@ mock.module('@tauri-apps/api/event', () => ({ listen }));
 const { DenoiseSession, createDenoiseSessionIdentity, initialDenoiseDraft } = await import(
   '../../../src/components/modals/editing/DenoiseModal'
 );
-const { isCurrentDenoiseEvent } = await import('../../../src/schemas/denoiseWorkflowSchemas');
+const { denoiseBatchRequestV1Schema, denoiseRequestV1Schema, isCurrentDenoiseEvent } = await import(
+  '../../../src/schemas/denoiseWorkflowSchemas'
+);
 
 let cleanup: (() => Promise<void>) | null = null;
 
@@ -29,8 +31,14 @@ afterEach(async () => {
 });
 
 test('pure defaults and identity distinguish source mode, ordering, and same-target reopen', () => {
-  expect(initialDenoiseDraft(true)).toEqual({ intensity: 50, method: 'ai' });
-  expect(initialDenoiseDraft(false)).toEqual({ intensity: 15, method: 'bm3d' });
+  expect(initialDenoiseDraft(true)).toEqual({
+    algorithm: 'nind_rgb_raised_cosine_tiled_v2',
+    strengthPercent: 50,
+  });
+  expect(initialDenoiseDraft(false)).toEqual({
+    algorithm: 'collaborative_transform_filter_v1',
+    strengthPercent: 15,
+  });
   expect(createDenoiseSessionIdentity(['/a', '/b'], true, 1)).not.toBe(
     createDenoiseSessionIdentity(['/b', '/a'], true, 1),
   );
@@ -42,22 +50,74 @@ test('RAW and raster sessions synchronously render their own defaults and preser
   const runtime = installRuntime();
   cleanup = runtime.unmount;
   await runtime.render('raw:1', props({ isRaw: true, targetPaths: ['/raw.ARW'] }));
-  expect(runtime.summary().dataset['denoiseMethod']).toBe('ai');
-  expect(runtime.summary().dataset['denoiseIntensity']).toBe('50');
+  expect(runtime.summary().dataset['denoiseAlgorithm']).toBe('nind_rgb_raised_cosine_tiled_v2');
+  expect(runtime.summary().dataset['denoiseStrengthPercent']).toBe('50');
 
   await runtime.click(runtime.button('modals.denoise.methodAi'));
   await runtime.click(runtime.button('modals.denoise.methodBm3d'));
-  expect(runtime.summary().dataset['denoiseMethod']).toBe('bm3d');
-  expect(runtime.summary().dataset['denoiseIntensity']).toBe('15');
+  expect(runtime.summary().dataset['denoiseAlgorithm']).toBe('collaborative_transform_filter_v1');
+  expect(runtime.summary().dataset['denoiseStrengthPercent']).toBe('15');
   await runtime.render('raw:1', props({ isRaw: true, progressMessage: 'unrelated render', targetPaths: ['/raw.ARW'] }));
-  expect(runtime.summary().dataset['denoiseMethod']).toBe('bm3d');
+  expect(runtime.summary().dataset['denoiseAlgorithm']).toBe('collaborative_transform_filter_v1');
 
   await runtime.render('raster:2', props({ isRaw: false, targetPaths: ['/image.jpg'] }));
-  expect(runtime.summary().dataset['denoiseMethod']).toBe('bm3d');
-  expect(runtime.summary().dataset['denoiseIntensity']).toBe('15');
+  expect(runtime.summary().dataset['denoiseAlgorithm']).toBe('collaborative_transform_filter_v1');
+  expect(runtime.summary().dataset['denoiseStrengthPercent']).toBe('15');
   await runtime.render('raw:3', props({ isRaw: true, targetPaths: ['/raw.ARW'] }));
-  expect(runtime.summary().dataset['denoiseMethod']).toBe('ai');
-  expect(runtime.summary().dataset['denoiseIntensity']).toBe('50');
+  expect(runtime.summary().dataset['denoiseAlgorithm']).toBe('nind_rgb_raised_cosine_tiled_v2');
+  expect(runtime.summary().dataset['denoiseStrengthPercent']).toBe('50');
+});
+
+test('strict current request schemas reject legacy and malformed command payloads', () => {
+  const current = denoiseRequestV1Schema.parse({
+    algorithm: 'collaborative_transform_filter_v1',
+    parameters: { strength: 0.25 },
+    schemaVersion: 1,
+    sourceIdentity: '/image.ARW',
+  });
+  expect(current.parameters.strength).toBe(0.25);
+  expect(denoiseRequestV1Schema.safeParse({ intensity: 0.25, method: 'bm3d', path: '/image.ARW' }).success).toBe(false);
+  expect(denoiseRequestV1Schema.safeParse({ ...current, algorithm: 'future_algorithm_v9' }).success).toBe(false);
+  expect(denoiseRequestV1Schema.safeParse({ ...current, cacheIdentity: 'frontend-forgery' }).success).toBe(false);
+  expect(denoiseRequestV1Schema.safeParse({ ...current, parameters: { strength: Number.NaN } }).success).toBe(false);
+  expect(denoiseRequestV1Schema.safeParse({ ...current, parameters: { strength: 1.01 } }).success).toBe(false);
+  expect(denoiseBatchRequestV1Schema.safeParse({ requests: [], schemaVersion: 1 }).success).toBe(false);
+});
+
+test('single and batch UI actions emit the same versioned request shape', async () => {
+  const denoise = mock(() => {});
+  const batch = mock(async () => []);
+  const runtime = installRuntime();
+  cleanup = runtime.unmount;
+
+  await runtime.render('single', props({ onDenoise: denoise, targetPaths: ['/single.ARW'] }));
+  await runtime.click(runtime.button('modals.denoise.btnStart'));
+  expect(denoise).toHaveBeenCalledWith({
+    algorithm: 'nind_rgb_raised_cosine_tiled_v2',
+    parameters: { strength: 0.5 },
+    schemaVersion: 1,
+    sourceIdentity: '/single.ARW',
+  });
+
+  await runtime.render('batch', props({ onBatchDenoise: batch, targetPaths: ['/a.ARW', '/b.ARW'] }));
+  await runtime.click(runtime.button('modals.denoise.btnBatchDenoise'));
+  expect(batch).toHaveBeenCalledWith({
+    requests: [
+      {
+        algorithm: 'nind_rgb_raised_cosine_tiled_v2',
+        parameters: { strength: 0.5 },
+        schemaVersion: 1,
+        sourceIdentity: '/a.ARW',
+      },
+      {
+        algorithm: 'nind_rgb_raised_cosine_tiled_v2',
+        parameters: { strength: 0.5 },
+        schemaVersion: 1,
+        sourceIdentity: '/b.ARW',
+      },
+    ],
+    schemaVersion: 1,
+  });
 });
 
 test('superseded batch completion and progress cannot populate the successor session', async () => {

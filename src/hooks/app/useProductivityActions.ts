@@ -4,9 +4,13 @@ import { z } from 'zod';
 import { hdrRuntimePlanSchema } from '../../schemas/computational-merge/hdrMergeUiSchemas';
 import { panoramaRuntimePlanSchema } from '../../schemas/computational-merge/panoramaUiSchemas';
 import {
+  type DenoiseBatchRequestV1,
   type DenoiseOperationHandle,
+  type DenoiseRequestV1,
+  denoiseBatchRequestV1Schema,
   denoiseCancelReceiptSchema,
   denoiseOperationHandleSchema,
+  denoiseRequestV1Schema,
 } from '../../schemas/denoiseWorkflowSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
 import { useHdrWorkflowStore } from '../../store/useHdrWorkflowStore';
@@ -267,9 +271,13 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   }, [refreshImageList, setUI]);
 
   const handleApplyDenoise = useCallback(
-    async (intensity: number, method: 'ai' | 'bm3d') => {
+    async (request: DenoiseRequestV1) => {
       const { denoiseModalState } = useUIStore.getState();
       if (denoiseModalState.targetPaths.length === 0) return;
+      const currentRequest = denoiseRequestV1Schema.parse(request);
+      if (currentRequest.sourceIdentity !== denoiseModalState.targetPaths[0]) {
+        throw new Error('Denoise request source is no longer current.');
+      }
 
       setUI((state) => ({
         denoiseModalState: {
@@ -285,7 +293,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
 
       const launch = invokeWithSchema(
         Invokes.ApplyDenoising,
-        { path: denoiseModalState.targetPaths[0], intensity, method },
+        { request: currentRequest },
         denoiseOperationHandleSchema,
       );
       denoiseLaunchRef.current = launch;
@@ -298,7 +306,7 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
           }));
           await invokeWithSchema(
             Invokes.ExecuteDenoising,
-            { operation, path: denoiseModalState.targetPaths[0], intensity, method },
+            { operation, request: currentRequest },
             emptyTauriResponseSchema,
           );
         } else {
@@ -353,11 +361,12 @@ export function useProductivityActions(refreshImageList: () => Promise<void>) {
   );
 
   const handleBatchDenoise = useCallback(
-    async (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => {
+    async (batch: DenoiseBatchRequestV1) => {
       try {
+        const currentBatch = denoiseBatchRequestV1Schema.parse(batch);
         const savedPaths = await invokeWithSchema(
           Invokes.BatchDenoiseImages,
-          { paths, intensity, method },
+          { batch: currentBatch },
           savedOutputPathListSchema,
         );
         await refreshImageList();

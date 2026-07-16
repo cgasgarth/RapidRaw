@@ -11,7 +11,8 @@ use sha2::{Digest, Sha256};
 
 use crate::app_settings::AppSettings;
 use crate::computational::denoise_artifact::{
-    EnhancedDenoiseBuildOutput, EnhancedDenoisePlanV1, SceneRangeCounts,
+    DenoiseAlgorithmV1, DenoiseParametersV1, DenoiseRequestV1, EnhancedDenoiseBuildOutput,
+    EnhancedDenoisePlanV1, SceneRangeCounts,
 };
 use crate::computational::denoise_service::EnhancedDenoiseService;
 use crate::denoise_render::{apply_denoise_stage, calculate_denoise_render_hash};
@@ -115,7 +116,12 @@ fn run_private_denoise_real_raw_proof(
 
     let rendered = apply_denoise_stage(&base_image, &enabled).into_owned();
     let cache_root = private_root.join(ARTIFACT_DIR).join("enhanced-cache");
-    let plan = EnhancedDenoisePlanV1::legacy_adapter(&source_path, "bm3d", 0.38)?;
+    let plan = EnhancedDenoisePlanV1::compile(&DenoiseRequestV1 {
+        algorithm: DenoiseAlgorithmV1::CollaborativeTransformFilterV1,
+        parameters: DenoiseParametersV1 { strength: 0.38 },
+        schema_version: 1,
+        source_identity: source_path_string.clone(),
+    })?;
     let service = EnhancedDenoiseService::default();
     service.activate_image(&source_path_string);
     let prepared = service.begin(&source_path_string, &plan)?;

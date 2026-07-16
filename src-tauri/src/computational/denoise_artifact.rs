@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::UNIX_EPOCH;
 
-const ARTIFACT_VERSION: u32 = 1;
-const IMPLEMENTATION_VERSION: u32 = 2;
+const ARTIFACT_VERSION: u32 = 2;
+const IMPLEMENTATION_VERSION: u32 = 3;
 const DEFAULT_MEMORY_BUDGET_BYTES: u64 = 512 * 1024 * 1024;
 const DEFAULT_DISK_BUDGET_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 const NIND_MODEL_SHA256: &str = "ee3586279d514df557ff3f7dec6df37fafc51ba5d3a3435b2cc9ac2d9017e7fe";
@@ -43,15 +43,71 @@ impl PhysicalSourceRevision {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DenoiseAlgorithmV1 {
+    CollaborativeTransformFilterV1,
+    NindRgbRaisedCosineTiledV2,
+}
+
+impl DenoiseAlgorithmV1 {
+    pub const fn requires_ai(self) -> bool {
+        matches!(self, Self::NindRgbRaisedCosineTiledV2)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DenoiseParametersV1 {
+    pub strength: f32,
+}
+
+impl DenoiseParametersV1 {
+    fn validate(self) -> Result<Self, String> {
+        if !self.strength.is_finite() || !(0.0..=1.0).contains(&self.strength) {
+            return Err("denoise_strength_out_of_range".to_string());
+        }
+        Ok(self)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DenoiseRequestV1 {
+    pub algorithm: DenoiseAlgorithmV1,
+    pub parameters: DenoiseParametersV1,
+    pub schema_version: u32,
+    pub source_identity: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DenoiseBatchRequestV1 {
+    pub requests: Vec<DenoiseRequestV1>,
+    pub schema_version: u32,
+}
+
+impl DenoiseBatchRequestV1 {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.schema_version != 1 {
+            return Err("denoise_batch_schema_version_unsupported".to_string());
+        }
+        if self.requests.is_empty() || self.requests.len() > 512 {
+            return Err("denoise_batch_size_out_of_range".to_string());
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EnhancedDenoisePlanV1 {
     pub source_revision: PhysicalSourceRevision,
     pub source_class: String,
     pub decode_fingerprint: String,
     pub noise_profile_fingerprint: String,
-    pub algorithm_id: String,
-    pub legacy_method_token: Option<String>,
+    pub algorithm: DenoiseAlgorithmV1,
+    pub parameters: DenoiseParametersV1,
     pub model_content_hash: Option<String>,
     pub quality: String,
     pub impact: f32,
@@ -60,20 +116,20 @@ pub struct EnhancedDenoisePlanV1 {
     pub stage_placement: String,
     pub input_domain: String,
     pub output_domain: String,
-    pub intensity: f32,
     pub implementation_version: u32,
 }
 
 impl EnhancedDenoisePlanV1 {
-    pub fn legacy_adapter(
-        source_path: &Path,
-        method: &str,
-        intensity: f32,
-    ) -> Result<Self, String> {
-        if !intensity.is_finite() || !(0.0..=1.0).contains(&intensity) {
-            return Err("denoise_intensity_out_of_range".to_string());
+    pub fn compile(request: &DenoiseRequestV1) -> Result<Self, String> {
+        if request.schema_version != 1 {
+            return Err("denoise_request_schema_version_unsupported".to_string());
         }
-        let source_revision = PhysicalSourceRevision::from_path(source_path)?;
+        if request.source_identity.is_empty() {
+            return Err("denoise_source_identity_required".to_string());
+        }
+        let parameters = request.parameters.validate()?;
+        let (source_path, _) = crate::file_management::parse_virtual_path(&request.source_identity);
+        let source_revision = PhysicalSourceRevision::from_path(&source_path)?;
         let source_class = if crate::formats::is_raw_file(&source_revision.canonical_path) {
             if source_path
                 .extension()
@@ -86,11 +142,6 @@ impl EnhancedDenoisePlanV1 {
             }
         } else {
             "encoded_rgb"
-        };
-        let algorithm_id = match method {
-            "ai" => "nind_rgb_raised_cosine_tiled_v2",
-            "bm3d" => "legacy_collaborative_transform_filter_v1",
-            _ => return Err(format!("denoise_method_unsupported:{method}")),
         };
         let decode_fingerprint = fingerprint_json(&serde_json::json!({
             "source": source_revision,
@@ -105,13 +156,16 @@ impl EnhancedDenoisePlanV1 {
             source_class: source_class.to_string(),
             decode_fingerprint,
             noise_profile_fingerprint,
-            algorithm_id: algorithm_id.to_string(),
-            legacy_method_token: Some(method.to_string()),
-            model_content_hash: (method == "ai").then(|| format!("sha256:{NIND_MODEL_SHA256}")),
+            algorithm: request.algorithm,
+            parameters,
+            model_content_hash: request
+                .algorithm
+                .requires_ai()
+                .then(|| format!("sha256:{NIND_MODEL_SHA256}")),
             quality: "enhanced".to_string(),
             impact: 1.0,
             natural_grain: 0.0,
-            tile_policy: if method == "ai" {
+            tile_policy: if request.algorithm.requires_ai() {
                 "mirror_pad_504px_raised_cosine_normalized_v2"
             } else {
                 "full_frame_collaborative_v1"
@@ -120,7 +174,6 @@ impl EnhancedDenoisePlanV1 {
             stage_placement: "post_demosaic_pre_creative_tone".to_string(),
             input_domain: "bounded_rgb_model_plus_scene_linear_residual".to_string(),
             output_domain: "scene_linear_rgb_f32".to_string(),
-            intensity,
             implementation_version: IMPLEMENTATION_VERSION,
         })
     }
@@ -544,7 +597,25 @@ mod tests {
     fn fixture_plan(root: &Path) -> EnhancedDenoisePlanV1 {
         let source = root.join("source.raw");
         fs::write(&source, b"physical source").unwrap();
-        EnhancedDenoisePlanV1::legacy_adapter(&source, "bm3d", 0.4).unwrap()
+        EnhancedDenoisePlanV1::compile(&fixture_request(
+            &source,
+            DenoiseAlgorithmV1::CollaborativeTransformFilterV1,
+            0.4,
+        ))
+        .unwrap()
+    }
+
+    fn fixture_request(
+        source: &Path,
+        algorithm: DenoiseAlgorithmV1,
+        strength: f32,
+    ) -> DenoiseRequestV1 {
+        DenoiseRequestV1 {
+            algorithm,
+            parameters: DenoiseParametersV1 { strength },
+            schema_version: 1,
+            source_identity: source.to_string_lossy().into_owned(),
+        }
     }
 
     fn fixture_image(value: f32) -> DynamicImage {
@@ -635,13 +706,49 @@ mod tests {
     }
 
     #[test]
+    fn version_mismatched_manifest_is_quarantined_and_rebuilt() {
+        let temp = tempfile::tempdir().unwrap();
+        let plan = fixture_plan(temp.path());
+        let cache = temp.path().join("cache");
+        let fingerprint = plan.fingerprint().unwrap();
+        EnhancedDenoiseArtifactStore::new(1)
+            .get_or_build(&cache, plan.clone(), || Ok(fixture_output(0.5)))
+            .unwrap();
+        let (_, manifest) = artifact_paths(&cache, &fingerprint);
+        let mut stale: serde_json::Value =
+            serde_json::from_slice(&fs::read(&manifest).unwrap()).unwrap();
+        stale["artifactVersion"] = serde_json::json!(ARTIFACT_VERSION - 1);
+        fs::write(&manifest, serde_json::to_vec_pretty(&stale).unwrap()).unwrap();
+
+        let builds = AtomicUsize::new(0);
+        EnhancedDenoiseArtifactStore::new(1)
+            .get_or_build(&cache, plan, || {
+                builds.fetch_add(1, Ordering::SeqCst);
+                Ok(fixture_output(0.8))
+            })
+            .unwrap();
+        assert_eq!(builds.load(Ordering::SeqCst), 1);
+        assert!(manifest.with_extension("json.quarantine").exists());
+    }
+
+    #[test]
     fn source_replacement_and_algorithm_changes_invalidate_identity() {
         let temp = tempfile::tempdir().unwrap();
         let first = fixture_plan(temp.path());
         let source = temp.path().join("source.raw");
         fs::write(&source, b"replacement source is different").unwrap();
-        let replacement = EnhancedDenoisePlanV1::legacy_adapter(&source, "bm3d", 0.4).unwrap();
-        let ai = EnhancedDenoisePlanV1::legacy_adapter(&source, "ai", 0.4).unwrap();
+        let replacement = EnhancedDenoisePlanV1::compile(&fixture_request(
+            &source,
+            DenoiseAlgorithmV1::CollaborativeTransformFilterV1,
+            0.4,
+        ))
+        .unwrap();
+        let ai = EnhancedDenoisePlanV1::compile(&fixture_request(
+            &source,
+            DenoiseAlgorithmV1::NindRgbRaisedCosineTiledV2,
+            0.4,
+        ))
+        .unwrap();
         assert_ne!(
             first.fingerprint().unwrap(),
             replacement.fingerprint().unwrap()
@@ -653,12 +760,76 @@ mod tests {
     }
 
     #[test]
+    fn strict_request_rejects_unknown_algorithms_fields_versions_and_invalid_strengths() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.raw");
+        fs::write(&source, b"physical source").unwrap();
+        let valid = serde_json::json!({
+            "algorithm": "collaborative_transform_filter_v1",
+            "parameters": { "strength": 0.4 },
+            "schemaVersion": 1,
+            "sourceIdentity": source,
+        });
+        assert!(serde_json::from_value::<DenoiseRequestV1>(valid.clone()).is_ok());
+        let mut unknown_algorithm = valid.clone();
+        unknown_algorithm["algorithm"] = serde_json::json!("future_algorithm_v9");
+        assert!(serde_json::from_value::<DenoiseRequestV1>(unknown_algorithm).is_err());
+        let mut unknown_field = valid.clone();
+        unknown_field["intensity"] = serde_json::json!(0.4);
+        assert!(serde_json::from_value::<DenoiseRequestV1>(unknown_field).is_err());
+        let mut forged_identity = valid.clone();
+        forged_identity["cacheIdentity"] = serde_json::json!("frontend-forgery");
+        assert!(serde_json::from_value::<DenoiseRequestV1>(forged_identity).is_err());
+
+        let mut unsupported_version: DenoiseRequestV1 = serde_json::from_value(valid).unwrap();
+        unsupported_version.schema_version = 2;
+        assert_eq!(
+            EnhancedDenoisePlanV1::compile(&unsupported_version).unwrap_err(),
+            "denoise_request_schema_version_unsupported"
+        );
+        for strength in [f32::NAN, f32::INFINITY, -0.01, 1.01] {
+            unsupported_version.schema_version = 1;
+            unsupported_version.parameters.strength = strength;
+            assert_eq!(
+                EnhancedDenoisePlanV1::compile(&unsupported_version).unwrap_err(),
+                "denoise_strength_out_of_range"
+            );
+        }
+    }
+
+    #[test]
+    fn identical_current_request_compiles_to_identical_plan_and_fingerprint() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.raw");
+        fs::write(&source, b"physical source").unwrap();
+        let request = fixture_request(
+            &source,
+            DenoiseAlgorithmV1::CollaborativeTransformFilterV1,
+            0.4,
+        );
+        let first = EnhancedDenoisePlanV1::compile(&request).unwrap();
+        let second = EnhancedDenoisePlanV1::compile(&request).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(first.fingerprint().unwrap(), second.fingerprint().unwrap());
+    }
+
+    #[test]
     fn disk_budget_evicts_oldest_complete_artifact_pair() {
         let temp = tempfile::tempdir().unwrap();
         let source = temp.path().join("source.raw");
         fs::write(&source, b"physical source").unwrap();
-        let first = EnhancedDenoisePlanV1::legacy_adapter(&source, "bm3d", 0.2).unwrap();
-        let second = EnhancedDenoisePlanV1::legacy_adapter(&source, "bm3d", 0.8).unwrap();
+        let first = EnhancedDenoisePlanV1::compile(&fixture_request(
+            &source,
+            DenoiseAlgorithmV1::CollaborativeTransformFilterV1,
+            0.2,
+        ))
+        .unwrap();
+        let second = EnhancedDenoisePlanV1::compile(&fixture_request(
+            &source,
+            DenoiseAlgorithmV1::CollaborativeTransformFilterV1,
+            0.8,
+        ))
+        .unwrap();
         let first_id = first.fingerprint().unwrap();
         let second_id = second.fingerprint().unwrap();
         let cache = temp.path().join("cache");
