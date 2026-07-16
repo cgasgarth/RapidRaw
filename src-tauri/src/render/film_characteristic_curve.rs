@@ -36,6 +36,7 @@ pub struct FilmCharacteristicCurveV1 {
     pub exposure_knots_ev: Vec<f32>,
     pub response_knots: Vec<f32>,
     pub endpoint_slope: [f32; 2],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub density: Option<FilmDensityRangeV1>,
 }
 

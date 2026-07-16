@@ -232,6 +232,7 @@ let thumbnailOperationId = 0;
 let catalogIndexingOperationId = 0;
 let catalogPageSize = 256;
 let batchAutoAdjustInvocation = 0;
+let persistedRecoveryEmitted = false;
 const harnessAdjustmentsByPath = new Map<string, unknown>();
 const harnessEditDocumentsByPath = new Map<string, unknown>();
 let harnessImages: BrowserHarnessImage[] = [
@@ -841,13 +842,28 @@ const handleBrowserHarnessInvoke = (command: string, args?: Record<string, unkno
         path?: string;
         sessionId?: { imageSession: number; selectionGeneration: number };
       };
+      const path = request.path ?? `${browserHarnessRoot}/browser-harness.ARW`;
+      const editDocumentV2 = roundTripTauriJson(harnessEditDocumentsByPath.get(path) ?? createDefaultEditDocumentV2());
       const decoded = {
         exif: { Make: 'RawEngine Harness', Model: 'Browser Tauri API' },
         height: agentAuditE2eEnabled ? 4 : 768,
         is_raw: true,
-        metadata: { adjustments: harnessAdjustmentsByPath.get(request.path ?? '') ?? null, harness: true },
+        metadata: {
+          adjustments: harnessAdjustmentsByPath.get(path) ?? null,
+          editDocumentV2,
+          harness: true,
+        },
         width: agentAuditE2eEnabled ? 4 : 1024,
       };
+      if (!persistedRecoveryEmitted && new URL(window.location.href).searchParams.get('qaPersistedRecovery') === '1') {
+        persistedRecoveryEmitted = true;
+        dispatchBrowserHarnessEvent('persisted-render-state-recovered', {
+          backupPath: `${path}.rrdata.quarantine`,
+          outcome: 'quarantined',
+          path,
+          reasonCodes: ['edit_document_v2_invalid'],
+        });
+      }
       dispatchBrowserHarnessEvent('image-open-update', {
         dataUrl: `data:image/jpeg;base64,${harnessPreviewJpegBase64}`,
         imageId: request.imageId ?? request.path ?? 'browser-harness-image',

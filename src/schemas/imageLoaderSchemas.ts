@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { rawInputTransformReceiptV2Schema } from '../../packages/rawengine-schema/src/color/rawInputTransformSchemas';
-import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
+import { currentRenderEditDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 
 const exifSchema = z.record(z.string(), z.string()).nullable();
 
@@ -294,7 +294,7 @@ export const rawCameraProfileProvenanceReceiptSchema = z
 
 export const loadedMetadataSchema = z
   .object({
-    editDocumentV2: editDocumentV2Schema.nullable().optional(),
+    editDocumentV2: currentRenderEditDocumentV2Schema.nullable().optional(),
   })
   .loose();
 

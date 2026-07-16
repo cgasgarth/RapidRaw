@@ -17,6 +17,7 @@ export interface ValidationNode {
 }
 
 const all: ValidationMode[] = ['commit', 'push', 'pr', 'full', 'release'];
+const commit: ValidationMode[] = ['commit'];
 const broad: ValidationMode[] = ['push', 'pr', 'full', 'release'];
 const ci: ValidationMode[] = ['pr', 'full', 'release'];
 const node = (
@@ -62,6 +63,19 @@ export const validationManifest: readonly ValidationNode[] = [
   node('render-abi', ['bun', 'run', 'check:render-abi'], ['rust', 'scripts']),
   {
     ...node('rust-clippy', ['bun', 'run', 'check:rust:clippy'], ['rust', 'dependencies'], 'native-heavy'),
+    queueResources: ['native-heavy'],
+  },
+  {
+    ...node(
+      'rust-affected-tests',
+      ['bun', 'scripts/validation/run-affected-rust-module-tests.ts'],
+      ['rust'],
+      'native-heavy',
+      commit,
+      ['rust-clippy'],
+      'local',
+      15 * 60_000,
+    ),
     queueResources: ['native-heavy'],
   },
   node('schema', ['bun', 'run', 'check:schema'], ['schema', 'frontend'], 'cpu-heavy'),

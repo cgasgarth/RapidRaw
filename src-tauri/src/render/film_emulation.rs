@@ -19,6 +19,7 @@ use super::film_density_grain::{
     FilmDensityGrainV1, apply as apply_density_grain, reference as reference_density_grain,
 };
 use super::film_print_scan::{apply as apply_print_scan, reference as reference_print_scan};
+use super::film_residual_lut::FilmResidualLutManifestV1;
 
 pub const FILM_NODE_TYPE: &str = "film_emulation";
 pub const FILM_CONTRACT_VERSION: u32 = 1;
@@ -53,9 +54,11 @@ pub struct FilmEmulationNodeV1 {
     pub contract_version: u32,
     pub enabled: bool,
     pub profile_ref: FilmEmulationProfileRef,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stage_params: Option<FilmEmulationStageParamsV1>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub residual_lut: Option<FilmResidualLutManifestV1>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub characteristic_curve: Option<FilmCharacteristicCurveV1>,
     pub mix: f32,
     pub working_space: String,
@@ -190,6 +193,9 @@ impl FilmEmulationNodeV1 {
             if curve.response_knots.iter().copied().ne(expected) {
                 return Err("film_emulation_profile_curve_mismatch");
             }
+        }
+        if let Some(residual_lut) = &self.residual_lut {
+            residual_lut.validate()?;
         }
         if self.profile_ref.version != REFERENCE_PROFILE_VERSION {
             return Err("film_emulation_profile_hash_mismatch");
@@ -584,6 +590,7 @@ fn reference_node() -> FilmEmulationNodeV1 {
             content_sha256: REFERENCE_PROFILE_CONTENT_SHA256.to_string(),
         },
         stage_params: None,
+        residual_lut: None,
         characteristic_curve: None,
         mix: 1.0,
         working_space: "acescg_linear_v1".to_string(),

@@ -36,7 +36,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 use std::time::Instant;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[derive(serde::Serialize)]
 pub struct LoadImageResult {
@@ -1190,15 +1190,41 @@ pub async fn load_image(
     state: tauri::State<'_, AppState>,
     app_handle: tauri::AppHandle,
 ) -> Result<LoadImageResult, String> {
-    let metadata = load_image_open_metadata(&path)?;
+    let metadata = load_image_open_metadata(&path, &app_handle, true)?;
     load_image_prepared(path, state.inner(), app_handle, metadata, true, None, None).await
 }
 
-pub(crate) fn load_image_open_metadata(path: &str) -> Result<ImageMetadata, String> {
+pub(crate) fn load_image_open_metadata(
+    path: &str,
+    app_handle: &tauri::AppHandle,
+    foreground: bool,
+) -> Result<ImageMetadata, String> {
     let (source_path, sidecar_path) = parse_virtual_path(path);
     let source_path_str = source_path.to_string_lossy().to_string();
-    let mut metadata: ImageMetadata =
-        crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path))?.metadata;
+    let persisted = crate::exif_processing::load_sidecar_recovering(&sidecar_path, Some(path))?;
+    let recovered = !matches!(
+        persisted.outcome,
+        crate::exif_processing::PersistedStateOutcome::Absent
+            | crate::exif_processing::PersistedStateOutcome::Current
+    );
+    if recovered {
+        let _ = app_handle.emit(
+            "persisted-render-state-recovered",
+            serde_json::json!({
+                "path": path,
+                "outcome": persisted.outcome,
+                "backupPath": persisted.backup_path,
+                "reasonCodes": persisted.reason_codes,
+            }),
+        );
+        let state = app_handle.state::<AppState>();
+        state.render().native_caches().clear_decoded();
+        if foreground {
+            RenderCaches::new(&state).clear_canonical_reset_artifacts();
+            state.render().preview_runtime().invalidate_current();
+        }
+    }
+    let mut metadata: ImageMetadata = persisted.metadata;
     let mut should_save_sidecar = false;
     if is_raw_file(&source_path_str)
         && crate::exif_processing::repair_raw_sidecar_camera_metadata(&source_path, &mut metadata)
@@ -1223,7 +1249,7 @@ pub(crate) async fn prefetch_image(
     app_handle: tauri::AppHandle,
     cancellation: Option<(Arc<AtomicUsize>, usize)>,
 ) -> Result<LoadImageResult, String> {
-    let metadata = load_image_open_metadata(&path)?;
+    let metadata = load_image_open_metadata(&path, &app_handle, false)?;
     load_image_prepared(path, state, app_handle, metadata, false, cancellation, None).await
 }
 

@@ -520,7 +520,7 @@ pub async fn begin_image_open(
         );
         return Err("image_open_superseded".to_string());
     }
-    let metadata = load_image_open_metadata(&request.path)?;
+    let metadata = load_image_open_metadata(&request.path, &app, true)?;
     let metadata_fingerprint =
         blake3::hash(&serde_json::to_vec(&metadata).map_err(|error| error.to_string())?)
             .to_hex()
