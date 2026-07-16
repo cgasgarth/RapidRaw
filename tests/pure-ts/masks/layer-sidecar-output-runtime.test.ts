@@ -1,6 +1,10 @@
 import { expect, test } from 'bun:test';
 
-import { INITIAL_MASK_ADJUSTMENTS, type MaskContainer } from '../../../src/utils/adjustments.ts';
+import {
+  createDefaultMaskEditNodes,
+  INITIAL_MASK_ADJUSTMENTS,
+  type MaskContainer,
+} from '../../../src/utils/adjustments.ts';
 import type { LayerRgbPixel } from '../../../src/utils/layers/layerPreviewExportParity.ts';
 import {
   buildLayerSidecarPreviewExportRuntimePlan,
@@ -18,17 +22,22 @@ const layerPixels: Array<LayerRgbPixel> = [
   { b: 200, g: 192, r: 128 },
 ];
 
-const makeLayer = (overrides: Partial<MaskContainer> = {}): MaskContainer => ({
-  adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
-  blendMode: 'multiply',
-  id: 'sidecar-opacity-layer',
-  invert: false,
-  name: 'Sidecar opacity layer',
-  opacity: 100,
-  subMasks: [],
-  visible: true,
-  ...overrides,
-});
+const makeLayer = (overrides: Partial<MaskContainer> = {}): MaskContainer =>
+  Object.assign(
+    {
+      adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1 as const,
+      blendMode: 'multiply' as const,
+      id: 'sidecar-opacity-layer',
+      invert: false,
+      name: 'Sidecar opacity layer',
+      opacity: 100,
+      subMasks: [],
+      visible: true,
+    },
+    overrides,
+  );
 
 const bridgeContext = (operationId: string, graphRevision = 'graph-issue-4798') => ({
   graphRevision,
