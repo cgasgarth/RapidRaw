@@ -163,6 +163,27 @@ export interface ParsedPresetLibrary {
   quarantinedCount: number;
 }
 
+export interface ExternalPresetImportDiagnostic {
+  code: 'invalid_external_value' | 'unsupported_external_field';
+  field: string;
+  message: string;
+}
+
+const externalPresetImportResultSchema = z
+  .object({
+    diagnostics: z.array(
+      z
+        .object({
+          code: z.enum(['invalid_external_value', 'unsupported_external_field']),
+          field: z.string().min(1),
+          message: z.string().min(1),
+        })
+        .strict(),
+    ),
+    presets: z.unknown(),
+  })
+  .strict();
+
 /** Runtime boundary for native and imported preset libraries; invalid entries are quarantined, never promoted. */
 export const parsePresetLibrary = (value: unknown): ParsedPresetLibrary => {
   const topLevel = z.array(z.unknown()).safeParse(value);
@@ -195,6 +216,13 @@ export const parsePresetLibrary = (value: unknown): ParsedPresetLibrary => {
     });
   }
   return { items, quarantinedCount };
+};
+
+export const parseExternalPresetImportResult = (
+  value: unknown,
+): { diagnostics: ExternalPresetImportDiagnostic[]; library: ParsedPresetLibrary } => {
+  const result = externalPresetImportResultSchema.parse(value);
+  return { diagnostics: result.diagnostics, library: parsePresetLibrary(result.presets) };
 };
 
 export const lowerEditDocumentPresetPayload = (payload: EditDocumentV2CopyPayload): Partial<Adjustments> =>

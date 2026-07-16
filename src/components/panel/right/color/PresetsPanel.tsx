@@ -425,7 +425,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     deleteItem,
     duplicatePreset,
     exportPresetsToFile,
-    importLegacyPresetsFromFile,
+    importExternalPresetsFromFile,
     importPresetsFromFile,
     isLoading,
     loadError,
@@ -698,7 +698,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         filters: [
           { name: t('editor.presets.dialog.allPresetFiles'), extensions: ['rrpreset', 'xmp', 'lrtemplate'] },
           { name: t('editor.presets.dialog.rapidRawPreset'), extensions: ['rrpreset'] },
-          { name: t('editor.presets.dialog.legacyPreset'), extensions: ['xmp', 'lrtemplate'] },
+          { name: t('editor.presets.dialog.lightroomPreset'), extensions: ['xmp', 'lrtemplate'] },
         ],
         multiple: false,
         title: t('editor.presets.dialog.importPresetsTitle'),
@@ -708,7 +708,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       const previousNames = new Set(collectPresetNames(presets));
       const imported =
         selectedPath.toLocaleLowerCase().endsWith('.xmp') || selectedPath.toLocaleLowerCase().endsWith('.lrtemplate')
-          ? await importLegacyPresetsFromFile(selectedPath)
+          ? await importExternalPresetsFromFile(selectedPath)
           : await importPresetsFromFile(selectedPath);
       const conflicts = collectPresetNames(imported ?? []).filter((name) => {
         const suffix = name.match(/^(.*) \((\d+)\)$/u);
@@ -721,7 +721,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       console.error('Failed to import presets:', error);
       setActionError(t('editor.presets.errors.importFailed'));
     }
-  }, [clearPreviews, importLegacyPresetsFromFile, importPresetsFromFile, presets, t]);
+  }, [clearPreviews, importExternalPresetsFromFile, importPresetsFromFile, presets, t]);
 
   const handleExport = useCallback(
     async (item: UserPreset) => {

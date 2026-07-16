@@ -1757,7 +1757,7 @@
         "exportAllTitle": "すべてのプリセットを書き出し",
         "exportTitle": "{{type}}を書き出し",
         "importPresetsTitle": "プリセットをインポート",
-        "legacyPreset": "レガシープリセット",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "プリセットファイル",
         "rapidRawPreset": "RapidRAWプリセット"
       },

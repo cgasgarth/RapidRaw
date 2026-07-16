@@ -1879,7 +1879,7 @@
         "exportAllTitle": "Экспортировать все пресеты",
         "exportTitle": "Экспорт: {{type}}",
         "importPresetsTitle": "Импортировать пресеты",
-        "legacyPreset": "Старый пресет",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Файл пресета",
         "rapidRawPreset": "Пресет RapidRAW"
       },

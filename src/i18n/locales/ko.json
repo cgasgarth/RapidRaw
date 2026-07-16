@@ -838,7 +838,7 @@
         "exportAllTitle": "모든 프리셋 내보내기",
         "exportTitle": "{{type}} 내보내기",
         "importPresetsTitle": "프리셋 가져오기",
-        "legacyPreset": "레거시 프리셋",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "프리셋 파일",
         "rapidRawPreset": "RapidRAW 프리셋"
       },

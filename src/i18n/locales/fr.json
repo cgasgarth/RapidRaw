@@ -1831,7 +1831,7 @@
         "exportAllTitle": "Exporter tous les paramètres prédéfinis",
         "exportTitle": "Exporter {{type}}",
         "importPresetsTitle": "Importer des paramètres prédéfinis",
-        "legacyPreset": "Ancien paramètre prédéfini",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Fichier de paramètre prédéfini",
         "rapidRawPreset": "Paramètre prédéfini RapidRAW"
       },

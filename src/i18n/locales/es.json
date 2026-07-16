@@ -1831,7 +1831,7 @@
         "exportAllTitle": "Exportar todos los ajustes preestablecidos",
         "exportTitle": "Exportar {{type}}",
         "importPresetsTitle": "Importar ajustes preestablecidos",
-        "legacyPreset": "Ajuste preestablecido heredado",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Archivo de ajuste preestablecido",
         "rapidRawPreset": "Ajuste preestablecido de RapidRAW"
       },

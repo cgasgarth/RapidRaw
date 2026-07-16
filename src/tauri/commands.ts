@@ -115,7 +115,7 @@ export enum Invokes {
   GetSupportedFileTypes = 'get_supported_file_types',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
-  HandleImportLegacyPresetsFromFile = 'handle_import_legacy_presets_from_file',
+  HandleImportExternalPresetsFromFile = 'handle_import_external_presets_from_file',
   ImportFiles = 'import_files',
   CancelImport = 'cancel_import',
   GetActiveImportJobStatus = 'get_active_import_job_status',

@@ -1845,7 +1845,7 @@
         "exportAllTitle": "Alle Vorgaben exportieren",
         "exportTitle": "{{type}} exportieren",
         "importPresetsTitle": "Vorgaben importieren",
-        "legacyPreset": "Alte Vorgabe",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "Vorgabendatei",
         "rapidRawPreset": "RapidRAW Vorgabe"
       },

@@ -48,7 +48,7 @@ macro_rules! with_commands {
             ("library", crate::file_management::apply_auto_adjustments_to_paths),
             ("library", crate::file_management::commit_batch_auto_adjustment),
             ("library", crate::presets::handle_import_presets_from_file),
-            ("library", crate::presets::handle_import_legacy_presets_from_file),
+            ("library", crate::presets::handle_import_external_presets_from_file),
             ("library", crate::presets::handle_export_presets_to_file),
             ("library", crate::presets::save_community_preset),
             ("library", crate::file_management::clear_all_sidecars),

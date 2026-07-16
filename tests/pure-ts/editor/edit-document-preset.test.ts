@@ -14,6 +14,7 @@ import {
   configureEditDocumentPresetPayload,
   createEditDocumentPresetPayload,
   lowerEditDocumentPresetPayload,
+  parseExternalPresetImportResult,
   parsePresetLibrary,
   resolveEditDocumentPresetPayload,
 } from '../../../src/utils/editDocumentPreset';
@@ -285,5 +286,62 @@ describe('descriptor-derived edit document presets', () => {
     expect(parsed.items).toHaveLength(2);
     expect(parsed.items[0]?.preset?.editDocumentV2).toEqual(validPayload);
     expect(parsed.items[1]?.folder?.children.map((preset) => preset.id)).toEqual(['legacy']);
+  });
+
+  test('validates external-import diagnostics and strict current preset authority together', () => {
+    const destination = useEditorStore.getState().editDocumentV2;
+    const importedDocument = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      exposure: 0.8,
+    });
+    const payload = createEditDocumentPresetPayload(importedDocument, false, 'style');
+    const result = parseExternalPresetImportResult({
+      diagnostics: [
+        {
+          code: 'unsupported_external_field',
+          field: 'SharpenRadius',
+          message: "Lightroom/XMP field 'SharpenRadius' is not supported and was not imported",
+        },
+        {
+          code: 'invalid_external_value',
+          field: 'Texture',
+          message: "Lightroom/XMP field 'Texture' has an invalid numeric value and was not imported",
+        },
+      ],
+      presets: [
+        {
+          preset: {
+            adjustments: {},
+            editDocumentV2: payload,
+            id: 'lightroom-current',
+            includeCropTransform: false,
+            includeMasks: false,
+            name: 'Lightroom Current',
+            presetType: 'style',
+          },
+        },
+      ],
+    });
+
+    expect(result.diagnostics.map(({ field }) => field)).toEqual(['SharpenRadius', 'Texture']);
+    expect(result.library.quarantinedCount).toBe(0);
+    expect(result.library.items[0]?.preset?.adjustments).toEqual({});
+    expect(editDocumentV2CopyPayloadSchema.parse(result.library.items[0]?.preset?.editDocumentV2)).toEqual(payload);
+    const imported = result.library.items[0]?.preset;
+    if (imported === undefined) throw new Error('Expected imported current preset.');
+    const resolved = resolveEditDocumentPresetPayload(imported, destination);
+    if (resolved === null) throw new Error('Expected strict imported payload.');
+    const state = useEditorStore.getState();
+    const transaction = buildPresetEditTransaction(state, resolved, 'external-preset-apply');
+    if (transaction === null) throw new Error('Expected imported preset transaction.');
+    expect(state.applyEditTransaction(transaction).after.exposure).toBe(0.8);
+    expect(buildPresetPreviewAdjustments(imported)?.exposure).toBe(0.8);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(-0.5);
+    useEditorStore.getState().redo();
+    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.8);
+    expect(() =>
+      parseExternalPresetImportResult({ diagnostics: [{ code: 'ignored', field: 'x', message: 'x' }], presets: [] }),
+    ).toThrow();
   });
 });

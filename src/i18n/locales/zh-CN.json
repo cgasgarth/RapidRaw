@@ -1828,7 +1828,7 @@
         "exportAllTitle": "导出所有预设",
         "exportTitle": "导出 {{type}}",
         "importPresetsTitle": "导入预设",
-        "legacyPreset": "旧版预设",
+        "lightroomPreset": "Lightroom/XMP",
         "presetFile": "预设文件",
         "rapidRawPreset": "RapidRAW 预设"
       },
