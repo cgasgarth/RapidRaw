@@ -66,6 +66,7 @@ import {
 } from '../../../../utils/color/style/colorStylePresetCatalog';
 import { buildPresetEditTransaction, resolveEditDocumentPresetPayload } from '../../../../utils/editDocumentPreset';
 import { areEditDocumentsEqual } from '../../../../utils/editTransaction';
+import { classifyPresetLibraryLoadState } from '../../../../utils/presetLibraryLoadState';
 import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
 import RenameFolderModal from '../../../modals/library/RenameFolderModal';
@@ -822,8 +823,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   );
 
   const selectedPreset = selectedPresetId ? (allPresetMap.get(selectedPresetId) ?? null) : null;
-  const quarantineNotice = loadError?.startsWith('Quarantined ') === true ? loadError : null;
-  const fatalLoadError = loadError !== null && quarantineNotice === null ? loadError : null;
+  const { fatalLoadError, quarantineNotice } = classifyPresetLibraryLoadState(loadError);
   const notice = quarantineNotice
     ? { kind: 'warning' as const, label: quarantineNotice }
     : fatalLoadError

@@ -28,6 +28,7 @@ import {
   replaceEditDocumentV2SourceArtifacts,
   setEditDocumentV2NodeEnabled,
 } from '../../../src/utils/editDocumentV2';
+import { classifyPresetLibraryLoadState } from '../../../src/utils/presetLibraryLoadState';
 
 const targetPath = '/fixture/preset-target.ARW';
 const session = createEditorImageSession({ generation: 41, path: targetPath, source: 'cache' });
@@ -175,6 +176,14 @@ describe('current RapidRaw preset envelope', () => {
 
     expect(parsed.items).toEqual([{ preset: current }]);
     expect(parsed.quarantinedCount).toBe(1);
+    expect(classifyPresetLibraryLoadState('Quarantined 1 invalid preset entries.')).toEqual({
+      fatalLoadError: null,
+      quarantineNotice: 'Quarantined 1 invalid preset entries.',
+    });
+    expect(classifyPresetLibraryLoadState('native preset storage unavailable')).toEqual({
+      fatalLoadError: 'native preset storage unavailable',
+      quarantineNotice: null,
+    });
   });
 
   test('compiles every built-in color style into the same strict current envelope', () => {
