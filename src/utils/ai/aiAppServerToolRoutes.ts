@@ -141,7 +141,7 @@ const AI_APP_SERVER_TOOL_ROUTE_MANIFEST = aiAppServerToolRouteManifestSchema.par
     {
       deferredIssue: '#1963',
       reason:
-        'The inherited denoise invoke multiplexes classic and AI NIND paths; app-server migration needs a separate denoise dry-run plan with model provenance before mapping.',
+        'The current strict denoise request selects versioned classic or AI NIND algorithms; app-server migration still needs an accepted denoise dry-run plan with model provenance before mapping.',
       sourceKind: AiAppServerToolRouteSourceKind.TauriInvoke,
       sourceOperation: 'apply_denoising',
       status: AiAppServerToolRouteStatus.Deferred,

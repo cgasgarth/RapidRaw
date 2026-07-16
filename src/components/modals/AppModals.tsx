@@ -11,7 +11,11 @@ import {
   burstSrCandidateJobHandleSchema,
   burstSrCandidateJobResultSchema,
 } from '../../schemas/computational-merge/superResolutionCandidateRuntimeSchemas';
-import type { DenoiseOperationHandle } from '../../schemas/denoiseWorkflowSchemas';
+import type {
+  DenoiseBatchRequestV1,
+  DenoiseOperationHandle,
+  DenoiseRequestV1,
+} from '../../schemas/denoiseWorkflowSchemas';
 import { focusStackApplyReceiptSchema } from '../../schemas/focus-stack/focusStackApplySchemas';
 import {
   focusStackCandidateJobHandleSchema,
@@ -102,9 +106,9 @@ export interface AppModalsProps {
   handleStartHdr: (paths: string[], operationId: string) => void;
   requestThumbnails: (paths: string[]) => void;
   refreshImageList: () => Promise<void>;
-  handleApplyDenoise: (intensity: number, method: 'ai' | 'bm3d') => Promise<void>;
+  handleApplyDenoise: (request: DenoiseRequestV1) => Promise<void>;
   handleCancelDenoise: (operation?: DenoiseOperationHandle) => Promise<void>;
-  handleBatchDenoise: (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => Promise<string[]>;
+  handleBatchDenoise: (batch: DenoiseBatchRequestV1) => Promise<string[]>;
   handleSaveDenoisedImage: () => Promise<string>;
   handleCreateFolder: (folderName: string) => Promise<void>;
   handleRenameFolder: (newName: string) => Promise<void>;
@@ -864,8 +868,8 @@ export default function AppModals(props: AppModalsProps) {
         onClose={() => {
           setUI((state) => ({ denoiseModalState: { ...state.denoiseModalState, isOpen: false } }));
         }}
-        onDenoise={(intensity, method) => {
-          void props.handleApplyDenoise(intensity, method);
+        onDenoise={(request) => {
+          void props.handleApplyDenoise(request);
         }}
         onCancel={props.handleCancelDenoise}
         onBatchDenoise={props.handleBatchDenoise}

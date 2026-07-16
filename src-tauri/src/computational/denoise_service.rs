@@ -301,6 +301,9 @@ fn operation_handle(identity: &OperationIdentity) -> DenoiseOperationHandle {
 
 #[cfg(test)]
 mod tests {
+    use super::super::denoise_artifact::{
+        DenoiseAlgorithmV1, DenoiseParametersV1, DenoiseRequestV1,
+    };
     use super::*;
     use image::{DynamicImage, ImageBuffer, Rgb};
     use std::fs;
@@ -314,7 +317,15 @@ mod tests {
         if !source.exists() {
             fs::write(&source, b"physical source").unwrap();
         }
-        EnhancedDenoisePlanV1::legacy_adapter(&source, "bm3d", intensity).unwrap()
+        EnhancedDenoisePlanV1::compile(&DenoiseRequestV1 {
+            algorithm: DenoiseAlgorithmV1::CollaborativeTransformFilterV1,
+            parameters: DenoiseParametersV1 {
+                strength: intensity,
+            },
+            schema_version: 1,
+            source_identity: source.to_string_lossy().into_owned(),
+        })
+        .unwrap()
     }
 
     fn fixture_output(value: f32) -> EnhancedDenoiseBuildOutput {
@@ -490,6 +501,29 @@ mod tests {
                 .current_artifact("image-a", &plan.source_revision)
                 .is_some()
         );
+    }
+
+    #[test]
+    fn execute_rejects_stale_source_and_parameter_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let original = fixture_plan(temp.path(), 0.4);
+        let service = EnhancedDenoiseService::default();
+        service.activate_image("image-a");
+        let prepared = service.begin("image-a", &original).unwrap();
+
+        let changed_parameters = fixture_plan(temp.path(), 0.7);
+        assert!(matches!(
+            service.resume(prepared.handle(), "image-a", &changed_parameters),
+            Err(error) if error == STALE_DENOISE_OPERATION
+        ));
+
+        let source = temp.path().join("source.raw");
+        fs::write(&source, b"physical source replaced with a newer revision").unwrap();
+        let changed_source = fixture_plan(temp.path(), 0.4);
+        assert!(matches!(
+            service.resume(prepared.handle(), "image-a", &changed_source),
+            Err(error) if error == STALE_DENOISE_OPERATION
+        ));
     }
 
     #[test]

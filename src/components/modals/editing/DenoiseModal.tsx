@@ -6,7 +6,13 @@ import { useTranslation } from 'react-i18next';
 
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
-import type { DenoiseOperationHandle } from '../../../schemas/denoiseWorkflowSchemas';
+import {
+  createDenoiseRequestV1,
+  type DenoiseAlgorithmV1,
+  type DenoiseBatchRequestV1,
+  type DenoiseOperationHandle,
+  type DenoiseRequestV1,
+} from '../../../schemas/denoiseWorkflowSchemas';
 import { parsePathProgressPayload } from '../../../schemas/tauriEventSchemas';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { getDisplayFileName } from '../../../utils/displayFilePath';
@@ -20,8 +26,8 @@ interface DenoiseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCancel: (operation?: DenoiseOperationHandle) => Promise<void>;
-  onDenoise: (intensity: number, method: 'ai' | 'bm3d') => void;
-  onBatchDenoise: (intensity: number, method: 'ai' | 'bm3d', paths: string[]) => Promise<string[]>;
+  onDenoise: (request: DenoiseRequestV1) => void;
+  onBatchDenoise: (batch: DenoiseBatchRequestV1) => Promise<string[]>;
   onSave: () => Promise<string>;
   onOpenFile: (path: string) => void;
   error: string | null;
@@ -42,8 +48,8 @@ interface DenoiseSessionProps extends Omit<DenoiseModalProps, 'isOpen'> {
 }
 
 export const initialDenoiseDraft = (isRaw: boolean) => ({
-  intensity: isRaw ? 50 : 15,
-  method: isRaw ? ('ai' as const) : ('bm3d' as const),
+  algorithm: isRaw ? ('nind_rgb_raised_cosine_tiled_v2' as const) : ('collaborative_transform_filter_v1' as const),
+  strengthPercent: isRaw ? 50 : 15,
 });
 
 export const createDenoiseSessionIdentity = (targetPaths: readonly string[], isRaw: boolean, openEpoch: number) =>
@@ -293,8 +299,8 @@ export function DenoiseSession({
 }: DenoiseSessionProps) {
   const { t } = useTranslation();
   const initialDraft = initialDenoiseDraft(isRaw);
-  const [intensity, setIntensity] = useState<number>(() => initialDraft.intensity);
-  const [method, setMethod] = useState<'ai' | 'bm3d'>(() => initialDraft.method);
+  const [strengthPercent, setStrengthPercent] = useState<number>(() => initialDraft.strengthPercent);
+  const [algorithm, setAlgorithm] = useState<DenoiseAlgorithmV1>(() => initialDraft.algorithm);
   const [isSaving, setIsSaving] = useState(false);
   const [savedPath, setSavedPath] = useState<string | null>(null);
   const [batchSavedPaths, setBatchSavedPaths] = useState<string[] | null>(null);
@@ -319,10 +325,10 @@ export function DenoiseSession({
     void onCancel(activeOperationRef.current ?? undefined);
   }, [onCancel]);
 
-  const methodOptions = useMemo<Array<{ label: string; value: 'ai' | 'bm3d' }>>(
+  const algorithmOptions = useMemo<Array<{ label: string; value: DenoiseAlgorithmV1 }>>(
     () => [
-      { label: t('modals.denoise.methodAi'), value: 'ai' },
-      { label: t('modals.denoise.methodBm3d'), value: 'bm3d' },
+      { label: t('modals.denoise.methodAi'), value: 'nind_rgb_raised_cosine_tiled_v2' },
+      { label: t('modals.denoise.methodBm3d'), value: 'collaborative_transform_filter_v1' },
     ],
     [t],
   );
@@ -363,9 +369,11 @@ export function DenoiseSession({
         ? t('modals.denoise.downloadingText', { status: aiModelDownloadStatus })
         : progressMessage || t('modals.denoise.initializing');
   const batchProgressFileName = batchProgress?.path.split(/[\\/]/).pop() ?? '';
-  const selectedMethodLabel = methodOptions.find((option) => option.value === method)?.label ?? '';
-  const selectedMethodDescription =
-    method === 'ai' ? t('modals.denoise.methodAiDescription') : t('modals.denoise.methodBm3dDescription');
+  const selectedAlgorithmLabel = algorithmOptions.find((option) => option.value === algorithm)?.label ?? '';
+  const selectedAlgorithmDescription =
+    algorithm === 'nind_rgb_raised_cosine_tiled_v2'
+      ? t('modals.denoise.methodAiDescription')
+      : t('modals.denoise.methodBm3dDescription');
   const savedOutputName = savedPath ? getDisplayFileName(savedPath) : '';
   const batchSavedCount = batchSavedPaths?.length ?? 0;
   const firstBatchSavedPath = batchSavedPaths?.[0] ?? null;
@@ -390,7 +398,8 @@ export function DenoiseSession({
   };
 
   const handleRunDenoise = async () => {
-    if (!hasDenoiseTargets) return;
+    const sourceIdentity = targetPaths[0];
+    if (!sourceIdentity) return;
     const operationId = operationIdRef.current + 1;
     operationIdRef.current = operationId;
     setSavedPath(null);
@@ -399,7 +408,10 @@ export function DenoiseSession({
     if (isBatch) {
       setIsSaving(true);
       try {
-        const paths = await onBatchDenoise(intensity / 100, method, targetPaths);
+        const paths = await onBatchDenoise({
+          requests: targetPaths.map((path) => createDenoiseRequestV1(path, algorithm, strengthPercent / 100)),
+          schemaVersion: 1,
+        });
         if (operationIdRef.current === operationId) setBatchSavedPaths(paths);
       } catch (e) {
         if (operationIdRef.current === operationId) console.error('Batch denoise failed:', e);
@@ -410,7 +422,7 @@ export function DenoiseSession({
         }
       }
     } else {
-      onDenoise(intensity / 100, method);
+      onDenoise(createDenoiseRequestV1(sourceIdentity, algorithm, strengthPercent / 100));
     }
   };
 
@@ -594,8 +606,8 @@ export function DenoiseSession({
         <UiText className="text-center max-w-md leading-relaxed">{t('modals.denoise.description')}</UiText>
         <section
           className="mt-6 grid w-full max-w-xl grid-cols-2 gap-2 rounded-md border border-border-color bg-bg-primary p-3 text-xs"
-          data-denoise-intensity={intensity}
-          data-denoise-method={method}
+          data-denoise-algorithm={algorithm}
+          data-denoise-strength-percent={strengthPercent}
           data-denoise-source-count={denoiseSourceCount}
           data-is-batch={String(isBatch)}
           data-testid="denoise-setup-summary"
@@ -603,11 +615,11 @@ export function DenoiseSession({
           {[
             {
               label: t('modals.denoise.summaryMethod'),
-              value: selectedMethodLabel,
+              value: selectedAlgorithmLabel,
             },
             {
               label: t('modals.denoise.summaryIntensity'),
-              value: t('modals.denoise.summaryIntensityValue', { value: intensity }),
+              value: t('modals.denoise.summaryIntensityValue', { value: strengthPercent }),
             },
             {
               label: t('modals.denoise.summarySourceMode'),
@@ -625,7 +637,7 @@ export function DenoiseSession({
               label: t('modals.denoise.summaryWorkload'),
               value: t('modals.denoise.summaryWorkloadValue', {
                 count: denoiseSourceCount,
-                method: selectedMethodLabel,
+                method: selectedAlgorithmLabel,
               }),
             },
           ].map((item) => (
@@ -716,32 +728,36 @@ export function DenoiseSession({
               {t('modals.denoise.methodLabel')}
             </UiText>
             <Dropdown
-              options={methodOptions}
-              value={method}
+              options={algorithmOptions}
+              value={algorithm}
               onChange={(val) => {
-                setMethod(val);
-                setIntensity(val === 'ai' ? 50 : 15);
+                setAlgorithm(val);
+                setStrengthPercent(val === 'nind_rgb_raised_cosine_tiled_v2' ? 50 : 15);
               }}
             />
             <UiText
               variant={TextVariants.small}
               color={TextColors.secondary}
               className="leading-snug"
-              data-denoise-method-guidance={method}
+              data-denoise-algorithm-guidance={algorithm}
             >
-              {selectedMethodDescription}
+              {selectedAlgorithmDescription}
             </UiText>
           </div>
           <div className="flex-1 max-w-[280px]">
             <Slider
-              label={method === 'ai' ? t('modals.denoise.qualityTileSizeLabel') : t('modals.denoise.strengthLabel')}
-              value={intensity}
+              label={
+                algorithm === 'nind_rgb_raised_cosine_tiled_v2'
+                  ? t('modals.denoise.qualityTileSizeLabel')
+                  : t('modals.denoise.strengthLabel')
+              }
+              value={strengthPercent}
               min={0}
               max={100}
               step={1}
-              defaultValue={method === 'ai' ? 50 : 15}
+              defaultValue={algorithm === 'nind_rgb_raised_cosine_tiled_v2' ? 50 : 15}
               onChange={(e) => {
-                setIntensity(Number(e.target.value));
+                setStrengthPercent(Number(e.target.value));
               }}
               trackClassName="bg-bg-secondary"
               fillOrigin="min"

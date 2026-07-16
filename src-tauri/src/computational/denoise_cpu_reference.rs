@@ -43,8 +43,8 @@ pub struct DenoiseCpuReferenceSettings {
 }
 
 impl DenoiseCpuReferenceSettings {
-    pub fn from_intensity(intensity: f32) -> Self {
-        let strength = intensity.clamp(0.0, 1.0);
+    pub fn from_strength(strength: f32) -> Self {
+        let strength = strength.clamp(0.0, 1.0);
         Self {
             luma_strength: strength * 0.32,
             chroma_strength: strength * 0.52,
@@ -402,7 +402,7 @@ mod tests {
         let manifest_path = repo_root().join("fixtures/detail/denoise/denoise-fixtures.json");
         let manifest: Manifest =
             serde_json::from_str(&fs::read_to_string(manifest_path).unwrap()).unwrap();
-        let settings = DenoiseCpuReferenceSettings::from_intensity(0.62);
+        let settings = DenoiseCpuReferenceSettings::from_strength(0.62);
         let mut reports = Vec::new();
 
         for fixture in manifest
@@ -692,7 +692,7 @@ mod tests {
         image.put_pixel(0, 0, Rgb([0.1, 0.2, 0.3]));
         image.put_pixel(1, 0, Rgb([0.4, 0.5, 0.6]));
         let output =
-            apply_cpu_reference_denoise(&image, DenoiseCpuReferenceSettings::from_intensity(0.0));
+            apply_cpu_reference_denoise(&image, DenoiseCpuReferenceSettings::from_strength(0.0));
         assert_eq!(image.as_raw(), output.as_raw());
     }
 
@@ -722,7 +722,7 @@ mod tests {
     fn scene_linear_negative_and_over_range_values_are_not_clamped() {
         let image = Rgb32FImage::from_pixel(5, 5, Rgb([1.25, -0.2, 0.55]));
         let output =
-            apply_cpu_reference_denoise(&image, DenoiseCpuReferenceSettings::from_intensity(0.8));
+            apply_cpu_reference_denoise(&image, DenoiseCpuReferenceSettings::from_strength(0.8));
         let pixel = output.get_pixel(2, 2);
 
         assert!(pixel[0] > 1.0);

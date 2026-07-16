@@ -18,7 +18,8 @@ use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering as AtomicOrdering};
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::denoise_artifact::{
-    EnhancedDenoiseArtifactV1, EnhancedDenoiseBuildOutput, EnhancedDenoisePlanV1, SceneRangeCounts,
+    DenoiseAlgorithmV1, DenoiseBatchRequestV1, DenoiseRequestV1, EnhancedDenoiseArtifactV1,
+    EnhancedDenoiseBuildOutput, EnhancedDenoisePlanV1, SceneRangeCounts,
 };
 use super::denoise_service::{DenoiseOperation, DenoiseOperationHandle, STALE_DENOISE_OPERATION};
 
@@ -32,6 +33,45 @@ struct ProgressReporter<'a> {
     total_work: usize,
     app_handle: &'a AppHandle,
     operation: Option<DenoiseOperationHandle>,
+}
+
+#[derive(Debug)]
+struct CompiledDenoiseRequestV1 {
+    source_path: std::path::PathBuf,
+    source_sidecar_path: std::path::PathBuf,
+    plan: EnhancedDenoisePlanV1,
+    request: DenoiseRequestV1,
+}
+
+fn compile_denoise_request(request: DenoiseRequestV1) -> Result<CompiledDenoiseRequestV1, String> {
+    let plan = EnhancedDenoisePlanV1::compile(&request)?;
+    ensure_algorithm_available(plan.algorithm)?;
+    let (source_path, source_sidecar_path) = parse_virtual_path(&request.source_identity);
+    Ok(CompiledDenoiseRequestV1 {
+        source_path,
+        source_sidecar_path,
+        plan,
+        request,
+    })
+}
+
+fn compile_denoise_batch(
+    batch: DenoiseBatchRequestV1,
+) -> Result<Vec<CompiledDenoiseRequestV1>, String> {
+    batch.validate()?;
+    batch
+        .requests
+        .into_iter()
+        .map(compile_denoise_request)
+        .collect()
+}
+
+fn ensure_algorithm_available(algorithm: DenoiseAlgorithmV1) -> Result<(), String> {
+    if algorithm.requires_ai() {
+        #[cfg(not(feature = "ai"))]
+        return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
+    }
+    Ok(())
 }
 
 const BLOCK_SIZE: usize = 8;
@@ -50,8 +90,8 @@ struct Bm3dParams {
 }
 
 impl Bm3dParams {
-    fn from_intensity(i: f32) -> Self {
-        let val = i.clamp(0.001, 1.0);
+    fn from_strength(strength: f32) -> Self {
+        let val = strength.clamp(0.001, 1.0);
         Self {
             sigma: val * 80.0,
             hard_th_lambda: 2.0 + (val * 2.5),
@@ -63,45 +103,30 @@ impl Bm3dParams {
 
 #[tauri::command]
 pub fn apply_denoising(
-    path: String,
-    intensity: f32,
-    method: String,
+    request: DenoiseRequestV1,
     state: tauri::State<'_, AppState>,
 ) -> Result<DenoiseOperationHandle, String> {
-    let (source_path, _) = parse_virtual_path(&path);
-    let plan = EnhancedDenoisePlanV1::legacy_adapter(&source_path, &method, intensity)?;
-
-    if method == "ai" {
-        #[cfg(not(feature = "ai"))]
-        return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
-    }
-
+    let compiled = compile_denoise_request(request)?;
     let denoise = Arc::clone(state.computational().denoise());
-    let operation = denoise.begin(&path, &plan)?;
+    let operation = denoise.begin(&compiled.request.source_identity, &compiled.plan)?;
     Ok(operation.handle())
 }
 
 #[tauri::command]
 pub fn execute_denoising(
     operation: DenoiseOperationHandle,
-    path: String,
-    intensity: f32,
-    method: String,
+    request: DenoiseRequestV1,
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<(), String> {
     let denoise = Arc::clone(state.computational().denoise());
     let preparation = (|| {
-        let (source_path, _) = parse_virtual_path(&path);
-        let path_str = source_path.to_string_lossy().to_string();
-        let plan = EnhancedDenoisePlanV1::legacy_adapter(&source_path, &method, intensity)?;
+        let compiled = compile_denoise_request(request)?;
+        let path_str = compiled.source_path.to_string_lossy().to_string();
         let cache_root = enhanced_cache_root(&app_handle)?;
-        if method == "ai" {
-            #[cfg(not(feature = "ai"))]
-            return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
-        }
-        let claimed = denoise.resume(operation, &path, &plan)?;
-        Ok((path_str, plan, cache_root, claimed))
+        let claimed =
+            denoise.resume(operation, &compiled.request.source_identity, &compiled.plan)?;
+        Ok((path_str, compiled.plan, cache_root, claimed))
     })();
     let (path_str, plan, cache_root, operation) = match preparation {
         Ok(prepared) => prepared,
@@ -123,7 +148,7 @@ pub fn execute_denoising(
         let ai_lease: Option<()> = None;
 
         #[cfg(feature = "ai")]
-        if method == "ai" {
+        if plan.algorithm.requires_ai() {
             let lease_result = {
                 let managed_state = app_handle.state::<AppState>();
                 managed_state
@@ -158,13 +183,15 @@ pub fn execute_denoising(
         let task_operation = operation.clone();
         let task_app_handle = app_handle.clone();
         let task_path = path_str.clone();
+        let algorithm = plan.algorithm;
+        let strength = plan.parameters.strength;
         let result = tokio::task::spawn_blocking(move || {
             let _ai_lease = ai_lease;
             task_denoise.build_current(&task_operation, &cache_root, plan, || {
                 denoise_image(
                     task_path.clone(),
-                    intensity,
-                    method,
+                    strength,
+                    algorithm,
                     task_app_handle.clone(),
                     ai_session,
                     Some(handle),
@@ -208,12 +235,15 @@ pub fn cancel_denoising(
 
 #[tauri::command]
 pub async fn batch_denoise_images(
-    paths: Vec<String>,
-    intensity: f32,
-    method: String,
+    batch: DenoiseBatchRequestV1,
     app_handle: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
+    let request_count = batch.requests.len();
+    let compiled_requests = compile_denoise_batch(batch)?;
+    let requires_ai = compiled_requests
+        .iter()
+        .any(|compiled| compiled.plan.algorithm.requires_ai());
     #[cfg(feature = "ai")]
     let mut ai_session: Option<AiSession> = None;
     #[cfg(not(feature = "ai"))]
@@ -222,7 +252,7 @@ pub async fn batch_denoise_images(
     let mut ai_lease = None;
     #[cfg(not(feature = "ai"))]
     let ai_lease: Option<()> = None;
-    if method == "ai" {
+    if requires_ai {
         #[cfg(not(feature = "ai"))]
         return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
         #[cfg(feature = "ai")]
@@ -244,33 +274,27 @@ pub async fn batch_denoise_images(
         let _ai_lease = ai_lease;
         let mut results = Vec::new();
 
-        for (i, path_str) in paths.iter().enumerate() {
+        for (i, compiled) in compiled_requests.into_iter().enumerate() {
+            let path_str = &compiled.request.source_identity;
             let _ = app_handle.emit(
                 "denoise-batch-progress",
                 serde_json::json!({
                     "current": i + 1,
-                    "total": paths.len(),
+                    "total": request_count,
                     "path": path_str
                 }),
             );
 
-            let (source_path, source_sidecar_path) =
-                crate::file_management::parse_virtual_path(path_str);
+            let source_path = compiled.source_path;
+            let source_sidecar_path = compiled.source_sidecar_path;
             let real_path = source_path.to_string_lossy().to_string();
-
-            let plan = match EnhancedDenoisePlanV1::legacy_adapter(&source_path, &method, intensity)
-            {
-                Ok(plan) => plan,
-                Err(error) => {
-                    let _ = app_handle.emit(crate::events::DENOISE_ERROR, error);
-                    continue;
-                }
-            };
-            match denoise.get_or_build_cached(&cache_root, plan, || {
+            let algorithm = compiled.plan.algorithm;
+            let strength = compiled.plan.parameters.strength;
+            match denoise.get_or_build_cached(&cache_root, compiled.plan, || {
                 crate::denoising::denoise_image(
                     real_path.clone(),
-                    intensity,
-                    method.clone(),
+                    strength,
+                    algorithm,
                     app_handle.clone(),
                     #[cfg(feature = "ai")]
                     ai_session.clone(),
@@ -400,12 +424,12 @@ pub async fn save_denoised_image(
 
 fn run_bm3d(
     rgb_img: &Rgb32FImage,
-    intensity: f32,
+    strength: f32,
     app_handle: &AppHandle,
     operation: Option<DenoiseOperationHandle>,
 ) -> Result<DynamicImage, String> {
     let (width, height) = rgb_img.dimensions();
-    let params = Bm3dParams::from_intensity(intensity);
+    let params = Bm3dParams::from_strength(strength);
     let dct_tables = Arc::new(DctTables::new());
 
     let rgb_channels = split_channels(rgb_img);
@@ -432,7 +456,7 @@ fn run_bm3d(
     {
         emit_denoise_progress(app_handle, operation, "Blending detail...");
         let blurred_y = gaussian_blur_1ch(&original_y, width as usize, height as usize, 3.0);
-        let detail_strength = (intensity * 0.5_f32).clamp(0.0_f32, 0.5_f32);
+        let detail_strength = (strength * 0.5_f32).clamp(0.0_f32, 0.5_f32);
         let y_ch = &mut denoised_channels[0];
         for i in 0..y_ch.len() {
             let hf = original_y[i] - blurred_y[i];
@@ -452,8 +476,8 @@ fn run_bm3d(
 
 fn denoise_image(
     path_str: String,
-    intensity: f32,
-    method: String,
+    strength: f32,
+    algorithm: DenoiseAlgorithmV1,
     app_handle: AppHandle,
     ai_session: Option<AiSession>,
     operation: Option<DenoiseOperationHandle>,
@@ -483,22 +507,26 @@ fn denoise_image(
     let rgb_img_for_denoiser = dynamic_img.to_rgb32f();
     let input_range = SceneRangeCounts::measure(&rgb_img_for_denoiser);
 
-    let out_dynamic = if method == "ai" {
-        #[cfg(not(feature = "ai"))]
-        return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
-        #[cfg(feature = "ai")]
-        {
-            let session_arc = ai_session.ok_or_else(|| "AI Session not provided".to_string())?;
-            crate::ai::ai_processing::run_ai_denoise_with_progress(
-                &rgb_img_for_denoiser,
-                intensity,
-                &session_arc,
-                &|message| emit_denoise_progress(&app_handle, operation, message),
-            )
-            .map_err(|e| e.to_string())?
+    let out_dynamic = match algorithm {
+        DenoiseAlgorithmV1::NindRgbRaisedCosineTiledV2 => {
+            #[cfg(not(feature = "ai"))]
+            return Err("ai_denoise_unavailable:build_without_ai_feature".to_string());
+            #[cfg(feature = "ai")]
+            {
+                let session_arc =
+                    ai_session.ok_or_else(|| "AI Session not provided".to_string())?;
+                crate::ai::ai_processing::run_ai_denoise_with_progress(
+                    &rgb_img_for_denoiser,
+                    strength,
+                    &session_arc,
+                    &|message| emit_denoise_progress(&app_handle, operation, message),
+                )
+                .map_err(|e| e.to_string())?
+            }
         }
-    } else {
-        run_bm3d(&rgb_img_for_denoiser, intensity, &app_handle, operation)?
+        DenoiseAlgorithmV1::CollaborativeTransformFilterV1 => {
+            run_bm3d(&rgb_img_for_denoiser, strength, &app_handle, operation)?
+        }
     };
 
     emit_denoise_progress(&app_handle, operation, "Finalizing data...");
@@ -1230,4 +1258,79 @@ fn gaussian_blur_1ch(data: &[f32], width: usize, height: usize, sigma: f32) -> V
     }
 
     out
+}
+
+#[cfg(test)]
+mod request_compiler_tests {
+    use super::super::denoise_artifact::DenoiseParametersV1;
+    use super::*;
+
+    fn request(source: &Path, strength: f32) -> DenoiseRequestV1 {
+        DenoiseRequestV1 {
+            algorithm: DenoiseAlgorithmV1::CollaborativeTransformFilterV1,
+            parameters: DenoiseParametersV1 { strength },
+            schema_version: 1,
+            source_identity: source.to_string_lossy().into_owned(),
+        }
+    }
+
+    #[test]
+    fn single_and_batch_use_the_same_plan_compiler() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.raw");
+        fs::write(&source, b"physical source").unwrap();
+        let request = request(&source, 0.37);
+        let single = compile_denoise_request(request.clone()).unwrap();
+        let batch = compile_denoise_batch(DenoiseBatchRequestV1 {
+            requests: vec![request.clone()],
+            schema_version: 1,
+        })
+        .unwrap();
+        let direct = EnhancedDenoisePlanV1::compile(&request).unwrap();
+        assert_eq!(single.plan, direct);
+        assert_eq!(batch[0].plan, direct);
+        assert_eq!(
+            single.plan.fingerprint().unwrap(),
+            batch[0].plan.fingerprint().unwrap()
+        );
+    }
+
+    #[test]
+    fn malformed_batch_is_rejected_before_any_runtime_work() {
+        assert_eq!(
+            compile_denoise_batch(DenoiseBatchRequestV1 {
+                requests: Vec::new(),
+                schema_version: 1,
+            })
+            .unwrap_err(),
+            "denoise_batch_size_out_of_range"
+        );
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.raw");
+        fs::write(&source, b"physical source").unwrap();
+        assert!(
+            compile_denoise_batch(DenoiseBatchRequestV1 {
+                requests: vec![
+                    request(&source, 0.4),
+                    request(&temp.path().join("missing.raw"), 0.4)
+                ],
+                schema_version: 1,
+            })
+            .is_err()
+        );
+    }
+
+    #[cfg(not(feature = "ai"))]
+    #[test]
+    fn non_ai_build_rejects_the_current_ai_algorithm_explicitly() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("source.raw");
+        fs::write(&source, b"physical source").unwrap();
+        let mut ai_request = request(&source, 0.5);
+        ai_request.algorithm = DenoiseAlgorithmV1::NindRgbRaisedCosineTiledV2;
+        assert_eq!(
+            compile_denoise_request(ai_request).unwrap_err(),
+            "ai_denoise_unavailable:build_without_ai_feature"
+        );
+    }
 }
