@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, mock, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { act, render as testingRender, waitFor } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import type { CullingSuggestions, ImageAnalysisResult } from '../../../src/components/ui/AppProperties';
@@ -26,12 +26,7 @@ const { buildInitialCullingDecision, reduceCullingDecision } = await import(
   '../../../src/components/modals/editing/cullingSessionModel'
 );
 
-let runtime: { container: HTMLDivElement; root: Root } | null = null;
-
 afterEach(() => {
-  if (runtime) act(() => runtime?.root.unmount());
-  runtime?.container.remove();
-  runtime = null;
   requests.length = 0;
   invoke.mockClear();
 });
@@ -77,10 +72,10 @@ describe('culling decision session', () => {
   test('ignores a closed session response and applies the current decision set exactly once', async () => {
     const onApply = mock(() => undefined);
     const onClose = mock(() => undefined);
-    const { container, render } = await installRuntime(onApply, onClose);
+    const { container, render, user } = await installRuntime(onApply, onClose);
 
     await render({ isOpen: true, paths: ['/old.ARW'], suggestions: null });
-    await clickButton(container, 'Start Culling');
+    await clickButton(user, container, 'Start Culling');
     expect(requests).toHaveLength(1);
     await render({ isOpen: false, paths: [], suggestions: null });
     await act(async () => requests[0]?.resolve(suggestions('/old.ARW', '/old.ARW')));
@@ -91,8 +86,8 @@ describe('culling decision session', () => {
       '/new.ARW',
     );
     expect(selectedCount(container)).toContain('1 result selected');
-    await clickButton(container, 'Apply to 1');
-    await clickButton(container, 'Apply to 1');
+    await clickButton(user, container, 'Apply to 1');
+    await clickButton(user, container, 'Apply to 1');
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply).toHaveBeenCalledWith('reject', ['/new.jpg']);
   });
@@ -101,11 +96,11 @@ describe('culling decision session', () => {
     const onApply = mock(() => undefined);
     const onClose = mock(() => undefined);
     const initial = suggestions('/same.ARW', '/same.jpg');
-    const { container, render } = await installRuntime(onApply, onClose);
+    const { container, render, user } = await installRuntime(onApply, onClose);
     await render({ isOpen: true, paths: ['/same.ARW', '/same.jpg'], suggestions: initial });
-    await clickImage(container, '/same.jpg');
+    await clickImage(user, container, '/same.jpg');
     expect(selectedCount(container)).toContain('0 results selected');
-    await clickButton(container, 'Cancel');
+    await clickButton(user, container, 'Cancel');
     expect(onApply).not.toHaveBeenCalled();
 
     await render({ isOpen: false, paths: [], suggestions: null });
@@ -118,24 +113,30 @@ async function installRuntime(
   onApply: (action: 'reject' | 'rate_zero' | 'delete', paths: string[]) => void,
   onClose: () => void,
 ) {
-  const window = new Window({ url: 'http://localhost' });
-  Object.assign(globalThis, {
-    document: window.document,
-    HTMLElement: window.HTMLElement,
-    IS_REACT_ACT_ENVIRONMENT: true,
-    navigator: window.navigator,
-    Node: window.Node,
-    window,
-  });
   if (!i18next.isInitialized) {
     await i18next.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', resources: { en: { translation: en } } });
   }
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-  runtime = { container, root };
+  const modal = (isOpen: boolean, paths: string[], value: CullingSuggestions | null) =>
+    createElement(
+      I18nextProvider,
+      { i18n: i18next },
+      createElement(CullingModal, {
+        error: null,
+        getThumbnailUrl: (path: string) => `data:image/jpeg,${encodeURIComponent(path)}`,
+        imagePaths: paths,
+        isOpen,
+        onApply,
+        onClose,
+        onError: () => undefined,
+        progress: null,
+        suggestions: value,
+      }),
+    );
+  const rendered = testingRender(modal(false, [], null));
+  const user = userEvent.setup();
   return {
-    container,
+    container: rendered.container,
+    user,
     render: async ({
       isOpen,
       paths,
@@ -145,46 +146,24 @@ async function installRuntime(
       paths: string[];
       suggestions: CullingSuggestions | null;
     }) => {
-      await act(async () => {
-        root.render(
-          createElement(
-            I18nextProvider,
-            { i18n: i18next },
-            createElement(CullingModal, {
-              error: null,
-              getThumbnailUrl: (path: string) => `data:image/jpeg,${encodeURIComponent(path)}`,
-              imagePaths: paths,
-              isOpen,
-              onApply,
-              onClose,
-              onError: () => undefined,
-              progress: null,
-              suggestions: value,
-            }),
-          ),
-        );
-        await new Promise((resolve) => window.setTimeout(resolve, 20));
-      });
+      rendered.rerender(modal(isOpen, paths, value));
+      if (isOpen) {
+        await waitFor(() => expect(rendered.container.querySelector('[data-testid="culling-session"]')).not.toBeNull());
+      }
     },
   };
 }
 
-async function clickButton(container: HTMLElement, text: string) {
+async function clickButton(user: UserEvent, container: HTMLElement, text: string) {
   const button = [...container.querySelectorAll('button')].find((candidate) => candidate.textContent?.includes(text));
   if (!button) throw new Error(`Missing button: ${text}`);
-  await act(async () => {
-    button.click();
-    await new Promise((resolve) => window.setTimeout(resolve, 20));
-  });
+  await user.click(button);
 }
 
-async function clickImage(container: HTMLElement, alt: string) {
+async function clickImage(user: UserEvent, container: HTMLElement, alt: string) {
   const image = container.querySelector<HTMLImageElement>(`img[alt="${alt}"]`);
   if (!image?.parentElement?.parentElement) throw new Error(`Missing image: ${alt}`);
-  await act(async () => {
-    image.parentElement?.parentElement?.click();
-    await new Promise((resolve) => window.setTimeout(resolve, 20));
-  });
+  await user.click(image.parentElement.parentElement);
 }
 
 function selectedCount(container: HTMLElement): string {

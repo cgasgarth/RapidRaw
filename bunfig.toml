@@ -1,4 +1,5 @@
 [test]
+preload = ["./tests/setup/bun-dom.ts"]
 # Global floors live in scripts/ci/check-bun-coverage.ts. Bun 1.3.14 applies
 # its built-in scalar threshold per loaded file, which cannot express a global
 # repository floor without excluding partially exercised product files.

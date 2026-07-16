@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { afterEach, describe, expect, spyOn, test } from 'bun:test';
+import { act, fireEvent, render as testingRender } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement, Profiler } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, Profiler } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import EditorNavigator, {
   createNavigatorPreviewState,
@@ -13,18 +13,11 @@ import EditorNavigator, {
 import { type NavigatorPreviewArtifact, useEditorStore } from '../../../src/store/useEditorStore';
 import type { EditorZoomCommand } from '../../../src/utils/editorZoom';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 const initialEditorState = useEditorStore.getState();
+const i18n = await createTestI18n();
 
 afterEach(() => {
-  if (renderedRoot) {
-    act(() => renderedRoot?.root.unmount());
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-  useEditorStore.getState().hydrateEditorRenderAuthority(initialEditorState);
+  act(() => useEditorStore.getState().hydrateEditorRenderAuthority(initialEditorState));
 });
 
 test('routes every compact zoom mode through the canonical zoom command callback', async () => {
@@ -34,10 +27,8 @@ test('routes every compact zoom mode through the canonical zoom command callback
     container.querySelectorAll<HTMLButtonElement>('[aria-label="Navigator zoom modes"] button'),
   );
 
-  await act(async () => {
-    buttons.forEach((button) => button.click());
-    await flushPromises();
-  });
+  const user = userEvent.setup();
+  for (const button of buttons) await user.click(button);
 
   expect(commands).toEqual([{ kind: 'fit' }, { kind: 'fill' }, { kind: 'one-to-one' }, { kind: 'two-to-one' }]);
 });
@@ -53,10 +44,7 @@ test('keyboard pan updates only the canonical viewer transform', async () => {
   const { container } = await renderNavigator({ controller });
   const overview = required<HTMLDivElement>(container, '[data-testid="editor-navigator-overview"]');
 
-  await act(async () => {
-    overview.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
-    await flushPromises();
-  });
+  fireEvent.keyDown(overview, { key: 'ArrowRight' });
 
   expect(transforms.at(-1)).toEqual([-440, -300, 2]);
   expect(useEditorStore.getState().adjustmentSnapshot.value).toBe(adjustments);
@@ -68,12 +56,10 @@ test('rejects a stale overview load after the preview identity changes', async (
   const { container } = await renderNavigator();
   const staleImage = required<HTMLImageElement>(container, 'img[src="blob:first"]');
 
-  await act(async () => {
+  act(() => {
     useEditorStore.setState({ navigatorPreviewArtifact: artifact('b', 'graph-b', '2', 'blob:second') });
-    await flushPromises();
-    staleImage.dispatchEvent(new window.Event('load'));
-    await flushPromises();
   });
+  fireEvent.load(staleImage);
 
   expect(container.querySelector('[aria-label="Loading Navigator preview"]')).not.toBeNull();
   expect(container.querySelector('[data-testid="editor-navigator-viewport"]')).toBeNull();
@@ -84,14 +70,13 @@ test('does not reload a coherent artifact when equivalent adjustments are reallo
   const { container } = await renderNavigator();
   const image = required<HTMLImageElement>(container, 'img[src="blob:coherent"]');
 
-  await act(async () => {
+  act(() => {
     useEditorStore.getState().hydrateEditorRenderAuthority((state) => ({
       editDocumentV2: structuredClone(state.editDocumentV2),
       history: state.history.map((entry, index) =>
         index === state.historyIndex ? structuredClone(state.editDocumentV2) : entry,
       ),
     }));
-    await flushPromises();
   });
 
   expect(container.querySelector('img[src="blob:coherent"]')).toBe(image);
@@ -102,24 +87,21 @@ test('keys interaction ownership by rapid A → B → A artifacts but not transf
   const { container } = await renderNavigator();
   const firstOverview = required<HTMLDivElement>(container, '[data-testid="editor-navigator-overview"]');
 
-  await act(async () => {
+  act(() => {
     useEditorStore.setState({ navigatorPreviewArtifact: artifact('b', 'graph-b', '2', 'blob:b') });
-    await flushPromises();
   });
   const secondOverview = required<HTMLDivElement>(container, '[data-testid="editor-navigator-overview"]');
   expect(secondOverview).not.toBe(firstOverview);
 
-  await act(async () => {
+  act(() => {
     useEditorStore.setState({ navigatorPreviewArtifact: artifact('a-2', 'graph-a', '3', 'blob:a') });
-    await flushPromises();
   });
   const thirdOverview = required<HTMLDivElement>(container, '[data-testid="editor-navigator-overview"]');
   expect(thirdOverview).not.toBe(secondOverview);
   expect(required<HTMLElement>(container, '[data-testid="editor-navigator"]').dataset.previewSession).toBe('3');
 
-  await act(async () => {
+  act(() => {
     useEditorStore.setState((state) => ({ baseRenderSize: { ...state.baseRenderSize, offsetX: 2 } }));
-    await flushPromises();
   });
   expect(required<HTMLDivElement>(container, '[data-testid="editor-navigator-overview"]')).toBe(thirdOverview);
 });
@@ -153,6 +135,8 @@ test('converges repeated pan, zoom, resize, and image snapshots without duplicat
 
 test('publishes one settled controller transform after continuous motion and cleans up its sampler', async () => {
   const intervalDriver = new ControlledIntervalDriver();
+  const setIntervalSpy = spyOn(window, 'setInterval').mockImplementation(intervalDriver.setInterval);
+  const clearIntervalSpy = spyOn(window, 'clearInterval').mockImplementation(intervalDriver.clearInterval);
   let candidate = { positionX: 0, positionY: 0, scale: 1 };
   let renderCount = 0;
   const controller: EditorTransformController = {
@@ -165,40 +149,36 @@ test('publishes one settled controller transform after continuous motion and cle
   };
   const rendered = await renderNavigator({
     controller,
-    intervalDriver,
     onRender: () => renderCount++,
   });
   const navigator = required<HTMLElement>(rendered.container, '[data-testid="editor-navigator"]');
   const initialRenderCount = renderCount;
 
-  await act(async () => {
+  act(() => {
     for (let step = 1; step <= 100; step += 1) {
       candidate = { positionX: -step * 2, positionY: -step, scale: 1 + step / 100 };
       intervalDriver.tick();
     }
-    await flushPromises();
   });
   expect(renderCount).toBe(initialRenderCount);
   expect(readNavigatorTransform(navigator)).toEqual({ positionX: 0, positionY: 0, scale: 1 });
 
   candidate = { positionX: -240, positionY: -120, scale: 2.5 };
-  await act(async () => {
+  act(() => {
     intervalDriver.tick();
-    await flushPromises();
   });
   expect(renderCount).toBe(initialRenderCount);
-  await act(async () => {
+  act(() => {
     intervalDriver.tick();
-    await flushPromises();
   });
   expect(renderCount).toBe(initialRenderCount + 1);
   expect(readNavigatorTransform(navigator)).toEqual(candidate);
   expect(intervalDriver.activeCount).toBe(1);
 
-  act(() => rendered.root.unmount());
-  rendered.container.remove();
-  renderedRoot = null;
+  rendered.unmount();
   expect(intervalDriver.activeCount).toBe(0);
+  setIntervalSpy.mockRestore();
+  clearIntervalSpy.mockRestore();
 });
 
 describe('Navigator preview artifact reducer', () => {
@@ -221,51 +201,35 @@ describe('Navigator preview artifact reducer', () => {
   });
 });
 
-async function renderNavigator({
+function renderNavigator({
   controller = {
     instance: { transformState: { positionX: -400, positionY: -300, scale: 2 } },
     setTransform: () => undefined,
   },
   onZoomChange = () => undefined,
-  intervalDriver,
   onRender,
 }: {
   controller?: EditorTransformController;
-  intervalDriver?: ControlledIntervalDriver;
   onRender?: () => void;
   onZoomChange?: (command: EditorZoomCommand) => void;
 } = {}) {
-  installDom(intervalDriver);
   useEditorStore.setState({
     baseRenderSize: { containerHeight: 600, containerWidth: 800, height: 600, offsetX: 0, offsetY: 0, width: 800 },
     finalPreviewUrl: useEditorStore.getState().finalPreviewUrl,
     originalSize: { height: 3000, width: 4000 },
     zoomMode: { devicePixelsPerImagePixel: 1, kind: 'ratio' },
   });
-  const i18n = i18next.createInstance();
-  await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', react: { useSuspense: false } });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    const navigator = createElement(EditorNavigator, {
-      onZoomChange,
-      transformControllerRef: { current: controller },
-    });
-    root.render(
-      createElement(
-        I18nextProvider,
-        { i18n },
-        onRender
-          ? createElement(Profiler, { id: 'editor-navigator', onRender: () => onRender() }, navigator)
-          : navigator,
-      ),
-    );
-    await flushPromises();
+  const navigator = createElement(EditorNavigator, {
+    onZoomChange,
+    transformControllerRef: { current: controller },
   });
-  renderedRoot = { container, root };
-  return { container, root };
+  return testingRender(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      onRender ? createElement(Profiler, { id: 'editor-navigator', onRender: () => onRender() }, navigator) : navigator,
+    ),
+  );
 }
 
 function artifact(id: string, graphIdentity: string, imageSessionId: string, url: string): NavigatorPreviewArtifact {
@@ -276,45 +240,6 @@ function required<T extends Element>(container: Element, selector: string): T {
   const element = container.querySelector<T>(selector);
   if (!element) throw new Error(`Expected ${selector}`);
   return element;
-}
-
-function installDom(intervalDriver?: ControlledIntervalDriver) {
-  const window = new Window({ url: 'http://localhost/editor-navigator-test' });
-  class TestResizeObserver {
-    observe() {}
-    disconnect() {}
-  }
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window, writable: true });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document, writable: true });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator, writable: true });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement, writable: true });
-  Object.defineProperty(globalThis, 'ResizeObserver', {
-    configurable: true,
-    value: TestResizeObserver,
-    writable: true,
-  });
-  Object.defineProperty(globalThis, 'requestAnimationFrame', {
-    configurable: true,
-    value: () => 1,
-    writable: true,
-  });
-  Object.defineProperty(globalThis, 'cancelAnimationFrame', {
-    configurable: true,
-    value: (handle: number) => window.clearTimeout(handle),
-    writable: true,
-  });
-  if (intervalDriver) {
-    Object.defineProperty(window, 'setInterval', {
-      configurable: true,
-      value: intervalDriver.setInterval,
-      writable: true,
-    });
-    Object.defineProperty(window, 'clearInterval', {
-      configurable: true,
-      value: intervalDriver.clearInterval,
-      writable: true,
-    });
-  }
 }
 
 class ControlledIntervalDriver {
@@ -349,6 +274,8 @@ function readNavigatorTransform(element: HTMLElement): { positionX: number; posi
   };
 }
 
-async function flushPromises() {
-  await new Promise((resolve) => setTimeout(resolve, 5));
+async function createTestI18n() {
+  const instance = i18next.createInstance();
+  await instance.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', react: { useSuspense: false } });
+  return instance;
 }

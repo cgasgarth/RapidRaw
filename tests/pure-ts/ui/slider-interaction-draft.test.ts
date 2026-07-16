@@ -1,23 +1,11 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { expect, test } from 'bun:test';
+import { act, fireEvent, render as testingRender } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement } from 'react';
 import { I18nextProvider, type i18n, initReactI18next } from 'react-i18next';
 
 import Slider, { type SliderChangeEvent } from '../../../src/components/ui/primitives/Slider.tsx';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-let mounted: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (mounted !== null) {
-    act(() => mounted?.root.unmount());
-    mounted.container.remove();
-    mounted = null;
-  }
-});
 
 test('idle controlled updates render synchronously while an active drag holds only its interaction draft', async () => {
   const changes: number[] = [];
@@ -29,10 +17,7 @@ test('idle controlled updates render synchronously while an active drag holds on
   await view.render(20);
   expect(requiredRange(view.container).value).toBe('20');
 
-  await act(async () => {
-    range.dispatchEvent(mouseEvent('mousedown', 50));
-    await flushPromises();
-  });
+  fireEvent.mouseDown(range, { clientX: 50 });
   expect(changes).toEqual([50]);
   expect(dragStates).toEqual([true]);
   expect(requiredRange(view.container).value).toBe('50');
@@ -40,11 +25,8 @@ test('idle controlled updates render synchronously while an active drag holds on
   await view.render(25);
   expect(requiredRange(view.container).value).toBe('50');
 
-  await act(async () => {
-    window.dispatchEvent(mouseEvent('mouseup', 50));
-    window.dispatchEvent(mouseEvent('mouseup', 50));
-    await flushPromises();
-  });
+  fireEvent.mouseUp(window, { clientX: 50 });
+  fireEvent.mouseUp(window, { clientX: 50 });
   expect(requiredRange(view.container).value).toBe('25');
   expect(dragStates).toEqual([true, false]);
 });
@@ -56,9 +38,15 @@ test('a wheel burst keeps its draft through delayed parent renders and falls bac
   const slider = view.container.querySelector<HTMLElement>('[data-testid="draft-slider"]');
   if (slider === null) throw new Error('Expected slider root.');
 
+  const wheel = new Event('wheel', { bubbles: true, cancelable: true });
+  Object.defineProperties(wheel, {
+    deltaX: { value: 0 },
+    deltaY: { value: -100 },
+    shiftKey: { value: true },
+  });
   await act(async () => {
-    slider.dispatchEvent(wheelEvent(-100));
-    await flushPromises();
+    slider.dispatchEvent(wheel);
+    await Promise.resolve();
   });
   expect(changes).toEqual([11]);
   expect(dragStates).toEqual([]);
@@ -81,18 +69,12 @@ test('touch promotion and cancellation share the exact once drag boundary', asyn
   const range = requiredRange(view.container);
   range.getBoundingClientRect = () => ({ left: 0, width: 100 }) as DOMRect;
 
-  await act(async () => {
-    range.dispatchEvent(touchEvent('touchstart', 10, 10));
-    range.dispatchEvent(touchEvent('touchmove', 30, 10));
-    await flushPromises();
-  });
+  fireEvent.touchStart(range, { touches: [{ clientX: 10, clientY: 10 }] });
+  fireEvent.touchMove(range, { touches: [{ clientX: 30, clientY: 10 }] });
   expect(changes).toEqual([30]);
   expect(dragStates).toEqual([true]);
 
-  await act(async () => {
-    range.dispatchEvent(touchEvent('touchcancel'));
-    await flushPromises();
-  });
+  fireEvent.touchCancel(range, { touches: [] });
   expect(dragStates).toEqual([true, false]);
   expect(requiredRange(view.container).value).toBe('10');
 });
@@ -105,24 +87,20 @@ test('explicit lifecycle previews many pointer values but commits or cancels exa
   const range = requiredRange(view.container);
   range.getBoundingClientRect = () => ({ left: 0, width: 100 }) as DOMRect;
 
-  await act(async () => {
-    range.dispatchEvent(mouseEvent('mousedown', 20));
-    window.dispatchEvent(mouseEvent('mousemove', 35));
-    window.dispatchEvent(mouseEvent('mousemove', 60));
-    window.dispatchEvent(mouseEvent('mouseup', 60));
-    await flushPromises();
-  });
+  fireEvent.mouseDown(range, { clientX: 20 });
+  fireEvent.mouseMove(window, { clientX: 35 });
+  fireEvent.mouseMove(window, { clientX: 60 });
+  fireEvent.mouseUp(window, { clientX: 60 });
   expect(changes.length).toBeGreaterThanOrEqual(3);
   expect(lifecycle).toEqual(['start', 'commit']);
 
   lifecycle.length = 0;
   await act(async () => {
     await new Promise((resolve) => window.setTimeout(resolve, 310));
-    range.dispatchEvent(mouseEvent('mousedown', 40));
-    window.dispatchEvent(mouseEvent('mousemove', 50));
-    window.dispatchEvent(new window.Event('blur'));
-    window.dispatchEvent(mouseEvent('mouseup', 50));
-    await flushPromises();
+    fireEvent.mouseDown(range, { clientX: 40 });
+    fireEvent.mouseMove(window, { clientX: 50 });
+    fireEvent(window, new Event('blur'));
+    fireEvent.mouseUp(window, { clientX: 50 });
   });
   expect(lifecycle).toEqual(['start', 'cancel']);
 });
@@ -132,97 +110,52 @@ test('typed numeric text commits once without creating a transient preview inter
   const dragStates: boolean[] = [];
   const lifecycle: string[] = [];
   const view = await renderSlider(10, changes, dragStates, lifecycle);
+  const user = userEvent.setup();
   const valueButton = view.container.querySelector<HTMLElement>('[data-testid="draft-slider-value"]');
   if (valueButton === null) throw new Error('Expected numeric value button.');
 
-  await act(async () => {
-    valueButton.click();
-    await flushPromises();
-  });
+  await user.click(valueButton);
   const input = view.container.querySelector<HTMLInputElement>('[data-testid="draft-slider-input"]');
   if (input === null) throw new Error('Expected numeric value input.');
-  await act(async () => {
-    input.value = '42';
-    input.dispatchEvent(new window.Event('input', { bubbles: true }));
-    input.dispatchEvent(new window.KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
-    await flushPromises();
-  });
+  await user.clear(input);
+  await user.type(input, '42{Enter}');
 
   expect(changes).toEqual([42]);
   expect(lifecycle).toEqual([]);
 });
 
 async function renderSlider(value: number, changes: number[], dragStates: boolean[], lifecycle?: string[]) {
-  installDom();
   const translations = await createTestI18n();
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
+  const element = (nextValue: number) =>
+    createElement(
+      I18nextProvider,
+      { i18n: translations },
+      createElement(Slider, {
+        defaultValue: 0,
+        label: 'Exposure',
+        max: 100,
+        min: 0,
+        onChange: (event: SliderChangeEvent) => changes.push(Number(event.target.value)),
+        onDragStateChange: (state: boolean) => dragStates.push(state),
+        onInteractionCancel: lifecycle ? () => lifecycle.push('cancel') : undefined,
+        onInteractionCommit: lifecycle ? () => lifecycle.push('commit') : undefined,
+        onInteractionStart: lifecycle ? () => lifecycle.push('start') : undefined,
+        step: 1,
+        testId: 'draft-slider',
+        value: nextValue,
+      }),
+    );
+  const rendered = testingRender(element(value));
   const render = async (nextValue: number) => {
-    await act(async () => {
-      root.render(
-        createElement(
-          I18nextProvider,
-          { i18n: translations },
-          createElement(Slider, {
-            defaultValue: 0,
-            label: 'Exposure',
-            max: 100,
-            min: 0,
-            onChange: (event: SliderChangeEvent) => changes.push(Number(event.target.value)),
-            onDragStateChange: (state: boolean) => dragStates.push(state),
-            onInteractionCancel: lifecycle ? () => lifecycle.push('cancel') : undefined,
-            onInteractionCommit: lifecycle ? () => lifecycle.push('commit') : undefined,
-            onInteractionStart: lifecycle ? () => lifecycle.push('start') : undefined,
-            step: 1,
-            testId: 'draft-slider',
-            value: nextValue,
-          }),
-        ),
-      );
-      await flushPromises();
-    });
+    rendered.rerender(element(nextValue));
   };
-  await render(value);
-  mounted = { container, root };
-  return { container, render };
+  return { container: rendered.container, render };
 }
 
 function requiredRange(container: Element) {
   const range = container.querySelector<HTMLInputElement>('[data-testid="draft-slider-range"]');
   if (range === null) throw new Error('Expected range input.');
   return range;
-}
-
-function mouseEvent(type: string, clientX: number) {
-  const event = new window.Event(type, { bubbles: true, cancelable: true });
-  Object.defineProperty(event, 'clientX', { value: clientX });
-  return event;
-}
-
-function wheelEvent(deltaY: number) {
-  const event = new window.Event('wheel', { bubbles: true, cancelable: true });
-  Object.defineProperties(event, {
-    deltaX: { value: 0 },
-    deltaY: { value: deltaY },
-    shiftKey: { value: true },
-  });
-  return event;
-}
-
-function touchEvent(type: string, clientX?: number, clientY?: number) {
-  const event = new window.Event(type, { bubbles: true, cancelable: true });
-  const touches = clientX === undefined || clientY === undefined ? [] : [{ clientX, clientY }];
-  Object.defineProperty(event, 'touches', { value: touches });
-  return event;
-}
-
-function installDom() {
-  const testWindow = new Window({ url: 'http://localhost/slider-interaction-test' });
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: testWindow });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: testWindow.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: testWindow.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: testWindow.HTMLElement });
 }
 
 async function createTestI18n(): Promise<i18n> {
@@ -235,9 +168,4 @@ async function createTestI18n(): Promise<i18n> {
     resources: { en: { translation: { ui: { slider: { clickToEdit: 'Click to edit', reset: 'Reset' } } } } },
   });
   return instance;
-}
-
-async function flushPromises() {
-  await Promise.resolve();
-  await Promise.resolve();
 }

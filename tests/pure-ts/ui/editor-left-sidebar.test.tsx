@@ -1,28 +1,14 @@
-import { afterEach, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { expect, test } from 'bun:test';
+import { render, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
-import { act, createElement, useEffect, useState } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
+import { createElement, useEffect, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import EditorLeftSidebar, {
   EDITOR_LEFT_SECTION_IDS,
   type EditorLeftSectionId,
 } from '../../../src/components/panel/editor/EditorLeftSidebar';
-
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-
-let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
-
-afterEach(() => {
-  if (renderedRoot !== null) {
-    act(() => {
-      renderedRoot?.root.unmount();
-    });
-    renderedRoot.container.remove();
-    renderedRoot = null;
-  }
-});
 
 test('renders one ordered Develop workflow with stable accessible slots and one scroll root', async () => {
   const { container } = await renderSidebar();
@@ -43,32 +29,28 @@ test('renders one ordered Develop workflow with stable accessible slots and one 
 });
 
 test('persists section disclosure changes through the typed callback', async () => {
+  const user = userEvent.setup();
   const changes: Array<[EditorLeftSectionId, boolean]> = [];
   const { container } = await renderSidebar({ changes });
   const presets = getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-toggle"]');
 
-  await act(async () => {
-    presets.click();
-    await flushPromises();
-  });
+  await user.click(presets);
 
   expect(changes).toEqual([['presets', false]]);
   expect(presets.getAttribute('aria-expanded')).toBe('false');
 });
 
 test('collapse restores focus to the stable expand control and preserves geometry', async () => {
+  const user = userEvent.setup();
   const { container } = await renderSidebar();
   const collapse = getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-collapse"]');
 
-  await act(async () => {
-    collapse.focus();
-    collapse.click();
-    await flushPromises();
-  });
+  collapse.focus();
+  await user.click(collapse);
 
   const expand = getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-expand"]');
   const sidebar = getRequiredElement<HTMLElement>(container, 'aside[aria-label="Develop workflow"]');
-  expect(document.activeElement).toBe(expand);
+  await waitFor(() => expect(document.activeElement).toBe(expand));
   expect(sidebar.getAttribute('data-editor-left-state')).toBe('collapsed');
   expect(sidebar.style.width).toBe('32px');
   expect(getRequiredElement<HTMLElement>(container, '[data-testid="editor-left-region"]').style.width).toBe('32px');
@@ -76,27 +58,19 @@ test('collapse restores focus to the stable expand control and preserves geometr
 });
 
 test('unmounts Presets workflow when its section or sidebar collapses', async () => {
+  const user = userEvent.setup();
   const lifecycle: string[] = [];
   const { container } = await renderSidebar({ lifecycle });
 
   expect(lifecycle).toEqual(['mounted']);
 
-  await act(async () => {
-    getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-toggle"]').click();
-    await flushPromises();
-  });
+  await user.click(getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-toggle"]'));
   expect(lifecycle).toEqual(['mounted', 'unmounted']);
 
-  await act(async () => {
-    getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-toggle"]').click();
-    await flushPromises();
-  });
+  await user.click(getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-toggle"]'));
   expect(lifecycle).toEqual(['mounted', 'unmounted', 'mounted']);
 
-  await act(async () => {
-    getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-collapse"]').click();
-    await flushPromises();
-  });
+  await user.click(getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-collapse"]'));
   expect(lifecycle).toEqual(['mounted', 'unmounted', 'mounted', 'unmounted']);
 });
 
@@ -145,41 +119,13 @@ async function renderSidebar({
   changes?: Array<[EditorLeftSectionId, boolean]>;
   lifecycle?: string[];
 } = {}) {
-  installDom();
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', react: { useSuspense: false } });
-  const container = document.createElement('div');
-  document.body.append(container);
-  const root = createRoot(container);
-
-  await act(async () => {
-    root.render(createElement(I18nextProvider, { i18n }, createElement(SidebarHarness, { changes, lifecycle })));
-    await flushPromises();
-  });
-
-  renderedRoot = { container, root };
-  return { container, root };
+  return render(createElement(I18nextProvider, { i18n }, createElement(SidebarHarness, { changes, lifecycle })));
 }
 
 function getRequiredElement<T extends Element = Element>(container: Element, selector: string): T {
   const element = container.querySelector<T>(selector);
   if (element === null) throw new Error(`Expected ${selector} to render.`);
   return element;
-}
-
-function installDom() {
-  const window = new Window({ url: 'http://localhost/editor-left-sidebar-test' });
-  class TestResizeObserver {
-    observe() {}
-    disconnect() {}
-  }
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: window });
-  Object.defineProperty(globalThis, 'document', { configurable: true, value: window.document });
-  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: window.navigator });
-  Object.defineProperty(globalThis, 'HTMLElement', { configurable: true, value: window.HTMLElement });
-  Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: TestResizeObserver });
-}
-
-async function flushPromises() {
-  await new Promise((resolve) => setTimeout(resolve, 0));
 }

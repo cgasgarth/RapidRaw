@@ -20,43 +20,9 @@ import {
 } from '../../../src/store/useUIStore';
 import { createDefaultEditorWorkspacePreferences } from '../../../src/utils/editorWorkspacePreferences';
 
-const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
-
-class MemoryStorage implements Storage {
-  private readonly values = new Map<string, string>();
-
-  get length() {
-    return this.values.size;
-  }
-
-  clear() {
-    this.values.clear();
-  }
-
-  getItem(key: string) {
-    return this.values.get(key) ?? null;
-  }
-
-  key(index: number) {
-    return Array.from(this.values.keys())[index] ?? null;
-  }
-
-  removeItem(key: string) {
-    this.values.delete(key);
-  }
-
-  setItem(key: string, value: string) {
-    this.values.set(key, value);
-  }
-}
-
-function installMemoryStorage() {
-  const storage = new MemoryStorage();
-  Object.defineProperty(globalThis, 'localStorage', {
-    configurable: true,
-    value: storage,
-  });
-  return storage;
+function resetStorage() {
+  localStorage.clear();
+  return localStorage;
 }
 
 function resetRightPanelState(panel: Panel | null = DEFAULT_EDITOR_RIGHT_PANEL) {
@@ -72,11 +38,7 @@ function resetRightPanelState(panel: Panel | null = DEFAULT_EDITOR_RIGHT_PANEL) 
 afterEach(() => {
   resetRightPanelState();
 
-  if (originalLocalStorageDescriptor) {
-    Object.defineProperty(globalThis, 'localStorage', originalLocalStorageDescriptor);
-  } else {
-    delete (globalThis as { localStorage?: Storage }).localStorage;
-  }
+  localStorage.clear();
 });
 
 describe('editor right panel persistence', () => {
@@ -96,7 +58,7 @@ describe('editor right panel persistence', () => {
   });
 
   test('restores a current persisted editing panel and resets invalid panels', () => {
-    const storage = installMemoryStorage();
+    const storage = resetStorage();
     const preferences = createDefaultEditorWorkspacePreferences();
     preferences.rightInspector.activePanel = Panel.Masks;
     preferences.rightInspector.recentPanels = [Panel.Masks];
@@ -114,7 +76,7 @@ describe('editor right panel persistence', () => {
   });
 
   test('persists only meaningful editing panel selections', () => {
-    const storage = installMemoryStorage();
+    const storage = resetStorage();
     resetRightPanelState(Panel.Color);
 
     useUIStore.getState().setRightPanel(Panel.Masks);
@@ -135,7 +97,7 @@ describe('editor right panel persistence', () => {
   });
 
   test('keeps slide direction deterministic from rail ordering', () => {
-    installMemoryStorage();
+    resetStorage();
     resetRightPanelState(Panel.Color);
 
     useUIStore.getState().setRightPanel(Panel.Adjustments);
@@ -149,7 +111,7 @@ describe('editor right panel persistence', () => {
   });
 
   test('records typed recent right panels from real panel selections', () => {
-    installMemoryStorage();
+    resetStorage();
     resetRightPanelState(Panel.Color);
 
     useUIStore.getState().setRightPanel(Panel.Masks);
@@ -163,7 +125,7 @@ describe('editor right panel persistence', () => {
   });
 
   test('claims session keep-alive membership in the panel selection command', () => {
-    installMemoryStorage();
+    resetStorage();
     resetRightPanelState(Panel.Color);
 
     useUIStore.getState().setRightPanel(Panel.Agent);
@@ -178,7 +140,7 @@ describe('editor right panel persistence', () => {
   });
 
   test('declares each rapid selection predecessor synchronously without readiness callbacks', () => {
-    installMemoryStorage();
+    resetStorage();
     resetRightPanelState(Panel.Color);
 
     useUIStore.getState().setRightPanel(Panel.Adjustments);
@@ -206,7 +168,7 @@ describe('editor right panel persistence', () => {
   });
 
   test('collapses the active panel without replacing the rendered or persisted editing rail', () => {
-    const storage = installMemoryStorage();
+    const storage = resetStorage();
     resetRightPanelState(Panel.Masks);
     useUIStore.setState((state) => ({
       editorWorkspacePreferences: {
