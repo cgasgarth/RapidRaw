@@ -224,6 +224,16 @@ pub fn compile_render_plan_cached(
     context: CompileRenderPlanContext,
     lut: Option<Arc<Lut>>,
 ) -> Result<Arc<CompiledRenderPlan>, RenderPlanError> {
+    if !raw.is_object() {
+        return Err(RenderPlanError {
+            code: "render_plan.invalid_type",
+            field: "$",
+            message: "adjustments must be an object".into(),
+        });
+    }
+    // A caller-provided revision can locate only a plan that is valid for this
+    // build. Never let a cache hit bypass the current graph-version boundary.
+    validate_current_edit_graph_version(raw)?;
     if let Some(plan) = {
         let mut cache = cache().lock().unwrap();
         let hit = cache
@@ -1725,6 +1735,47 @@ mod tests {
                 .get("migration")
                 .is_none()
         );
+    }
+
+    #[test]
+    fn cached_boundary_cannot_alias_non_current_graph_versions_to_a_current_plan() {
+        let context = context(80_5948);
+        let current_raw = current_render_adjustments(json!({"exposure": 10}));
+        let current = compile_render_plan_cached(&current_raw, context, None).unwrap();
+        let cached = compile_render_plan_cached(&current_raw, context, None).unwrap();
+        assert!(Arc::ptr_eq(&current, &cached));
+        assert_eq!(cached.edit_graph.pipeline_version, 2);
+        assert_eq!(cached.edit_graph.receipt.pipeline_version, 2);
+        assert_eq!(cached.fingerprints.full, cached.edit_graph.fingerprint);
+        assert_eq!(cached.effective_json["rawEngineEditGraphVersion"], 2);
+
+        let mut missing = current_raw.clone();
+        missing
+            .as_object_mut()
+            .unwrap()
+            .remove("rawEngineEditGraphVersion");
+        let error = compile_render_plan_cached(&missing, context, None)
+            .err()
+            .expect("missing graph version must not hit the current plan cache");
+        assert_eq!(error.code, "render_plan.missing_edit_graph_version");
+
+        for version in [json!(0), json!(1), json!(3)] {
+            let raw = current_render_adjustments(json!({"rawEngineEditGraphVersion": version}));
+            let error = compile_render_plan_cached(&raw, context, None)
+                .err()
+                .expect("old or future graph version must not hit the current plan cache");
+            assert_eq!(error.code, "render_plan.unsupported_edit_graph_version");
+        }
+        for version in [json!(-2), json!(2.5), json!("2")] {
+            let raw = current_render_adjustments(json!({"rawEngineEditGraphVersion": version}));
+            let error = compile_render_plan_cached(&raw, context, None)
+                .err()
+                .expect("malformed graph version must not hit the current plan cache");
+            assert_eq!(error.code, "render_plan.invalid_edit_graph_version");
+        }
+
+        let still_cached = compile_render_plan_cached(&current_raw, context, None).unwrap();
+        assert!(Arc::ptr_eq(&current, &still_cached));
     }
 
     #[test]
