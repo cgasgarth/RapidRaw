@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 /// Identifies every phase belonging to one selected-image open lifecycle.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ImageOpenSessionId {
     pub selection_generation: u64,
     pub image_session: u64,

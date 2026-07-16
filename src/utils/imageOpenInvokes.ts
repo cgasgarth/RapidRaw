@@ -8,26 +8,45 @@ import {
 import { Invokes } from '../tauri/commands';
 import { invokeWithSchema } from './tauriSchemaInvoke';
 
-const imageOpenDiagnosticsSchema = z
+const nonnegativeIntegerSchema = z.number().int().nonnegative().safe();
+
+export const imageOpenDiagnosticsSchema = z
   .object({
-    duplicatePrefetchDrops: z.number().int().nonnegative(),
-    foregroundOpens: z.number().int().nonnegative(),
-    metadataReads: z.number().int().nonnegative(),
-    peakPrefetchInFlight: z.number().int().nonnegative(),
-    prefetchCancelled: z.number().int().nonnegative(),
-    prefetchCompleted: z.number().int().nonnegative(),
-    prefetchPromotions: z.number().int().nonnegative(),
-    prefetchRequested: z.number().int().nonnegative(),
-    prefetchStarted: z.number().int().nonnegative(),
-    stalePhaseDrops: z.number().int().nonnegative(),
+    duplicatePrefetchDrops: nonnegativeIntegerSchema,
+    embeddedPreviewAttempted: nonnegativeIntegerSchema,
+    embeddedPreviewCacheHits: nonnegativeIntegerSchema,
+    embeddedPreviewElapsedMillis: nonnegativeIntegerSchema,
+    embeddedPreviewEncodedBytes: nonnegativeIntegerSchema,
+    embeddedPreviewPublished: nonnegativeIntegerSchema,
+    embeddedPreviewRejected: nonnegativeIntegerSchema,
+    embeddedPreviewStaleSuppressed: nonnegativeIntegerSchema,
+    foregroundOpens: nonnegativeIntegerSchema,
+    lastEmbeddedCandidateHeight: nonnegativeIntegerSchema,
+    lastEmbeddedCandidateWidth: nonnegativeIntegerSchema,
+    metadataReads: nonnegativeIntegerSchema,
+    peakPrefetchInFlight: nonnegativeIntegerSchema,
+    prefetchCancelled: nonnegativeIntegerSchema,
+    prefetchCompleted: nonnegativeIntegerSchema,
+    prefetchPromotions: nonnegativeIntegerSchema,
+    prefetchRequested: nonnegativeIntegerSchema,
+    prefetchStarted: nonnegativeIntegerSchema,
+    stalePrefetchDrops: nonnegativeIntegerSchema,
+    stalePhaseDrops: nonnegativeIntegerSchema,
   })
   .strict();
 
-const scheduleImagePrefetchRequestSchema = z
+export const scheduleImagePrefetchRequestSchema = z
   .object({
     candidates: z.array(z.string().min(1)).max(3),
-    collectionGeneration: z.number().int().nonnegative(),
+    collectionGeneration: nonnegativeIntegerSchema,
+    currentPath: z.string().min(1),
     memoryPressure: z.boolean(),
+    sessionId: z
+      .object({
+        imageSession: nonnegativeIntegerSchema,
+        selectionGeneration: nonnegativeIntegerSchema,
+      })
+      .strict(),
     workloadBusy: z.boolean(),
   })
   .strict();

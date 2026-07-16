@@ -231,6 +231,7 @@ export function useAppNavigation({
         memoryPressure: false,
         now: performance.now(),
         orderedPaths: useLibraryStore.getState().imageList.map((image) => image.path),
+        sessionId: { imageSession: session.generation, selectionGeneration: session.generation },
         workloadBusy:
           process.exportState.status === Status.Exporting ||
           process.importState.status === Status.Importing ||

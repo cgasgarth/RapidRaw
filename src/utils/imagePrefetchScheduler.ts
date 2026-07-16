@@ -5,6 +5,10 @@ export interface ImagePrefetchNavigationInput {
   memoryPressure: boolean;
   now: number;
   orderedPaths: string[];
+  sessionId: {
+    imageSession: number;
+    selectionGeneration: number;
+  };
   workloadBusy: boolean;
 }
 
@@ -52,7 +56,9 @@ export class ImagePrefetchScheduler {
     return {
       candidates: [...new Set(candidates)].slice(0, 3),
       collectionGeneration: this.collectionGeneration,
+      currentPath: input.currentPath,
       memoryPressure: input.memoryPressure,
+      sessionId: input.sessionId,
       workloadBusy: input.workloadBusy,
     };
   }

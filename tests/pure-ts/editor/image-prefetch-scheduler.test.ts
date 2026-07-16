@@ -10,6 +10,7 @@ describe('directional image prefetch scheduler', () => {
         memoryPressure: false,
         now: 1_000,
         orderedPaths: ['a', 'b', 'c', 'd'],
+        sessionId: { imageSession: 1, selectionGeneration: 1 },
         workloadBusy: false,
       }).candidates,
     ).toEqual(['c', 'd', 'a']);
@@ -23,6 +24,7 @@ describe('directional image prefetch scheduler', () => {
       memoryPressure: false,
       now: 1_000,
       orderedPaths: paths,
+      sessionId: { imageSession: 1, selectionGeneration: 1 },
       workloadBusy: false,
     });
     expect(
@@ -31,6 +33,7 @@ describe('directional image prefetch scheduler', () => {
         memoryPressure: false,
         now: 1_050,
         orderedPaths: paths,
+        sessionId: { imageSession: 2, selectionGeneration: 2 },
         workloadBusy: false,
       }).candidates,
     ).toEqual(['a']);
@@ -44,6 +47,7 @@ describe('directional image prefetch scheduler', () => {
         memoryPressure: true,
         now: 1_000,
         orderedPaths: ['a', 'b', 'c', 'd'],
+        sessionId: { imageSession: 1, selectionGeneration: 1 },
         workloadBusy: true,
       }).candidates,
     ).toEqual(['c']);
@@ -56,6 +60,7 @@ describe('directional image prefetch scheduler', () => {
       memoryPressure: false,
       now: 1_000,
       orderedPaths: ['a', 'b', 'c'],
+      sessionId: { imageSession: 1, selectionGeneration: 1 },
       workloadBusy: false,
     });
     const second = scheduler.schedule({
@@ -63,10 +68,13 @@ describe('directional image prefetch scheduler', () => {
       memoryPressure: false,
       now: 1_100,
       orderedPaths: ['x', 'y', 'z'],
+      sessionId: { imageSession: 2, selectionGeneration: 2 },
       workloadBusy: false,
     });
     expect(second.collectionGeneration).toBeGreaterThan(first.collectionGeneration);
     expect(second.candidates).toEqual(['z', 'x']);
+    expect(second.currentPath).toBe('y');
+    expect(second.sessionId).toEqual({ imageSession: 2, selectionGeneration: 2 });
   });
 
   test('deterministic 100-image benchmark removes sequential decode stalls after warmup', () => {
@@ -86,6 +94,7 @@ describe('directional image prefetch scheduler', () => {
         memoryPressure: false,
         now: index * 500,
         orderedPaths: paths,
+        sessionId: { imageSession: index + 1, selectionGeneration: index + 1 },
         workloadBusy: false,
       });
       request.candidates.forEach((path) => warmed.add(path));
