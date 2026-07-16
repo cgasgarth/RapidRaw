@@ -4,9 +4,10 @@
 import { readFileSync } from 'node:fs';
 import { relative } from 'node:path';
 
-import ts from '@typescript/typescript6';
+import type { Expression, Node } from 'oxc-parser';
 
 import { getExtension, walkRepoFiles } from '../../../scripts/lib/ci/repo-files.ts';
+import { lineAtOffset, parseSource, visitSource } from '../../../scripts/lib/ci/source-ast.ts';
 
 const ROOT = process.cwd();
 
@@ -14,58 +15,35 @@ const CHECKED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.ts', '.cjs']
 
 const hasCheckedExtension = (path) => CHECKED_EXTENSIONS.has(getExtension(path));
 
-const getScriptKind = (path) => {
-  switch (getExtension(path)) {
-    case '.tsx':
-      return ts.ScriptKind.TSX;
-    case '.jsx':
-      return ts.ScriptKind.JSX;
-    case '.js':
-    case '.ts':
-    case '.cjs':
-      return ts.ScriptKind.JS;
-    default:
-      return ts.ScriptKind.TS;
-  }
-};
-
-const getLine = (sourceFile, position) => sourceFile.getLineAndCharacterOfPosition(position).line + 1;
-
-const unwrapExpression = (node) => {
+const unwrapExpression = (node: Expression): Expression => {
   let current = node;
-  while (ts.isParenthesizedExpression(current)) {
+  while (current.type === 'ParenthesizedExpression') {
     current = current.expression;
   }
   return current;
 };
 
-const getAsExpressionLabel = (node) => {
-  if (!ts.isAsExpression(node)) return null;
-  if (node.type.kind === ts.SyntaxKind.AnyKeyword) return 'assertion to any';
+const getAsExpressionLabel = (node: Node): string | null => {
+  if (node.type !== 'TSAsExpression') return null;
+  if (node.typeAnnotation.type === 'TSAnyKeyword') return 'assertion to any';
   const expression = unwrapExpression(node.expression);
-  if (ts.isAsExpression(expression) && expression.type.kind === ts.SyntaxKind.UnknownKeyword) {
+  if (expression.type === 'TSAsExpression' && expression.typeAnnotation.type === 'TSUnknownKeyword') {
     return 'double assertion through unknown';
   }
   return null;
 };
 
-export const findUnsafeCastViolations = (filePath, contents) => {
-  const sourceFile = ts.createSourceFile(filePath, contents, ts.ScriptTarget.Latest, true, getScriptKind(filePath));
-  const violations = [];
-
-  const visit = (node) => {
+export const findUnsafeCastViolations = (filePath: string, contents: string) => {
+  const violations: Array<{ label: string; line: number }> = [];
+  visitSource(parseSource(filePath, contents), (node) => {
     const label = getAsExpressionLabel(node);
     if (label) {
       violations.push({
         label,
-        line: getLine(sourceFile, node.getStart(sourceFile)),
+        line: lineAtOffset(contents, node.start),
       });
     }
-
-    ts.forEachChild(node, visit);
-  };
-
-  visit(sourceFile);
+  });
   return violations;
 };
 

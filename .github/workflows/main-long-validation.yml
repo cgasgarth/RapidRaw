@@ -17,52 +17,103 @@ permissions:
   contents: read
 
 jobs:
-  frontend-full:
-    name: 'frontend: exhaustive closure'
+  frontend-static:
+    name: 'frontend: static quality'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/setup-bun-deps
-      - name: Install browser contract runtime
-        run: bunx playwright install chromium
-      - name: Run complete frontend, schema, bundle, and browser contracts
+      - name: Run static frontend quality
         run: |
           bun run lint
           bun run format:check
           bun run typecheck
+
+  frontend-contracts:
+    name: 'frontend: schema and policy contracts'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Run schema, policy, i18n, and documentation contracts
+        run: |
           bun run check:schema
-          bun run test:unit
-          bun run check:bundle
           bunx i18next-cli lint
           bunx i18next-cli extract --ci --dry-run
           bunx knip --config knip.jsonc --dependencies --reporter compact
           bun tests/integration/checks/check-script-extension-policy.ts
           bun tests/integration/checks/check-unsafe-casts.ts
           bun tests/integration/checks/editor/check-editor-render-authority-boundary.ts
-          bun packages/rawengine-schema/scripts/check-edit-command-bus.ts
-          bun scripts/checks/ci/check-schema-contract-gate.ts
           bun run check:docs
+
+  frontend-unit:
+    name: 'frontend: Bun unit and component tests'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Run Bun tests with native parallel scheduling
+        run: bun run test:unit
+
+  frontend-browser:
+    name: 'frontend: browser and visual runtime'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Install browser contract runtime
+        run: bunx playwright install chromium
+      - name: Run browser contracts
+        run: |
           bun run check:browser-harness
           bun tests/integration/checks/editor/check-section-disclosure-edit-authority-browser.ts
-
       - name: Run browser visual smoke
         run: bun scripts/proofs/capture-visual-smoke.ts --scenario empty-library
 
-      - name: Generate bundle analysis report
-        if: ${{ success() }}
-        run: |
-          bun scripts/ci/generate-vite-bundle-report.ts
-          bun scripts/ci/write-vite-bundle-step-summary.ts
+  frontend-bundle:
+    name: 'frontend: production bundle and budgets'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: ./.github/actions/setup-bun-deps
+      - name: Build and validate the production bundle once
+        run: bun run check:bundle
+      - name: Write bundle analysis summary
+        run: bun scripts/ci/write-vite-bundle-step-summary.ts
 
       - name: Upload bundle analysis report
-        if: ${{ success() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: main-vite-bundle-report-${{ github.run_id }}-${{ github.run_attempt }}
+          name: main-vite-bundle-report-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/bundle-report/**
           retention-days: 14
           if-no-files-found: error
+
+  frontend-full:
+    name: 'frontend: exhaustive closure'
+    needs:
+      - frontend-static
+      - frontend-contracts
+      - frontend-unit
+      - frontend-browser
+      - frontend-bundle
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+      - name: Fail closed on any frontend lane failure
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        run: bun scripts/ci/verify-main-frontend-closure.ts
 
   workflow-contracts:
     name: 'workflow: actionlint and pinned actions'

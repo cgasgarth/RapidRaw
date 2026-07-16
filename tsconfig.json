@@ -1,30 +1,11 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "types": [],
-    "allowSyntheticDefaultImports": true,
-    "allowImportingTsExtensions": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
     "jsx": "react-jsx",
     "lib": ["dom", "esnext"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "noImplicitOverride": true,
-    "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "noPropertyAccessFromIndexSignature": true,
-    "exactOptionalPropertyTypes": true,
-    "noUncheckedIndexedAccess": true,
-    "noUncheckedSideEffectImports": true,
-    "allowUnreachableCode": false,
-    "allowUnusedLabels": false,
-    "resolveJsonModule": true,
-    "rootDir": ".",
-    "skipLibCheck": true,
-    "strict": true,
-    "target": "es2024"
+    "rootDir": "."
   },
-  "include": ["src", "packages/*/src"],
+  "include": ["src"],
   "exclude": ["node_modules"]
 }
