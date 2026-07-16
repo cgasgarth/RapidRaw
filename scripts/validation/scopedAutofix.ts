@@ -1,4 +1,6 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 export type GitSpawnEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -15,7 +17,7 @@ export const readStagedAutofixPaths = (root: string, gitEnvironment: GitSpawnEnv
     .filter((path) => path.length > 0);
 };
 
-/** Formats staged blobs through Biome stdin, never the working copy. */
+/** Formats staged blobs and synchronizes only working copies that exactly matched their staged snapshot. */
 export const runScopedAutofix = (
   root: string,
   paths: readonly string[],
@@ -24,7 +26,14 @@ export const runScopedAutofix = (
 ): number => {
   if (paths.length === 0) return 0;
   const [executable, ...command] = biomeCommand;
-  const formatted: Array<{ blob: string; mode: string; path: string }> = [];
+  const formatted: Array<{
+    blob: string;
+    formattedContent: Buffer;
+    mode: string;
+    path: string;
+    stagedContent: Buffer;
+    synchronizeWorkingCopy: boolean;
+  }> = [];
   for (const path of paths) {
     const indexEntry = spawnSync('git', ['ls-files', '-s', '-z', '--', path], {
       cwd: root,
@@ -50,6 +59,7 @@ export const runScopedAutofix = (
       process.stderr.write(fix.stderr);
       return fix.status ?? 1;
     }
+    if (fix.stdout.equals(staged.stdout)) continue;
     const nextBlob = spawnSync('git', ['hash-object', '-w', '--stdin'], {
       cwd: root,
       encoding: 'utf8',
@@ -57,7 +67,16 @@ export const runScopedAutofix = (
       input: fix.stdout,
     });
     if (nextBlob.status !== 0) return nextBlob.status ?? 1;
-    formatted.push({ blob: nextBlob.stdout.trim(), mode: match[1], path });
+    const workingPath = join(root, path);
+    const workingContent = readFileSync(workingPath);
+    formatted.push({
+      blob: nextBlob.stdout.trim(),
+      formattedContent: fix.stdout,
+      mode: match[1],
+      path,
+      stagedContent: staged.stdout,
+      synchronizeWorkingCopy: workingContent.equals(staged.stdout),
+    });
   }
   for (const entry of formatted) {
     const update = spawnSync('git', ['update-index', '--cacheinfo', entry.mode, entry.blob, entry.path], {
@@ -66,6 +85,12 @@ export const runScopedAutofix = (
       stdio: 'inherit',
     });
     if (update.status !== 0) return update.status ?? 1;
+  }
+  for (const entry of formatted) {
+    if (!entry.synchronizeWorkingCopy) continue;
+    const workingPath = join(root, entry.path);
+    if (!readFileSync(workingPath).equals(entry.stagedContent)) continue;
+    writeFileSync(workingPath, entry.formattedContent);
   }
   return 0;
 };

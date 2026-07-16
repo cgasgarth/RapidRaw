@@ -26,7 +26,39 @@ afterEach(async () => {
 });
 
 describe('scoped precommit autofix', () => {
-  test('formats only the staged snapshot and preserves unrelated working hunks', async () => {
+  test('commits import-order drift format-green on the first scoped fix', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-scoped-autofix-imports-'));
+    roots.push(root);
+    expect(git(root, 'init', '-q').status).toBe(0);
+    expect(git(root, 'config', 'core.fsmonitor', 'false').status).toBe(0);
+    await writeFile(
+      join(root, 'biome.json'),
+      JSON.stringify({
+        $schema: 'https://biomejs.dev/schemas/2.0.0/schema.json',
+        formatter: { enabled: true },
+        linter: { enabled: false },
+      }),
+    );
+    const source =
+      "import { join } from 'node:path';\nimport { readFile } from 'node:fs/promises';\nexport { join, readFile };\n";
+    await writeFile(join(root, 'fixture.ts'), source);
+    expect(git(root, 'add', '.').status).toBe(0);
+
+    const gitEnvironment = isolatedGitEnvironment(process.env);
+    const biomeCommand = ['bun', join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome')];
+    expect(runScopedAutofix(root, readStagedAutofixPaths(root, gitEnvironment), biomeCommand, gitEnvironment)).toBe(0);
+    const formatted = git(root, 'show', ':fixture.ts').stdout;
+    expect(formatted.indexOf('node:fs/promises')).toBeLessThan(formatted.indexOf('node:path'));
+    expect(await readFile(join(root, 'fixture.ts'), 'utf8')).toBe(formatted);
+    expect(
+      git(root, '-c', 'user.email=test@example.invalid', '-c', 'user.name=RapidRaw-test', 'commit', '-qm', 'fixture')
+        .status,
+    ).toBe(0);
+    expect(git(root, 'status', '--porcelain').stdout).toBe('');
+    expect(spawnSync(biomeCommand[0], [biomeCommand[1], 'ci', 'fixture.ts'], { cwd: root }).status).toBe(0);
+  });
+
+  test('formats only the staged snapshot and preserves partially staged working hunks', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-scoped-autofix-'));
     roots.push(root);
     expect(git(root, 'init', '-q').status).toBe(0);
@@ -74,6 +106,78 @@ describe('scoped precommit autofix', () => {
     ]);
     expect(await readFile(join(root, 'src/intended.ts'), 'utf8')).toBe(workingIntended);
     expect(git(root, 'show', ':src/intended.ts').stdout).toContain('intended = { value: 2 };');
+  });
+
+  test('synchronizes a fully staged fix without touching an unrelated dirty file', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-scoped-autofix-unrelated-'));
+    roots.push(root);
+    expect(git(root, 'init', '-q').status).toBe(0);
+    expect(git(root, 'config', 'core.fsmonitor', 'false').status).toBe(0);
+    await writeFile(
+      join(root, 'biome.json'),
+      JSON.stringify({
+        $schema: 'https://biomejs.dev/schemas/2.0.0/schema.json',
+        formatter: { enabled: true },
+        linter: { enabled: false },
+      }),
+    );
+    await writeFile(join(root, 'intended.ts'), 'export const intended = 1;\n');
+    await writeFile(join(root, 'unrelated.ts'), 'export const unrelated = 1;\n');
+    expect(git(root, 'add', '.').status).toBe(0);
+    expect(
+      git(root, '-c', 'user.email=test@example.invalid', '-c', 'user.name=RapidRaw-test', 'commit', '-qm', 'fixture')
+        .status,
+    ).toBe(0);
+
+    await writeFile(join(root, 'intended.ts'), 'export const intended={value:2}\n');
+    expect(git(root, 'add', 'intended.ts').status).toBe(0);
+    const unrelated = 'export const unrelated = { keep:   true };\n';
+    await writeFile(join(root, 'unrelated.ts'), unrelated);
+    const gitEnvironment = isolatedGitEnvironment(process.env);
+    expect(
+      runScopedAutofix(
+        root,
+        readStagedAutofixPaths(root, gitEnvironment),
+        ['bun', join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome')],
+        gitEnvironment,
+      ),
+    ).toBe(0);
+
+    expect(git(root, 'diff', '--cached', '--name-only').stdout.trim()).toBe('intended.ts');
+    expect(git(root, 'diff', '--name-only').stdout.trim()).toBe('unrelated.ts');
+    expect(await readFile(join(root, 'unrelated.ts'), 'utf8')).toBe(unrelated);
+    expect(await readFile(join(root, 'intended.ts'), 'utf8')).toBe(git(root, 'show', ':intended.ts').stdout);
+  });
+
+  test('leaves an already formatted staged path unchanged', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'rapidraw-scoped-autofix-noop-'));
+    roots.push(root);
+    expect(git(root, 'init', '-q').status).toBe(0);
+    expect(git(root, 'config', 'core.fsmonitor', 'false').status).toBe(0);
+    await writeFile(
+      join(root, 'biome.json'),
+      JSON.stringify({
+        $schema: 'https://biomejs.dev/schemas/2.0.0/schema.json',
+        formatter: { enabled: true },
+        linter: { enabled: false },
+      }),
+    );
+    const source = 'export const fixture = { value: 1 };\n';
+    await writeFile(join(root, 'fixture.ts'), source);
+    expect(git(root, 'add', '.').status).toBe(0);
+    const indexBefore = git(root, 'ls-files', '-s', 'fixture.ts').stdout;
+    const gitEnvironment = isolatedGitEnvironment(process.env);
+    expect(
+      runScopedAutofix(
+        root,
+        ['fixture.ts'],
+        ['bun', join(process.cwd(), 'node_modules/@biomejs/biome/bin/biome')],
+        gitEnvironment,
+      ),
+    ).toBe(0);
+    expect(git(root, 'ls-files', '-s', 'fixture.ts').stdout).toBe(indexBefore);
+    expect(git(root, 'show', ':fixture.ts').stdout).toBe(source);
+    expect(await readFile(join(root, 'fixture.ts'), 'utf8')).toBe(source);
   });
 
   test('updates only the fixture index when the parent process exports a hook index', async () => {
