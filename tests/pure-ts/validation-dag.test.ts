@@ -850,64 +850,73 @@ await lease.release();`;
     const sameWorktree = join(root, 'same');
     const parallelWorktrees = [join(root, 'one'), join(root, 'two'), join(root, 'three')];
     const coordinator = join(root, 'locks');
-    await mkdir(sameWorktree);
-    await Promise.all(parallelWorktrees.map((worktree) => mkdir(worktree)));
-    await Promise.all(
-      [sameWorktree, ...parallelWorktrees].map(async (worktree) => {
-        await writeFile(join(worktree, 'input.ts'), 'export const input = true;\n');
-        await initFixtureRepository(worktree);
-        await mkdir(join(worktree, 'dist'));
-        await writeFile(join(worktree, 'dist', 'artifact'), 'stale');
-      }),
-    );
-    const producer: ValidationNode = {
-      id: 'producer-output',
-      command: [
-        'bun',
-        '-e',
-        "import {mkdir} from 'node:fs/promises';const path='dist/artifact';await mkdir('dist',{recursive:true});if(await Bun.file(path).exists())process.exit(9);await Bun.write(path,String(process.pid));await Bun.sleep(120);await Bun.file(path).delete()",
-      ],
-      dependencies: [],
-      inputs: ['frontend'],
-      resourceClass: 'light',
-      cachePolicy: 'none',
-      modes: ['commit'],
-      timeoutMs: 2_000,
-      outputs: ['dist'],
-    };
-    const options = (worktree: string) => ({
-      mode: 'commit' as const,
-      changedPaths: ['input.ts'],
-      noCache: true,
-      verifyCache: false,
-      explainCache: false,
-      root: worktree,
-      resourceCoordinatorRoot: coordinator,
-    });
+    try {
+      await mkdir(sameWorktree);
+      await Promise.all(parallelWorktrees.map((worktree) => mkdir(worktree)));
+      await Promise.all(
+        [sameWorktree, ...parallelWorktrees].map(async (worktree) => {
+          await writeFile(join(worktree, 'input.ts'), 'export const input = true;\n');
+          await initFixtureRepository(worktree);
+          await mkdir(join(worktree, 'dist'));
+          await writeFile(join(worktree, 'dist', 'artifact'), 'stale');
+        }),
+      );
+      const producer: ValidationNode = {
+        id: 'producer-output',
+        command: [
+          'bun',
+          '-e',
+          "import {mkdir} from 'node:fs/promises';const path='dist/artifact';await mkdir('dist',{recursive:true});if(await Bun.file(path).exists())process.exit(9);await Bun.write(path,String(process.pid));await Bun.sleep(120);await Bun.file(path).delete()",
+        ],
+        dependencies: [],
+        inputs: ['frontend'],
+        resourceClass: 'light',
+        cachePolicy: 'none',
+        modes: ['commit'],
+        timeoutMs: 2_000,
+        outputs: ['dist'],
+      };
+      const options = (worktree: string) => ({
+        mode: 'commit' as const,
+        changedPaths: ['input.ts'],
+        noCache: true,
+        verifyCache: false,
+        explainCache: false,
+        root: worktree,
+        resourceCoordinatorRoot: coordinator,
+      });
 
-    expect(
-      await Promise.all([
-        runValidation([producer], options(sameWorktree)),
-        runValidation([producer], options(sameWorktree)),
-      ]),
-    ).toEqual([0, 0]);
-    const parallelProducer: ValidationNode = {
-      ...producer,
-      command: [
-        'bun',
-        '-e',
-        "import {mkdir,readdir} from 'node:fs/promises';const rendezvous='../parallel-rendezvous';await mkdir(`${rendezvous}/${process.pid}`,{recursive:true});for(let attempt=0;;attempt+=1){if((await readdir(rendezvous)).length>=3)break;if(attempt===250)process.exit(10);await Bun.sleep(20)}const path='dist/artifact';await mkdir('dist',{recursive:true});if(await Bun.file(path).exists())process.exit(9);await Bun.write(path,String(process.pid));await Bun.file(path).delete()",
-      ],
-      timeoutMs: 8_000,
-    };
-    expect(
-      await Promise.all(parallelWorktrees.map((worktree) => runValidation([parallelProducer], options(worktree)))),
-    ).toEqual([0, 0, 0]);
-    expect(validationOutputResource(parallelWorktrees[0], 'dist')).not.toBe(
-      validationOutputResource(parallelWorktrees[1], 'dist'),
-    );
-    expect(await readdir(join(root, 'parallel-rendezvous'))).toHaveLength(3);
-  });
+      expect(
+        await Promise.all([
+          runValidation([producer], options(sameWorktree)),
+          runValidation([producer], options(sameWorktree)),
+        ]),
+      ).toEqual([0, 0]);
+      const parallelProducer: ValidationNode = {
+        ...producer,
+        command: [
+          'bun',
+          '-e',
+          "import {mkdir,readdir} from 'node:fs/promises';const rendezvous='../parallel-rendezvous';await mkdir(`${rendezvous}/${process.pid}`,{recursive:true});for(let attempt=0;;attempt+=1){if((await readdir(rendezvous)).length>=3)break;if(attempt===250)process.exit(10);await Bun.sleep(20)}const path='dist/artifact';await mkdir('dist',{recursive:true});if(await Bun.file(path).exists())process.exit(9);await Bun.write(path,String(process.pid));await Bun.file(path).delete()",
+        ],
+        timeoutMs: 8_000,
+      };
+      expect(
+        await Promise.all(parallelWorktrees.map((worktree) => runValidation([parallelProducer], options(worktree)))),
+      ).toEqual([0, 0, 0]);
+      expect(validationOutputResource(parallelWorktrees[0], 'dist')).not.toBe(
+        validationOutputResource(parallelWorktrees[1], 'dist'),
+      );
+      expect(await readdir(join(root, 'parallel-rendezvous'))).toHaveLength(3);
+      for (const worktree of [sameWorktree, ...parallelWorktrees]) {
+        expect(
+          await Bun.file(join(coordinator, `${validationOutputResource(worktree, 'dist')}.lock`)).exists(),
+        ).toBeFalse();
+      }
+    } finally {
+      await rm(root, { force: true, recursive: true });
+    }
+  }, 15_000);
 
   test('programmatic nested validation inherits its active output-lease owner without self-queueing', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'rapidraw-validation-nested-output-'));
@@ -981,7 +990,7 @@ await lease.release();`;
       await Promise.allSettled(children.map((child) => child.exited));
       await rm(directory, { force: true, recursive: true });
     }
-  });
+  }, 20_000);
 
   test('holds producer output ownership through downstream consumers', async () => {
     const root = await mkdtemp(join(tmpdir(), 'rapidraw-validation-output-lifetime-'));
