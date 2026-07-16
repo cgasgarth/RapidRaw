@@ -11,7 +11,7 @@ use super::render_plan::color_fingerprint_for_test;
 use crate::AppState;
 use crate::adjustments::abi::{AllAdjustments, GlobalAdjustments, MAX_MASKS, MaskAdjustments};
 use crate::gpu_processing::{
-    EditGraphExecutionAuthority, PreGpuImageIdentity, RenderRequest, Roi,
+    EditGraphExecutionAuthority, PreGpuImageIdentity, RenderRequest, Roi, acquire_gpu_test_lock,
     get_or_init_compute_gpu_context_for_tests, process_and_get_unclamped_dynamic_image,
 };
 use crate::lut_processing::Lut;
@@ -331,6 +331,7 @@ fn registry_is_ordered_unique_and_every_node_has_an_executable_adapter() {
 
 #[test]
 fn production_cpu_and_wgpu_nodes_execute_identity_and_non_default_vectors() {
+    let _gpu_test_guard = acquire_gpu_test_lock();
     let source = source_fixture();
     let app = tauri::test::mock_builder()
         .manage(AppState::new())
