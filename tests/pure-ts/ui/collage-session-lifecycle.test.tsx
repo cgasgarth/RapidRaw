@@ -75,7 +75,7 @@ test('disposing during metadata load prevents stale preview work from entering a
   await act(async () => metadataResolvers[1]?.());
   await act(async () => Promise.resolve());
   expect(
-    calls.filter(({ command, args }) => command === 'generate_preview_for_path' && args.path === '/b.ARW'),
+    calls.filter(({ command, args }) => command === 'generate_preview_for_path' && args['path'] === '/b.ARW'),
   ).toHaveLength(1);
   expect(runtime.container.querySelector('button[aria-label="a.ARW"]')).toBeNull();
 });
@@ -122,7 +122,7 @@ function installRuntime() {
   const imageDescriptor = Object.getOwnPropertyDescriptor(window, 'Image');
   const originalCreateObjectUrl = URL.createObjectURL;
   const originalRevokeObjectUrl = URL.revokeObjectURL;
-  const originalGetContext = HTMLCanvasElement.prototype.getContext;
+  const getContextDescriptor = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'getContext');
   const originalToDataUrl = HTMLCanvasElement.prototype.toDataURL;
   Object.defineProperty(window, 'Image', { configurable: true, value: TestImage });
   URL.createObjectURL = (blob: Blob) => {
@@ -130,18 +130,21 @@ function installRuntime() {
     return `blob:${++objectUrl}`;
   };
   URL.revokeObjectURL = (url: string) => revoked.push(url);
-  HTMLCanvasElement.prototype.getContext = (() => ({
-    beginPath() {},
-    clearRect() {},
-    clip() {},
-    drawImage() {},
-    fillRect() {},
-    restore() {},
-    roundRect() {},
-    save() {},
-    scale() {},
-    fillStyle: '',
-  })) as typeof HTMLCanvasElement.prototype.getContext;
+  Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+    configurable: true,
+    value: () => ({
+      beginPath() {},
+      clearRect() {},
+      clip() {},
+      drawImage() {},
+      fillRect() {},
+      restore() {},
+      roundRect() {},
+      save() {},
+      scale() {},
+      fillStyle: '',
+    }),
+  });
   HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,current-session';
   const rendered = testingRender(
     createElement(CollageModal, { isOpen: false, onClose: () => {}, onSave: async () => '', sourceImages: [] }),
@@ -202,11 +205,12 @@ function installRuntime() {
       if (!mounted) return;
       mounted = false;
       rendered.unmount();
-      if (imageDescriptor === undefined) delete window.Image;
+      if (imageDescriptor === undefined) Reflect.deleteProperty(window, 'Image');
       else Object.defineProperty(window, 'Image', imageDescriptor);
       URL.createObjectURL = originalCreateObjectUrl;
       URL.revokeObjectURL = originalRevokeObjectUrl;
-      HTMLCanvasElement.prototype.getContext = originalGetContext;
+      if (getContextDescriptor === undefined) Reflect.deleteProperty(HTMLCanvasElement.prototype, 'getContext');
+      else Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', getContextDescriptor);
       HTMLCanvasElement.prototype.toDataURL = originalToDataUrl;
       await Promise.resolve();
     },

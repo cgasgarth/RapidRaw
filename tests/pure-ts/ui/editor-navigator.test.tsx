@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { act, fireEvent, render as testingRender } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
@@ -98,7 +98,7 @@ test('keys interaction ownership by rapid A → B → A artifacts but not transf
   });
   const thirdOverview = required<HTMLDivElement>(container, '[data-testid="editor-navigator-overview"]');
   expect(thirdOverview).not.toBe(secondOverview);
-  expect(required<HTMLElement>(container, '[data-testid="editor-navigator"]').dataset.previewSession).toBe('3');
+  expect(required<HTMLElement>(container, '[data-testid="editor-navigator"]').dataset['previewSession']).toBe('3');
 
   act(() => {
     useEditorStore.setState((state) => ({ baseRenderSize: { ...state.baseRenderSize, offsetX: 2 } }));
@@ -135,8 +135,10 @@ test('converges repeated pan, zoom, resize, and image snapshots without duplicat
 
 test('publishes one settled controller transform after continuous motion and cleans up its sampler', async () => {
   const intervalDriver = new ControlledIntervalDriver();
-  const setIntervalSpy = spyOn(window, 'setInterval').mockImplementation(intervalDriver.setInterval);
-  const clearIntervalSpy = spyOn(window, 'clearInterval').mockImplementation(intervalDriver.clearInterval);
+  const setIntervalDescriptor = Object.getOwnPropertyDescriptor(window, 'setInterval');
+  const clearIntervalDescriptor = Object.getOwnPropertyDescriptor(window, 'clearInterval');
+  Object.defineProperty(window, 'setInterval', { configurable: true, value: intervalDriver.setInterval });
+  Object.defineProperty(window, 'clearInterval', { configurable: true, value: intervalDriver.clearInterval });
   let candidate = { positionX: 0, positionY: 0, scale: 1 };
   let renderCount = 0;
   const controller: EditorTransformController = {
@@ -177,8 +179,8 @@ test('publishes one settled controller transform after continuous motion and cle
 
   rendered.unmount();
   expect(intervalDriver.activeCount).toBe(0);
-  setIntervalSpy.mockRestore();
-  clearIntervalSpy.mockRestore();
+  restoreProperty(window, 'setInterval', setIntervalDescriptor);
+  restoreProperty(window, 'clearInterval', clearIntervalDescriptor);
 });
 
 describe('Navigator preview artifact reducer', () => {
@@ -249,7 +251,7 @@ class ControlledIntervalDriver {
   readonly setInterval = (callback: TimerHandler): number => {
     if (typeof callback !== 'function') throw new Error('Controlled interval requires a callback.');
     const id = this.nextId++;
-    this.callbacks.set(id, callback);
+    this.callbacks.set(id, () => Reflect.apply(callback, undefined, []));
     return id;
   };
 
@@ -268,10 +270,15 @@ class ControlledIntervalDriver {
 
 function readNavigatorTransform(element: HTMLElement): { positionX: number; positionY: number; scale: number } {
   return {
-    positionX: Number(element.dataset.transformPositionX),
-    positionY: Number(element.dataset.transformPositionY),
-    scale: Number(element.dataset.transformScale),
+    positionX: Number(element.dataset['transformPositionX']),
+    positionY: Number(element.dataset['transformPositionY']),
+    scale: Number(element.dataset['transformScale']),
   };
+}
+
+function restoreProperty(target: Window, key: 'clearInterval' | 'setInterval', descriptor?: PropertyDescriptor) {
+  if (descriptor === undefined) Reflect.deleteProperty(target, key);
+  else Object.defineProperty(target, key, descriptor);
 }
 
 async function createTestI18n() {

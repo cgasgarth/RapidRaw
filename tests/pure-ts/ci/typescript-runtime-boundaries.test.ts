@@ -31,6 +31,24 @@ const installedPackageSchema = z.object({
   version: z.string(),
 });
 
+const lockfileSchema = z.object({
+  packages: z.record(z.string(), z.tuple([z.string()]).rest(z.unknown())),
+});
+
+const workflowSchema = z.object({
+  jobs: z.record(
+    z.string(),
+    z.object({
+      name: z.string().optional(),
+      steps: z.array(z.object({ name: z.string().optional(), run: z.string().optional() })).optional(),
+    }),
+  ),
+});
+
+const forbiddenTypeScript6Token = /(?:^|[^a-z0-9])(?:typescript|tsc|ts)[-_\s@]*6(?:$|[^0-9])/iu;
+const forbiddenTypeScriptLanePath =
+  /(?:typescript|tsconfig|typecheck)[^/]*(?:compat|legacy|shim)|(?:compat|legacy|shim)[^/]*(?:typescript|tsconfig|typecheck)/iu;
+
 afterAll(async () => {
   await api.close();
 });
@@ -124,6 +142,73 @@ describe('TypeScript 7 runtime project boundaries', () => {
         acceptsInstalledCompiler: Bun.semver.satisfies(compiler.version, dependency.range),
         dependency: `${dependency.name}@${dependency.version}`,
       }).toEqual({ acceptsInstalledCompiler: true, dependency: `${dependency.name}@${dependency.version}` });
+    }
+  });
+
+  test('has no TypeScript 6 package, command, config, workflow, documentation lane, shim, or alias', async () => {
+    const packageJson = packageSchema.parse(await Bun.file(resolve(repositoryRoot, 'package.json')).json());
+    const directPackages = { ...packageJson.dependencies, ...packageJson.devDependencies };
+    expect(
+      Object.entries(directPackages).filter(
+        ([name, version]) => forbiddenTypeScript6Token.test(name) || forbiddenTypeScript6Token.test(version),
+      ),
+    ).toEqual([]);
+    expect(
+      Object.entries(packageJson.scripts).filter(
+        ([name, command]) => forbiddenTypeScript6Token.test(name) || forbiddenTypeScript6Token.test(command),
+      ),
+    ).toEqual([]);
+
+    const lockfile = lockfileSchema.parse(Bun.JSONC.parse(await Bun.file(resolve(repositoryRoot, 'bun.lock')).text()));
+    const installedCompilers = Object.entries(lockfile.packages)
+      .filter(([name]) => name === 'typescript' || name.startsWith('@typescript/typescript-'))
+      .map(([name, [identity]]) => `${name}:${identity}`)
+      .sort();
+    expect(installedCompilers.some((identity) => identity.startsWith('typescript:typescript@7.'))).toBe(true);
+    expect(installedCompilers.every((identity) => /@7\./u.test(identity))).toBe(true);
+
+    const trackedFiles = Bun.spawnSync(['git', 'ls-files'], { cwd: repositoryRoot, stdout: 'pipe' })
+      .stdout.toString()
+      .split(/\r?\n/u)
+      .filter(Boolean);
+    expect(
+      trackedFiles.filter((path) => forbiddenTypeScript6Token.test(path) || forbiddenTypeScriptLanePath.test(path)),
+    ).toEqual([]);
+
+    const configPaths = trackedFiles.filter((path) => /(?:^|\/)tsconfig[^/]*\.json$/u.test(path));
+    for (const configPath of configPaths) {
+      const project = await parseProject(configPath);
+      const aliases = z.record(z.string(), z.array(z.string())).catch({}).parse(project.options['paths']);
+      expect(
+        Object.entries(aliases).filter(
+          ([alias, targets]) =>
+            forbiddenTypeScript6Token.test(alias) || targets.some((target) => forbiddenTypeScript6Token.test(target)),
+        ),
+      ).toEqual([]);
+    }
+
+    for (const workflowPath of trackedFiles.filter((path) => /^\.github\/workflows\/.*\.ya?ml$/u.test(path))) {
+      const workflow = workflowSchema.parse(
+        Bun.YAML.parse(await Bun.file(resolve(repositoryRoot, workflowPath)).text()),
+      );
+      const executableSurface = Object.values(workflow.jobs).flatMap((job) => [
+        job.name ?? '',
+        ...(job.steps?.flatMap((step) => [step.name ?? '', step.run ?? '']) ?? []),
+      ]);
+      expect(executableSurface.filter((value) => forbiddenTypeScript6Token.test(value))).toEqual([]);
+    }
+
+    for (const declarationPath of trackedFiles.filter((path) => path.endsWith('.d.ts'))) {
+      const declarations = await Bun.file(resolve(repositoryRoot, declarationPath)).text();
+      const moduleAliases = [...declarations.matchAll(/declare\s+module\s+['"]([^'"]+)['"]/gu)]
+        .map((match) => match[1])
+        .filter((specifier): specifier is string => specifier !== undefined);
+      expect(moduleAliases.filter((specifier) => forbiddenTypeScript6Token.test(specifier))).toEqual([]);
+    }
+
+    for (const documentPath of trackedFiles.filter((path) => path.endsWith('.md'))) {
+      const document = await Bun.file(resolve(repositoryRoot, documentPath)).text();
+      expect(forbiddenTypeScript6Token.test(document)).toBe(false);
     }
   });
 });

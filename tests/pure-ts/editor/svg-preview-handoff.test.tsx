@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { SvgPreviewHandoff } from '../../../src/components/panel/editor/SvgPreviewHandoff.tsx';
 import type { InteractivePatch } from '../../../src/store/useEditorStore.ts';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
@@ -144,7 +144,7 @@ function patch(url: string): InteractivePatch {
     basePreviewUrl: 'blob:base-a',
     fullHeight: 100,
     fullWidth: 200,
-    geometryIdentity: 'geometry',
+    geometryIdentity: 1,
     normH: 0.5,
     normW: 0.5,
     normX: 0.1,

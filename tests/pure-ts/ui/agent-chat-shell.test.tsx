@@ -129,14 +129,14 @@ describe('agent chat shell', () => {
 
     const { container } = await render(createElement(AgentPanel));
     expect(
-      required<HTMLElement>(container, '[data-testid="agent-right-rail-panel"]').dataset.reviewWorkspaceState,
+      required<HTMLElement>(container, '[data-testid="agent-right-rail-panel"]').dataset['reviewWorkspaceState'],
     ).toBe('ready');
     expect(required<HTMLElement>(container, 'h2').textContent).toBe('DSC_4850.ARW');
     expect(container.textContent).toContain('6000 x 4000');
     expect(container.querySelector('img[alt=""]')).not.toBeNull();
     const modelConfiguration = required<HTMLElement>(container, '[data-testid="agent-model-configuration"]');
-    expect(modelConfiguration.dataset.modelId).toBe('gpt-5.6-terra');
-    expect(modelConfiguration.dataset.reasoningTier).toBe('light');
+    expect(modelConfiguration.dataset['modelId']).toBe('gpt-5.6-terra');
+    expect(modelConfiguration.dataset['reasoningTier']).toBe('light');
   });
 
   test('renders a compact typed preview, applies it, restores focus, and keeps lifecycle status in one surface', async () => {
@@ -149,15 +149,15 @@ describe('agent chat shell', () => {
     await user.click(quickStart(container, 'Recover highlights'));
     expect(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]').disabled).toBe(false);
     await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]'));
-    await waitFor(() => expect(composer.dataset.livePromptStatus).not.toBe('previewing'));
-    if (composer.dataset.livePromptStatus !== 'dry_run_ready') {
+    await waitFor(() => expect(composer.dataset['livePromptStatus']).not.toBe('previewing'));
+    if (composer.dataset['livePromptStatus'] !== 'dry_run_ready') {
       throw new Error(
-        `Expected a ready preview, got ${composer.dataset.livePromptStatus}: ${container.querySelector('[data-testid="agent-live-prompt-error"]')?.textContent ?? 'no error'}`,
+        `Expected a ready preview, got ${composer.dataset['livePromptStatus']}: ${container.querySelector('[data-testid="agent-live-prompt-error"]')?.textContent ?? 'no error'}`,
       );
     }
 
     const result = required<HTMLElement>(container, '[data-testid="agent-photographer-result"]');
-    expect(result.dataset.proposalState).toBe('dry_run_ready');
+    expect(result.dataset['proposalState']).toBe('dry_run_ready');
     expect(result.querySelectorAll('[data-testid="agent-photographer-before-after"] img')).toHaveLength(2);
     expect(required<HTMLElement>(result, '[data-testid="agent-selected-image-proposal-state"]').textContent).toContain(
       'ready',
@@ -167,7 +167,7 @@ describe('agent chat shell', () => {
     focusTracker.focus.mockClear();
 
     const messageIds = Array.from(container.querySelectorAll<HTMLElement>('[data-testid^="agent-chat-message-"]')).map(
-      (message) => message.dataset.testid,
+      (message) => message.dataset['testid'],
     );
     expect(messageIds).toEqual([
       'agent-chat-message-existing-assistant-message',
@@ -176,8 +176,8 @@ describe('agent chat shell', () => {
     ]);
 
     await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-apply"]'));
-    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('applied'));
-    expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset.proposalState).toBe(
+    await waitFor(() => expect(composer.dataset['livePromptStatus']).toBe('applied'));
+    expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset['proposalState']).toBe(
       'applied',
     );
     expect(container.querySelector('[data-testid="agent-live-prompt-rollback"]')).not.toBeNull();
@@ -185,8 +185,8 @@ describe('agent chat shell', () => {
     focusTracker.focus.mockClear();
 
     await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-rollback"]'));
-    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('rolled_back'));
-    expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset.proposalState).toBe(
+    await waitFor(() => expect(composer.dataset['livePromptStatus']).toBe('rolled_back'));
+    expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset['proposalState']).toBe(
       'rolled_back',
     );
     await waitFor(() => expect(focusTracker.focus).toHaveBeenCalled());
@@ -202,7 +202,7 @@ describe('agent chat shell', () => {
     await user.click(quickStart(container, 'Recover highlights'));
     expect(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]').disabled).toBe(false);
     await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]'));
-    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('failed'));
+    await waitFor(() => expect(composer.dataset['livePromptStatus']).toBe('failed'));
 
     expect(required<HTMLElement>(container, '[data-testid="agent-live-prompt-error"]').textContent).toContain(
       'Select an image before previewing',
@@ -223,14 +223,14 @@ describe('agent chat shell', () => {
 
     await user.click(quickStart(container, 'Recover highlights'));
     await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-run"]'));
-    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('previewing'));
+    await waitFor(() => expect(composer.dataset['livePromptStatus']).toBe('previewing'));
 
     await user.click(input);
     focusTracker.focus.mockClear();
     await user.keyboard('{Escape}');
-    await waitFor(() => expect(composer.dataset.livePromptStatus).toBe('cancelled'));
+    await waitFor(() => expect(composer.dataset['livePromptStatus']).toBe('cancelled'));
 
-    expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset.proposalState).toBe(
+    expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset['proposalState']).toBe(
       'cancelled',
     );
     await waitFor(() => expect(focusTracker.focus).toHaveBeenCalled());
@@ -280,11 +280,13 @@ function buildPreviewBytes(): ArrayBuffer {
     ? new Uint8Array([0xff, 0xd8, 0xff, 0xd9]).buffer
     : (() => {
         const currentPreview = getRawEngineImagePreview({ requestId: 'agent-chat-shell-ui-preview' });
-        return buildAgentMediumPreviewEncodedBytesForTest({
-          graphRevision: currentPreview.receipt.graphRevision,
-          imagePath: currentImage.path,
-          preview: currentPreview.preview,
-        }).buffer;
+        return Uint8Array.from(
+          buildAgentMediumPreviewEncodedBytesForTest({
+            graphRevision: currentPreview.receipt.graphRevision,
+            imagePath: currentImage.path,
+            preview: currentPreview.preview,
+          }),
+        ).buffer;
       })();
 }
 

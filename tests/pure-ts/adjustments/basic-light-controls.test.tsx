@@ -10,7 +10,7 @@ import en from '../../../src/i18n/locales/en.json';
 import { useUIStore } from '../../../src/store/useUIStore';
 import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 let renderedRoot: { container: HTMLDivElement; root: Root } | null = null;
 
@@ -120,7 +120,7 @@ test('tone mapper switching preserves tone values and exposes edited/reset state
   });
 
   expect(getAdjustments()).toMatchObject({ brightness: 0.4, contrast: 18, exposure: 0.65, toneMapper: 'agx' });
-  expect(mapperRow.dataset.modified).toBe('true');
+  expect(mapperRow.dataset['modified']).toBe('true');
   expect(container.querySelector('[data-testid="rapid-view-controls"]')).toBeNull();
 
   await act(async () => {
@@ -134,7 +134,7 @@ test('tone mapper switching preserves tone values and exposes edited/reset state
     exposure: 0.65,
     toneMapper: 'rapidView',
   });
-  expect(mapperRow.dataset.modified).toBe('false');
+  expect(mapperRow.dataset['modified']).toBe('false');
 });
 
 test('mask and forced tone-mapper contexts omit only the global process selector', async () => {
@@ -185,7 +185,7 @@ function BasicHarness({
 
   return createElement(BasicAdjustments, {
     adjustments,
-    appSettings: tonemapperOverrideEnabled ? { tonemapperOverrideEnabled: true } : undefined,
+    ...(tonemapperOverrideEnabled ? { appSettings: { tonemapperOverrideEnabled: true } } : {}),
     isForMask,
     setAdjustments: (update) => {
       setAdjustmentsState((previous) => {

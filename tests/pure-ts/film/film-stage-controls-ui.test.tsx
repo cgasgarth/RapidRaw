@@ -9,7 +9,7 @@ import FilmStageControls from '../../../src/components/film/FilmStageControls';
 import en from '../../../src/i18n/locales/en.json';
 import { getFilmStageControlDescriptors } from '../../../src/utils/film-look/filmStageControls';
 
-globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
 
 let root: Root | null = null;
 let container: HTMLDivElement | null = null;
@@ -40,14 +40,15 @@ describe('Film stage controls UI', () => {
   test('renders renderer descriptor and routes value/reset interactions', async () => {
     const window = new Window();
     Object.assign(globalThis, { document: window.document, window });
-    container = window.document.createElement('div');
-    window.document.body.append(container);
+    const testContainer = document.createElement('div');
+    container = testContainer;
+    document.body.append(testContainer);
     const descriptor = getFilmStageControlDescriptors()[0];
     if (descriptor === undefined) throw new Error('Expected response descriptor');
     const changes: number[] = [];
     const resets: string[] = [];
     const translations = await createTestI18n();
-    root = createRoot(container);
+    root = createRoot(testContainer);
     await act(async () => {
       root?.render(
         createElement(
@@ -61,13 +62,13 @@ describe('Film stage controls UI', () => {
         ),
       );
     });
-    const slider = container.querySelector<HTMLInputElement>('input[type="range"]');
+    const slider = testContainer.querySelector<HTMLInputElement>('input[type="range"]');
     expect(slider?.getAttribute('aria-label')).toBe(`${responseLabelKey} slider`);
-    expect(container.querySelector('[data-stage-modified="false"]')).not.toBeNull();
+    expect(testContainer.querySelector('[data-stage-modified="false"]')).not.toBeNull();
     if (slider === null) throw new Error('Expected descriptor slider');
     await act(async () => {
       slider.value = '1.25';
-      slider.dispatchEvent(new window.Event('input', { bubbles: true }));
+      slider.dispatchEvent(new globalThis.window.Event('input', { bubbles: true }));
       const reactPropsKey = Object.keys(slider).find((key) => key.startsWith('__reactProps$'));
       const reactProps = reactPropsKey === undefined ? null : Reflect.get(slider, reactPropsKey);
       if (typeof reactProps?.onChange !== 'function') throw new Error('Expected slider change handler');
@@ -89,7 +90,7 @@ describe('Film stage controls UI', () => {
         ),
       );
     });
-    const reset = container.querySelector<HTMLButtonElement>('button[aria-label*="Reset"]');
+    const reset = testContainer.querySelector<HTMLButtonElement>('button[aria-label*="Reset"]');
     expect(reset).not.toBeNull();
     await act(async () => reset?.click());
     expect(resets).toEqual(['reference_luminance_shaper_p']);

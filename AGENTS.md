@@ -23,7 +23,7 @@ North star: `RAW_EDITOR_PLAN.md` drives a macOS-first, Capture One/Lightroom-cla
 ## Code Hygiene
 
 - Use `apply_patch` for manual edits. Search repo-scoped with `rg` for text/files and `sg` for structure; bound `sed`/`head`/`tail`/`jq`; skip deps/build/cache unless needed. Use Bun for TS/React and one-off JS/TS; no Apple Events automation unless explicitly permitted.
-- TypeScript 7 is the sole supported compiler/tooling target. Keep TS/lint strict; do not add TS6 packages, lanes, configs, shims, or compatibility aliases. No `as any` or `as unknown as`. Use Zod for TS-facing runtime schemas/config. Major or risky package bumps need dedicated issues.
+- TypeScript 7 is the sole supported compiler/tooling target. Keep TS/lint strict; do not add pre-7 packages, lanes, configs, shims, or compatibility aliases. No `as any` or `as unknown as`. Use Zod for TS-facing runtime schemas/config. Major or risky package bumps need dedicated issues.
 - Avoid slop: no stray artifacts, helper indirection, generated inventory/report JSON, weak tests, workflow-string/command-name/metadata tests, agent-workflow files, or package/script bloat. No per-test/per-proof package aliases; scripts stay suite/workflow level. Prefer native tooling; keep `scripts/` for real helpers/generators/wrappers.
 
 ## Validation
