@@ -13,10 +13,10 @@ import {
 } from '../../../schemas/agent/agentChatTranscriptSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import {
+  type BasicToneAdjustmentPayload,
   type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import {
   buildSelectiveColorCommandEnvelope,
@@ -159,9 +159,9 @@ const detectExpertIntents = (prompt: string): AgentToneColorDryRunExpertIntent[]
 };
 
 const buildBasicTonePayload = (
-  base: LegacyBasicToneAdjustmentPayload,
+  base: BasicToneAdjustmentPayload,
   intents: readonly AgentToneColorDryRunExpertIntent[],
-): LegacyBasicToneAdjustmentPayload => ({
+): BasicToneAdjustmentPayload => ({
   ...base,
   blacks: clamp(base.blacks + (intents.includes('contrast') ? -7 : -3), -100, 100),
   clarity: clamp(base.clarity + (intents.includes('contrast') ? 14 : 6), -100, 100),

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "issue": 2321,
-  "runtimeStatus": "typed_command_envelope_compatibility_fixture",
-  "legacyAdjustmentPayload": {
+  "runtimeStatus": "typed_command_envelope_fixture",
+  "basicToneAdjustmentPayload": {
     "blacks": -8,
     "brightness": 0.2,
     "clarity": 14,

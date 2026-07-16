@@ -15,12 +15,12 @@ import { useEditorStore } from '../../../store/useEditorStore';
 import type { Adjustments } from '../../adjustments';
 import {
   applyBasicToneCommandEnvelopeToAdjustments,
+  type BasicToneAdjustmentPayload,
   type BasicToneCommandContextActor,
   type BasicToneCommandContextTarget,
   type BasicToneCommandEnvelope,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
 import { buildBasicToneCommandEditTransaction, captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
 import { buildAdjustmentMutationOperations } from '../../editTransaction';
@@ -34,7 +34,7 @@ export interface AgentLiveBasicToneApplyOptions {
   additionalAdjustmentPatch?: Partial<Adjustments>;
   expectedGraphRevision?: string;
   operationId: string;
-  requestedAdjustments: LegacyBasicToneAdjustmentPayload;
+  requestedAdjustments: BasicToneAdjustmentPayload;
   sessionId: string;
 }
 
@@ -207,7 +207,7 @@ const copyObjectRecord = (value: object): Record<string, unknown> => {
   return record;
 };
 
-const buildLegacyBasicToneCommandEnvelope = (command: TypedBasicToneCommand): BasicToneCommandEnvelope => {
+const buildBasicToneCommandEnvelopeFromTypedCommand = (command: TypedBasicToneCommand): BasicToneCommandEnvelope => {
   const actor: BasicToneCommandContextActor = {
     id: command.actor.id,
     kind: command.actor.kind,
@@ -308,7 +308,7 @@ export const applyBasicToneCommandToLiveEditor = async (
   const apply = await bridge.dispatch(command);
   if (!apply.ok) throw new Error(`Typed basic-tone apply failed: ${apply.message}`);
   const mutation = toneColorMutationResultV1Schema.parse(apply.result);
-  const basicToneCommand = buildLegacyBasicToneCommandEnvelope(command);
+  const basicToneCommand = buildBasicToneCommandEnvelopeFromTypedCommand(command);
 
   useEditorStore.getState().applyBasicToneCommand(basicToneCommand, commitIdentity);
 

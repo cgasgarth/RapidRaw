@@ -1,5 +1,7 @@
 #!/usr/bin/env bun
 
+import { readFile } from 'node:fs/promises';
+
 import { z } from 'zod';
 
 import {
@@ -10,16 +12,19 @@ import { ToolType } from '../../../../src/components/panel/right/layers/Masks.ts
 import { RawEngineAppServerHostToolName } from '../../../../src/schemas/agent/agentRuntimeSchemas.ts';
 import { useEditorStore } from '../../../../src/store/useEditorStore.ts';
 import { ActiveChannel, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments.ts';
+import { setAgentMediumPreviewAttachmentRendererForTest } from '../../../../src/utils/agent/context/agentMediumPreviewAttachmentRuntime.ts';
 import {
   AGENT_PREVIEW_RENDER_TOOL_NAME,
   AGENT_STATE_GET_TOOL_NAME,
   RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME,
+  rawEngineImageGetPreviewAttachmentResponseSchema,
 } from '../../../../src/utils/agent/context/agentReadOnlyAppServerTools.ts';
 import {
+  type BasicToneAdjustmentPayload,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
-  type LegacyBasicToneAdjustmentPayload,
 } from '../../../../src/utils/basicToneCommandBridge.ts';
+import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   handleRawEngineAppServerHostRequestAsync,
   isApprovedAgentAppServerToolName,
@@ -28,6 +33,18 @@ import { ToneColorAppServerToolName } from '../../../../src/utils/toneColorAppSe
 
 const selectedPath = '/Users/cgas/Pictures/Capture One/Alaska/DSC_3163.ARW';
 const bins = Array.from({ length: 256 }, (_, index) => (index === 0 || index === 255 ? 10 : 2));
+const mediumPreviewFixture = new Uint8Array(
+  await readFile(new URL('../../../../docs/baseline/render/rapidraw-vite-empty-root-2026-06-10.jpg', import.meta.url)),
+);
+for (let index = 0; index + 8 < mediumPreviewFixture.length; index += 1) {
+  if (mediumPreviewFixture[index] !== 0xff || mediumPreviewFixture[index + 1] !== 0xc0) continue;
+  mediumPreviewFixture[index + 5] = 0x04;
+  mediumPreviewFixture[index + 6] = 0x00;
+  mediumPreviewFixture[index + 7] = 0x06;
+  mediumPreviewFixture[index + 8] = 0x00;
+  break;
+}
+setAgentMediumPreviewAttachmentRendererForTest(async () => new Uint8Array(mediumPreviewFixture));
 const dispatchResponseSchema = z
   .object({
     dispatchStatus: z.enum(['completed', 'rejected']),
@@ -111,8 +128,8 @@ const dispatchWithDraftSession = async (
     }),
   );
 
-const buildBasicTonePayload = (patch: Partial<LegacyBasicToneAdjustmentPayload>): LegacyBasicToneAdjustmentPayload => {
-  const base = useEditorStore.getState().adjustments;
+const buildBasicTonePayload = (patch: Partial<BasicToneAdjustmentPayload>): BasicToneAdjustmentPayload => {
+  const base = useEditorStore.getState().adjustmentSnapshot.value;
   return {
     blacks: patch.blacks ?? base.blacks,
     brightness: patch.brightness ?? base.brightness,
@@ -140,7 +157,7 @@ const buildTypedBasicToneCommand = ({
   dryRun: boolean;
   expectedGraphRevision: string;
   operationId: string;
-  patch: Partial<LegacyBasicToneAdjustmentPayload>;
+  patch: Partial<BasicToneAdjustmentPayload>;
   sessionId: string;
 }) =>
   buildBasicToneCommandEnvelope(
@@ -158,9 +175,10 @@ const buildTypedBasicToneCommand = ({
     },
   );
 
+const initialEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
 useEditorStore.getState().hydrateEditorRenderAuthority({
-  adjustments: INITIAL_ADJUSTMENTS,
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
+  editDocumentV2: initialEditDocumentV2,
   finalPreviewUrl: 'blob:rawengine-agent-dispatch-before',
   hasRenderedFirstFrame: true,
   histogram: {
@@ -169,7 +187,7 @@ useEditorStore.getState().hydrateEditorRenderAuthority({
     [ActiveChannel.Luma]: { color: '#FFFFFF', data: bins },
     [ActiveChannel.Red]: { color: '#FF6B6B', data: bins },
   },
-  history: [INITIAL_ADJUSTMENTS],
+  history: [initialEditDocumentV2],
   historyIndex: 0,
   selectedImage: {
     exif: { ISO: '320', LensModel: 'FE 24-70mm F2.8 GM II' },
@@ -206,32 +224,19 @@ const imagePreview = await dispatch(
   'dispatch-image-preview-1',
 );
 if (imagePreview.dispatchStatus !== 'completed') {
-  throw new Error('rawengine.image.get_preview dispatch did not complete.');
+  throw new Error(`rawengine.image.get_preview dispatch rejected: ${imagePreview.message ?? 'missing message'}`);
 }
-const imagePreviewResult = z
-  .object({
-    dimensions: z
-      .object({
-        height: z.number().int().positive(),
-        longEdgePx: z.literal(1536),
-        width: z.number().int().positive(),
-      })
-      .passthrough(),
-    editRevision: z.object({ graphRevision: z.string().min(1), recipeHash: z.string().min(1) }).passthrough(),
-    preview: z.object({ includesOriginalRaw: z.literal(false), purpose: z.literal('initial_context') }).passthrough(),
-    staleRecipeHash: z.boolean(),
-    toolName: z.literal(RAW_ENGINE_IMAGE_GET_PREVIEW_TOOL_NAME),
-  })
-  .passthrough()
-  .parse(imagePreview.result);
+const imagePreviewResult = rawEngineImageGetPreviewAttachmentResponseSchema.parse(imagePreview.result);
+const imagePreviewAttachment = imagePreviewResult.attachment.attachment;
 if (
-  imagePreviewResult.staleRecipeHash ||
-  imagePreviewResult.editRevision.graphRevision !== initialState.snapshot.graphRevision ||
-  imagePreviewResult.editRevision.recipeHash !== initialRecipeHash ||
-  imagePreviewResult.dimensions.width <= 0 ||
-  imagePreviewResult.dimensions.height <= 0
+  imagePreviewAttachment.revision.graphRevision !== initialState.snapshot.graphRevision ||
+  imagePreviewAttachment.revision.recipeHash !== initialRecipeHash ||
+  imagePreviewAttachment.longEdgePx !== 1536 ||
+  imagePreviewAttachment.includesOriginalRaw ||
+  imagePreviewAttachment.dimensions.width <= 0 ||
+  imagePreviewAttachment.dimensions.height <= 0
 ) {
-  throw new Error('rawengine.image.get_preview dispatch did not return current bounded preview metadata.');
+  throw new Error('rawengine.image.get_preview dispatch did not return a current bounded attachment.');
 }
 
 const dryRun = await dispatch(
@@ -291,7 +296,7 @@ const applyPayload = applyResultSchema.parse(toneColorMutationResultV1Schema.par
 if (
   applyPayload.appliedGraphRevision.length === 0 ||
   useEditorStore.getState().historyIndex !== 1 ||
-  useEditorStore.getState().adjustments.exposure !== 0.32
+  useEditorStore.getState().adjustmentSnapshot.value.exposure !== 0.32
 ) {
   throw new Error('typed tonecolor.apply_command dispatch did not mutate the editor session.');
 }
