@@ -500,7 +500,7 @@ fn skin_tone_uniformity_has_cpu_wgpu_and_preview_export_pixel_parity() {
         let blue = 0.025 + (x + y) as f32 * 0.002;
         Rgba([red, green, blue, 0.81])
     }));
-    let recipe = serde_json::json!({
+    let recipe = crate::render::render_plan::current_render_adjustments(serde_json::json!({
         "rawEngineEditGraphVersion": 2,
         "skinToneUniformity": {
             "enabled": true,
@@ -512,7 +512,7 @@ fn skin_tone_uniformity_has_cpu_wgpu_and_preview_export_pixel_parity() {
             "targetLuminance": 0.56,
             "targetSaturation": 0.38
         }
-    });
+    }));
     let plan = crate::render::render_plan::compile_render_plan(
         &recipe,
         crate::render::render_plan::CompileRenderPlanContext {
