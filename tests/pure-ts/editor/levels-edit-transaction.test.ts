@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import { editDocumentLumaLevelsV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { LevelsSettings } from '../../../src/schemas/color/levelsSchemas';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
@@ -60,8 +61,8 @@ describe('Levels edit transaction', () => {
 
   test('commits one validated Levels action with receipt, invalidation, and Undo/Redo', () => {
     const before = useEditorStore.getState();
-    const beforeNode = before.editDocumentV2.nodes.luma_levels;
-    const beforeTone = before.editDocumentV2.nodes.scene_global_color_tone;
+    const beforeNode = before.editDocumentV2.nodes['luma_levels'];
+    const beforeTone = before.editDocumentV2.nodes['scene_global_color_tone'];
     const next = initialLevels();
     next.enabled = true;
     next.inputBlack = 0.08;
@@ -95,19 +96,25 @@ describe('Levels edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().adjustmentSnapshot.value.levels).toEqual(next);
-    expect(result.afterEditDocumentV2.nodes.luma_levels.params.levels).toEqual(next);
-    expect(result.afterEditDocumentV2.nodes.luma_levels).not.toBe(beforeNode);
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(beforeTone);
-    expect(result.afterEditDocumentV2.extensions.legacyAdjustments).not.toHaveProperty('levels');
+    expect(
+      editDocumentLumaLevelsV2Schema.parse(result.afterEditDocumentV2.nodes['luma_levels']?.params).levels,
+    ).toEqual(next);
+    expect(result.afterEditDocumentV2.nodes['luma_levels']).not.toBe(beforeNode);
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
+    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('levels');
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustmentSnapshot.value.levels).toEqual(INITIAL_ADJUSTMENTS.levels);
-    expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels).toEqual(
-      INITIAL_ADJUSTMENTS.levels,
-    );
+    expect(
+      editDocumentLumaLevelsV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['luma_levels']?.params)
+        .levels,
+    ).toEqual(INITIAL_ADJUSTMENTS.levels);
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().adjustmentSnapshot.value.levels).toEqual(next);
-    expect(useEditorStore.getState().editDocumentV2.nodes.luma_levels.params.levels).toEqual(next);
+    expect(
+      editDocumentLumaLevelsV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['luma_levels']?.params)
+        .levels,
+    ).toEqual(next);
   });
 
   test('carries Levels node authority through save execution and reopen', async () => {
@@ -127,14 +134,14 @@ describe('Levels edit transaction', () => {
         return { path: execution.path, sidecarRevision: `sha256:${'b'.repeat(64)}` };
       },
       onAccepted: () => {},
-      setTimer: (callback) => {
+      setTimer: (callback, _delayMs) => {
         callback();
-        return 0;
+        return setTimeout(() => {}, 0);
       },
     });
     runner.installSession({
       adjustmentRevision: 0,
-      adjustments: { ...committed.adjustments, levels: initialLevels() },
+      adjustments: { ...committed.adjustmentSnapshot.value, levels: initialLevels() },
       editDocumentV2: beforeDocument,
       imageSessionId: session.id,
       path: sourcePath,
@@ -143,7 +150,7 @@ describe('Levels edit transaction', () => {
     if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed Levels receipt');
     runner.submitCommitted({
       adjustmentRevision: committed.adjustmentRevision,
-      adjustments: committed.adjustments,
+      adjustments: committed.adjustmentSnapshot.value,
       editDocumentV2: committed.editDocumentV2,
       imageSessionId: session.id,
       interactionActive: false,
@@ -156,12 +163,16 @@ describe('Levels edit transaction', () => {
     await Promise.resolve();
 
     expect(executions).toHaveLength(1);
-    expect(executions[0]?.editDocumentV2.nodes.luma_levels.params.levels).toEqual(next);
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
-      executions[0]?.adjustments ?? committed.adjustments,
+    const execution = executions[0];
+    if (execution === undefined) throw new Error('Expected one Levels persistence execution.');
+    expect(editDocumentLumaLevelsV2Schema.parse(execution.editDocumentV2.nodes['luma_levels']?.params).levels).toEqual(
+      next,
     );
-    expect(reopened.nodes.luma_levels.params.levels).toEqual(next);
+    const reopened = hydrateImageOpenEditDocumentV2(
+      { adjustments: execution.adjustments, editDocumentV2: execution.editDocumentV2 },
+      execution.adjustments,
+    );
+    expect(editDocumentLumaLevelsV2Schema.parse(reopened.nodes['luma_levels']?.params).levels).toEqual(next);
     expect(reopened).toEqual(committed.editDocumentV2);
   });
 
