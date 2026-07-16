@@ -26,6 +26,20 @@ pub(crate) fn default_technical_white_balance_json() -> Value {
     })
 }
 
+#[cfg(all(test, feature = "tauri-test"))]
+pub(crate) fn test_technical_white_balance_json(kelvin: f64, duv: f64) -> Value {
+    let coordinates = cct_duv_to_coordinates(kelvin, duv)
+        .expect("technical white-balance test coordinates must be valid");
+    let mut technical = default_technical_white_balance_json();
+    technical["mode"] = serde_json::json!("kelvin_tint");
+    technical["source"] = serde_json::json!("user");
+    technical["kelvin"] = serde_json::json!(coordinates.cct_kelvin);
+    technical["duv"] = serde_json::json!(coordinates.duv);
+    technical["x"] = serde_json::json!(coordinates.xy[0]);
+    technical["y"] = serde_json::json!(coordinates.xy[1]);
+    technical
+}
+
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum WhiteBalanceModeV1 {
