@@ -4058,11 +4058,15 @@ mod tests {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let sidecar_path = temp_dir.path().join("head-project.arw.rrdata");
         let invalid_document = document.clone();
+        let edit_revision = crate::exif_processing::render_state_revision(&document, None)
+            .expect("invalid document remains serializable");
         let sidecar = json!({
-            "adjustments": { "exposure": 0.4, "masks": [layer()] },
+            "contract": "rapidraw.sidecar.v1",
             "editDocumentV2": document,
+            "editRevision": edit_revision,
             "rating": 5,
-            "version": 2
+            "schemaVersion": 1,
+            "sourceIdentity": "/photos/head-project.arw"
         });
         let original_bytes = serde_json::to_vec_pretty(&sidecar).expect("serialize sidecar");
 
@@ -4091,19 +4095,13 @@ mod tests {
             loaded.outcome,
             crate::exif_processing::PersistedStateOutcome::Quarantined
         );
-        assert_eq!(loaded.metadata.adjustments, json!({}));
-        assert!(loaded.metadata.edit_document_v2.is_none());
+        assert!(loaded.metadata.adjustments.is_object());
+        assert!(loaded.metadata.edit_document_v2.is_some());
         assert_eq!(
             std::fs::read(loaded.backup_path.expect("byte-preserving backup")).unwrap(),
             original_bytes
         );
-        let quarantined = loaded
-            .metadata
-            .persisted_render_state
-            .expect("recovery state")
-            .quarantined_extensions;
-        assert!(quarantined.contains_key("rejectedAdjustments"));
-        assert!(quarantined.contains_key("rejectedEditDocumentV2"));
+        assert!(!sidecar_path.exists());
     }
 
     #[test]

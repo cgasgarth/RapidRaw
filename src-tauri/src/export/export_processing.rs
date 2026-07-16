@@ -5655,7 +5655,19 @@ mod tests {
             appearance_count: 1,
             explicit_virtual_copy: None,
         });
-        fs::write(target.sidecar_path, br#"{"exposure":1}"#).unwrap();
+        let mut current = crate::exif_processing::load_sidecar(&target.sidecar_path);
+        current.rating = 1;
+        crate::exif_processing::save_sidecar_metadata_atomic(&target.sidecar_path, &current)
+            .unwrap();
+        let expected_sidecar =
+            crate::file_management::parse_virtual_path(&source_path.to_string_lossy()).1;
+        assert!(expected_sidecar.exists());
+        assert_ne!(
+            SourceRevision::from_path(&expected_sidecar)
+                .unwrap()
+                .identity(),
+            sidecar_drift.planned[0].edit_revision
+        );
         let error = validate_export_manifest_for_resume(&sidecar_drift).unwrap_err();
         assert!(error.contains("export_resume_edit_revision_drift"));
     }

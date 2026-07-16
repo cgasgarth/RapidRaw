@@ -3575,7 +3575,6 @@ mod tests {
 
     fn metadata_with_artifact_sources(sources: Vec<serde_json::Value>) -> ImageMetadata {
         ImageMetadata {
-            version: 1,
             rating: 0,
             adjustments: serde_json::Value::Null,
             edit_document_v2: None,
@@ -3589,7 +3588,8 @@ mod tests {
                 })],
                 ..RawEngineArtifacts::new_v1()
             }),
-            persisted_render_state: None,
+            source_identity: String::new(),
+            edit_revision: String::new(),
         }
     }
 

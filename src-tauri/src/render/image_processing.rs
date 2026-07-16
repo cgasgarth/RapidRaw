@@ -9,42 +9,6 @@ use std::sync::Arc;
 
 use crate::color::view_transform::{ViewTransformPlanV1, ViewTransformSettingsV1};
 
-pub const PERSISTED_RENDER_STATE_SCHEMA_VERSION: u32 = 2;
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct PersistedStateRecoveryReceipt {
-    pub from_version: u32,
-    pub to_version: u32,
-    pub source_identity: String,
-    pub previous_edit_revision: Option<String>,
-    pub disabled_fields: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub migrated_fields: Vec<String>,
-    pub reason_codes: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct PersistedRenderState {
-    pub schema_version: u32,
-    pub implementation_revision: u32,
-    pub source_identity: String,
-    pub edit_revision: String,
-    /// Canonical user-authored pixel state. Product/source defaults are resolved at render time.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub user_edits: Option<serde_json::Map<String, Value>>,
-    pub defaults_policy_revision: u32,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub camera_input_transform_receipt: Option<Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub xmp_revision: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub recovery_receipts: Vec<PersistedStateRecoveryReceipt>,
-    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
-    pub quarantined_extensions: serde_json::Map<String, Value>,
-}
-
 pub use crate::geometry::IntoCowImage;
 pub use crate::gpu_processing::{
     RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image,
@@ -103,8 +67,8 @@ impl Default for RawEngineArtifacts {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ImageMetadata {
-    pub version: u32,
     pub rating: u8,
+    /// Runtime projection compiled from `edit_document_v2`; never persisted in `.rrdata`.
     pub adjustments: Value,
     #[serde(
         default,
@@ -122,25 +86,23 @@ pub struct ImageMetadata {
         skip_serializing_if = "Option::is_none"
     )]
     pub raw_engine_artifacts: Option<RawEngineArtifacts>,
-    #[serde(
-        default,
-        rename = "persistedRenderState",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub persisted_render_state: Option<PersistedRenderState>,
+    #[serde(default, skip)]
+    pub source_identity: String,
+    #[serde(default, skip)]
+    pub edit_revision: String,
 }
 
 impl Default for ImageMetadata {
     fn default() -> Self {
         ImageMetadata {
-            version: 1,
             rating: 0,
             adjustments: Value::Null,
             edit_document_v2: None,
             tags: None,
             exif: None,
             raw_engine_artifacts: None,
-            persisted_render_state: None,
+            source_identity: String::new(),
+            edit_revision: String::new(),
         }
     }
 }
@@ -1300,7 +1262,6 @@ mod tests {
     #[test]
     fn image_metadata_preserves_raw_engine_artifacts() {
         let metadata = ImageMetadata {
-            version: 1,
             rating: 5,
             adjustments: json!({ "exposure": 0.15 }),
             edit_document_v2: None,
@@ -1319,7 +1280,8 @@ mod tests {
                 })],
                 ..RawEngineArtifacts::new_v1()
             }),
-            persisted_render_state: None,
+            source_identity: "/photos/panorama.dng".to_string(),
+            edit_revision: "sha256:test".to_string(),
         };
 
         let roundtripped: ImageMetadata = serde_json::from_value(

@@ -2072,19 +2072,14 @@ fn attach_negative_lab_conversion_bundle_path_to_output_sidecars(
         }
 
         if changed {
-            let json = serde_json::to_string_pretty(&sidecar).map_err(|e| {
-                format!(
-                    "Failed to serialize Negative Lab sidecar with conversion bundle path: {}",
-                    e
-                )
-            })?;
-            fs::write(&output.sidecar_path, json).map_err(|e| {
-                format!(
-                    "Failed to update Negative Lab sidecar {} with conversion bundle path: {}",
-                    output.sidecar_path.display(),
-                    e
-                )
-            })?;
+            crate::exif_processing::save_sidecar_metadata_atomic(&output.sidecar_path, &sidecar)
+                .map_err(|error| {
+                    format!(
+                        "Failed to update Negative Lab sidecar {} with conversion bundle path: {}",
+                        output.sidecar_path.display(),
+                        error
+                    )
+                })?;
         }
     }
 
@@ -6346,7 +6341,27 @@ mod tests {
         .expect("sidecar should be written");
 
         let sidecar_path = negative_lab_output_sidecar_path(&output_path);
-        let sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let persisted: serde_json::Value =
+            serde_json::from_slice(&fs::read(&sidecar_path).unwrap()).unwrap();
+        let persisted_artifacts: RawEngineArtifacts =
+            serde_json::from_value(persisted["rawEngineArtifacts"].clone()).unwrap();
+        assert_eq!(
+            persisted["editRevision"],
+            crate::exif_processing::render_state_revision(
+                &persisted["editDocumentV2"],
+                Some(&persisted_artifacts)
+            )
+            .unwrap()
+        );
+        let loaded = crate::exif_processing::load_sidecar_recovering(&sidecar_path, None)
+            .expect("sidecar should be readable");
+        assert_eq!(
+            loaded.outcome,
+            crate::exif_processing::PersistedStateOutcome::Current,
+            "negative output sidecar rejected: {:?}",
+            loaded.reason_codes
+        );
+        let sidecar = loaded.metadata;
         let artifacts = sidecar
             .raw_engine_artifacts
             .expect("rawEngineArtifacts should be present");
@@ -6555,7 +6570,15 @@ mod tests {
         .expect("sidecar should be written");
 
         let sidecar_path = negative_lab_output_sidecar_path(&output_path);
-        let mut sidecar = crate::exif_processing::load_sidecar(&sidecar_path);
+        let loaded = crate::exif_processing::load_sidecar_recovering(&sidecar_path, None)
+            .expect("sidecar should be readable");
+        assert_eq!(
+            loaded.outcome,
+            crate::exif_processing::PersistedStateOutcome::Current,
+            "negative output sidecar rejected: {:?}",
+            loaded.reason_codes
+        );
+        let mut sidecar = loaded.metadata;
         assert!(!refresh_negative_lab_stale_artifacts(&mut sidecar));
 
         fs::write(&output_path, b"changed-positive-output").expect("output should be changed");
