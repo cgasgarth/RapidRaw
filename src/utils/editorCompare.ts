@@ -2,6 +2,11 @@ import type { ImageDimensions, RenderSize } from '../hooks/viewport/useImageRend
 
 export type EditorCompareMode = 'off' | 'hold-original' | 'split-wipe' | 'side-by-side';
 export type EditorCompareOrientation = 'horizontal' | 'vertical';
+
+/** The sticky modes cycled by the viewer's Before/After command. Hold-original is
+ * intentionally excluded: it is a transient/loupe mode and is controlled by B. */
+export const EDITOR_COMPARE_MODE_CYCLE = ['off', 'side-by-side', 'split-wipe'] as const;
+export type EditorCompareCycleMode = (typeof EDITOR_COMPARE_MODE_CYCLE)[number];
 export type EditorCompareSource =
   | { identity: string | null; kind: 'original' }
   | { identity: string; kind: 'reference'; label: string };
@@ -14,6 +19,15 @@ export interface EditorCompareState {
   orientation: EditorCompareOrientation;
   source: EditorCompareSource;
   synchronizedTransform: 'locked';
+}
+
+export interface EditorComparePresentation {
+  readonly active: boolean;
+  readonly axis: EditorCompareOrientation;
+  readonly isHoldOriginal: boolean;
+  readonly isSideBySide: boolean;
+  readonly isSplitWipe: boolean;
+  readonly paneOrder: readonly ['original', 'edited'];
 }
 
 export type EditorCompareCommand =
@@ -42,6 +56,32 @@ export const clampCompareDivider = (position: number): number => {
   return Math.min(0.95, Math.max(0.05, position));
 };
 
+export const isEditorCompareActive = (state: Pick<EditorCompareState, 'isOriginalHeld' | 'mode'>): boolean =>
+  state.mode !== 'off' || state.isOriginalHeld;
+
+export const resolveEditorComparePresentation = (
+  state: Pick<EditorCompareState, 'isOriginalHeld' | 'mode' | 'orientation'>,
+): EditorComparePresentation => ({
+  active: isEditorCompareActive(state),
+  axis: state.orientation,
+  isHoldOriginal: state.mode === 'hold-original' || state.isOriginalHeld,
+  isSideBySide: state.mode === 'side-by-side' && !state.isOriginalHeld,
+  isSplitWipe: state.mode === 'split-wipe' && !state.isOriginalHeld,
+  paneOrder: ['original', 'edited'],
+});
+
+export const cycleEditorCompareMode = (mode: EditorCompareMode, direction: 1 | -1 = 1): EditorCompareCycleMode => {
+  const current: EditorCompareCycleMode = EDITOR_COMPARE_MODE_CYCLE.includes(mode as EditorCompareCycleMode)
+    ? (mode as EditorCompareCycleMode)
+    : 'off';
+  const index = EDITOR_COMPARE_MODE_CYCLE.indexOf(current);
+  return (
+    EDITOR_COMPARE_MODE_CYCLE[
+      (index + direction + EDITOR_COMPARE_MODE_CYCLE.length) % EDITOR_COMPARE_MODE_CYCLE.length
+    ] ?? 'off'
+  );
+};
+
 export const reduceEditorCompare = (state: EditorCompareState, command: EditorCompareCommand): EditorCompareState => {
   switch (command.type) {
     case 'set-mode':
@@ -65,8 +105,6 @@ export const reduceEditorCompare = (state: EditorCompareState, command: EditorCo
   }
 };
 
-const isEditorCompareActive = (state: EditorCompareState): boolean => state.mode !== 'off' || state.isOriginalHeld;
-
 export interface ComparePaneLayout {
   edited: RenderSize;
   original: RenderSize;
@@ -84,6 +122,9 @@ export const resolveComparePaneLayout = ({
   viewport: ImageDimensions;
 }): ComparePaneLayout => {
   const isPaired = mode === 'side-by-side';
+  // Hold-original and split-wipe are rendered in one shared image rect. The
+  // orientation still remains part of the state so switching back to a paired
+  // view preserves the user's last axis.
   const gap = isPaired ? 8 : 0;
   const pane = {
     height: isPaired && orientation === 'horizontal' ? (viewport.height - gap) / 2 : viewport.height,

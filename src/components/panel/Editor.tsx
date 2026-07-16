@@ -50,7 +50,7 @@ import {
   selectEditDocumentMasks,
   selectEditDocumentSourceArtifacts,
 } from '../../utils/editDocumentSelectors';
-import { resolveComparePaneLayout } from '../../utils/editorCompare';
+import { cycleEditorCompareMode, isEditorCompareActive, resolveComparePaneLayout } from '../../utils/editorCompare';
 import { WHEEL_SNAP_DELAY_MS } from '../../utils/editorGestureMath';
 import { createEditorOverlayGeometry, overlayPoint, overlayRect } from '../../utils/editorOverlayGeometry';
 import { createEditorPresentationDescriptor } from '../../utils/editorPresentationDescriptor';
@@ -320,10 +320,11 @@ export default function Editor({
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const isInitialMount = useRef(true);
   const previousFullScreenRef = useRef(isFullScreen);
   const previousLightsOutLevelRef = useRef(lightsOutLevel);
   const lightsOutRestoreFocusRef = useRef<HTMLElement | null>(null);
+  const compareRestoreFocusRef = useRef<HTMLElement | null>(null);
+  const previousCompareActiveRef = useRef(false);
   const pendingZoomAnchorRef = useRef<{ x: number; y: number } | null>(null);
   const suppressDoubleClickUntilRef = useRef(0);
   const suppressCompatibilityClickUntilRef = useRef(0);
@@ -1217,8 +1218,24 @@ export default function Editor({
   );
 
   useEffect(() => {
+    const active = isEditorCompareActive(compare);
+    if (active && !previousCompareActiveRef.current && typeof document !== 'undefined') {
+      compareRestoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
+    if (!active && previousCompareActiveRef.current) {
+      const focusTarget = compareRestoreFocusRef.current;
+      compareRestoreFocusRef.current = null;
+      if (focusTarget !== null && focusTarget.isConnected) queueMicrotask(() => focusTarget.focus());
+    }
+    previousCompareActiveRef.current = active;
+  }, [compare]);
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (isEditorCompareActive(compare) && !isEditableKeyboardTarget(event.target)) {
+          dispatchCompare({ type: 'exit' });
+        }
         applyViewportTransition(
           dispatchViewportInteraction({
             reason: 'escape',
@@ -1228,6 +1245,21 @@ export default function Editor({
         return;
       }
       const focusContext = isEditableKeyboardTarget(event.target) ? 'editable' : 'viewer';
+      if (focusContext === 'viewer' && event.key.toLowerCase() === 'y' && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        if (!event.repeat) {
+          dispatchCompare({
+            mode: cycleEditorCompareMode(compare.mode, event.shiftKey ? -1 : 1),
+            type: 'set-mode',
+          });
+        }
+        return;
+      }
+      if (focusContext === 'viewer' && event.key.toLowerCase() === 'b' && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        if (!event.repeat) dispatchCompare({ held: true, type: 'set-original-held' });
+        return;
+      }
       if (!shouldActivateTemporaryHand({ focusContext, key: event.key })) return;
       event.preventDefault();
       applyViewportTransition(
@@ -1238,6 +1270,10 @@ export default function Editor({
       );
     };
     const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === 'b' && !event.metaKey && !event.ctrlKey) {
+        dispatchCompare({ held: false, type: 'set-original-held' });
+        return;
+      }
       if (event.key !== ' ') return;
       applyViewportTransition(
         dispatchViewportInteraction({
@@ -1268,7 +1304,7 @@ export default function Editor({
         }),
       );
     };
-  }, [applyViewportTransition, dispatchViewportInteraction]);
+  }, [applyViewportTransition, compare, dispatchCompare, dispatchViewportInteraction]);
 
   useEffect(() => {
     const container = imageContainerRef.current;
@@ -1426,23 +1462,6 @@ export default function Editor({
     },
     [commitObjectPromptAt],
   );
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    if (compare.mode !== 'hold-original' && !compare.isOriginalHeld) return;
-
-    const syncTimer = setTimeout(() => {
-      dispatchCompare({ type: 'exit' });
-    }, 0);
-
-    return () => {
-      clearTimeout(syncTimer);
-    };
-  }, [adjustments, compare.isOriginalHeld, compare.mode, dispatchCompare]);
 
   useEffect(() => {
     if (isMasking || isAiEditing) return;

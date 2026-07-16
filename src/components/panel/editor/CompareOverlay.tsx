@@ -40,6 +40,7 @@ export function CompareOverlay({
   const label = (text: string, rect: RenderSize, align: 'left' | 'right') => (
     <span
       className="pointer-events-none absolute rounded border border-editor-overlay-stroke bg-editor-panel/90 px-2 py-1 text-[11px] font-medium text-text-primary"
+      data-compare-pane-label={text}
       style={{
         left: cssPx(align === 'left' ? rect.offsetX + 12 : rect.offsetX + rect.width - 12),
         top: cssPx(rect.offsetY + 12),
