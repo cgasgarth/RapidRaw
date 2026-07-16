@@ -8,6 +8,7 @@ import {
   isCropChangeMeaningful,
   isCropValidAfterRotation,
   percentCropFromPixelCrop,
+  pixelCropFromNormalizedCrop,
   pixelCropFromPercentCrop,
   resolveCropForGeometryTransaction,
   resolveNextCropForGeometryChange,
@@ -103,14 +104,14 @@ describe('crop auto-fit helpers', () => {
 
   test('commits rotation and crop normalization in one geometry transaction', () => {
     const nextCrop = resolveCropForGeometryTransaction(
-      { unit: 'px', x: 0, y: 0, width: 2000, height: 1000 },
+      { unit: 'normalized', x: 0, y: 0, width: 1, height: 1 },
       2000,
       1000,
       { rotation: 0, aspectRatio: null, orientationSteps: 0 },
       { rotation: 12, aspectRatio: null, orientationSteps: 0 },
     );
     expect(nextCrop).not.toBeNull();
-    expect(isCropValidAfterRotation(nextCrop, 2000, 1000, 12)).toBe(true);
+    expect(isCropValidAfterRotation(pixelCropFromNormalizedCrop(nextCrop!, 2000, 1000), 2000, 1000, 12)).toBe(true);
   });
 
   test('validates crop corners after rotation', () => {

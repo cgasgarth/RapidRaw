@@ -1,4 +1,3 @@
-import type { Crop } from 'react-image-crop';
 import {
   type PerceptualGradingSettingsV1,
   perceptualGradingSettingsV1Schema,
@@ -8,7 +7,10 @@ import {
   type PointColorPlanV1,
   pointColorPlanV1Schema,
 } from '../../packages/rawengine-schema/src/color/pointColorSchemas';
-import { editDocumentMaskNodesV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
+import {
+  type EditDocumentGeometryCropV2,
+  editDocumentMaskNodesV2Schema,
+} from '../../packages/rawengine-schema/src/editDocumentV2';
 import { filmEmulationNodeV1Schema } from '../../packages/rawengine-schema/src/film/filmEmulationSchemas';
 import type { FilmEmulationNodeV1 } from '../../packages/rawengine-schema/src/rawEngineSchemas';
 import {
@@ -291,7 +293,7 @@ export interface Adjustments {
   /** Persisted native edit-graph process version; legacy sidecars default to v1. */
   rawEngineEditGraphVersion: number;
   referenceMatchApplicationReceipt: MatchLookApplicationReceiptV1 | null;
-  crop: Crop | null;
+  crop: EditDocumentGeometryCropV2 | null;
   deblurEnabled: boolean;
   deblurSigmaPx: number;
   deblurStrength: number;

@@ -416,7 +416,7 @@ describe('reduceEditTransaction', () => {
 
   test('patches strict geometry and its explicit domain without recreating unrelated nodes', () => {
     const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
-    const crop = { height: 1800, unit: 'px' as const, width: 2400, x: 400, y: 300 };
+    const crop = { height: 0.6, unit: 'normalized' as const, width: 0.6, x: 0.1, y: 0.1 };
     const result = reduceEditTransaction(
       INITIAL_ADJUSTMENTS,
       4,

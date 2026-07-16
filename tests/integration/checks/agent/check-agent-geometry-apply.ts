@@ -82,7 +82,7 @@ const baselineAdjustmentRevision = useEditorStore.getState().adjustmentRevision;
 if (
   agentGeometryApplyRequestSchema.safeParse({
     expectedRecipeHash: 'recipe:test',
-    geometry: { crop: { height: 50, unit: '%', width: 60, x: 50, y: 0 } },
+    geometry: { crop: { height: 0.5, unit: 'normalized', width: 0.6, x: 0.5, y: 0 } },
     operationId: 'invalid-crop',
     requestId: 'invalid-crop',
     sessionId: 'agent-geometry-invalid',
@@ -121,7 +121,7 @@ const result = await applyAgentGeometry({
   expectedRecipeHash: initialSnapshot.initialPreview.recipeHash,
   geometry: {
     aspectRatio: 1.5,
-    crop: { height: 68, unit: '%', width: 82, x: 8, y: 10 },
+    crop: { height: 0.68, unit: 'normalized', width: 0.82, x: 0.08, y: 0.1 },
     flipHorizontal: true,
     rotation: 1.25,
     transformScale: 1.08,
@@ -136,7 +136,7 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustmentSnapshot.value.crop?.x !== 8 ||
+  state.adjustmentSnapshot.value.crop?.x !== 0.08 ||
   state.adjustmentSnapshot.value.rotation !== 1.25 ||
   !state.adjustmentSnapshot.value.flipHorizontal ||
   state.adjustmentSnapshot.value.transformScale !== 1.08
@@ -157,7 +157,7 @@ if (
 }
 if (
   state.editDocumentV2.nodes.geometry?.params.rotation !== 1.25 ||
-  (state.editDocumentV2.nodes.geometry.params.crop as { x?: unknown } | undefined)?.x !== 8
+  (state.editDocumentV2.nodes.geometry.params.crop as { x?: unknown } | undefined)?.x !== 0.08
 ) {
   throw new Error(
     `agent.geometry.apply did not update the canonical geometry node: ${JSON.stringify(

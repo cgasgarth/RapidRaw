@@ -84,7 +84,7 @@ describe('straighten edit transaction', () => {
     const geometry = editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params);
     expect(result.afterEditDocumentV2.nodes['geometry']).not.toBe(beforeGeometry);
     expect(geometry).toMatchObject({
-      crop: { ...result.after.crop, unit: 'px' },
+      crop: result.after.crop,
       rotation: -5.5,
     });
     expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
@@ -161,10 +161,10 @@ describe('straighten edit transaction', () => {
     );
   });
 
-  test('keeps legacy unitless pixel crops inert while the node document remains unit-explicit', () => {
-    const legacyCrop = { height: 1800, width: 2400, x: 400, y: 300 };
+  test('keeps normalized current crops exact while the node document remains unit-explicit', () => {
+    const currentCrop = { height: 0.6, unit: 'normalized' as const, width: 0.6, x: 0.1, y: 0.1 };
     useEditorStore.getState().hydrateEditorRenderAuthority((state) => {
-      const adjustments = { ...state.adjustmentSnapshot.value, crop: legacyCrop };
+      const adjustments = { ...state.adjustmentSnapshot.value, crop: currentCrop };
       const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
       return {
         adjustmentRevision: 0,
@@ -176,17 +176,16 @@ describe('straighten edit transaction', () => {
 
     const state = useEditorStore.getState();
     expect(editDocumentGeometryV2Schema.parse(state.editDocumentV2.nodes['geometry']?.params).crop).toEqual({
-      ...legacyCrop,
-      unit: 'px',
+      ...currentCrop,
     });
     const result = state.applyEditTransaction(
       buildStraightenEditTransaction(transactionState(), identity(), 0, 'straighten-legacy-crop-no-op'),
     );
     expect(result.noOp).toBeTrue();
     expect(result.nextAdjustmentRevision).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.crop).toEqual({ ...legacyCrop, unit: 'px' });
+    expect(useEditorStore.getState().adjustmentSnapshot.value.crop).toEqual(currentCrop);
     expect(
       editDocumentGeometryV2Schema.parse(useEditorStore.getState().editDocumentV2.nodes['geometry']?.params).crop,
-    ).toEqual({ ...legacyCrop, unit: 'px' });
+    ).toEqual(currentCrop);
   });
 });

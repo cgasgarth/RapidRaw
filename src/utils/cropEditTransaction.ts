@@ -1,4 +1,4 @@
-import type { Crop } from 'react-image-crop';
+import type { EditDocumentGeometryCropV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface CropCommitIdentity {
@@ -20,7 +20,7 @@ export interface CropEditTransactionState {
 export const buildCropEditTransaction = (
   state: CropEditTransactionState,
   identity: CropCommitIdentity,
-  crop: Crop,
+  crop: EditDocumentGeometryCropV2,
   transactionId: string,
 ): EditTransactionRequest => {
   if (identity.tool !== 'crop') throw new Error(`crop_transaction.invalid_tool:${identity.tool}`);

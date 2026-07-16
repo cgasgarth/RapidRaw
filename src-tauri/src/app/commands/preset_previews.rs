@@ -30,20 +30,8 @@ use crate::render::mask_generation::{
 use crate::render::render_pipeline;
 use crate::render::render_plan::compile_consumer_render_plan;
 
-fn scale_crop_adjustment(adjustments: &serde_json::Value, scale: f32) -> serde_json::Value {
-    let mut scaled = adjustments.clone();
-    if let Some(crop_value) = scaled.get_mut(adjustment_fields::CROP)
-        && let Ok(crop) = serde_json::from_value::<Crop>(crop_value.clone())
-    {
-        *crop_value = serde_json::to_value(Crop {
-            x: crop.x * scale as f64,
-            y: crop.y * scale as f64,
-            width: crop.width * scale as f64,
-            height: crop.height * scale as f64,
-        })
-        .unwrap_or(serde_json::Value::Null);
-    }
-    scaled
+fn scale_crop_adjustment(adjustments: &serde_json::Value, _scale: f32) -> serde_json::Value {
+    adjustments.clone()
 }
 
 fn compose_community_tiles(mut tiles: Vec<RgbImage>, tile_dimension: u32) -> Option<RgbImage> {
@@ -322,14 +310,11 @@ pub(crate) async fn generate_all_community_previews(
                 .and_then(|m| serde_json::from_value(m.clone()).ok())
                 .unwrap_or_default();
 
-            let unscaled_crop_offset = js_adjustments
+            let actual_scaled_crop_offset = js_adjustments
                 .get(adjustment_fields::CROP)
                 .and_then(|c| serde_json::from_value::<Crop>(c.clone()).ok())
-                .map_or((0.0, 0.0), |c| (c.x as f32, c.y as f32));
-            let actual_scaled_crop_offset = (
-                unscaled_crop_offset.0 * base_scale,
-                unscaled_crop_offset.1 * base_scale,
-            );
+                .and_then(|crop| crop.pixel_bounds(base_image.width(), base_image.height()))
+                .map_or((0.0, 0.0), |(x, y, _, _)| (x as f32, y as f32));
 
             let mask_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = mask_definitions
                 .iter()
@@ -425,16 +410,17 @@ mod tests {
 
     use super::{compose_community_tiles, encode_preset_preview_output, scale_crop_adjustment};
     use crate::color::adjustment_fields;
-    use crate::geometry::Crop;
+    use crate::geometry::{Crop, CropUnit};
 
     #[test]
-    fn crop_geometry_scales_with_the_thumbnail() {
+    fn normalized_crop_geometry_is_invariant_across_thumbnail_scale() {
         let adjustments = serde_json::json!({
             adjustment_fields::CROP: Crop {
-                x: 10.0,
-                y: 20.0,
-                width: 300.0,
-                height: 200.0,
+                x: 0.1,
+                y: 0.2,
+                width: 0.3,
+                height: 0.4,
+                unit: CropUnit::Normalized,
             },
             "exposure": 0.5,
         });
@@ -442,7 +428,7 @@ mod tests {
         let crop: Crop = serde_json::from_value(scaled[adjustment_fields::CROP].clone()).unwrap();
         assert_eq!(
             (crop.x, crop.y, crop.width, crop.height),
-            (2.5, 5.0, 75.0, 50.0)
+            (0.1, 0.2, 0.3, 0.4)
         );
         assert_eq!(scaled["exposure"], 0.5);
     }

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
-import type { Crop } from 'react-image-crop';
-
-import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import {
+  type EditDocumentGeometryCropV2,
+  editDocumentGeometryV2Schema,
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { CropStraightenSessionIdentity } from '../../../src/components/panel/editor/cropStraightenController';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
@@ -22,7 +23,13 @@ const identity = (overrides: Partial<CropStraightenSessionIdentity> = {}): CropS
   tool: 'crop',
   ...overrides,
 });
-const crop: Crop = { height: 1800, unit: 'px', width: 2400, x: 400, y: 300 };
+const crop: EditDocumentGeometryCropV2 = {
+  height: 0.6,
+  unit: 'normalized',
+  width: 0.6,
+  x: 0.1,
+  y: 0.1,
+};
 const selectedImage = {
   exif: null,
   height: 3000,

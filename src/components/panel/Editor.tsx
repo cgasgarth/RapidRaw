@@ -39,6 +39,7 @@ import {
   getOrientedDimensions,
   isCropValidAfterRotation,
   percentCropFromPixelCrop,
+  pixelCropFromNormalizedCrop,
   pixelCropFromPercentCrop,
   resolveNextCropForGeometryChange,
   updateCropDraft,
@@ -531,12 +532,19 @@ export default function Editor({
   const isMasking = activeRightPanel === Panel.Masks;
   const isAiEditing = activeRightPanel === Panel.Ai;
 
+  const orientedCropDimensions = selectedImage
+    ? getOrientedDimensions(selectedImage.width, selectedImage.height, adjustments.orientationSteps || 0)
+    : null;
+  const currentPixelCrop =
+    adjustments.crop && orientedCropDimensions
+      ? pixelCropFromNormalizedCrop(adjustments.crop, orientedCropDimensions.width, orientedCropDimensions.height)
+      : null;
   const croppedDimensions = useMemo<ImageDimensions | null>(() => {
-    if (adjustments.crop) {
-      return { width: adjustments.crop.width, height: adjustments.crop.height };
+    if (currentPixelCrop) {
+      return { width: currentPixelCrop.width, height: currentPixelCrop.height };
     }
     return getEditorPreviewDimensions(selectedImage, adjustments.orientationSteps || 0);
-  }, [selectedImage, adjustments.crop, adjustments.orientationSteps]);
+  }, [selectedImage, currentPixelCrop, adjustments.orientationSteps]);
   const viewportContextKey = useMemo(() => {
     const crop = adjustments.crop;
     return JSON.stringify({
@@ -597,7 +605,7 @@ export default function Editor({
         mode: zoomMode,
         renderSize: imageRenderSize,
         sourceSize: getEditorZoomSourceSize({
-          crop: adjustments.crop,
+          crop: currentPixelCrop,
           orientationSteps: adjustments.orientationSteps,
           originalSize: selectedImage
             ? { height: selectedImage.height, width: selectedImage.width }
@@ -608,7 +616,7 @@ export default function Editor({
           width: imageContainerRef.current?.clientWidth ?? 0,
         },
       }),
-    [adjustments.crop, adjustments.orientationSteps, devicePixelRatio, imageRenderSize, selectedImage, zoomMode],
+    [adjustments.orientationSteps, currentPixelCrop, devicePixelRatio, imageRenderSize, selectedImage, zoomMode],
   );
   const zoomResolutionState = getEditorZoomResolutionState({
     renderedPreviewResolution,
@@ -667,7 +675,7 @@ export default function Editor({
   const overlayGeometry = useMemo(
     () =>
       createEditorOverlayGeometry({
-        crop: adjustments.crop,
+        crop: currentPixelCrop,
         devicePixelRatio,
         geometryEpoch: overlayGeometryEpochRef.current,
         orientationSteps: adjustments.orientationSteps ?? 0,
@@ -682,7 +690,7 @@ export default function Editor({
         },
       }),
     [
-      adjustments.crop,
+      currentPixelCrop,
       adjustments.orientationSteps,
       adjustments.rotation,
       devicePixelRatio,
@@ -1716,14 +1724,11 @@ export default function Editor({
         rotation: liveRotation ?? adjustments.rotation ?? 0,
       })
     : 'no-image';
-  const orientedCropDimensions = selectedImage
-    ? getOrientedDimensions(selectedImage.width, selectedImage.height, adjustments.orientationSteps || 0)
-    : null;
   const displayedCanonicalPixelCrop =
     selectedImage && liveRotation !== null
       ? resolveNextCropForGeometryChange({
           aspectRatio: adjustments.aspectRatio,
-          currentCrop: adjustments.crop,
+          currentCrop: currentPixelCrop,
           effectiveRotation: liveRotation,
           imageHeight: selectedImage.height,
           imageWidth: selectedImage.width,
@@ -1736,7 +1741,7 @@ export default function Editor({
           },
           rotation: adjustments.rotation || 0,
         }).nextPixelCrop
-      : adjustments.crop;
+      : currentPixelCrop;
   const canonicalPercentCrop =
     isCropping && displayedCanonicalPixelCrop && orientedCropDimensions
       ? percentCropFromPixelCrop(
@@ -2052,12 +2057,13 @@ export default function Editor({
         return;
       }
 
-      const dimensions = getOrientedDimensions(
-        selectedImage.width,
-        selectedImage.height,
-        adjustments.orientationSteps || 0,
-      );
-      const newPixelCrop = pixelCropFromPercentCrop(pc, dimensions.width, dimensions.height);
+      const normalizedCrop = {
+        height: pc.height / 100,
+        unit: 'normalized' as const,
+        width: pc.width / 100,
+        x: pc.x / 100,
+        y: pc.y / 100,
+      };
       const state = useEditorStore.getState();
       applyEditTransaction(
         buildCropEditTransaction(
@@ -2067,7 +2073,7 @@ export default function Editor({
             sourceRevision: viewerSampleGraphRevision,
           },
           identity,
-          newPixelCrop,
+          normalizedCrop,
           crypto.randomUUID(),
         ),
       );

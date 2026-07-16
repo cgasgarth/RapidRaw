@@ -170,7 +170,8 @@ impl PreviewGeometryService {
         let target_long_edge =
             serde_json::from_value::<Crop>(adjustments[adjustment_fields::CROP].clone())
                 .ok()
-                .map(|crop| crop.width.max(crop.height) as f32)
+                .and_then(|crop| crop.pixel_bounds(oriented_width, oriented_height))
+                .map(|(_, _, width, height)| width.max(height) as f32)
                 .filter(|dimension| dimension.is_finite() && *dimension > 0.0)
                 .unwrap_or_else(|| oriented_width.max(oriented_height) as f32);
 
@@ -181,22 +182,8 @@ impl PreviewGeometryService {
         }
     }
 
-    pub fn scale_adjustments(adjustments: &Value, source_scale: f32) -> Value {
-        if source_scale >= 1.0 {
-            return adjustments.clone();
-        }
-        let mut scaled = adjustments.clone();
-        if let Some(crop_value) = scaled.get_mut(adjustment_fields::CROP)
-            && let Ok(mut crop) = serde_json::from_value::<Crop>(crop_value.clone())
-        {
-            let scale = f64::from(source_scale);
-            crop.x *= scale;
-            crop.y *= scale;
-            crop.width *= scale;
-            crop.height *= scale;
-            *crop_value = serde_json::to_value(crop).unwrap_or(Value::Null);
-        }
-        scaled
+    pub fn scale_adjustments(adjustments: &Value, _source_scale: f32) -> Value {
+        adjustments.clone()
     }
 }
 
@@ -245,18 +232,16 @@ fn compute_direct_crop_preview(
     } else {
         source.dimensions()
     };
-    let mut x = crop.x.round().max(0.0) as u32;
-    let mut y = crop.y.round().max(0.0) as u32;
-    if x >= oriented_width || y >= oriented_height {
+    let Some((mut x, mut y, mut width, mut height)) =
+        crop.pixel_bounds(oriented_width, oriented_height)
+    else {
         return Ok(None);
-    }
-    let mut width = (crop.width.round().max(1.0) as u32).min(oriented_width - x);
-    let mut height = (crop.height.round().max(1.0) as u32).min(oriented_height - y);
+    };
+    let unscaled_crop_offset = (x as f32, y as f32);
     if rotation.rem_euclid(360.0).abs() > f64::EPSILON || has_geometry || patch_sampler.is_some() {
         return render_mapped_crop_preview(
             source,
             MappedCropPreviewPlan {
-                crop,
                 crop_bounds: (x, y, width, height),
                 orientation: orientation as u8,
                 flip_horizontal: adjustments[adjustment_fields::FLIP_HORIZONTAL]
@@ -319,7 +304,7 @@ fn compute_direct_crop_preview(
 
     Ok(Some(PreviewGeometryResult {
         effective_scale,
-        unscaled_crop_offset: (crop.x as f32, crop.y as f32),
+        unscaled_crop_offset,
         receipt: PreviewGeometryReceipt {
             source_pixel_count: u64::from(source.width()) * u64::from(source.height()),
             working_pixel_count: u64::from(source_crop_width) * u64::from(source_crop_height),
@@ -333,7 +318,6 @@ fn compute_direct_crop_preview(
 }
 
 struct MappedCropPreviewPlan<'a> {
-    crop: Crop,
     crop_bounds: (u32, u32, u32, u32),
     orientation: u8,
     flip_horizontal: bool,
@@ -364,7 +348,7 @@ fn render_mapped_crop_preview(
     let orientation = plan.orientation;
     let flip_horizontal = plan.flip_horizontal;
     let flip_vertical = plan.flip_vertical;
-    let crop_offset = (plan.crop.x as f32, plan.crop.y as f32);
+    let crop_offset = (crop_x as f32, crop_y as f32);
     let patch_sampler = plan.patch_sampler;
     let decorate_source = |source_x, source_y, pixel: &mut [f32]| {
         if let Some(sampler) = patch_sampler.as_ref() {
@@ -453,7 +437,7 @@ mod tests {
             PreviewGeometryService::source_scale(
                 10_000,
                 8_000,
-                &json!({"crop": {"x": 4_000.0, "y": 3_000.0, "width": 2_000.0, "height": 1_500.0}}),
+                &json!({"crop": {"unit": "normalized", "x": 0.4, "y": 0.375, "width": 0.2, "height": 0.1875}}),
                 2_000,
             ),
             1.0
@@ -462,7 +446,7 @@ mod tests {
             PreviewGeometryService::source_scale(
                 10_000,
                 8_000,
-                &json!({"crop": {"x": 2_000.0, "y": 2_000.0, "width": 4_000.0, "height": 3_000.0}}),
+                &json!({"crop": {"unit": "normalized", "x": 0.2, "y": 0.25, "width": 0.4, "height": 0.375}}),
                 2_000,
             ),
             0.5
@@ -501,7 +485,7 @@ mod tests {
             image::Rgb([x as f32 / 999.0, y as f32 / 799.0, 0.25])
         }));
         let adjustments = json!({
-            "crop": {"x": 400.0, "y": 300.0, "width": 200.0, "height": 100.0},
+            "crop": {"unit": "normalized", "x": 0.4, "y": 0.375, "width": 0.2, "height": 0.125},
         });
         let result = compute_direct_crop_preview(&source, &adjustments, 100, None)
             .unwrap()
@@ -529,7 +513,7 @@ mod tests {
         let adjustments = json!({
             "orientationSteps": 1,
             "flipHorizontal": true,
-            "crop": {"x": 40.0, "y": 80.0, "width": 100.0, "height": 120.0},
+            "crop": {"unit": "normalized", "x": 0.2, "y": 0.26666666666666666, "width": 0.5, "height": 0.4},
         });
         let (full, _) = apply_all_transformations(&source, &adjustments);
         let reference = downscale_f32_image(&full, 50, 50).to_rgb32f();
@@ -558,7 +542,7 @@ mod tests {
             "rotation": 7.0,
             "orientationSteps": 1,
             "flipVertical": true,
-            "crop": {"x": 100.0, "y": 160.0, "width": 200.0, "height": 240.0},
+            "crop": {"unit": "normalized", "x": 0.25, "y": 0.26666666666666666, "width": 0.5, "height": 0.4},
         });
         let (full, _) = apply_all_transformations(&source, &adjustments);
         let reference = downscale_f32_image(&full, 100, 100).to_rgb32f();
@@ -590,7 +574,7 @@ mod tests {
             "transformHorizontal": -7.0,
             "transformDistortion": 4.0,
             "rotation": -3.0,
-            "crop": {"x": 180.0, "y": 120.0, "width": 240.0, "height": 160.0},
+            "crop": {"unit": "normalized", "x": 0.3, "y": 0.3, "width": 0.4, "height": 0.4},
         });
         let (full, _) = apply_all_transformations(&source, &adjustments);
         let reference = downscale_f32_image(&full, 120, 120).to_rgb32f();
@@ -617,7 +601,7 @@ mod tests {
         let source = DynamicImage::new_rgb32f(600, 400);
         let adjustments = json!({
             "transformDistortion": 4.0,
-            "crop": {"x": 180.0, "y": 120.0, "width": 240.0, "height": 240.0},
+            "crop": {"unit": "normalized", "x": 0.3, "y": 0.3, "width": 0.4, "height": 0.6},
         });
         let checks = std::sync::atomic::AtomicUsize::new(0);
         let cancellation = || {
@@ -655,10 +639,11 @@ mod tests {
             "transformDistortion": 4.0,
             "rotation": 2.5,
             "crop": {
-                "x": (width - crop_width) / 2,
-                "y": (height - crop_height) / 2,
-                "width": crop_width,
-                "height": crop_height,
+                "unit": "normalized",
+                "x": f64::from(width - crop_width) / 2.0 / f64::from(width),
+                "y": f64::from(height - crop_height) / 2.0 / f64::from(height),
+                "width": f64::from(crop_width) / f64::from(width),
+                "height": f64::from(crop_height) / f64::from(height),
             },
         });
         let started = std::time::Instant::now();
@@ -742,17 +727,14 @@ mod tests {
     }
 
     #[test]
-    fn preview_geometry_scales_pixel_crop_coordinates_once() {
+    fn preview_geometry_keeps_normalized_crop_invariant_across_source_scale() {
         let adjustments = json!({
-            "crop": {"x": 1200.0, "y": 800.0, "width": 4000.0, "height": 3000.0},
+            "crop": {"unit": "normalized", "x": 0.12, "y": 0.1, "width": 0.4, "height": 0.375},
             "rotation": 1.5,
             "transformVertical": 12.0,
         });
         let scaled = PreviewGeometryService::scale_adjustments(&adjustments, 0.25);
-        assert_eq!(
-            scaled["crop"],
-            json!({"x": 300.0, "y": 200.0, "width": 1000.0, "height": 750.0})
-        );
+        assert_eq!(scaled["crop"], adjustments["crop"]);
         assert_eq!(scaled["rotation"], adjustments["rotation"]);
         assert_eq!(
             scaled["transformVertical"],
@@ -768,7 +750,7 @@ mod tests {
         let adjustments = json!({
             "rotation": 2.0,
             "flipHorizontal": true,
-            "crop": {"x": 100.0, "y": 75.0, "width": 200.0, "height": 150.0},
+            "crop": {"unit": "normalized", "x": 0.25, "y": 0.25, "width": 0.5, "height": 0.5},
         });
 
         let (full, offset) = apply_all_transformations(&source, &adjustments);
@@ -836,7 +818,7 @@ mod tests {
         let color = RgbImage::from_pixel(400, 300, image::Rgb([255, 0, 0]));
         let adjustments = json!({
             "rotation": 3.0,
-            "crop": {"x": 100.0, "y": 75.0, "width": 200.0, "height": 150.0},
+            "crop": {"unit": "normalized", "x": 0.25, "y": 0.25, "width": 0.5, "height": 0.5},
             "aiPatches": [{
                 "id": "mapped-preview-patch",
                 "revision": 1,

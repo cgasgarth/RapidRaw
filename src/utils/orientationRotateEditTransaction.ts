@@ -1,5 +1,5 @@
 import type { Adjustments } from './adjustments';
-import { calculateCenteredCrop } from './cropUtils';
+import { calculateCenteredCrop, getOrientedDimensions, normalizedCropFromPixelCrop } from './cropUtils';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface OrientationRotateCommitIdentity {
@@ -95,7 +95,12 @@ export const buildOrientationRotateEditTransaction = (
       : state.adjustmentSnapshot.value.aspectRatio;
   const width = state.selectedImage?.width;
   const height = state.selectedImage?.height;
-  const crop = width && height ? calculateCenteredCrop(width, height, orientationSteps, aspectRatio) : null;
+  const pixelCrop = width && height ? calculateCenteredCrop(width, height, orientationSteps, aspectRatio) : null;
+  const orientedDimensions = width && height ? getOrientedDimensions(width, height, orientationSteps) : null;
+  const crop =
+    pixelCrop && orientedDimensions
+      ? normalizedCropFromPixelCrop(pixelCrop, orientedDimensions.width, orientedDimensions.height)
+      : null;
 
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
