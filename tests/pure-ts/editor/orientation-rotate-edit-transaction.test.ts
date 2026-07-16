@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
+import { editDocumentGeometryV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -96,7 +97,7 @@ describe('orientation rotate edit transaction', () => {
     });
     expect(after.finalPreviewUrl).toBeNull();
     expect(after.navigatorPreviewArtifact).toBeNull();
-    expect(result.afterEditDocumentV2.nodes.geometry.params).toMatchObject({
+    expect(editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params)).toMatchObject({
       aspectRatio: 3 / 4,
       orientationSteps: 1,
       rotation: 0,
