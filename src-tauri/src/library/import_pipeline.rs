@@ -295,7 +295,7 @@ impl<R: Runtime> ImportPipeline<R> {
         job_id: &str,
     ) -> Result<PreparedImportResume, String> {
         let journal = read_job_journal(app, job_id)?;
-        let validation = validate_journal_resume(&journal);
+        let validation = validate_journal_resume_for_runtime(app, &journal);
         if !validation.invalid.is_empty() {
             return Err(format!(
                 "Import resume rejected: {} source or destination revision(s) changed",
@@ -1180,7 +1180,8 @@ pub fn validate_job_resume<R: Runtime>(
     app: &AppHandle<R>,
     job_id: &str,
 ) -> Result<ImportResumeValidation, String> {
-    Ok(validate_journal_resume(&read_job_journal(app, job_id)?))
+    let journal = read_job_journal(app, job_id)?;
+    Ok(validate_journal_resume_for_runtime(app, &journal))
 }
 
 fn read_job_journal<R: Runtime>(
@@ -1243,6 +1244,25 @@ fn validate_journal_resume(journal: &ImportJobJournal) -> ImportResumeValidation
     validation.verified_completed.sort_unstable();
     validation.resumable.sort_unstable();
     validation
+}
+
+fn validate_journal_resume_for_runtime<R: Runtime>(
+    app: &AppHandle<R>,
+    journal: &ImportJobJournal,
+) -> ImportResumeValidation {
+    // A resumed job starts in a new filesystem-watcher generation. Seed that
+    // generation with the prior journal's committed artifact identities before
+    // verification reads them. Stable metadata notifications from validation
+    // are then recognized as prior-epoch echoes, while a later content revision
+    // still invalidates the identity and reaches the catalog.
+    app.state::<super::changefeed::LibraryFilesystemChangefeed>()
+        .register_prior_epoch_paths(journal.receipt.completed.iter().flat_map(|receipt| {
+            receipt
+                .artifacts
+                .iter()
+                .map(|artifact| PathBuf::from(&artifact.destination))
+        }));
+    validate_journal_resume(journal)
 }
 
 fn hash_path(path: &Path) -> Result<String, String> {
