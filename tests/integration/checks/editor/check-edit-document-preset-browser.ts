@@ -14,13 +14,14 @@ const baseUrl = `http://${host}:${String(port)}`;
 const presetName = 'Descriptor Proof';
 
 const savedPresetSchema = z.object({
-  adjustments: z.object({ exposure: z.number() }).passthrough(),
   editDocumentV2: editDocumentV2CopyPayloadSchema,
+  format: z.literal('rapidraw.preset'),
   id: z.string().min(1),
   includeCropTransform: z.boolean(),
   includeMasks: z.literal(false),
   name: z.literal(presetName),
   presetType: z.enum(['style', 'tool']),
+  schemaVersion: z.literal(1),
 });
 
 const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
@@ -163,7 +164,6 @@ try {
     ),
   );
   if (
-    savedPreset.adjustments.exposure !== 0.85 ||
     savedPreset.editDocumentV2.nodes.scene_global_color_tone?.params.exposure !== 0.85 ||
     savedPreset.editDocumentV2.nodes.geometry !== undefined ||
     savedPreset.editDocumentV2.nodes.layers !== undefined ||
@@ -237,7 +237,7 @@ try {
       'enabled',
     ) !== true
   ) {
-    throw new Error('Preset apply did not persist matching flat and EditDocumentV2 render authority.');
+    throw new Error('Preset apply did not persist matching current edit-document render authority.');
   }
 
   await openPresetsPanel(page);

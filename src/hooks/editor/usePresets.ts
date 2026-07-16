@@ -7,9 +7,10 @@ import type { Adjustments } from '../../utils/adjustments';
 import {
   configureEditDocumentPresetPayload,
   createEditDocumentPresetPayload,
-  lowerEditDocumentPresetPayload,
   parseExternalPresetImportResult,
   parsePresetLibrary,
+  RAPIDRAW_PRESET_FORMAT,
+  RAPIDRAW_PRESET_SCHEMA_VERSION,
 } from '../../utils/editDocumentPreset';
 import { debounce } from '../../utils/timing';
 
@@ -25,8 +26,6 @@ export interface UserPreset {
   preset?: Preset;
 }
 
-type PresetAdjustments = Record<string, unknown>;
-
 const USER_COLOR_STYLE_LEGAL_WARNING =
   'User-created color style preset. RawEngine does not claim manufacturer, film-stock, competitor, official, or exact-emulation status.';
 
@@ -41,8 +40,6 @@ const buildUserColorStyleProvenance = (existing?: Preset['colorStyleProvenance']
   };
 };
 
-const clonePresetAdjustments = (adjustments: Partial<Adjustments>): PresetAdjustments => structuredClone(adjustments);
-
 function getFolderChildren(folder: Folder): Preset[] {
   return folder.children;
 }
@@ -56,7 +53,7 @@ function arrayMove<T>(array: T[], from: number, to: number): T[] {
   return newArray;
 }
 
-export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV2: EditDocumentV2) {
+export function usePresets(_currentAdjustments: Adjustments, currentEditDocumentV2: EditDocumentV2) {
   const [presets, setPresets] = useState<Array<UserPreset>>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -120,16 +117,16 @@ export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV
     presetType: 'tool' | 'style' = 'style',
   ): Preset => {
     const editDocumentV2 = createEditDocumentPresetPayload(currentEditDocumentV2, includeCropTransform, presetType);
-    const presetAdjustments = lowerEditDocumentPresetPayload(editDocumentV2);
 
     const newPresetData: Preset = {
-      adjustments: presetAdjustments,
       editDocumentV2,
+      format: RAPIDRAW_PRESET_FORMAT,
       id: crypto.randomUUID(),
       name,
       includeMasks: false,
       includeCropTransform,
       presetType,
+      schemaVersion: RAPIDRAW_PRESET_SCHEMA_VERSION,
       ...(presetType === 'style' ? { colorStyleProvenance: buildUserColorStyleProvenance() } : {}),
     };
 
@@ -250,15 +247,12 @@ export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV
       setStorageError('Preset configuration rejected corrupt editDocumentV2 authority.');
       return null;
     }
-    const newAdjustments = lowerEditDocumentPresetPayload(editDocumentV2);
-
     let updatedPreset: Preset | null = null;
     const updatedPresets = presets.map((item: UserPreset) => {
       if (item.preset?.id === id) {
         updatedPreset = {
           ...item.preset,
           name,
-          adjustments: newAdjustments,
           editDocumentV2,
           includeMasks: false,
           includeCropTransform,
@@ -275,7 +269,6 @@ export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV
           updatedPreset = {
             ...child,
             name,
-            adjustments: newAdjustments,
             editDocumentV2,
             includeMasks: false,
             includeCropTransform,
@@ -318,14 +311,11 @@ export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV
     const includeCropTransform = existingPreset.includeCropTransform === true;
     const presetType = existingPreset.presetType || 'style';
     const editDocumentV2 = createEditDocumentPresetPayload(currentEditDocumentV2, includeCropTransform, presetType);
-    const presetAdjustments = lowerEditDocumentPresetPayload(editDocumentV2);
-
     let updatedPreset: Preset | null = null;
     const updatedPresets = presets.map((item: UserPreset) => {
       if (item.preset?.id === id) {
         updatedPreset = {
           ...item.preset,
-          adjustments: presetAdjustments,
           editDocumentV2,
           includeMasks: false,
           includeCropTransform,
@@ -341,7 +331,6 @@ export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV
         if (child !== undefined) {
           updatedPreset = {
             ...child,
-            adjustments: presetAdjustments,
             editDocumentV2,
             includeMasks: false,
             includeCropTransform,
@@ -387,16 +376,10 @@ export function usePresets(currentAdjustments: Adjustments, currentEditDocumentV
       }
 
       const newPreset: Preset = {
-        adjustments: clonePresetAdjustments(presetToDuplicate.adjustments),
-        editDocumentV2:
-          presetToDuplicate.editDocumentV2 === undefined
-            ? undefined
-            : structuredClone(presetToDuplicate.editDocumentV2),
+        ...structuredClone(presetToDuplicate),
+        editDocumentV2: structuredClone(presetToDuplicate.editDocumentV2),
         id: crypto.randomUUID(),
         name: `${presetToDuplicate.name} Copy`,
-        includeMasks: presetToDuplicate.includeMasks,
-        includeCropTransform: presetToDuplicate.includeCropTransform,
-        presetType: presetToDuplicate.presetType || 'style',
       };
 
       let updatedPresets: UserPreset[];

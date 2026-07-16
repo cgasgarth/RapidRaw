@@ -111,21 +111,23 @@ test('accepts a fallback path only in the keyed session that requested it', asyn
 });
 
 test('preserves the Save Community Preset payload contract', () => {
-  expect(
-    buildSaveCommunityPresetPayload({
-      adjustments: { exposure: 1 },
-      creator: 'Author',
-      includeCropTransform: true,
-      includeMasks: false,
-      name: 'Preset',
-    }),
-  ).toEqual({
+  const payload = buildSaveCommunityPresetPayload({
     adjustments: { exposure: 1 },
+    creator: 'Author',
+    includeCropTransform: true,
+    includeMasks: false,
+    name: 'Preset',
+  });
+  expect(payload.preset).toMatchObject({
+    format: 'rapidraw.preset',
     includeCropTransform: true,
     includeMasks: false,
     name: 'Preset',
     presetType: 'style',
+    schemaVersion: 1,
   });
+  expect(payload.preset.editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(1);
+  expect(payload.preset).not.toHaveProperty('adjustments');
 });
 
 function installRuntime(fetchImplementation?: () => Promise<Response>) {

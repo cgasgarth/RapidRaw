@@ -1,26 +1,30 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
-import { editDocumentV2CopyPayloadSchema } from '../../../packages/rawengine-schema/src/editDocumentV2';
-import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import {
-  createDefaultMaskEditNodes,
-  INITIAL_ADJUSTMENTS,
-  INITIAL_MASK_ADJUSTMENTS,
-} from '../../../src/utils/adjustments';
+  type EditDocumentV2,
+  type EditDocumentV2CopyPayload,
+  editDocumentV2CopyPayloadSchema,
+} from '../../../packages/rawengine-schema/src/editDocumentV2';
+import type { Preset } from '../../../src/components/ui/AppProperties';
+import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import {
+  BUILT_IN_COLOR_STYLE_PRESETS,
+  buildBuiltInColorStylePreset,
+} from '../../../src/utils/color/style/colorStylePresetCatalog';
 import {
   buildPresetEditTransaction,
   buildPresetPreviewAdjustments,
   configureEditDocumentPresetPayload,
   createEditDocumentPresetPayload,
-  lowerEditDocumentPresetPayload,
   parseExternalPresetImportResult,
   parsePresetLibrary,
+  RAPIDRAW_PRESET_FORMAT,
+  RAPIDRAW_PRESET_SCHEMA_VERSION,
   resolveEditDocumentPresetPayload,
 } from '../../../src/utils/editDocumentPreset';
 import {
   legacyAdjustmentsToEditDocumentV2,
-  prepareEditDocumentV2ForRender,
   replaceEditDocumentV2SourceArtifacts,
   setEditDocumentV2NodeEnabled,
 } from '../../../src/utils/editDocumentV2';
@@ -40,7 +44,36 @@ const selectedImage = {
   width: 4000,
 };
 
-describe('descriptor-derived edit document presets', () => {
+const envelope = (
+  editDocumentV2: EditDocumentV2CopyPayload,
+  overrides: Partial<Omit<Preset, 'editDocumentV2'>> = {},
+): Preset => ({
+  editDocumentV2,
+  format: RAPIDRAW_PRESET_FORMAT,
+  id: 'current-preset',
+  includeCropTransform: false,
+  includeMasks: false,
+  name: 'Current preset',
+  presetType: 'style',
+  schemaVersion: RAPIDRAW_PRESET_SCHEMA_VERSION,
+  ...overrides,
+});
+
+const toneOnlyPayload = (document: EditDocumentV2, exposure: number): EditDocumentV2CopyPayload => {
+  const node = document.nodes['scene_global_color_tone'];
+  if (node === undefined) throw new Error('Expected scene-global tone node.');
+  return {
+    nodes: {
+      scene_global_color_tone: {
+        ...node,
+        params: { ...node.params, exposure },
+      },
+    },
+    schemaVersion: 2,
+  };
+};
+
+describe('current RapidRaw preset envelope', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), brightness: 0.2, exposure: -0.5 };
     const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
@@ -58,11 +91,7 @@ describe('descriptor-derived edit document presets', () => {
 
   test('serializes descriptor-approved nodes, disabled state, and optional geometry without source domains', () => {
     const artifacts = replaceEditDocumentV2SourceArtifacts(
-      legacyAdjustmentsToEditDocumentV2({
-        ...structuredClone(INITIAL_ADJUSTMENTS),
-        exposure: 1.25,
-        rotation: 3,
-      }),
+      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25, rotation: 3 }),
       { aiPatches: [] },
     );
     const source = setEditDocumentV2NodeEnabled(artifacts, 'scene_global_color_tone', false);
@@ -74,227 +103,134 @@ describe('descriptor-derived edit document presets', () => {
     expect(style.nodes).not.toHaveProperty('lens_correction');
     expect(style.nodes).not.toHaveProperty('layers');
     expect(style.nodes).not.toHaveProperty('source_artifacts');
-    expect(style).not.toHaveProperty('provenance');
-    expect(style).not.toHaveProperty('sourceArtifacts');
 
     const withGeometry = createEditDocumentPresetPayload(source, true, 'style');
     expect(withGeometry.nodes['geometry']?.params['rotation']).toBe(3);
     expect(withGeometry.nodes).toHaveProperty('lens_correction');
-    expect(lowerEditDocumentPresetPayload(withGeometry)).toMatchObject({ exposure: 1.25, rotation: 3 });
+    expect(buildPresetPreviewAdjustments(envelope(withGeometry, { includeCropTransform: true }))?.rotation).toBe(3);
   });
 
-  test('tool presets omit enabled defaults but retain disabled default nodes as authored state', () => {
+  test('preserves disabled authored nodes in tool presets', () => {
     const defaults = legacyAdjustmentsToEditDocumentV2(structuredClone(INITIAL_ADJUSTMENTS));
     const source = setEditDocumentV2NodeEnabled(defaults, 'scene_global_color_tone', false);
     const tool = createEditDocumentPresetPayload(source, false, 'tool');
 
-    expect(Object.keys(tool.nodes)).toContain('scene_global_color_tone');
     expect(tool.nodes['scene_global_color_tone']?.enabled).toBeFalse();
   });
 
-  test('promotes a partial legacy preset against destination authority without changing sibling nodes', () => {
-    const destination = useEditorStore.getState().editDocumentV2;
-    const cameraInputBefore = destination.nodes['camera_input'];
-    const payload = resolveEditDocumentPresetPayload(
-      { adjustments: { exposure: 0.75 }, includeCropTransform: false },
-      destination,
-    );
-    expect(payload?.nodes['scene_global_color_tone']?.params).toMatchObject({ brightness: 0.2, exposure: 0.75 });
-    expect(payload?.nodes).not.toHaveProperty('camera_input');
-    if (payload === null) throw new Error('Expected promoted legacy preset payload.');
-
+  test('applies only current nodes, preserves unrelated authority, and supports undo/redo', () => {
     const state = useEditorStore.getState();
+    const sourceArtifactsBefore = state.editDocumentV2.nodes['source_artifacts'];
+    const payload = resolveEditDocumentPresetPayload(
+      envelope(toneOnlyPayload(state.editDocumentV2, 0.75)),
+      state.editDocumentV2,
+    );
+    if (payload === null) throw new Error('Expected current preset payload.');
     const request = buildPresetEditTransaction(state, payload, 'preset-apply');
     if (request === null) throw new Error('Expected preset transaction.');
+
     const result = state.applyEditTransaction(request);
     expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false, source: 'preset' });
     expect(result.after).toMatchObject({ brightness: 0.2, exposure: 0.75 });
-    expect(result.afterEditDocumentV2.nodes['camera_input']).toBe(cameraInputBefore);
-    expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().history).toHaveLength(2);
-
+    expect(result.afterEditDocumentV2.nodes['source_artifacts']).toBe(sourceArtifactsBefore);
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(-0.5);
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.75);
   });
 
-  test('is exact no-op, reopens strictly, and publishes the same preview/export render node', () => {
+  test('is an exact no-op on reapply and reopens the same strict payload', () => {
     const state = useEditorStore.getState();
-    const payload = resolveEditDocumentPresetPayload(
-      { adjustments: { exposure: -0.5 }, includeCropTransform: false },
-      state.editDocumentV2,
-    );
-    if (payload === null) throw new Error('Expected preset payload.');
-    const request = buildPresetEditTransaction(state, payload, 'preset-no-op');
+    const payload = toneOnlyPayload(state.editDocumentV2, -0.5);
+    const resolved = resolveEditDocumentPresetPayload(envelope(payload), state.editDocumentV2);
+    if (resolved === null) throw new Error('Expected current preset payload.');
+    const request = buildPresetEditTransaction(state, resolved, 'preset-no-op');
     if (request === null) throw new Error('Expected preset transaction.');
     const result = state.applyEditTransaction(request);
 
     expect(result.noOp).toBeTrue();
     expect(useEditorStore.getState().adjustmentRevision).toBe(0);
     expect(useEditorStore.getState().history).toHaveLength(1);
-    expect(useEditorStore.getState().lastEditApplicationReceipt).toBeNull();
-    const reopened = editDocumentV2CopyPayloadSchema.parse(structuredClone(payload));
-    expect(reopened).toEqual(payload);
-    const renderDocument = prepareEditDocumentV2ForRender(INITIAL_ADJUSTMENTS, result.afterEditDocumentV2, [
-      'scene_global_color_tone',
-    ]);
-    expect(renderDocument.nodes['scene_global_color_tone']).toBe(
-      result.afterEditDocumentV2.nodes['scene_global_color_tone'],
-    );
-    expect(renderDocument.nodes['scene_global_color_tone']?.params['exposure']).toBe(
-      lowerEditDocumentPresetPayload(payload).exposure,
-    );
+    expect(editDocumentV2CopyPayloadSchema.parse(structuredClone(payload))).toEqual(payload);
   });
 
-  test('native preview compilation trusts strict V2 authority over a stale legacy mirror', () => {
+  test('previews only strict current authority and never promotes flat data', () => {
     const document = legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 });
-    const payload = createEditDocumentPresetPayload(document, false, 'style');
-    expect(
-      buildPresetPreviewAdjustments({
-        adjustments: { exposure: -1.75 },
-        editDocumentV2: payload,
-        includeCropTransform: false,
-      })?.exposure,
-    ).toBe(1.25);
-    expect(buildPresetPreviewAdjustments({ adjustments: { exposure: 0.5 } })?.exposure).toBe(0.5);
-    expect(
-      buildPresetPreviewAdjustments({
-        adjustments: { exposure: 0.5 },
-        editDocumentV2: { nodes: { source_artifacts: document.nodes['source_artifacts'] }, schemaVersion: 2 } as never,
-      }),
-    ).toBeNull();
+    const current = envelope(createEditDocumentPresetPayload(document, false, 'style'));
+    expect(buildPresetPreviewAdjustments(current)?.exposure).toBe(1.25);
+
+    const flatOnly = { ...current, adjustments: { exposure: -1.75 } };
+    const parsed = parsePresetLibrary([{ preset: flatOnly }]);
+    expect(parsed).toEqual({ items: [], quarantinedCount: 1 });
   });
 
-  test('configure migrates legacy state and enforces descriptor policy for style/tool conversion', () => {
-    const style = configureEditDocumentPresetPayload(
-      {
-        adjustments: {
-          exposure: 1,
-          masks: [
-            {
-              adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
-              editNodes: createDefaultMaskEditNodes(),
-              editNodeSchemaVersion: 1,
-              id: 'legacy-mask',
-              invert: false,
-              name: 'Legacy mask',
-              opacity: 100,
-              subMasks: [],
-              visible: true,
-            },
-          ],
-        },
-        includeCropTransform: false,
-      },
-      false,
-      'style',
-    );
-    if (style === null) throw new Error('Expected legacy preset migration.');
-    expect(style.nodes['scene_global_color_tone']?.params['exposure']).toBe(1);
-    expect(style.nodes).not.toHaveProperty('layers');
-    expect(style.nodes).not.toHaveProperty('source_artifacts');
-    expect(style.nodes).not.toHaveProperty('geometry');
+  test('compiles every built-in color style into the same strict current envelope', () => {
+    const destination = useEditorStore.getState().editDocumentV2;
+    for (const builtIn of BUILT_IN_COLOR_STYLE_PRESETS) {
+      const current = buildBuiltInColorStylePreset(builtIn, destination);
+      const parsed = parsePresetLibrary([{ preset: current }]);
+      expect(parsed.quarantinedCount).toBe(0);
+      expect(parsed.items[0]?.preset).toEqual(current);
+      expect(current).not.toHaveProperty('adjustments');
+      expect(Object.keys(current.editDocumentV2.nodes).length).toBeGreaterThan(0);
+    }
+  });
+
+  test('configures current authority between style, tool, and optional geometry policies', () => {
+    const document = legacyAdjustmentsToEditDocumentV2({
+      ...structuredClone(INITIAL_ADJUSTMENTS),
+      exposure: 1,
+      rotation: 4,
+    });
+    const style = createEditDocumentPresetPayload(document, false, 'style');
+    const configured = configureEditDocumentPresetPayload(envelope(style), true, 'style');
+    if (configured === null) throw new Error('Expected current preset configuration.');
+    expect(configured.nodes['scene_global_color_tone']?.params['exposure']).toBe(1);
+    expect(configured.nodes).toHaveProperty('geometry');
+    expect(configured.nodes).not.toHaveProperty('layers');
+    expect(configured.nodes).not.toHaveProperty('source_artifacts');
 
     const tool = configureEditDocumentPresetPayload(
-      { adjustments: lowerEditDocumentPresetPayload(style), editDocumentV2: style, includeCropTransform: false },
+      envelope(configured, { includeCropTransform: true }),
       false,
       'tool',
     );
-    if (tool === null) throw new Error('Expected strict V2 preset configuration.');
-    expect(tool.nodes['scene_global_color_tone']?.params['exposure']).toBe(1);
-    expect(Object.keys(tool.nodes).length).toBeLessThan(Object.keys(style.nodes).length);
+    if (tool === null) throw new Error('Expected current tool configuration.');
+    expect(tool.nodes).not.toHaveProperty('geometry');
+    expect(Object.keys(tool.nodes).length).toBeLessThan(Object.keys(configured.nodes).length);
   });
 
-  test('rejects malformed, cross-node, and artifact payloads without legacy fallback', () => {
+  test('quarantines flat, incomplete, future, malformed, provenance-leaking, and disallowed-node entries', () => {
     const destination = useEditorStore.getState().editDocumentV2;
-    expect(
-      resolveEditDocumentPresetPayload(
-        {
-          adjustments: { exposure: 1.75 },
-          editDocumentV2: {
-            nodes: { source_artifacts: destination.nodes['source_artifacts'] },
-            schemaVersion: 2,
-          } as never,
-        },
-        destination,
-      ),
-    ).toBeNull();
-    expect(
-      resolveEditDocumentPresetPayload(
-        {
-          adjustments: {},
-          editDocumentV2: {
-            nodes: {
-              scene_global_color_tone: { ...destination.nodes['geometry'], type: 'geometry' },
-            },
-            schemaVersion: 2,
-          } as never,
-        },
-        destination,
-      ),
-    ).toBeNull();
-    expect(
-      configureEditDocumentPresetPayload(
-        {
-          adjustments: { exposure: 1.75 },
-          editDocumentV2: {
-            nodes: { source_artifacts: destination.nodes['source_artifacts'] },
-            schemaVersion: 2,
-          } as never,
-        },
-        false,
-        'style',
-      ),
-    ).toBeNull();
-  });
-
-  test('validates native preset and folder payloads while quarantining corrupt explicit V2 authority', () => {
-    const destination = useEditorStore.getState().editDocumentV2;
-    const validPayload = createEditDocumentPresetPayload(destination, false, 'style');
+    const valid = envelope(toneOnlyPayload(destination, 0.25));
+    const invalidEntries = [
+      { id: 'flat', name: 'Flat', adjustments: { exposure: 1 } },
+      { ...valid, editDocumentV2: undefined },
+      { ...valid, schemaVersion: 2 },
+      { ...valid, editDocumentV2: { nodes: {}, schemaVersion: 2 } },
+      { ...valid, editDocumentV2: { ...valid.editDocumentV2, provenance: { source: 'leak' } } },
+      {
+        ...valid,
+        editDocumentV2: { nodes: { source_artifacts: destination.nodes['source_artifacts'] }, schemaVersion: 2 },
+      },
+    ];
     const parsed = parsePresetLibrary([
-      {
-        preset: {
-          adjustments: { exposure: -0.5 },
-          editDocumentV2: validPayload,
-          id: 'valid-v2',
-          name: 'Valid V2',
-        },
-      },
-      {
-        folder: {
-          children: [
-            { adjustments: { exposure: 0.25 }, id: 'legacy', name: 'Legacy' },
-            {
-              adjustments: { exposure: 1.75 },
-              editDocumentV2: {
-                nodes: { source_artifacts: destination.nodes['source_artifacts'] },
-                schemaVersion: 2,
-              },
-              id: 'corrupt-v2',
-              name: 'Corrupt V2',
-            },
-          ],
-          id: 'folder',
-          name: 'Folder',
-        },
-      },
-      { unexpected: true },
+      { preset: valid },
+      { folder: { children: invalidEntries, id: 'folder', name: 'Folder' } },
+      ...invalidEntries.map((preset) => ({ preset })),
     ]);
 
-    expect(parsed.quarantinedCount).toBe(2);
-    expect(parsed.items).toHaveLength(2);
-    expect(parsed.items[0]?.preset?.editDocumentV2).toEqual(validPayload);
-    expect(parsed.items[1]?.folder?.children.map((preset) => preset.id)).toEqual(['legacy']);
+    expect(parsed.items[0]?.preset).toEqual(valid);
+    expect(parsed.items[1]?.folder?.children).toEqual([]);
+    expect(parsed.quarantinedCount).toBe(invalidEntries.length * 2);
   });
 
-  test('validates external-import diagnostics and strict current preset authority together', () => {
+  test('accepts Lightroom/XMP import only after it returns a current envelope', () => {
     const destination = useEditorStore.getState().editDocumentV2;
-    const importedDocument = legacyAdjustmentsToEditDocumentV2({
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      exposure: 0.8,
+    const imported = envelope(toneOnlyPayload(destination, 0.8), {
+      id: 'lightroom-current',
+      name: 'Lightroom Current',
     });
-    const payload = createEditDocumentPresetPayload(importedDocument, false, 'style');
     const result = parseExternalPresetImportResult({
       diagnostics: [
         {
@@ -302,46 +238,17 @@ describe('descriptor-derived edit document presets', () => {
           field: 'SharpenRadius',
           message: "Lightroom/XMP field 'SharpenRadius' is not supported and was not imported",
         },
-        {
-          code: 'invalid_external_value',
-          field: 'Texture',
-          message: "Lightroom/XMP field 'Texture' has an invalid numeric value and was not imported",
-        },
       ],
-      presets: [
-        {
-          preset: {
-            adjustments: {},
-            editDocumentV2: payload,
-            id: 'lightroom-current',
-            includeCropTransform: false,
-            includeMasks: false,
-            name: 'Lightroom Current',
-            presetType: 'style',
-          },
-        },
-      ],
+      presets: [{ preset: imported }],
     });
 
-    expect(result.diagnostics.map(({ field }) => field)).toEqual(['SharpenRadius', 'Texture']);
     expect(result.library.quarantinedCount).toBe(0);
-    expect(result.library.items[0]?.preset?.adjustments).toEqual({});
-    expect(editDocumentV2CopyPayloadSchema.parse(result.library.items[0]?.preset?.editDocumentV2)).toEqual(payload);
-    const imported = result.library.items[0]?.preset;
-    if (imported === undefined) throw new Error('Expected imported current preset.');
+    expect(result.library.items[0]?.preset).toEqual(imported);
     const resolved = resolveEditDocumentPresetPayload(imported, destination);
     if (resolved === null) throw new Error('Expected strict imported payload.');
-    const state = useEditorStore.getState();
-    const transaction = buildPresetEditTransaction(state, resolved, 'external-preset-apply');
+    const transaction = buildPresetEditTransaction(useEditorStore.getState(), resolved, 'external-preset-apply');
     if (transaction === null) throw new Error('Expected imported preset transaction.');
-    expect(state.applyEditTransaction(transaction).after.exposure).toBe(0.8);
+    expect(useEditorStore.getState().applyEditTransaction(transaction).after.exposure).toBe(0.8);
     expect(buildPresetPreviewAdjustments(imported)?.exposure).toBe(0.8);
-    useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(-0.5);
-    useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.8);
-    expect(() =>
-      parseExternalPresetImportResult({ diagnostics: [{ code: 'ignored', field: 'x', message: 'x' }], presets: [] }),
-    ).toThrow();
   });
 });

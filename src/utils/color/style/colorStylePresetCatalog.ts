@@ -1,4 +1,12 @@
+import {
+  EDIT_DOCUMENT_NODE_DESCRIPTORS,
+  type EditDocumentNodeTypeV2,
+  type EditDocumentV2,
+  type EditDocumentV2CopyPayload,
+} from '../../../../packages/rawengine-schema/src/editDocumentV2';
+import type { Preset } from '../../../components/ui/AppProperties';
 import type { ColorStylePreset, ColorStylePresetCatalog } from '../../../schemas/color/colorStylePresetSchemas';
+import { RAPIDRAW_PRESET_FORMAT, RAPIDRAW_PRESET_SCHEMA_VERSION } from '../../editDocumentPreset';
 
 export const COLOR_STYLE_PRESET_CATALOG = {
   version: 1,
@@ -98,3 +106,32 @@ export const COLOR_STYLE_PRESET_CATALOG = {
 } satisfies ColorStylePresetCatalog;
 
 export const BUILT_IN_COLOR_STYLE_PRESETS: Array<ColorStylePreset> = COLOR_STYLE_PRESET_CATALOG.presets;
+
+/** Compile a governed built-in recipe directly into the current RapidRaw preset envelope. */
+export const buildBuiltInColorStylePreset = (preset: ColorStylePreset, destination: EditDocumentV2): Preset => {
+  const nodes: EditDocumentV2CopyPayload['nodes'] = {};
+  for (const descriptor of EDIT_DOCUMENT_NODE_DESCRIPTORS) {
+    if (descriptor.capabilities.preset !== 'creative') continue;
+    const fields = descriptor.legacyFields.filter((field) => Object.hasOwn(preset.adjustmentPatch, field));
+    if (fields.length === 0) continue;
+    const current = destination.nodes[descriptor.nodeType];
+    if (current === undefined) continue;
+    nodes[descriptor.nodeType as EditDocumentNodeTypeV2] = {
+      ...current,
+      params: {
+        ...current.params,
+        ...Object.fromEntries(fields.map((field) => [field, structuredClone(preset.adjustmentPatch[field])])),
+      },
+    };
+  }
+  return {
+    editDocumentV2: { nodes, schemaVersion: 2 },
+    format: RAPIDRAW_PRESET_FORMAT,
+    id: preset.id,
+    includeCropTransform: false,
+    includeMasks: false,
+    name: preset.name,
+    presetType: 'style',
+    schemaVersion: RAPIDRAW_PRESET_SCHEMA_VERSION,
+  };
+};
