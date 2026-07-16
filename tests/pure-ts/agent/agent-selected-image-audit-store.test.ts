@@ -260,6 +260,7 @@ describe('agent selected-image audit store', () => {
       selectedImagePath: record.receipt.selectedImagePath,
       sessionId: record.receipt.sessionId,
     });
+    expect(key).toMatch(/^rawengine\.agent\.selectedImageLiveSessionAudit\.v2\.sha256-/u);
     const { adapter, storage } = keyedMemoryAdapter(key);
 
     await appendAgentSelectedImageLiveSessionAuditRecord(adapter, record);
@@ -285,6 +286,17 @@ describe('agent selected-image audit store', () => {
 
     await expect(appendAgentSelectedImageLiveSessionAuditRecord(adapter, record)).rejects.toThrow();
     expect(storage.has(key)).toBe(false);
+  });
+
+  test('reports a stable new-session recovery reason for corrupt current storage', async () => {
+    const { adapter } = keyedMemoryAdapter('corrupt-current', new Map([['corrupt-current', '{not-json']]));
+    expect(await summarizeAgentSelectedImageLiveSessionAuditStore(adapter)).toEqual({
+      previewCount: 0,
+      recordCount: 0,
+      recoveryReason: 'corrupt_current_storage',
+      recoveryStatus: 'new_session_required',
+      replayPreflightStatus: 'unchecked',
+    });
   });
 
   test('passes replay preflight when current selected image lineage matches', async () => {
