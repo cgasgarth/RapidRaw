@@ -5725,13 +5725,9 @@ fn process_and_get_dynamic_image_inner(
 
     let max_dim = context.limits.max_texture_dimension_2d;
     validate_edit_graph_request(&request)?;
-    let (compiled_edit_graph_fingerprint, execution_abi_fingerprint) = match &request.edit_graph {
-        EditGraphExecutionAuthority::Compiled(graph) => {
-            (graph.fingerprint, graph.execution_abi_fingerprint)
-        }
-        #[cfg(all(test, feature = "tauri-test"))]
-        EditGraphExecutionAuthority::TestOnlyLegacy => (0, 0),
-    };
+    let EditGraphExecutionAuthority::Compiled(graph) = &request.edit_graph;
+    let compiled_edit_graph_fingerprint = graph.fingerprint;
+    let execution_abi_fingerprint = graph.execution_abi_fingerprint;
     if width > max_dim || height > max_dim {
         if capture_post_film.is_some() {
             return Err("film_runtime_proof_gpu_dimensions_unsupported".to_string());
