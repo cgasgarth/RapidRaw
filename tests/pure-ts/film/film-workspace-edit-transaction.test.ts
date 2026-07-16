@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
+import type { EditDocumentNodeTypeV2, EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -16,6 +17,12 @@ const node = (mix: number) => ({
   seedPolicy: 'source_stable_v1' as const,
   workingSpace: 'acescg_linear_v1' as const,
 });
+
+const requiredNode = (document: EditDocumentV2, nodeType: EditDocumentNodeTypeV2) => {
+  const value = document.nodes[nodeType];
+  if (value === undefined) throw new Error(`Expected edit document node ${nodeType}.`);
+  return value;
+};
 
 const seedStore = () => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
@@ -49,7 +56,7 @@ describe('current Film workspace transaction', () => {
     ]);
     expect(result.changedKeys).toEqual(['filmEmulation']);
     expect(result.after.filmEmulation).toEqual(node(0.72));
-    expect(result.afterEditDocumentV2.nodes.film_emulation.params).toEqual({ filmEmulation: node(0.72) });
+    expect(requiredNode(result.afterEditDocumentV2, 'film_emulation').params).toEqual({ filmEmulation: node(0.72) });
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
@@ -80,6 +87,8 @@ describe('current Film workspace transaction', () => {
       buildFilmWorkspaceEditTransactionRequest(current, { filmEmulation: null }, 'remove-film'),
     );
     expect(useEditorStore.getState().adjustmentSnapshot.value.filmEmulation).toBeNull();
-    expect(useEditorStore.getState().editDocumentV2.nodes.film_emulation.params).toEqual({ filmEmulation: null });
+    expect(requiredNode(useEditorStore.getState().editDocumentV2, 'film_emulation').params).toEqual({
+      filmEmulation: null,
+    });
   });
 });

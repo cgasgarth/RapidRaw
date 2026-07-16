@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 
+import type { EditDocumentNodeTypeV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS, INITIAL_MASK_ADJUSTMENTS } from '../../src/utils/adjustments';
@@ -25,7 +26,13 @@ const request = (overrides: Partial<EditTransactionRequest> = {}): EditTransacti
   ...overrides,
 });
 
-beforeEach(() => {
+const requiredNode = (document: EditDocumentV2, nodeType: EditDocumentNodeTypeV2) => {
+  const node = document.nodes[nodeType];
+  if (node === undefined) throw new Error(`Expected edit document node ${nodeType}.`);
+  return node;
+};
+
+const resetEditorState = () => {
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(initial);
   useEditorStore.getState().hydrateEditorRenderAuthority({
@@ -35,7 +42,10 @@ beforeEach(() => {
     historyIndex: 0,
     history: [editDocumentV2],
   });
-});
+};
+
+beforeEach(resetEditorState);
+afterEach(resetEditorState);
 
 describe('reduceEditTransaction', () => {
   test('routes focused tone, camera, calibration, curve, tone-equalizer, point-color, lens, grading, and geometry', () => {
@@ -102,6 +112,7 @@ describe('reduceEditTransaction', () => {
     ]);
 
     const parametricCurve = structuredClone(INITIAL_ADJUSTMENTS.parametricCurve);
+    if (parametricCurve === undefined) throw new Error('Expected initial parametric curve settings.');
     parametricCurve.luma.highlights = 18;
     const sceneCurve = buildAdjustmentMutationOperations(INITIAL_ADJUSTMENTS, {
       ...INITIAL_ADJUSTMENTS,
@@ -269,12 +280,12 @@ describe('reduceEditTransaction', () => {
     });
     expect(result.after.effectsEnabled).toBeFalse();
     expect(result.after.grainAmount).toBe(42);
-    expect(result.afterEditDocumentV2.nodes.display_creative).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['display_creative']).toMatchObject({
       enabled: false,
       params: { grainAmount: 42 },
     });
-    expect(result.afterEditDocumentV2.nodes.display_creative.params).toEqual(
-      result.beforeEditDocumentV2.nodes.display_creative.params,
+    expect(requiredNode(result.afterEditDocumentV2, 'display_creative').params).toEqual(
+      requiredNode(result.beforeEditDocumentV2, 'display_creative').params,
     );
     expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
   });
@@ -298,7 +309,7 @@ describe('reduceEditTransaction', () => {
         expect(result.afterEditDocumentV2.nodes[operation.nodeType]?.enabled).toBeFalse();
       }
     }
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.enabled).toBeTrue();
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']?.enabled).toBeTrue();
     expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
   });
 
@@ -316,13 +327,13 @@ describe('reduceEditTransaction', () => {
     );
 
     expect(result.after).toMatchObject({ exposure: 1.25, vignetteAmount: -20 });
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toMatchObject({
       enabled: false,
       params: { exposure: 1.25 },
     });
-    expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
-    expect(result.afterEditDocumentV2.nodes.detail_denoise_dehaze.enabled).toBeFalse();
-    expect(result.afterEditDocumentV2.nodes.display_creative.enabled).toBeTrue();
+    expect(requiredNode(result.afterEditDocumentV2, 'scene_curve').enabled).toBeFalse();
+    expect(requiredNode(result.afterEditDocumentV2, 'detail_denoise_dehaze').enabled).toBeFalse();
+    expect(requiredNode(result.afterEditDocumentV2, 'display_creative').enabled).toBeTrue();
   });
 
   test('typed-only authority replacement is a real revision with render invalidation', () => {
@@ -349,7 +360,7 @@ describe('reduceEditTransaction', () => {
       noOp: false,
     });
     expect(result.after).toEqual(INITIAL_ADJUSTMENTS);
-    expect(result.afterEditDocumentV2.nodes.scene_curve.enabled).toBeFalse();
+    expect(requiredNode(result.afterEditDocumentV2, 'scene_curve').enabled).toBeFalse();
     expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail']);
   });
 
@@ -394,12 +405,12 @@ describe('reduceEditTransaction', () => {
     );
 
     expect(result.after).toMatchObject({ exposure: 0.75, highlights: -20 });
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.params).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
       exposure: 0.75,
       highlights: -20,
     });
-    expect(result.afterEditDocumentV2.nodes.geometry).toBe(document.nodes.geometry);
-    expect(result.afterEditDocumentV2.nodes.scene_curve).toBe(document.nodes.scene_curve);
+    expect(result.afterEditDocumentV2.nodes['geometry']).toBe(document.nodes['geometry']);
+    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(document.nodes['scene_curve']);
     expect(result.changedKeys).toEqual(['exposure', 'highlights']);
   });
 
@@ -418,10 +429,10 @@ describe('reduceEditTransaction', () => {
     );
 
     expect(result.after).toMatchObject({ crop, rotation: 2.5 });
-    expect(result.afterEditDocumentV2.geometry).toEqual(result.afterEditDocumentV2.nodes.geometry?.params);
+    expect(requiredNode(result.afterEditDocumentV2, 'geometry').params).toEqual(result.afterEditDocumentV2.geometry);
     expect(result.afterEditDocumentV2.geometry).toMatchObject({ crop, rotation: 2.5 });
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone).toBe(document.nodes.scene_global_color_tone);
-    expect(result.afterEditDocumentV2.nodes.layers).toBe(document.nodes.layers);
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(document.nodes['scene_global_color_tone']);
+    expect(result.afterEditDocumentV2.nodes['layers']).toBe(document.nodes['layers']);
     expect(result.invalidatedStages).toEqual(['preview', 'navigator', 'thumbnail', 'geometry']);
   });
 
@@ -451,7 +462,7 @@ describe('reduceEditTransaction', () => {
     expect(result.after).toMatchObject({ brightness: 0, clarity: 18, contrast: 0, glowAmount: 16 });
     expect(result.after.masks).toEqual(before.masks);
     expect(result.after.levels).toEqual(before.levels);
-    expect(result.afterEditDocumentV2.nodes.scene_global_color_tone?.params).toMatchObject({
+    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
       brightness: 0,
       contrast: 0,
     });
@@ -474,7 +485,7 @@ describe('reduceEditTransaction', () => {
     const hydrated = useEditorStore.getState();
 
     expect(hydrated.adjustmentSnapshot.editDocumentV2).toBe(hydrated.editDocumentV2);
-    expect(hydrated.editDocumentV2.nodes.detail_denoise_dehaze?.params.clarity).toBe(18);
+    expect(hydrated.editDocumentV2.nodes['detail_denoise_dehaze']?.params['clarity']).toBe(18);
     expect(hydrated.adjustmentSnapshot.value.glowAmount).toBe(16);
 
     const afterReset = { ...hydrated.adjustmentSnapshot.value, brightness: 0, contrast: 0 };
@@ -620,7 +631,7 @@ describe('reduceEditTransaction', () => {
 
     expect(result.afterEditDocumentV2).toBe(state.editDocumentV2);
     expect(state.adjustmentSnapshot.editDocumentV2).toBe(state.editDocumentV2);
-    expect(state.adjustmentSnapshot.editDocumentV2.nodes.scene_global_color_tone?.params.exposure).toBe(1.25);
+    expect(state.adjustmentSnapshot.editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(1.25);
     expect(state.adjustmentSnapshot.value.exposure).toBe(1.25);
   });
 
@@ -696,8 +707,8 @@ describe('reduceEditTransaction', () => {
       },
     ]);
     expect(request.operations.some((operation) => operation.type === 'replace-adjustments')).toBe(false);
-    expect(result.afterEditDocumentV2.layers).toEqual({ masks: next.masks });
-    expect(result.afterEditDocumentV2.nodes.layers?.params).toEqual(result.afterEditDocumentV2.layers);
+    expect(result.afterEditDocumentV2.layers).toEqual(legacyAdjustmentsToEditDocumentV2(next).layers);
+    expect(requiredNode(result.afterEditDocumentV2, 'layers').params).toEqual(result.afterEditDocumentV2.layers);
 
     expect(result.applicationReceipt).toMatchObject({
       transactionId: 'layer-persist-1',
