@@ -7,6 +7,13 @@ const payload = {
   height: 1200,
   imageSession: 5,
   path: '/fixtures/current.raw',
+  presentationHealth: {
+    contentFingerprint: `sha256:${'a'.repeat(64)}`,
+    maxChroma: 0.25,
+    maxLuminance: 0.75,
+    sampleCount: 25,
+    visibleSampleCount: 24,
+  },
   previewOperationIdentity: {
     generation: 9,
     kind: 'settled' as const,
@@ -45,5 +52,15 @@ describe('WGPU frame-ready event contract', () => {
   test('rejects empty native surfaces before they can publish ready', () => {
     expect(() => parseWgpuFrameReadyPayload({ ...payload, width: 0 })).toThrow();
     expect(() => parseWgpuFrameReadyPayload({ ...payload, height: 0 })).toThrow();
+  });
+
+  test('requires bounded native content evidence on every frame receipt', () => {
+    expect(() => parseWgpuFrameReadyPayload({ ...payload, presentationHealth: undefined })).toThrow();
+    expect(() =>
+      parseWgpuFrameReadyPayload({
+        ...payload,
+        presentationHealth: { ...payload.presentationHealth, visibleSampleCount: 26 },
+      }),
+    ).toThrow();
   });
 });

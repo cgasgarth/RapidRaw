@@ -3,7 +3,9 @@ import { describe, expect, test } from 'bun:test';
 import type { PreviewQualityStatus } from '../../../src/utils/adaptivePreviewQuality';
 import type { PreviewOperationIdentity } from '../../../src/utils/previewCoordinator';
 import {
+  isVisibleWgpuPresentation,
   WgpuFramePresentationAuthority,
+  type WgpuPresentationHealth,
   type WgpuPreviewCommit,
 } from '../../../src/utils/wgpuFramePresentationAuthority';
 
@@ -52,18 +54,26 @@ const commit = (identity: PreviewOperationIdentity): WgpuPreviewCommit => ({
   renderedPreviewResolution: identity.session.targetWidth,
 });
 
+const healthy: WgpuPresentationHealth = {
+  contentFingerprint: `sha256:${'a'.repeat(64)}`,
+  maxChroma: 0.4,
+  maxLuminance: 0.8,
+  sampleCount: 25,
+  visibleSampleCount: 24,
+};
+
 describe('WGPU frame presentation authority', () => {
   test('commits only after the accepted operation and native frame receipt join exactly in either order', () => {
     const authority = new WgpuFramePresentationAuthority();
     const identity = operation();
     authority.installImageSession({ imageSessionId: 1, sourceImagePath: '/fixtures/a.raw' });
 
-    expect(authority.recordFrameReady(identity)).toBeNull();
+    expect(authority.recordFrameReady(identity, healthy)).toBeNull();
     expect(authority.acceptPreview(commit(identity))).toEqual(commit(identity));
 
     const successor = operation({ generation: 2, operationId: 2 });
     expect(authority.acceptPreview(commit(successor))).toBeNull();
-    expect(authority.recordFrameReady(successor)).toEqual(commit(successor));
+    expect(authority.recordFrameReady(successor, healthy)).toEqual(commit(successor));
   });
 
   test('rejects a delayed same-path frame from the previous reopen session', () => {
@@ -79,8 +89,8 @@ describe('WGPU frame presentation authority', () => {
     expect(authority.acceptPreview(commit(previous))).toBeNull();
     authority.installImageSession({ imageSessionId: 2, sourceImagePath: '/fixtures/a.raw' });
     expect(authority.acceptPreview(commit(reopened))).toBeNull();
-    expect(authority.recordFrameReady(previous)).toBeNull();
-    expect(authority.recordFrameReady(reopened)).toEqual(commit(reopened));
+    expect(authority.recordFrameReady(previous, healthy)).toBeNull();
+    expect(authority.recordFrameReady(reopened, healthy)).toEqual(commit(reopened));
   });
 
   test('keeps the CPU fallback authoritative across zoom until the new viewport frame is exact', () => {
@@ -100,7 +110,22 @@ describe('WGPU frame presentation authority', () => {
     authority.installImageSession({ imageSessionId: 1, sourceImagePath: '/fixtures/a.raw' });
 
     expect(authority.acceptPreview(commit(zoom))).toBeNull();
-    expect(authority.recordFrameReady(fit)).toBeNull();
-    expect(authority.recordFrameReady(zoom)).toEqual(commit(zoom));
+    expect(authority.recordFrameReady(fit, healthy)).toBeNull();
+    expect(authority.recordFrameReady(zoom, healthy)).toEqual(commit(zoom));
+  });
+
+  test('retains the current CPU fallback for black, empty, and invalid native presentation proof', () => {
+    const authority = new WgpuFramePresentationAuthority();
+    const identity = operation();
+    authority.installImageSession({ imageSessionId: 1, sourceImagePath: '/fixtures/a.raw' });
+    expect(authority.acceptPreview(commit(identity))).toBeNull();
+
+    const black = { ...healthy, maxChroma: 0, maxLuminance: 0, visibleSampleCount: 0 };
+    expect(isVisibleWgpuPresentation(black)).toBeFalse();
+    expect(authority.recordFrameReady(identity, black)).toBeNull();
+    expect(authority.recordFrameReady(identity, { ...black, sampleCount: 0 })).toBeNull();
+    expect(authority.recordFrameReady(identity, { ...healthy, maxLuminance: Number.NaN })).toBeNull();
+
+    expect(authority.recordFrameReady(identity, healthy)).toEqual(commit(identity));
   });
 });
