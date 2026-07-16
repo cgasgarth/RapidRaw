@@ -30,11 +30,11 @@
     }
   },
   "approval": {
-    "approvedAt": "2026-07-14T22:44:18Z",
-    "approvalCommit": "5601121e377b9b10098b95ac7a27a5d8d7cee2a1",
+    "approvedAt": "2026-07-16T03:13:19Z",
+    "approvalCommit": "850af6fe72256d0f87c97098de463ba319858ffb",
     "issueUrl": "https://github.com/cgasgarth/RapidRaw/issues/5024",
-    "prUrl": "https://github.com/cgasgarth/RapidRaw/pull/5734",
-    "reason": "Initial governed analytic, deterministic grain, and optical release baselines approved with production-path evidence.",
+    "prUrl": "https://github.com/cgasgarth/RapidRaw/pull/6003",
+    "reason": "Approved governed analytic, deterministic grain, optical, preview/export parity, and sRGB/Display-P3 output baselines with production-path evidence.",
     "reviewer": "repository-owner:cgasgarth"
   },
   "releasePolicy": {
