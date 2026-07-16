@@ -88,6 +88,27 @@ describe('EditDocumentV2 camera and detail migrations', () => {
         },
       }),
     ).toThrow();
+    for (const invalidWhiteBalance of [
+      { ...INITIAL_ADJUSTMENTS.whiteBalanceTechnical, mode: 'auto', source: 'user' },
+      { ...INITIAL_ADJUSTMENTS.whiteBalanceTechnical, mode: 'preset', source: 'preset', presetId: null },
+      {
+        ...INITIAL_ADJUSTMENTS.whiteBalanceTechnical,
+        synchronization: { mode: 'locked_reference', referenceSourceIdentity: null },
+      },
+    ]) {
+      expect(() =>
+        editDocumentV2Schema.parse({
+          ...document,
+          nodes: {
+            ...document.nodes,
+            camera_input: {
+              ...cameraNode,
+              params: { ...cameraNode.params, whiteBalanceTechnical: invalidWhiteBalance },
+            },
+          },
+        }),
+      ).toThrow();
+    }
     expect(() =>
       editDocumentV2Schema.parse({
         ...document,

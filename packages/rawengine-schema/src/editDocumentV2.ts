@@ -6,6 +6,7 @@ import { levelsSettingsSchema } from './color/levelsSchemas.js';
 import { perceptualGradingSettingsV1Schema } from './color/perceptualGradingSchemas.js';
 import { pointColorPlanV1Schema } from './color/pointColorSchemas.js';
 import { selectiveColorMixerSettingsSchema } from './color/selectiveColorMixerSchemas.js';
+import { technicalWhiteBalanceV1Schema } from './color/whiteBalanceSchemas.js';
 import { filmEmulationNodeV1Schema } from './film/filmEmulationSchemas.js';
 import { perspectiveCorrectionSettingsSchema } from './geometry/perspective/perspectiveSchemas.js';
 import {
@@ -1169,29 +1170,7 @@ export const editDocumentJsonValueSchema: z.ZodType<EditDocumentJsonValue> = z.l
   ]),
 );
 
-export const editDocumentTechnicalWhiteBalanceV2Schema = z
-  .object({
-    adaptation: z.literal('cat16_v1'),
-    confidence: z.number().finite().min(0).max(1).nullable(),
-    contract: z.literal('rapidraw.white_balance.v1'),
-    duv: z.number().finite().min(-0.05).max(0.05),
-    inputSemantics: z.enum(['raw_scene_linear', 'rendered_scene_linear_approximation']),
-    kelvin: z.number().finite().min(1667).max(25000),
-    mode: z.enum(['as_shot', 'auto', 'kelvin_tint', 'chromaticity', 'preset']),
-    presetId: z.enum(['tungsten', 'daylight', 'flash', 'cloudy', 'shade']).nullable(),
-    sampleCount: z.number().int().nonnegative().nullable(),
-    source: z.enum(['as_shot', 'auto', 'picker', 'preset', 'user']),
-    synchronization: z
-      .object({
-        mode: z.enum(['per_image', 'locked_reference']),
-        referenceSourceIdentity: z.string().trim().min(1).nullable(),
-      })
-      .strict(),
-    x: z.number().finite().gt(0).lt(1),
-    y: z.number().finite().gt(0).lt(1),
-  })
-  .strict()
-  .refine(({ x, y }) => x + y < 1, { message: 'Chromaticity x+y must be below one.' });
+export const editDocumentTechnicalWhiteBalanceV2Schema = technicalWhiteBalanceV1Schema;
 
 export const editDocumentCameraInputV2Schema = z
   .object({
