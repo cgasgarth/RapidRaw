@@ -121,6 +121,9 @@ const waitForDaemonState = async (
     await Bun.sleep(25);
   }
   await stopChild(child);
+  if (child.stderr === undefined || typeof child.stderr === 'number') {
+    throw new Error('QA daemon stderr pipe was unavailable.');
+  }
   const stderr = await new Response(child.stderr).text();
   throw new Error(`Daemon failed to publish state.${stderr.trim() === '' ? '' : `\n${stderr.slice(-2_000)}`}`);
 };

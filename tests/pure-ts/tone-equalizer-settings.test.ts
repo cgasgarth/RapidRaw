@@ -32,7 +32,7 @@ describe('tone equalizer settings lifecycle', () => {
   });
 
   test('round-trips valid settings and quarantines malformed sidecar state', () => {
-    const validBandEv = [0, 0, -0.5, 0.25, 1, 0, 0, 0, 0] as const;
+    const validBandEv: Adjustments['toneEqualizer']['bandEv'] = [0, 0, -0.5, 0.25, 1, 0, 0, 0, 0];
     const loaded = normalizeLoadedAdjustments({
       ...INITIAL_ADJUSTMENTS,
       rawEngineEditGraphVersion: 2,

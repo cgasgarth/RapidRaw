@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { type Browser, chromium, type Page } from '@playwright/test';
 import { z } from 'zod';
 import { allocateFreeTcpPort } from '../lib/dev-server-port';
+import { installBrowserProofNetworkBoundary } from './browser-network-boundary';
 import type { QaDaemonJob, QaLifecycleAdapter } from './daemon-engine';
 import type { QaDaemonMetrics } from './daemon-model';
 import type { QaArtifactRecord, QaPerformanceSpan, QaScenarioResult } from './model';
@@ -251,6 +252,7 @@ export function createBrowserLifecycleAdapter(
           if (message.type() === 'error' && !isExpectedOfflineHarnessMessage(message.text()))
             errors.push(message.text());
         });
+        await installBrowserProofNetworkBoundary(page);
         await page.route('https://api.github.com/repos/CyberTimon/RapidRAW/releases/latest', (route) =>
           route.fulfill({ json: { tag_name: 'v0.0.0-qa' }, status: 200 }),
         );

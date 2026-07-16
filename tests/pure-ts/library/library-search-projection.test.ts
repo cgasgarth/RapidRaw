@@ -105,7 +105,7 @@ describe('library query journeys', () => {
   ];
   const ratings = Object.fromEntries(fixtures.map((fixture) => [fixture.path, fixture.rating]));
 
-  test.each([
+  const behaviorCases: Array<[string, SearchCriteria, FilterCriteria, SortCriteria, string[]]> = [
     [
       'rating descending',
       noSearch,
@@ -168,7 +168,8 @@ describe('library query journeys', () => {
       ['/a/duplicate.JPG', '/pair/frame.ARW', '/pair/frame.ARW?vc=1', '/pair/frame.JPG'],
     ],
     ['focal search', { tags: ['mm>=85'], text: '', mode: 'AND' }, allFilter, nameSort, ['/b/duplicate.ARW']],
-  ] as const)('%s', (_name, searchCriteria, filterCriteria, sortCriteria, expected) => {
+  ];
+  test.each(behaviorCases)('%s', (_name, searchCriteria, filterCriteria, sortCriteria, expected) => {
     expect(run(fixtures, ratings, searchCriteria, filterCriteria, sortCriteria)).toEqual(expected);
   });
 
