@@ -18,7 +18,7 @@ import {
   applyAgentColor,
 } from '../../../../src/utils/agent/tools/agentColorApplyTool.ts';
 import { buildTechnicalWhiteBalance } from '../../../../src/utils/color/whiteBalance.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../../src/utils/profileTonePresets.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
@@ -81,7 +81,7 @@ const colorResultSchema = z
   })
   .passthrough();
 
-const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+const editDocumentV2 = createDefaultEditDocumentV2();
 useEditorStore.getState().hydrateEditorRenderAuthority({
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-color-before',
@@ -264,8 +264,8 @@ if (dryRunDispatch.dispatchStatus !== 'completed') throw new Error('agent color 
 if (
   dryRunStateAfter.historyIndex !== dryRunStateBefore.historyIndex ||
   dryRunStateAfter.history.length !== dryRunStateBefore.history.length ||
-  dryRunStateAfter.adjustmentSnapshot.value.hsl.oranges.saturation !==
-    dryRunStateBefore.adjustmentSnapshot.value.hsl.oranges.saturation ||
+  dryRunStateAfter.editDocumentV2.nodes['selective_color_mixer']!.params['hsl'].oranges.saturation !==
+    dryRunStateBefore.editDocumentV2.nodes['selective_color_mixer']!.params['hsl'].oranges.saturation ||
   dryRunStateAfter.uncroppedAdjustedPreviewUrl !== dryRunStateBefore.uncroppedAdjustedPreviewUrl
 ) {
   throw new Error('agent color typed HSL dry-run mutated live editor state.');
@@ -345,28 +345,48 @@ const afterSnapshot = buildAgentImageContextSnapshot();
 const colorMutationFailures = [
   [
     'whiteBalanceTechnical',
-    isDeepStrictEqual(state.adjustmentSnapshot.value.whiteBalanceTechnical, agentWhiteBalance),
+    isDeepStrictEqual(state.editDocumentV2.nodes['camera_input']!.params['whiteBalanceTechnical'], agentWhiteBalance),
     true,
   ],
-  ['vibrance', state.adjustmentSnapshot.value.vibrance, 14],
-  ['hsl.oranges.saturation', state.adjustmentSnapshot.value.hsl.oranges.saturation, 12],
-  ['colorGrading.highlights.saturation', state.adjustmentSnapshot.value.colorGrading.highlights.saturation, 7],
-  ['colorBalanceRgb.highlights.red', state.adjustmentSnapshot.value.colorBalanceRgb.highlights.red, 6],
-  ['channelMixer.red.red', state.adjustmentSnapshot.value.channelMixer.red.red, 104],
-  ['blackWhiteMixer.weights.oranges', state.adjustmentSnapshot.value.blackWhiteMixer.weights.oranges, 12],
-  ['cameraProfile', state.adjustmentSnapshot.value.cameraProfile, 'camera_portrait'],
-  ['colorCalibration.redSaturation', state.adjustmentSnapshot.value.colorCalibration.redSaturation, 8],
-  ['skinToneUniformity.hueUniformity', state.adjustmentSnapshot.value.skinToneUniformity.hueUniformity, 0.38],
+  ['vibrance', state.editDocumentV2.nodes['color_presence']!.params['vibrance'], 14],
+  ['hsl.oranges.saturation', state.editDocumentV2.nodes['selective_color_mixer']!.params['hsl'].oranges.saturation, 12],
+  [
+    'colorGrading.highlights.saturation',
+    state.editDocumentV2.nodes['perceptual_grading']!.params['colorGrading'].highlights.saturation,
+    7,
+  ],
+  [
+    'colorBalanceRgb.highlights.red',
+    state.editDocumentV2.nodes['color_balance_rgb']!.params['colorBalanceRgb'].highlights.red,
+    6,
+  ],
+  ['channelMixer.red.red', state.editDocumentV2.nodes['channel_mixer']!.params['channelMixer'].red.red, 104],
+  [
+    'blackWhiteMixer.weights.oranges',
+    state.editDocumentV2.nodes['black_white_mixer']!.params['blackWhiteMixer'].weights.oranges,
+    12,
+  ],
+  ['cameraProfile', state.editDocumentV2.nodes['camera_input']!.params['cameraProfile'], 'camera_portrait'],
+  [
+    'colorCalibration.redSaturation',
+    state.editDocumentV2.nodes['color_calibration']!.params['colorCalibration'].redSaturation,
+    8,
+  ],
+  [
+    'skinToneUniformity.hueUniformity',
+    state.editDocumentV2.nodes['skin_tone_uniformity']!.params['skinToneUniformity'].hueUniformity,
+    0.38,
+  ],
   [
     'selectiveColorRangeControls.oranges.widthDegrees',
-    state.adjustmentSnapshot.value.selectiveColorRangeControls.oranges.widthDegrees,
+    state.editDocumentV2.nodes['selective_color_mixer']!.params['selectiveColorRangeControls'].oranges.widthDegrees,
     42,
   ],
-  ['toneCurve', state.adjustmentSnapshot.value.toneCurve, 'soft_contrast'],
-  ['curveMode', state.adjustmentSnapshot.value.curveMode, 'parametric'],
+  ['toneCurve', state.editDocumentV2.nodes['scene_curve']!.params['toneCurve'], 'soft_contrast'],
+  ['curveMode', state.editDocumentV2.nodes['scene_curve']!.params['curveMode'], 'parametric'],
   [
     'parametricCurve.luma.highlights',
-    state.adjustmentSnapshot.value.parametricCurve.luma.highlights,
+    state.editDocumentV2.nodes['scene_curve']!.params['parametricCurve'].luma.highlights,
     TONE_CURVE_PARAMETRIC_PRESETS.soft_contrast.highlights,
   ],
 ].filter(([, actual, expected]) => actual !== expected);
@@ -386,11 +406,11 @@ if (
   throw new Error('agent.color.apply did not publish one source-bound EditTransaction receipt.');
 }
 if (
-  state.editDocumentV2.nodes.camera_input?.params.cameraProfile !== 'camera_portrait' ||
-  state.editDocumentV2.nodes.camera_input.params.whiteBalanceTechnical.kelvin !== agentWhiteBalance.kelvin ||
-  state.editDocumentV2.nodes.camera_input.params.whiteBalanceTechnical.duv !== agentWhiteBalance.duv ||
-  state.editDocumentV2.nodes.perceptual_grading?.params.colorGrading.highlights.saturation !== 7 ||
-  state.editDocumentV2.nodes.color_presence?.params.saturation !== 5
+  state.editDocumentV2.nodes.camera_input?.params['cameraProfile'] !== 'camera_portrait' ||
+  state.editDocumentV2.nodes.camera_input.params['whiteBalanceTechnical'].kelvin !== agentWhiteBalance.kelvin ||
+  state.editDocumentV2.nodes.camera_input.params['whiteBalanceTechnical'].duv !== agentWhiteBalance.duv ||
+  state.editDocumentV2.nodes.perceptual_grading?.params['colorGrading'].highlights.saturation !== 7 ||
+  state.editDocumentV2.nodes.color_presence?.params['saturation'] !== 5
 ) {
   throw new Error('agent.color.apply did not update canonical color nodes.');
 }

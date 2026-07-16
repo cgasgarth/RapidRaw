@@ -215,7 +215,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
   const [rollbackSnapshot, setRollbackSnapshot] = useState<AgentRollbackSnapshot | null>(null);
   const rollbackValidationKey = useEditorStore((state) =>
     JSON.stringify({
-      adjustments: state.adjustmentSnapshot.value,
+      adjustments: state.editDocumentV2,
       finalPreviewUrl: state.finalPreviewUrl,
       historyIndex: state.historyIndex,
       selectedImagePath: state.selectedImage?.path ?? null,
@@ -467,7 +467,7 @@ function LivePromptComposer({ isContextReady, onSessionEvent }: LivePromptCompos
         requestId: `${requestId}-lifecycle`,
         reviewedCommand: buildAgentReviewedAdjustmentCommandPlan({
           commandId: DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
-          sourceAdjustments: useEditorStore.getState().adjustmentSnapshot.value,
+          sourceEditDocumentV2: useEditorStore.getState().editDocumentV2,
         }).receipt,
         sessionId: dryRunReceipt.sessionId,
       });

@@ -1,4 +1,3 @@
-import type { Adjustments } from './adjustments';
 import { OriginalPreviewEffectRunner, type OriginalPreviewEffectRunnerOptions } from './originalPreviewEffectRunner';
 import type { PreviewCoordinatorEffect, PreviewSchedulingOriginalRequest } from './previewCoordinator';
 import type { PreviewRequestScopeSnapshot } from './previewRequestScopeAdapter';
@@ -30,7 +29,7 @@ export class PreviewOriginalCompareAdapter {
     return {
       request: {
         expectedImagePath: scope.session.sourceImagePath,
-        jsAdjustments: structuredClone(scope.renderSnapshot.value as Adjustments),
+        editDocumentV2: structuredClone(scope.renderSnapshot.editDocumentV2),
         targetResolution: scope.session.targetWidth,
         viewerSampleGraphRevision: scope.session.graphRevision,
       },

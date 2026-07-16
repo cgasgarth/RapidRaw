@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 
-import type { Adjustments } from '../utils/adjustments';
+import { selectEditDocumentLayers, selectEditDocumentSourceArtifacts } from '../utils/editDocumentSelectors';
 import { Invokes } from './commands';
 
 const finite = z.number().finite();
@@ -56,7 +57,7 @@ export type PreviewGeometryIdentity = Readonly<{
 export interface PreviewGeometryRequest {
   sourceIdentity: string;
   params: PreviewGeometryParams;
-  adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   showLines: boolean;
   target?: PreviewGeometryTarget;
 }
@@ -93,9 +94,9 @@ const fnv1a32 = (value: string): string => {
 
 const revisionOf = (value: unknown): string => fnv1a32(JSON.stringify(stableValue(value)));
 
-const retouchAuthority = (adjustments: Adjustments) => ({
-  aiPatches: adjustments.aiPatches,
-  masks: adjustments.masks.filter(
+const retouchAuthority = (document: EditDocumentV2) => ({
+  aiPatches: selectEditDocumentSourceArtifacts(document).aiPatches,
+  masks: selectEditDocumentLayers(document).masks.filter(
     (mask) => mask.retouchCloneSource !== undefined || mask.retouchRemoveSource !== undefined,
   ),
 });
@@ -106,7 +107,7 @@ export const buildPreviewGeometryIdentity = (request: PreviewGeometryRequest): P
   return Object.freeze({
     sourceIdentity: z.string().min(1).parse(request.sourceIdentity),
     geometryRevision: revisionOf(params),
-    retouchRevision: revisionOf(retouchAuthority(request.adjustments)),
+    retouchRevision: revisionOf(retouchAuthority(request.editDocumentV2)),
     target,
   });
 };
@@ -115,7 +116,7 @@ export const toPreviewGeometryInvokeArgs = (request: PreviewGeometryRequest) => 
   const target = previewGeometryTargetSchema.parse(request.target ?? DEFAULT_TARGET);
   return {
     params: previewGeometryParamsSchema.parse(request.params),
-    jsAdjustments: request.adjustments,
+    editDocumentV2: request.editDocumentV2,
     showLines: z.boolean().parse(request.showLines),
     target,
   };

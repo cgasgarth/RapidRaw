@@ -17,11 +17,17 @@ import {
 import { type ReactElement, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
+import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import { editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import AdjustmentSlider from '../../components/adjustments/AdjustmentSlider';
 import { AutoEditReviewPopover } from '../../components/adjustments/AutoEditReviewPopover';
 import ColorPanel from '../../components/adjustments/Color';
 import ColorWheel from '../../components/adjustments/ColorWheel';
-import DetailsPanel from '../../components/adjustments/Details';
+import type { AdjustmentUpdate, ColorPanelAdjustmentView } from '../../components/adjustments/color/types';
+import DetailsPanel, {
+  type DetailAdjustmentUpdate,
+  type DetailAdjustmentView,
+} from '../../components/adjustments/Details';
 import EffectsPanel from '../../components/adjustments/Effects';
 import { FilmEmulationWorkspace } from '../../components/film/FilmEmulationWorkspace';
 import FocusStackModal from '../../components/modals/computational-merge/FocusStackModal';
@@ -45,6 +51,7 @@ import type { ViewerRetouchCommand } from '../../components/panel/editor/viewerR
 import AgentChatShell from '../../components/panel/right/ai/AgentChatShell';
 import { AgentPanel } from '../../components/panel/right/ai/AgentPanel';
 import { TetherPanel } from '../../components/panel/right/capture/TetherPanel';
+import { selectColorPanelAdjustmentView } from '../../components/panel/right/color/ColorWorkspacePanel';
 import ControlsPanel from '../../components/panel/right/color/ControlsPanel';
 import CropPanel from '../../components/panel/right/color/CropPanel';
 import { EditorRightPanelHost } from '../../components/panel/right/EditorRightPanelHost';
@@ -121,7 +128,13 @@ import { agentChatTranscriptFixture } from '../../utils/agent/session/agentChatT
 import { buildTechnicalWhiteBalance } from '../../utils/color/whiteBalance';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detail/detailOutputComparisonProof';
-import { copyEditDocumentV2Nodes, legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
+import {
+  copyEditDocumentV2Nodes,
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  setEditDocumentV2NodeEnabled,
+} from '../../utils/editDocumentV2';
 import { buildFocusStackOutputReviewWorkflow } from '../../utils/focusStackOutputReview';
 import { buildHdrBracketPreflight, type HdrBracketPreflightSourceMetadata } from '../../utils/hdrBracketPreflight';
 import {
@@ -138,6 +151,43 @@ import { VISUAL_SMOKE_PROOF_TEST_IDS, VISUAL_SMOKE_SCENARIO_IDS, type VisualSmok
 const ignoreInitialMaskDrawCommit = (_command: ViewerInitialMaskDrawCommand): void => {};
 const ignoreParametricMaskTargetCommit = (_command: ViewerParametricMaskTargetCommand): void => {};
 const ignoreRetouchCommand = (_command: ViewerRetouchCommand): void => {};
+
+interface VisualEditDocumentSeed {
+  detail?: Partial<EditDocumentNodeParamsV2<'detail_denoise_dehaze'>>;
+  displayCreative?: Partial<EditDocumentNodeParamsV2<'display_creative'>>;
+  displayCreativeEnabled?: boolean;
+  filmEmulation?: Partial<EditDocumentNodeParamsV2<'film_emulation'>>;
+  geometry?: Partial<EditDocumentNodeParamsV2<'geometry'>>;
+  layers?: { masks: readonly MaskContainer[] };
+  lumaLevels?: Partial<EditDocumentNodeParamsV2<'luma_levels'>>;
+  sceneGlobalColorTone?: Partial<EditDocumentNodeParamsV2<'scene_global_color_tone'>>;
+}
+
+const createVisualEditDocument = (seed: VisualEditDocumentSeed = {}): EditDocumentV2 => {
+  let document = createDefaultEditDocumentV2();
+  if (seed.sceneGlobalColorTone !== undefined) {
+    document = patchEditDocumentV2Node(document, 'scene_global_color_tone', seed.sceneGlobalColorTone);
+  }
+  if (seed.detail !== undefined) {
+    document = patchEditDocumentV2Node(document, 'detail_denoise_dehaze', seed.detail);
+  }
+  if (seed.displayCreative !== undefined) {
+    document = patchEditDocumentV2Node(document, 'display_creative', seed.displayCreative);
+  }
+  if (seed.displayCreativeEnabled !== undefined) {
+    document = setEditDocumentV2NodeEnabled(document, 'display_creative', seed.displayCreativeEnabled);
+  }
+  if (seed.filmEmulation !== undefined) {
+    document = patchEditDocumentV2Node(document, 'film_emulation', seed.filmEmulation);
+  }
+  if (seed.geometry !== undefined) document = patchEditDocumentV2Node(document, 'geometry', seed.geometry);
+  if (seed.layers !== undefined) {
+    const layers = editDocumentLayersV2Schema.parse({ ...document.layers, masks: seed.layers.masks });
+    document = patchEditDocumentV2Node(document, 'layers', layers);
+  }
+  if (seed.lumaLevels !== undefined) document = patchEditDocumentV2Node(document, 'luma_levels', seed.lumaLevels);
+  return document;
+};
 
 type VisualToolRuntimeOverrides = Partial<Omit<ViewerToolRuntimeDescriptor, 'commands' | 'compare' | 'crop'>> & {
   readonly commands?: Partial<ViewerToolRuntimeDescriptor['commands']>;
@@ -399,31 +449,27 @@ const adjustmentsPanelRetuneRawImage: SelectedImage = {
 
 function useAdjustmentPanelSmokeState() {
   const [isReady] = useState(() => {
-    const adjustments: Adjustments = {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      brightness: 0.42,
-      clarity: 18,
-      contrast: 12,
-      glowAmount: 16,
-      effectsEnabled: false,
-      levels: {
-        ...INITIAL_ADJUSTMENTS.levels,
-        inputBlack: 0.06,
-        inputWhite: 0.92,
-      },
-    };
-    useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
-      copiedSectionAdjustments: {
-        section: 'basic',
-        values: {
-          brightness: adjustments.brightness,
-          contrast: adjustments.contrast,
-          exposure: adjustments.exposure,
+    const editDocumentV2 = createVisualEditDocument({
+      detail: { clarity: 18 },
+      displayCreative: { glowAmount: 16 },
+      displayCreativeEnabled: false,
+      lumaLevels: {
+        levels: {
+          ...INITIAL_ADJUSTMENTS.levels,
+          inputBlack: 0.06,
+          inputWhite: 0.92,
         },
       },
+      sceneGlobalColorTone: { brightness: 0.42, contrast: 12 },
+    });
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      editDocumentV2,
+      copiedSectionAdjustments: {
+        payload: copyEditDocumentV2Nodes(editDocumentV2, ['scene_global_color_tone']),
+        section: 'basic',
+      },
       histogram: null,
-      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
+      history: [editDocumentV2],
       historyIndex: 0,
       isWaveformVisible: false,
       previewScopeStatus: null,
@@ -1189,23 +1235,29 @@ const professionalFilmstripContextStatus = 'bottom bar';
 
 function useProfessionalEditorToolbarSmokeState() {
   useEffect(() => {
-    const initial = structuredClone(INITIAL_ADJUSTMENTS);
-    const exposure = { ...initial, exposure: 0.42 };
-    const crop = { ...exposure, crop: { x: 0.06, y: 0.08, width: 0.88, height: 0.78 } };
-    const masks = {
-      ...crop,
-      masks: [
-        {
-          adjustments: { ...INITIAL_MASK_ADJUSTMENTS, clarity: 14, exposure: 0.2 },
-          id: 'visual-smoke-mask-1',
-          invert: false,
-          name: 'Face dodge',
-          opacity: 78,
-          subMasks: [] as SubMask[],
-          visible: true,
-        },
-      ] as MaskContainer[],
-    };
+    const initial = createVisualEditDocument();
+    const exposure = createVisualEditDocument({ sceneGlobalColorTone: { exposure: 0.42 } });
+    const crop = createVisualEditDocument({
+      geometry: { crop: { height: 0.78, unit: 'normalized', width: 0.88, x: 0.06, y: 0.08 } },
+      sceneGlobalColorTone: { exposure: 0.42 },
+    });
+    const masks = createVisualEditDocument({
+      geometry: { crop: { height: 0.78, unit: 'normalized', width: 0.88, x: 0.06, y: 0.08 } },
+      layers: {
+        masks: [
+          {
+            adjustments: { ...INITIAL_MASK_ADJUSTMENTS, clarity: 14, exposure: 0.2 },
+            id: 'visual-smoke-mask-1',
+            invert: false,
+            name: 'Face dodge',
+            opacity: 78,
+            subMasks: [] as SubMask[],
+            visible: true,
+          },
+        ] as MaskContainer[],
+      },
+      sceneGlobalColorTone: { exposure: 0.42 },
+    });
 
     useSettingsStore.setState({
       appSettings: {
@@ -1243,7 +1295,7 @@ function useProfessionalEditorToolbarSmokeState() {
       osPlatform: 'macos',
     });
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(crop),
+      editDocumentV2: crop,
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform: {
         blackPointCompensation: 'enabled',
@@ -1256,7 +1308,7 @@ function useProfessionalEditorToolbarSmokeState() {
         transformApplied: true,
         transformPolicyFingerprint: 'sha256:professional-editor-toolbar-smoke',
       },
-      history: [initial, exposure, crop, masks].map(legacyAdjustmentsToEditDocumentV2),
+      history: [initial, exposure, crop, masks],
       historyIndex: 2,
       isExportSoftProofEnabled: true,
       selectedImage: professionalEditorToolbarImage,
@@ -1270,12 +1322,12 @@ function useProfessionalEditorToolbarSmokeState() {
 
 function useProfessionalEditorSmokeState() {
   useEffect(() => {
-    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    const editDocumentV2 = createVisualEditDocument();
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
+      editDocumentV2,
       displaySize: { height: 540, width: 810 },
       histogram: null,
-      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
+      history: [editDocumentV2],
       historyIndex: 0,
       isWaveformVisible: false,
       originalSize: { height: professionalEditorShellImage.height, width: professionalEditorShellImage.width },
@@ -1292,19 +1344,15 @@ function useProfessionalEditorSmokeState() {
 
 function useProfessionalFilmstripContextSmokeState() {
   useEffect(() => {
-    const adjustments = {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      contrast: 12,
-      exposure: 0.35,
-      highlights: -28,
-      shadows: 18,
-    };
+    const editDocumentV2 = createVisualEditDocument({
+      sceneGlobalColorTone: { contrast: 12, exposure: 0.35, highlights: -28, shadows: 18 },
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
-      copiedEditDocumentV2: copyEditDocumentV2Nodes(legacyAdjustmentsToEditDocumentV2(adjustments)),
+      editDocumentV2,
+      copiedEditDocumentV2: copyEditDocumentV2Nodes(editDocumentV2),
       displaySize: { height: 680, width: 1020 },
       histogram: null,
-      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
+      history: [editDocumentV2],
       historyIndex: 0,
       isWaveformVisible: false,
       originalSize: {
@@ -1512,14 +1560,15 @@ function ProfessionalEditorCanvasWell({ portrait = false }: { portrait?: boolean
 
 function useProfessionalEditorStatusChipsSmokeState() {
   useEffect(() => {
-    const adjustments = {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      levels: {
-        ...INITIAL_ADJUSTMENTS.levels,
-        inputBlack: 0.06,
-        inputWhite: 0.92,
+    const editDocumentV2 = createVisualEditDocument({
+      lumaLevels: {
+        levels: {
+          ...INITIAL_ADJUSTMENTS.levels,
+          inputBlack: 0.06,
+          inputWhite: 0.92,
+        },
       },
-    };
+    });
     const exportSoftProofTransform = {
       blackPointCompensation: 'enabled',
       colorManagedTransform: 'display-p3-preview',
@@ -1555,11 +1604,11 @@ function useProfessionalEditorStatusChipsSmokeState() {
     };
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
+      editDocumentV2,
       exportSoftProofRecipeId: 'visual-smoke-display-p3',
       exportSoftProofTransform,
       gamutWarningOverlay,
-      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
+      history: [editDocumentV2],
       historyIndex: 0,
       isExportSoftProofEnabled: true,
       previewScopeStatus: {
@@ -2613,11 +2662,9 @@ function BrushMaskCanvasVisualSmoke() {
     setLivePreview(null);
   };
 
-  const adjustments: Adjustments = {
-    ...INITIAL_ADJUSTMENTS,
-    aiPatches: [],
-    masks: [createBrushMaskCanvasContainer(subMask)],
-  };
+  const editDocumentV2 = createVisualEditDocument({
+    layers: { masks: [createBrushMaskCanvasContainer(subMask)] },
+  });
 
   return (
     <main
@@ -2636,7 +2683,7 @@ function BrushMaskCanvasVisualSmoke() {
           <div className="grid place-items-center bg-[#0b0d10] p-8">
             <div className="relative h-[360px] w-[640px] overflow-hidden rounded border border-white/10 bg-black">
               <ImageCanvas
-                adjustments={adjustments}
+                editDocumentV2={editDocumentV2}
                 appSettings={null}
                 cursorStyle="crosshair"
                 exportSoftProofRecipeId={null}
@@ -2749,7 +2796,7 @@ const cropTransformSmokeImage: SelectedImage = {
 };
 
 function ProfessionalCropTransformWorkspaceVisualSmoke() {
-  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const adjustments = useEditorStore((state) => state.editDocumentV2);
   const overlayMode = useEditorStore((state) => state.overlayMode);
   const overlayRotation = useEditorStore((state) => state.overlayRotation);
   const isStraightenActive = useEditorStore((state) => state.isStraightenActive);
@@ -2763,26 +2810,27 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
   });
 
   useEffect(() => {
-    const nextAdjustments: Adjustments = {
-      ...structuredClone(INITIAL_ADJUSTMENTS),
-      aspectRatio: 16 / 9,
-      crop: {
-        height: 0.64,
-        unit: 'normalized',
-        width: 0.68,
-        x: 0.16,
-        y: 0.18,
+    const editDocumentV2 = createVisualEditDocument({
+      geometry: {
+        aspectRatio: 16 / 9,
+        crop: {
+          height: 0.64,
+          unit: 'normalized',
+          width: 0.68,
+          x: 0.16,
+          y: 0.18,
+        },
+        flipHorizontal: true,
+        rotation: 2.4,
       },
-      flipHorizontal: true,
-      rotation: 2.4,
-    };
+    });
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(nextAdjustments),
+      editDocumentV2,
       displaySize: { height: 405, width: 720 },
       finalPreviewUrl: brushMaskCanvasImageDataUrl,
       hasRenderedFirstFrame: true,
-      history: [legacyAdjustmentsToEditDocumentV2(nextAdjustments)],
+      history: [editDocumentV2],
       historyIndex: 0,
       isRotationActive: false,
       isStraightenActive: false,
@@ -2837,7 +2885,7 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
               style={{ maxHeight: 520, maxWidth: 920 }}
             >
               <ImageCanvas
-                adjustments={adjustments}
+                editDocumentV2={adjustments}
                 appSettings={null}
                 cursorStyle="default"
                 exportSoftProofRecipeId={null}
@@ -2892,11 +2940,11 @@ function ProfessionalCropTransformWorkspaceVisualSmoke() {
         <div
           className="sr-only"
           data-active-overlay={overlayMode}
-          data-aspect-ratio={String(adjustments.aspectRatio)}
+          data-aspect-ratio={String(adjustments.geometry.aspectRatio)}
           data-canvas-backed="image-canvas"
           data-crop-height={String(crop.height)}
           data-crop-width={String(crop.width)}
-          data-flip-horizontal={String(adjustments.flipHorizontal)}
+          data-flip-horizontal={String(adjustments.geometry.flipHorizontal)}
           data-testid="professional-crop-transform-proof"
           data-visual-smoke-section="crop-transform-proof"
         />
@@ -3023,10 +3071,9 @@ const professionalCanvasGamutOverlay: GamutWarningOverlayPayload = {
 
 function ProfessionalCanvasOverlaysVisualSmoke() {
   const [crop, setCropState] = useState<Crop>({ height: 62, unit: '%', width: 66, x: 18, y: 18 });
-  const [retouchAdjustments, setRetouchAdjustments] = useState<Adjustments>(() => ({
-    ...INITIAL_ADJUSTMENTS,
-    masks: [professionalCanvasRetouchContainer],
-  }));
+  const [retouchEditDocumentV2, setRetouchEditDocumentV2] = useState(() =>
+    createVisualEditDocument({ layers: { masks: [professionalCanvasRetouchContainer] } }),
+  );
   const isCompactViewport = typeof window !== 'undefined' && window.innerWidth < 700;
   const cardClassName = 'relative min-h-0 overflow-hidden rounded-md border border-editor-overlay-stroke bg-black';
   const imageRenderSize = { height: 180, offsetX: 0, offsetY: 0, scale: 0.5, width: 320 };
@@ -3088,7 +3135,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
             <div className={cardClassName} data-visual-smoke-section="professional-canvas-crop">
               <ImageCanvas
                 {...baseCanvasProps}
-                adjustments={{ ...INITIAL_ADJUSTMENTS, aspectRatio: 16 / 9 }}
+                editDocumentV2={createVisualEditDocument({ geometry: { aspectRatio: 16 / 9 } })}
                 imageRenderSize={cropRenderSize}
                 maskOverlay={visualMaskOverlay(null)}
                 overlayMode="phiGrid"
@@ -3109,7 +3156,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
             <div className={cardClassName} data-visual-smoke-section="professional-canvas-mask-brush">
               <ImageCanvas
                 {...baseCanvasProps}
-                adjustments={{ ...INITIAL_ADJUSTMENTS, masks: [brushContainer] }}
+                editDocumentV2={createVisualEditDocument({ layers: { masks: [brushContainer] } })}
                 maskOverlay={visualMaskOverlay(brushOverlayUrl)}
                 toolRuntime={visualToolRuntime({
                   activeMaskContainerId: brushMaskCanvasContainerId,
@@ -3125,23 +3172,18 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
               <Button
                 className="sr-only"
                 data-testid="professional-canvas-show-remove"
-                onClick={() =>
-                  setRetouchAdjustments((previous) => ({
-                    ...previous,
-                    masks: previous.masks.map((mask) => {
-                      if (mask.id !== professionalCanvasRetouchLayerId) return mask;
-                      const { retouchCloneSource: _retouchCloneSource, ...removeOnlyMask } = mask;
-                      return removeOnlyMask;
-                    }),
-                  }))
-                }
+                onClick={() => {
+                  const { retouchCloneSource: _retouchCloneSource, ...removeOnlyMask } =
+                    professionalCanvasRetouchContainer;
+                  setRetouchEditDocumentV2(createVisualEditDocument({ layers: { masks: [removeOnlyMask] } }));
+                }}
                 variant="editorQuiet"
               >
                 {copy.professionalCanvasActiveStates}
               </Button>
               <ImageCanvas
                 {...baseCanvasProps}
-                adjustments={retouchAdjustments}
+                editDocumentV2={retouchEditDocumentV2}
                 maskOverlay={visualMaskOverlay(null)}
                 toolRuntime={visualToolRuntime({
                   activeMaskContainerId: professionalCanvasRetouchLayerId,
@@ -3211,7 +3253,7 @@ function ProfessionalCanvasOverlaysVisualSmoke() {
             <div className={cardClassName}>
               <ImageCanvas
                 {...baseCanvasProps}
-                adjustments={INITIAL_ADJUSTMENTS}
+                editDocumentV2={createVisualEditDocument()}
                 exportSoftProofRecipeId="professional-canvas-proof"
                 exportSoftProofTransform={professionalCanvasProofTransform}
                 gamutWarningOverlay={professionalCanvasGamutOverlay}
@@ -3251,11 +3293,11 @@ function WorkflowRailVisualSmoke() {
   };
 
   useEffect(() => {
-    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+    const editDocumentV2 = createVisualEditDocument();
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(adjustments),
+      editDocumentV2,
       histogram: null,
-      history: [legacyAdjustmentsToEditDocumentV2(adjustments)],
+      history: [editDocumentV2],
       historyIndex: 0,
       isWaveformVisible: false,
       previewScopeStatus: null,
@@ -3487,8 +3529,9 @@ function AgentChatVisualSmoke() {
       rootPaths: ['/Users/cgas/Pictures/Capture One'],
       sortCriteria: { key: 'rating', label: 'Rating', order: SortDirection.Descending },
     });
+    const editDocumentV2 = createVisualEditDocument();
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+      editDocumentV2,
       finalPreviewUrl: 'blob:rawengine-agent-visual-smoke-before',
       hasRenderedFirstFrame: true,
       histogram: {
@@ -3497,7 +3540,7 @@ function AgentChatVisualSmoke() {
         [ActiveChannel.Luma]: { color: '#FFFFFF', data: agentVisualSmokeHistogramBins },
         [ActiveChannel.Red]: { color: '#FF6B6B', data: agentVisualSmokeHistogramBins },
       },
-      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS)],
+      history: [editDocumentV2],
       historyIndex: 0,
       selectedImage: {
         exif: { ISO: '400', LensModel: 'FE 35mm F1.4 GM' },
@@ -3617,8 +3660,10 @@ function ProfessionalAgentReviewVisualSmoke() {
 
 function ProfessionalAgentReviewWorkspaceVisualSmoke() {
   useEffect(() => {
+    const initial = createVisualEditDocument();
+    const edited = createVisualEditDocument({ sceneGlobalColorTone: { exposure: 0.35 } });
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, exposure: 0.35 }),
+      editDocumentV2: edited,
       finalPreviewUrl: 'data:image/jpeg;base64,BBBB',
       hasRenderedFirstFrame: true,
       histogram: {
@@ -3627,7 +3672,7 @@ function ProfessionalAgentReviewWorkspaceVisualSmoke() {
         [ActiveChannel.Luma]: { color: '#FFFFFF', data: agentVisualSmokeHistogramBins },
         [ActiveChannel.Red]: { color: '#FF6B6B', data: agentVisualSmokeHistogramBins },
       },
-      history: [INITIAL_ADJUSTMENTS, { ...INITIAL_ADJUSTMENTS, exposure: 0.35 }].map(legacyAdjustmentsToEditDocumentV2),
+      history: [initial, edited],
       historyIndex: 1,
       lastBasicToneCommand: null,
       selectedImage: {
@@ -3892,7 +3937,16 @@ function MaskOverlayRawProofVisualSmoke() {
 }
 
 function DetailDustSpotVisualSmoke() {
-  const [adjustments, setAdjustments] = useState<Adjustments>(INITIAL_ADJUSTMENTS);
+  const [adjustments, setAdjustments] = useState<DetailAdjustmentView>(() => {
+    const defaults = createVisualEditDocument();
+    return {
+      ...selectEditDocumentNode(defaults, 'detail_denoise_dehaze').params,
+      ...selectEditDocumentNode(defaults, 'lens_correction').params,
+    };
+  });
+  const updateAdjustments = (update: DetailAdjustmentUpdate) => {
+    setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
+  };
 
   return (
     <main
@@ -3905,15 +3959,7 @@ function DetailDustSpotVisualSmoke() {
           className="overflow-y-auto border-r border-white/10 bg-[#15181c] p-4"
           data-visual-smoke-section="dust-controls"
         >
-          <DetailsPanel
-            adjustments={adjustments}
-            appSettings={null}
-            setAdjustments={(update) => {
-              setAdjustments((currentAdjustments) =>
-                typeof update === 'function' ? update(currentAdjustments) : { ...currentAdjustments, ...update },
-              );
-            }}
-          />
+          <DetailsPanel adjustments={adjustments} appSettings={null} setAdjustments={updateAdjustments} />
         </aside>
         <section className="bg-[#0f1114] p-8" data-visual-smoke-section="dust-proof">
           <div className="mb-4 flex items-center justify-between">
@@ -8192,16 +8238,18 @@ function NegativeLabRealRawPrivateReviewSmoke() {
 
 function FilmEmulationWorkspaceVisualSmoke() {
   const [ready, setReady] = useState(false);
-  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const adjustments = useEditorStore((state) => state.editDocumentV2);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const historyIndex = useEditorStore((state) => state.historyIndex);
   const receipt = useEditorStore((state) => state.lastEditApplicationReceipt);
+  const filmEmulation = selectEditDocumentNode(adjustments, 'film_emulation').params['filmEmulation'];
+  const exposure = selectEditDocumentNode(adjustments, 'scene_global_color_tone').params['exposure'];
 
   useEffect(() => {
-    const initial = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 };
+    const initial = createVisualEditDocument({ sceneGlobalColorTone: { exposure: 1.25 } });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(initial),
+      editDocumentV2: initial,
       exportSoftProofTransform: {
         blackPointCompensation: 'enabled',
         colorManagedTransform: 'display-p3-preview',
@@ -8214,7 +8262,7 @@ function FilmEmulationWorkspaceVisualSmoke() {
         transformPolicyFingerprint: 'film-workspace-before',
       },
       finalPreviewUrl: 'blob:film-workspace-before',
-      history: [legacyAdjustmentsToEditDocumentV2(initial)],
+      history: [initial],
       historyCheckpoints: [],
       historyIndex: 0,
       imageSession: null,
@@ -8256,15 +8304,15 @@ function FilmEmulationWorkspaceVisualSmoke() {
             <div className="rounded border border-white/10 bg-black/30 p-3">
               {/* i18next-instrument-ignore */}
               <p className="text-[#8d97a3]">Native node</p>
-              <p className="text-lg font-semibold">{adjustments.filmEmulation?.enabled ? 'Enabled' : 'Off'}</p>
+              <p className="text-lg font-semibold">{filmEmulation?.enabled ? 'Enabled' : 'Off'}</p>
             </div>
           </div>
           <div
             className="mt-4 rounded border border-white/10 bg-black/30 p-3 font-mono text-xs"
             data-adjustment-revision={adjustmentRevision}
             data-changed-keys={receipt?.changedKeys.join(',') ?? ''}
-            data-exposure={adjustments.exposure}
-            data-film-enabled={adjustments.filmEmulation?.enabled ? 'true' : 'false'}
+            data-exposure={exposure}
+            data-film-enabled={filmEmulation?.enabled ? 'true' : 'false'}
             data-history-index={historyIndex}
             data-source={receipt?.source ?? 'none'}
             data-testid="film-workspace-transaction-proof"
@@ -8368,15 +8416,15 @@ function ColorRangeLocalAdjustmentVisualSmoke() {
 }
 
 function ColorWorkflowVisualSmoke() {
-  const [adjustments, setAdjustments] = useState<Adjustments>(() => ({
-    ...structuredClone(INITIAL_ADJUSTMENTS),
+  const [adjustments, setAdjustments] = useState<ColorPanelAdjustmentView>(() => ({
+    ...selectColorPanelAdjustmentView(createVisualEditDocument()),
     saturation: -6,
     vibrance: 14,
     whiteBalanceTechnical: buildTechnicalWhiteBalance('kelvin_tint', 4_800, -0.006),
   }));
   const [isWbPickerActive, setIsWbPickerActive] = useState(false);
   const isCompactViewport = typeof window !== 'undefined' && window.innerWidth < 700;
-  const handleAdjustmentsChange = (update: Partial<Adjustments> | ((current: Adjustments) => Adjustments)) => {
+  const handleAdjustmentsChange = (update: AdjustmentUpdate) => {
     setAdjustments((current) => (typeof update === 'function' ? update(current) : { ...current, ...update }));
   };
   return (

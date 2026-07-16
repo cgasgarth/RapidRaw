@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { createEditDocumentPresetPayload } from '../../../src/utils/editDocumentPreset';
 import {
   copyEditDocumentV2Node,
-  legacyAdjustmentsToEditDocumentV2,
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
   resetEditDocumentV2Node,
 } from '../../../src/utils/editDocumentV2';
 import {
@@ -42,7 +42,7 @@ const identity = (
 describe('raw processing mode override edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -68,26 +68,23 @@ describe('raw processing mode override edit transaction', () => {
       },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['rawProcessingModeOverride'],
+      changedKeys: ['nodes.source_decode.params.rawProcessingModeOverride'],
       nextAdjustmentRevision: 1,
       noOp: false,
     });
-    expect(result.after.rawProcessingModeOverride).toBe('maximum');
-    expect(result.afterEditDocumentV2.sourceDecode.rawProcessingModeOverride).toBe('maximum');
-    expect(selectRawProcessingModeOverride(result.afterEditDocumentV2)).toBe('maximum');
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
+    expect(result.after.sourceDecode.rawProcessingModeOverride).toBe('maximum');
+    expect(result.after.sourceDecode.rawProcessingModeOverride).toBe('maximum');
+    expect(selectRawProcessingModeOverride(result.after)).toBe('maximum');
+    expect(result.after.nodes['scene_global_color_tone']).toBe(result.before.nodes['scene_global_color_tone']);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.rawProcessingModeOverride).toBeNull();
+    expect(useEditorStore.getState().editDocumentV2.sourceDecode.rawProcessingModeOverride).toBeNull();
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.rawProcessingModeOverride).toBe('maximum');
+    expect(useEditorStore.getState().editDocumentV2.sourceDecode.rawProcessingModeOverride).toBe('maximum');
   });
 
   test('supports inherit/reset but excludes source-decode state from copy and presets', () => {
-    const source = legacyAdjustmentsToEditDocumentV2({
-      ...structuredClone(INITIAL_ADJUSTMENTS),
+    const source = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'source_decode', {
       rawProcessingModeOverride: 'fast',
     });
     const reset = resetEditDocumentV2Node(source, 'source_decode');
@@ -108,7 +105,7 @@ describe('raw processing mode override edit transaction', () => {
       ),
     ).toThrow('raw_processing_mode_override_transaction.stale_source');
 
-    const document = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+    const document = createDefaultEditDocumentV2();
     expect(() =>
       editDocumentV2Schema.parse({
         ...document,

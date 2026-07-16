@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   PreviewCoordinator,
   type PreviewCoordinatorEffect,
@@ -15,7 +15,7 @@ import {
 
 const input = (path: string, imageSessionId: number): PreviewRequestScopeInput => ({
   adjustmentRevision: 0,
-  adjustmentSnapshot: publishAdjustmentSnapshot(null, structuredClone(INITIAL_ADJUSTMENTS)),
+  adjustmentSnapshot: publishAdjustmentSnapshot(null, createDefaultEditDocumentV2()),
   autoEditPreviewSession: null,
   baseRenderSize: { containerHeight: 800, containerWidth: 1200, height: 800, offsetX: 0, offsetY: 0, width: 1200 },
   basicToneSliderInteraction: null,

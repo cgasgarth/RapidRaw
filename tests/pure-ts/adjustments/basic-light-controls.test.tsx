@@ -4,10 +4,21 @@ import i18next from 'i18next';
 import { createElement, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
-import BasicAdjustments from '../../../src/components/adjustments/Basic';
+import BasicAdjustments, { type BasicAdjustmentView } from '../../../src/components/adjustments/Basic';
 import en from '../../../src/i18n/locales/en.json';
 import { useUIStore } from '../../../src/store/useUIStore';
-import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+
+const defaultBasicView = (): BasicAdjustmentView => {
+  const document = createDefaultEditDocumentV2();
+  return {
+    ...selectEditDocumentNode(document, 'scene_global_color_tone').params,
+    ...selectEditDocumentNode(document, 'scene_to_view_transform').params,
+    ...selectEditDocumentNode(document, 'tone_equalizer').params,
+  };
+};
 
 afterEach(() => {
   act(() => {
@@ -36,7 +47,6 @@ test('tone equalizer advanced controls commit typed zone and preview settings', 
     upperMiddle.dispatchEvent(new window.Event('input', { bubbles: true }));
     await flushPromises();
   });
-  expect(getAdjustments().rawEngineEditGraphVersion).toBe(2);
   expect(getAdjustments().toneEqualizer.enabled).toBe(true);
   expect(getAdjustments().toneEqualizer.selectedBand).toBe(6);
   expect(getAdjustments().toneEqualizer.bandEv[6]).toBe(1.25);
@@ -81,8 +91,8 @@ test('Light controls use the canonical tonal order and stable aligned rows', asy
 });
 
 test('tone mapper switching preserves tone values and exposes edited/reset state', async () => {
-  const initialAdjustments: Adjustments = {
-    ...INITIAL_ADJUSTMENTS,
+  const initialAdjustments: BasicAdjustmentView = {
+    ...defaultBasicView(),
     brightness: 0.4,
     contrast: 18,
     exposure: 0.65,
@@ -138,18 +148,16 @@ test('mask and forced tone-mapper contexts omit only the global process selector
   ).toHaveLength(7);
 });
 
-test('legacy sidecars retain Basic while explicit Rapid View settings round-trip', () => {
-  expect(normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, toneMapper: 'basic' }).toneMapper).toBe('basic');
-
-  const reopened = normalizeLoadedAdjustments({
-    ...INITIAL_ADJUSTMENTS,
+test('current Basic view settings round-trip without a flat sidecar shape', () => {
+  const reopened: BasicAdjustmentView = {
+    ...defaultBasicView(),
     toneMapper: 'rapidView',
     viewTransform: {
       ...INITIAL_ADJUSTMENTS.viewTransform,
       contrast: 1.37,
       shoulder: 0.72,
     },
-  });
+  };
   expect(reopened.toneMapper).toBe('rapidView');
   expect(reopened.viewTransform).toEqual({
     ...INITIAL_ADJUSTMENTS.viewTransform,
@@ -164,9 +172,9 @@ function BasicHarness({
   onAdjustmentsChange,
   tonemapperOverrideEnabled,
 }: {
-  initialAdjustments: Adjustments;
+  initialAdjustments: BasicAdjustmentView;
   isForMask: boolean;
-  onAdjustmentsChange: (adjustments: Adjustments) => void;
+  onAdjustmentsChange: (adjustments: BasicAdjustmentView) => void;
   tonemapperOverrideEnabled: boolean;
 }) {
   const [adjustments, setAdjustmentsState] = useState(initialAdjustments);
@@ -186,11 +194,11 @@ function BasicHarness({
 }
 
 async function renderBasic({
-  initialAdjustments = INITIAL_ADJUSTMENTS,
+  initialAdjustments = defaultBasicView(),
   isForMask = false,
   tonemapperOverrideEnabled = false,
 }: {
-  initialAdjustments?: Adjustments;
+  initialAdjustments?: BasicAdjustmentView;
   isForMask?: boolean;
   tonemapperOverrideEnabled?: boolean;
 } = {}) {

@@ -8,7 +8,8 @@ import {
   type ColorBalanceRgbCommitIdentity,
   isCurrentColorBalanceRgbIdentity,
 } from '../../../src/utils/colorBalanceRgbEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   EditorPersistenceEffectRunner,
   type EditorPersistenceExecution,
@@ -40,7 +41,7 @@ const initialColorBalance = (): ColorBalanceRgbSettings => structuredClone(INITI
 describe('Color Balance RGB edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -72,7 +73,7 @@ describe('Color Balance RGB edit transaction', () => {
       { nodeType: 'color_balance_rgb', patch: { colorBalanceRgb: next }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['colorBalanceRgb'],
+      changedKeys: ['nodes.color_balance_rgb.params.colorBalanceRgb'],
       invalidatedStages: ['preview', 'navigator', 'thumbnail'],
       nextAdjustmentRevision: 1,
       noOp: false,
@@ -89,21 +90,24 @@ describe('Color Balance RGB edit transaction', () => {
       transformedOriginalUrl: null,
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(next);
-    expect(result.afterEditDocumentV2.nodes['color_balance_rgb']?.params).toMatchObject({ colorBalanceRgb: next });
-    expect(result.afterEditDocumentV2.nodes['color_balance_rgb']).not.toBe(beforeNode);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toBe(beforeTone);
-    expect(result.afterEditDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('colorBalanceRgb');
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
+    ).toEqual(next);
+    expect(result.after.nodes['color_balance_rgb']?.params).toMatchObject({ colorBalanceRgb: next });
+    expect(result.after.nodes['color_balance_rgb']).not.toBe(beforeNode);
+    expect(result.after.nodes['scene_global_color_tone']).toBe(beforeTone);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(
-      INITIAL_ADJUSTMENTS.colorBalanceRgb,
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
+    ).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb);
     expect(useEditorStore.getState().editDocumentV2.nodes['color_balance_rgb']?.params).toMatchObject({
       colorBalanceRgb: INITIAL_ADJUSTMENTS.colorBalanceRgb,
     });
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(next);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
+    ).toEqual(next);
     expect(useEditorStore.getState().editDocumentV2.nodes['color_balance_rgb']?.params).toMatchObject({
       colorBalanceRgb: next,
     });
@@ -134,7 +138,6 @@ describe('Color Balance RGB edit transaction', () => {
     });
     runner.installSession({
       adjustmentRevision: 0,
-      adjustments: { ...committed.adjustmentSnapshot.value, colorBalanceRgb: initialColorBalance() },
       editDocumentV2: beforeDocument,
       imageSessionId: session.id,
       path: sourcePath,
@@ -143,7 +146,6 @@ describe('Color Balance RGB edit transaction', () => {
     if (committed.lastEditApplicationReceipt === null) throw new Error('missing committed color balance receipt');
     runner.submitCommitted({
       adjustmentRevision: committed.adjustmentRevision,
-      adjustments: committed.adjustmentSnapshot.value,
       editDocumentV2: committed.editDocumentV2,
       imageSessionId: session.id,
       interactionActive: false,
@@ -157,10 +159,7 @@ describe('Color Balance RGB edit transaction', () => {
 
     expect(executions).toHaveLength(1);
     expect(executions[0]?.editDocumentV2.nodes['color_balance_rgb']?.params).toMatchObject({ colorBalanceRgb: next });
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: executions[0]?.adjustments, editDocumentV2: executions[0]?.editDocumentV2 },
-      executions[0]?.adjustments ?? committed.adjustmentSnapshot.value,
-    );
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: executions[0]?.editDocumentV2 });
     expect(reopened.nodes['color_balance_rgb']?.params).toMatchObject({ colorBalanceRgb: next });
     expect(reopened).toEqual(committed.editDocumentV2);
   });
@@ -189,7 +188,9 @@ describe('Color Balance RGB edit transaction', () => {
     );
 
     const editedState = useEditorStore.getState();
-    const rangeReset = structuredClone(editedState.adjustmentSnapshot.value.colorBalanceRgb);
+    const rangeReset = structuredClone(
+      selectEditDocumentNode(editedState.editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
+    );
     rangeReset.shadows = structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb.shadows);
     const rangeResult = editedState.applyEditTransaction(
       buildColorBalanceRgbEditTransaction(
@@ -199,11 +200,19 @@ describe('Color Balance RGB edit transaction', () => {
         'color-balance-reset-shadows',
       ),
     );
-    expect(rangeResult).toMatchObject({ changedKeys: ['colorBalanceRgb'], nextAdjustmentRevision: 2, noOp: false });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb.shadows).toEqual(
-      INITIAL_ADJUSTMENTS.colorBalanceRgb.shadows,
-    );
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb.highlights.blue).toBe(-19);
+    expect(rangeResult).toMatchObject({
+      changedKeys: ['nodes.color_balance_rgb.params.colorBalanceRgb'],
+      nextAdjustmentRevision: 2,
+      noOp: false,
+    });
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb']
+        .shadows,
+    ).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb.shadows);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb']
+        .highlights.blue,
+    ).toBe(-19);
 
     const rangeResetState = useEditorStore.getState();
     rangeResetState.applyEditTransaction(
@@ -215,11 +224,13 @@ describe('Color Balance RGB edit transaction', () => {
       ),
     );
     expect(useEditorStore.getState().history).toHaveLength(4);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(
-      INITIAL_ADJUSTMENTS.colorBalanceRgb,
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
+    ).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toEqual(rangeReset);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
+    ).toEqual(rangeReset);
   });
 
   test('rejects stale path/session/revision and same-path fallback-session reopen identities', () => {
@@ -258,7 +269,11 @@ describe('Color Balance RGB edit transaction', () => {
     const fallbackResult = fallbackState.applyEditTransaction(
       buildColorBalanceRgbEditTransaction(fallbackState, fallbackIdentity, fallbackSettings, 'fallback-color-balance'),
     );
-    expect(fallbackResult).toMatchObject({ changedKeys: ['colorBalanceRgb'], nextAdjustmentRevision: 1, noOp: false });
+    expect(fallbackResult).toMatchObject({
+      changedKeys: ['nodes.color_balance_rgb.params.colorBalanceRgb'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       imageSessionId: fallbackIdentity.imageSessionId,
       transactionId: 'fallback-color-balance',

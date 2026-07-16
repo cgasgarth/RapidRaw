@@ -1,35 +1,43 @@
+import {
+  type EditDocumentV2,
+  editDocumentLayersV2Schema,
+  editDocumentSourceArtifactsV2Schema,
+} from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerInitialMaskDrawSessionKey } from '../components/panel/editor/viewerInitialMaskDrawInteractionController';
-import type { Mask, SubMask } from '../components/panel/right/layers/Masks';
-import type { Adjustments, AiPatch, MaskContainer } from './adjustments';
+import { selectEditDocumentLayers, selectEditDocumentSourceArtifacts } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface InitialMaskDrawEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustmentSnapshot: { readonly value: Adjustments };
+  readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSession: { readonly id: string } | null;
   readonly selectedImage: { readonly path: string } | null;
   readonly sourceRevision: string;
 }
 
-const updateSubMask = <Container extends MaskContainer | AiPatch>(
+type EditableSubMaskContainer = {
+  readonly subMasks: readonly { readonly id: string; readonly type: string }[];
+};
+
+const updateSubMask = <Container extends EditableSubMaskContainer, ParsedContainer>(
   containers: readonly Container[],
   maskId: string,
   tool: ViewerInitialMaskDrawSessionKey['tool'],
   parameters: Readonly<Record<string, unknown>>,
-): { readonly containers: Container[]; readonly found: boolean } => {
+  parse: (value: unknown) => readonly ParsedContainer[],
+): { readonly containers: readonly ParsedContainer[]; readonly found: boolean } => {
   let found = false;
   const containersAfter = containers.map((container) => ({
     ...container,
-    subMasks: container.subMasks.map((subMask: SubMask) => {
+    subMasks: container.subMasks.map((subMask) => {
       if (subMask.id !== maskId) return subMask;
-      if ((subMask.type as Mask) !== tool)
-        throw new Error(`initial_mask_transaction.tool_mismatch:${subMask.type}:${tool}`);
+      if (subMask.type !== tool) throw new Error(`initial_mask_transaction.tool_mismatch:${subMask.type}:${tool}`);
       found = true;
       return { ...subMask, parameters: { ...parameters } };
     }),
-  })) as Container[];
-  return { containers: containersAfter, found };
+  }));
+  return { containers: parse(containersAfter), found };
 };
 
 export const buildInitialMaskDrawEditTransaction = (
@@ -60,8 +68,20 @@ export const buildInitialMaskDrawEditTransaction = (
     );
   }
 
-  const masks = updateSubMask(state.adjustmentSnapshot.value.masks, identity.maskId, identity.tool, parameters);
-  const aiPatches = updateSubMask(state.adjustmentSnapshot.value.aiPatches, identity.maskId, identity.tool, parameters);
+  const masks = updateSubMask(
+    selectEditDocumentLayers(state.editDocumentV2).masks,
+    identity.maskId,
+    identity.tool,
+    parameters,
+    (value) => editDocumentLayersV2Schema.parse({ masks: value }).masks,
+  );
+  const aiPatches = updateSubMask(
+    selectEditDocumentSourceArtifacts(state.editDocumentV2).aiPatches,
+    identity.maskId,
+    identity.tool,
+    parameters,
+    (value) => editDocumentSourceArtifactsV2Schema.parse({ aiPatches: value }).aiPatches,
+  );
   if (!masks.found && !aiPatches.found) throw new Error(`initial_mask_transaction.missing_mask:${identity.maskId}`);
 
   return {
@@ -71,12 +91,12 @@ export const buildInitialMaskDrawEditTransaction = (
     operations: [
       {
         nodeType: 'layers',
-        patch: { masks: masks.containers },
+        patch: editDocumentLayersV2Schema.parse({ masks: masks.containers }),
         type: 'patch-edit-document-node',
       },
       {
         nodeType: 'source_artifacts',
-        patch: { aiPatches: aiPatches.containers },
+        patch: editDocumentSourceArtifactsV2Schema.parse({ aiPatches: aiPatches.containers }),
         type: 'patch-edit-document-node',
       },
     ],

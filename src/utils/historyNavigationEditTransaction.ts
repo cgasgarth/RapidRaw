@@ -25,7 +25,7 @@ export const buildHistoryNavigationEditTransaction = (
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
     operations: [
       {
-        editDocumentV2: structuredClone(editDocumentV2),
+        editDocumentV2,
         type: 'replace-edit-document',
       },
     ],
@@ -55,14 +55,14 @@ export const buildHistoryRestorationEditTransaction = (
     baseAdjustmentRevision: state.adjustmentRevision,
     compensationHistory: {
       checkpoints: structuredClone([...historyCheckpoints]),
-      entries: structuredClone([...history]),
+      entries: [...history],
       historyIndex: historyTargetIndex,
     },
     history: 'compensation',
     imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
     operations: [
       {
-        editDocumentV2: structuredClone(editDocumentV2),
+        editDocumentV2,
         type: 'replace-edit-document',
       },
     ],

@@ -1,8 +1,8 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { BatchAutoAdjustPathResultV1 } from '../schemas/batchAutoAdjustSchemas';
-import type { Adjustments } from './adjustments';
-import { areAdjustmentsEqual } from './adjustmentsSnapshot';
-import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
+import { areEditDocumentsEqual } from './adjustmentsSnapshot';
+import { buildAutoEditTransactionRequest, selectAutoEditAdjustmentProposal } from './autoEditTransaction';
+import type { EditTransactionRequest } from './editTransaction';
 
 export interface BatchAutoAdjustSelectionIdentity {
   adjustmentRevision: number;
@@ -13,7 +13,7 @@ export interface BatchAutoAdjustSelectionIdentity {
 export type BatchAutoAdjustSessionSource = 'cache' | 'cold-load';
 
 export interface BatchAutoAdjustSuccessorBaseline {
-  adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   identity: BatchAutoAdjustSelectionIdentity;
   source: BatchAutoAdjustSessionSource;
 }
@@ -21,25 +21,25 @@ export interface BatchAutoAdjustSuccessorBaseline {
 export interface BatchAutoAdjustPersistenceCompensationInput {
   barrierPersisted: boolean;
   captured: BatchAutoAdjustSelectionIdentity;
-  capturedAdjustments: Adjustments;
+  capturedEditDocumentV2: EditDocumentV2;
   current: BatchAutoAdjustSelectionIdentity | null;
-  currentAdjustments: Adjustments | null;
+  currentEditDocumentV2: EditDocumentV2 | null;
 }
 
 export const shouldCompensateBatchAutoAdjustPersistence = ({
   barrierPersisted,
   captured,
-  capturedAdjustments,
+  capturedEditDocumentV2,
   current,
-  currentAdjustments,
+  currentEditDocumentV2,
 }: BatchAutoAdjustPersistenceCompensationInput): boolean =>
   !barrierPersisted &&
   current !== null &&
-  currentAdjustments !== null &&
+  currentEditDocumentV2 !== null &&
   current.path === captured.path &&
   current.imageSessionId === captured.imageSessionId &&
   current.adjustmentRevision === captured.adjustmentRevision &&
-  areAdjustmentsEqual(currentAdjustments, capturedAdjustments);
+  areEditDocumentsEqual(currentEditDocumentV2, capturedEditDocumentV2);
 
 export type SelectedBatchAutoAdjustDisposition = 'apply-selected' | 'commit-target-only' | 'reject-stale';
 
@@ -74,61 +74,54 @@ export const selectedBatchAutoAdjustDisposition = (
 
 export const resolveBatchAutoAdjustAcceptanceIdentity = ({
   captured,
-  capturedAdjustments,
+  capturedEditDocumentV2,
   current,
-  currentAdjustments,
+  currentEditDocumentV2,
   currentSource = null,
   successorBaseline = null,
 }: {
   captured: BatchAutoAdjustSelectionIdentity;
-  capturedAdjustments: Adjustments;
+  capturedEditDocumentV2: EditDocumentV2;
   current: BatchAutoAdjustSelectionIdentity | null;
-  currentAdjustments: Adjustments | null;
+  currentEditDocumentV2: EditDocumentV2 | null;
   currentSource?: BatchAutoAdjustSessionSource | null;
   successorBaseline?: BatchAutoAdjustSuccessorBaseline | null;
 }): BatchAutoAdjustSelectionIdentity | null => {
-  if (current === null || currentAdjustments === null || current.path !== captured.path) return null;
+  if (current === null || currentEditDocumentV2 === null || current.path !== captured.path) return null;
   if (
     current.imageSessionId === captured.imageSessionId &&
     current.adjustmentRevision === captured.adjustmentRevision
   ) {
     return current;
   }
-  if (areAdjustmentsEqual(currentAdjustments, capturedAdjustments)) return current;
+  if (areEditDocumentsEqual(currentEditDocumentV2, capturedEditDocumentV2)) return current;
   return successorBaseline !== null &&
     currentSource === successorBaseline.source &&
     current.path === successorBaseline.identity.path &&
     current.imageSessionId === successorBaseline.identity.imageSessionId &&
     current.adjustmentRevision === successorBaseline.identity.adjustmentRevision &&
-    areAdjustmentsEqual(currentAdjustments, successorBaseline.adjustments)
+    areEditDocumentsEqual(currentEditDocumentV2, successorBaseline.editDocumentV2)
     ? current
     : null;
 };
 
 interface SelectedBatchAutoAdjustInput {
-  acceptedAdjustments: Adjustments;
+  acceptedEditDocumentV2: EditDocumentV2;
   captured: BatchAutoAdjustSelectionIdentity;
   current: BatchAutoAdjustSelectionIdentity | null;
-  currentAdjustments: Adjustments;
   currentEditDocumentV2: EditDocumentV2;
-  historyBaseline?: Adjustments;
   historyEditDocumentBaseline?: EditDocumentV2;
   result: BatchAutoAdjustPathResultV1;
 }
 
 export const buildSelectedBatchAutoAdjustTransaction = ({
-  acceptedAdjustments,
+  acceptedEditDocumentV2,
   captured,
   current,
-  currentAdjustments,
   currentEditDocumentV2,
-  historyBaseline,
   historyEditDocumentBaseline,
   result,
 }: SelectedBatchAutoAdjustInput): EditTransactionRequest | null => {
-  if ((historyBaseline === undefined) !== (historyEditDocumentBaseline === undefined)) {
-    throw new Error('batch_auto_adjust.history_authority_incomplete');
-  }
   if (
     (result.status !== 'applied' && result.status !== 'no_op') ||
     result.path !== captured.path ||
@@ -139,38 +132,43 @@ export const buildSelectedBatchAutoAdjustTransaction = ({
   }
 
   return {
-    baseAdjustmentRevision: current.adjustmentRevision,
-    history: 'single-entry',
-    imageSessionId: current.imageSessionId,
-    operations: buildAdjustmentMutationOperations(currentAdjustments, acceptedAdjustments, currentEditDocumentV2),
+    ...buildAutoEditTransactionRequest(
+      {
+        adjustmentRevision: current.adjustmentRevision,
+        editDocumentV2: currentEditDocumentV2,
+        graphRevision: `batch:${result.receipt.transactionId}`,
+        imageSessionId: current.imageSessionId,
+        path: current.path,
+      },
+      selectAutoEditAdjustmentProposal(acceptedEditDocumentV2),
+      result.receipt.transactionId,
+    ),
     persistence: 'native-committed',
-    ...(historyBaseline === undefined || historyEditDocumentBaseline === undefined
+    ...(historyEditDocumentBaseline === undefined
       ? {}
       : {
           nativeCommittedHistoryBaseline: historyEditDocumentBaseline,
         }),
-    source: 'auto-edit',
-    transactionId: result.receipt.transactionId,
   };
 };
 
 export const resolveBatchAutoAdjustReconciledHistoryBaseline = ({
-  acceptedAdjustments,
+  acceptedEditDocumentV2,
   captured,
-  capturedAdjustments,
+  capturedEditDocumentV2,
   current,
-  currentAdjustments,
+  currentEditDocumentV2,
 }: {
-  acceptedAdjustments: Adjustments;
+  acceptedEditDocumentV2: EditDocumentV2;
   captured: BatchAutoAdjustSelectionIdentity;
-  capturedAdjustments: Adjustments;
+  capturedEditDocumentV2: EditDocumentV2;
   current: BatchAutoAdjustSelectionIdentity | null;
-  currentAdjustments: Adjustments | null;
-}): Adjustments | null =>
+  currentEditDocumentV2: EditDocumentV2 | null;
+}): EditDocumentV2 | null =>
   current !== null &&
-  currentAdjustments !== null &&
+  currentEditDocumentV2 !== null &&
   current.path === captured.path &&
   current.imageSessionId !== captured.imageSessionId &&
-  areAdjustmentsEqual(currentAdjustments, acceptedAdjustments)
-    ? capturedAdjustments
+  areEditDocumentsEqual(currentEditDocumentV2, acceptedEditDocumentV2)
+    ? capturedEditDocumentV2
     : null;

@@ -6,14 +6,14 @@ import type {
 } from '../../../packages/rawengine-schema/src/editCommandBus';
 import { RawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { runAgentCoreEditCommandBundle } from '../../../src/utils/agent/planning/agentCoreEditCommandBundle';
 import {
   buildAgentToolEditTransaction,
   captureAgentToolCommitIdentity,
 } from '../../../src/utils/agentToolEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixtures/agent-core-bundle.ARW';
 const session = createEditorImageSession({ generation: 61, path: sourcePath, source: 'cache' });
@@ -52,7 +52,7 @@ class DeferredBundleBridge extends RawEngineLocalAppServerBridge {
 describe('agent core command bundle transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -99,7 +99,7 @@ describe('agent core command bundle transaction', () => {
       baseAdjustmentRevision: 0,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { contrast: 14 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { contrast: 14 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'intervening-bundle-edit',
@@ -108,9 +108,11 @@ describe('agent core command bundle transaction', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.contrast).toBe(14);
-    expect(after.adjustmentSnapshot.value.exposure).toBe(0);
-    expect(after.adjustmentSnapshot.value.hsl.oranges).toEqual(INITIAL_ADJUSTMENTS.hsl.oranges);
+    expect(selectEditDocumentNode(after.editDocumentV2, 'scene_global_color_tone').params['contrast']).toBe(14);
+    expect(selectEditDocumentNode(after.editDocumentV2, 'scene_global_color_tone').params['exposure']).toBe(0);
+    expect(selectEditDocumentNode(after.editDocumentV2, 'selective_color_mixer').params['hsl'].oranges).toEqual(
+      INITIAL_ADJUSTMENTS.hsl.oranges,
+    );
     expect(after.history).toHaveLength(2);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-bundle-edit');
   });
@@ -119,12 +121,18 @@ describe('agent core command bundle transaction', () => {
     const state = useEditorStore.getState();
     const identity = captureAgentToolCommitIdentity(state);
     if (identity === null) throw new Error('Expected bundle identity.');
-    const next = { ...state.adjustmentSnapshot.value, exposure: 0.3 };
+    const operations = [
+      {
+        nodeType: 'scene_global_color_tone' as const,
+        patch: { exposure: 0.3 },
+        type: 'patch-edit-document-node' as const,
+      },
+    ];
     expect(() =>
       buildAgentToolEditTransaction(
         { ...state, selectedImage: { path: '/fixtures/other.ARW' } },
         identity,
-        next,
+        operations,
         'stale-source',
       ),
     ).toThrow('agent_tool_transaction.stale_source');
@@ -132,7 +140,7 @@ describe('agent core command bundle transaction', () => {
       buildAgentToolEditTransaction(
         { ...state, imageSession: { id: 'other-session' } },
         identity,
-        next,
+        operations,
         'stale-session',
       ),
     ).toThrow('agent_tool_transaction.stale_session');
@@ -156,10 +164,14 @@ describe('agent core command bundle transaction', () => {
         transactionId: 'fallback-core-bundle_apply',
       },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_global_color_tone').params['exposure'],
+    ).toBe(0.4);
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_global_color_tone').params['exposure'],
+    ).toBe(0);
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
@@ -176,7 +188,13 @@ describe('agent core command bundle transaction', () => {
       buildAgentToolEditTransaction(
         { ...fallbackState, imageSessionId: 83 },
         identity,
-        { ...fallbackState.adjustmentSnapshot.value, exposure: 0.2 },
+        [
+          {
+            nodeType: 'scene_global_color_tone',
+            patch: { exposure: 0.2 },
+            type: 'patch-edit-document-node',
+          },
+        ],
         'stale-reopened-a',
       ),
     ).toThrow('agent_tool_transaction.stale_session:editor-image-session:81:editor-image-session:83');

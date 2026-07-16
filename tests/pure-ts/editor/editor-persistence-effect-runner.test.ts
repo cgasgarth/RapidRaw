@@ -1,12 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import {
-  copyEditDocumentV2Nodes,
-  createDefaultEditDocumentV2,
-  legacyAdjustmentsToEditDocumentV2,
-  updateEditDocumentV2Node,
-} from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildEditorPersistenceRequest,
   EditorPersistenceEffectRunner,
@@ -72,13 +66,8 @@ class FakeClock {
   }
 }
 
-const adjustments = (exposure: number) => ({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure });
-
-const currentDocument = (exposure: number) =>
-  updateEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', (tone) => ({
-    ...tone,
-    exposure,
-  }));
+const document = (exposure: number) =>
+  patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure });
 
 const receipt = (path: string, revision = 1): EditorPersistenceReceipt => ({
   path,
@@ -92,7 +81,7 @@ const editReceipt = (
 ): EditApplicationReceipt => ({
   adjustmentRevision,
   baseAdjustmentRevision: adjustmentRevision - 1,
-  changedKeys: ['exposure'],
+  changedKeys: ['nodes.scene_global_color_tone.params.exposure'],
   imageSessionId,
   persistence,
   source: 'manual-control',
@@ -103,8 +92,7 @@ const input = (overrides: Partial<EditorPersistenceInput> = {}): EditorPersisten
   const { editDocumentV2, ...rest } = overrides;
   return {
     adjustmentRevision: 1,
-    adjustments: adjustments(1),
-    editDocumentV2: currentDocument(1),
+    editDocumentV2: document(1),
     imageSessionId: 'session-a',
     interactionActive: false,
     multiSelection: null,
@@ -120,7 +108,7 @@ const prime = (runner: EditorPersistenceEffectRunner, overrides: Partial<EditorP
   runner.installSession(
     input({
       adjustmentRevision: 0,
-      adjustments: adjustments(0),
+      editDocumentV2: document(0),
       ...overrides,
     }),
   );
@@ -134,7 +122,7 @@ function harness(
   const accepted: Array<{ execution: EditorPersistenceExecution; receipt: EditorPersistenceReceipt }> = [];
   const clock = new FakeClock();
   const failures: Array<{ error: unknown; execution: EditorPersistenceExecution }> = [];
-  const snapshots: Array<{ adjustments: typeof INITIAL_ADJUSTMENTS; path: string }> = [];
+  const snapshots: Array<{ editDocumentV2: ReturnType<typeof document>; path: string }> = [];
   const runner = new EditorPersistenceEffectRunner({
     clearTimer: clock.clearTimer,
     execute,
@@ -148,7 +136,7 @@ function harness(
 
 describe('editor persistence effect runner', () => {
   test('seals migration-shaped editor state into the exact strict current native request', () => {
-    const migrationShaped = legacyAdjustmentsToEditDocumentV2(adjustments(0.75));
+    const migrationShaped = document(0.75);
     migrationShaped.extensions['quarantinedNodes'] = { future_curve_v3: { schemaVersion: 3 } };
     const sceneCurve = migrationShaped.nodes['scene_curve'];
     if (sceneCurve === undefined) throw new Error('Expected current scene-curve node.');
@@ -178,8 +166,39 @@ describe('editor persistence effect runner', () => {
     expect(editorPersistenceRequestSchema.parse(request)).toEqual(request);
   });
 
+  test('preserves validated current layer artifacts while rejecting arbitrary render extensions', () => {
+    const withArtifacts = document(0.5);
+    withArtifacts.extensions['rawEngineArtifacts'] = { layerStackSidecars: [], schemaVersion: 1 };
+    withArtifacts.extensions['browserHarnessTransport'] = { schemaVersion: 1 };
+
+    const request = buildEditorPersistenceRequest({ editDocumentV2: withArtifacts, path: '/fixtures/a.raw' });
+
+    expect(request.editDocumentV2.extensions).toEqual({
+      rawEngineArtifacts: { layerStackSidecars: [], schemaVersion: 1 },
+    });
+    expect(editorPersistenceRequestSchema.parse(request)).toEqual(request);
+    expect(
+      editorPersistenceRequestSchema.safeParse({
+        ...request,
+        editDocumentV2: {
+          ...request.editDocumentV2,
+          extensions: { browserHarnessTransport: { schemaVersion: 1 } },
+        },
+      }).success,
+    ).toBeFalse();
+    expect(
+      editorPersistenceRequestSchema.safeParse({
+        ...request,
+        editDocumentV2: {
+          ...request.editDocumentV2,
+          extensions: { rawEngineArtifacts: { layerStackSidecars: 'invalid', schemaVersion: 1 } },
+        },
+      }).success,
+    ).toBeFalse();
+  });
+
   test('rejects malformed, flat legacy, and unquarantined future authority without replacing the last valid request', () => {
-    const valid = buildEditorPersistenceRequest({ editDocumentV2: currentDocument(0.4), path: '/fixtures/a.raw' });
+    const valid = buildEditorPersistenceRequest({ editDocumentV2: document(0.4), path: '/fixtures/a.raw' });
     let persisted = { catalogRevision: 7, request: structuredClone(valid), sidecarRevision: 'sha256:last-valid' };
     const malformed = structuredClone(valid);
     const malformedTone = malformed.editDocumentV2.nodes['scene_global_color_tone'];
@@ -221,10 +240,10 @@ describe('editor persistence effect runner', () => {
       });
       return receipt(execution.path, execution.revision);
     });
-    const initial = currentDocument(0);
-    runner.installSession(input({ adjustmentRevision: 0, adjustments: adjustments(0), editDocumentV2: initial }));
-    const edited = currentDocument(0.65);
-    runner.submitCommitted(input({ adjustments: adjustments(0.65), editDocumentV2: edited }), 0);
+    const initial = document(0);
+    runner.installSession(input({ adjustmentRevision: 0, editDocumentV2: initial }));
+    const edited = document(0.65);
+    runner.submitCommitted(input({ editDocumentV2: edited }), 0);
     clock.advance(0);
     await flush();
 
@@ -238,12 +257,12 @@ describe('editor persistence effect runner', () => {
       rating: 0,
       tags: null,
     };
-    const nativeDocument = nativeEnvelope.editDocumentV2 as ReturnType<typeof currentDocument>;
+    const nativeDocument = nativeEnvelope.editDocumentV2 as ReturnType<typeof document>;
     expect(nativeDocument.nodes['scene_curve']?.params).not.toHaveProperty('sceneCurveV1');
     expect(nativeDocument.nodes['scene_curve']?.params).not.toHaveProperty('outputCurveV1');
     expect(nativeDocument.extensions).toEqual({});
 
-    const reopened = hydrateImageOpenEditDocumentV2(nativeEnvelope, adjustments(0.65));
+    const reopened = hydrateImageOpenEditDocumentV2(nativeEnvelope);
     expect(reopened).toEqual(edited);
     expect(reopened.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.65);
   });
@@ -272,7 +291,7 @@ describe('editor persistence effect runner', () => {
       executions += 1;
       return receipt(value.path);
     });
-    const primed = input({ adjustmentRevision: 0, adjustments: adjustments(0) });
+    const primed = input({ adjustmentRevision: 0, editDocumentV2: document(0) });
 
     runner.installSession(primed);
     runner.installSession(primed);
@@ -280,7 +299,7 @@ describe('editor persistence effect runner', () => {
 
     expect(executions).toBe(0);
     expect(snapshots).toHaveLength(1);
-    expect(snapshots[0]).toMatchObject({ adjustments: primed.adjustments, path: primed.path });
+    expect(snapshots[0]).toMatchObject({ editDocumentV2: primed.editDocumentV2, path: primed.path });
   });
 
   test('uses fake time and waits until interaction settles', async () => {
@@ -310,12 +329,9 @@ describe('editor persistence effect runner', () => {
       return receipt(value.path);
     });
     prime(runner);
-    const changedAdjustments = { ...adjustments(1), contrast: 25 };
-    const changedDocument = legacyAdjustmentsToEditDocumentV2(changedAdjustments);
     runner.submitCommitted(
       input({
-        adjustments: changedAdjustments,
-        editDocumentV2: changedDocument,
+        editDocumentV2: patchEditDocumentV2Node(document(1), 'scene_global_color_tone', { contrast: 25 }),
         multiSelection: { paths: ['/fixtures/b.raw'], selectedNodeIds: ['scene_global_color_tone'] },
       }),
       0,
@@ -323,9 +339,10 @@ describe('editor persistence effect runner', () => {
     clock.advance(0);
     await flush();
 
-    expect(executions[0]?.multiSelection).toEqual({
-      editDocumentV2: copyEditDocumentV2Nodes(changedDocument, ['scene_global_color_tone']),
-      paths: ['/fixtures/b.raw'],
+    expect(executions[0]?.multiSelection?.paths).toEqual(['/fixtures/b.raw']);
+    expect(executions[0]?.multiSelection?.payload.nodes['scene_global_color_tone']?.params).toMatchObject({
+      contrast: 25,
+      exposure: 1,
     });
   });
 
@@ -346,7 +363,7 @@ describe('editor persistence effect runner', () => {
       runner.submitCommitted(
         input({
           adjustmentRevision: 2,
-          adjustments: adjustments(2),
+          editDocumentV2: document(2),
           receipt: editReceipt('session-a', 2),
         }),
         0,
@@ -364,13 +381,13 @@ describe('editor persistence effect runner', () => {
     runner.submitCommitted(
       input({
         adjustmentRevision: 3,
-        adjustments: adjustments(3),
+        editDocumentV2: document(3),
         receipt: editReceipt('session-a', 3, 'native-committed'),
       }),
     );
     clock.advance(100);
     expect(executions).toHaveLength(1);
-    expect(snapshots.at(-1)).toMatchObject({ adjustments: adjustments(3), path: '/fixtures/a.raw' });
+    expect(snapshots.at(-1)).toMatchObject({ editDocumentV2: document(3), path: '/fixtures/a.raw' });
   });
 
   test('serializes revisions so a delayed predecessor cannot overwrite the newest sidecar', async () => {
@@ -387,12 +404,7 @@ describe('editor persistence effect runner', () => {
     runner.submitCommitted(input(), 0);
     clock.advance(0);
     runner.submitCommitted(
-      input({
-        adjustmentRevision: 2,
-        adjustments: adjustments(2),
-        editDocumentV2: currentDocument(2),
-        receipt: editReceipt('session-a', 2),
-      }),
+      input({ adjustmentRevision: 2, editDocumentV2: document(2), receipt: editReceipt('session-a', 2) }),
       0,
     );
     clock.advance(0);
@@ -409,7 +421,7 @@ describe('editor persistence effect runner', () => {
     expect(accepted.map(({ execution }) => execution.revision)).toEqual([2]);
     expect(accepted[0]?.execution.editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(2);
     expect(failures).toHaveLength(0);
-    expect(snapshots.at(-1)).toMatchObject({ adjustments: adjustments(2), path: '/fixtures/a.raw' });
+    expect(snapshots.at(-1)).toMatchObject({ editDocumentV2: document(2), path: '/fixtures/a.raw' });
   });
 
   test('A to B to successor-A rejects stale success and failure', async () => {

@@ -5,10 +5,9 @@ import {
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { CropStraightenSessionIdentity } from '../../../src/components/panel/editor/cropStraightenController';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildCropEditTransaction } from '../../../src/utils/cropEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/crop-target.ARW';
 const sourceRevision = 'viewer-graph:crop:1';
@@ -51,7 +50,9 @@ const transactionState = () => ({
 describe('crop edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: adjustments.exposure,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -71,17 +72,15 @@ describe('crop edit transaction', () => {
 
     expect(request.operations).toEqual([{ nodeType: 'geometry', patch: { crop }, type: 'patch-edit-document-node' }]);
     expect(result).toMatchObject({
-      changedKeys: ['crop'],
+      changedKeys: ['nodes.geometry.params.crop'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'geometry-tool',
     });
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
-    const geometry = editDocumentGeometryV2Schema.parse(result.afterEditDocumentV2.nodes['geometry']?.params);
+    expect(result.after.nodes['scene_global_color_tone']).toEqual(result.before.nodes['scene_global_color_tone']);
+    const geometry = editDocumentGeometryV2Schema.parse(result.after.nodes['geometry']?.params);
     expect(geometry.crop).toEqual(crop);
-    expect(result.afterEditDocumentV2.geometry).toEqual(geometry);
+    expect(result.after.geometry).toEqual(geometry);
     expect(result.invalidatedStages).toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -92,14 +91,13 @@ describe('crop edit transaction', () => {
     expect(useEditorStore.getState().adjustmentSnapshot.editDocumentV2).toBe(useEditorStore.getState().editDocumentV2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.crop).toBeNull();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.geometry.crop).toBeNull();
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
   });
 
   test('preserves exact no-ops and rejects stale source, session, graph, generation, tool, and revision', () => {
     useEditorStore.getState().hydrateEditorRenderAuthority((state) => {
-      const adjustments = { ...state.adjustmentSnapshot.value, crop };
-      const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+      const editDocumentV2 = patchEditDocumentV2Node(state.editDocumentV2, 'geometry', { crop });
       return {
         adjustmentRevision: state.adjustmentRevision,
         editDocumentV2,
@@ -133,7 +131,7 @@ describe('crop edit transaction', () => {
       baseAdjustmentRevision: 0,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { exposure: 0.5 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure: 0.5 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-edit',

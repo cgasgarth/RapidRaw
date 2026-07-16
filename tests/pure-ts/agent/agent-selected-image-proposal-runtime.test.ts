@@ -207,7 +207,7 @@ describe('agent selected-image proposal runtime', () => {
       requestId: 'issue-5014-live-session',
       reviewedCommand: buildAgentReviewedAdjustmentCommandPlan({
         commandId: 'highlight_recovery',
-        sourceAdjustments: useEditorStore.getState().adjustmentSnapshot.value,
+        sourceEditDocumentV2: useEditorStore.getState().editDocumentV2,
       }).receipt,
       sessionId: 'issue-5014-live-session',
     });

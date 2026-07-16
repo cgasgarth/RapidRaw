@@ -958,12 +958,12 @@ export async function assertNegativeLabBaseFogPreviewExportProof(page) {
   const hasPickedNeutralPatchEstimate = estimateCalls.some(
     (call) => negativeLabPickedNeutralPatchSampleSchema.safeParse(call.args.sampleRect).success,
   );
-  const hasAutoPreview = previewCalls.some((call) => call.args.params.base_fog_sample === null);
+  const hasAutoPreview = previewCalls.some((call) => call.args.params['base_fog_sample'] === null);
   const hasManualPreview = previewCalls.some(
-    (call) => call.args.params.base_fog_sample !== null && call.args.params.blue_weight === 1.18,
+    (call) => call.args.params['base_fog_sample'] !== null && call.args.params['blue_weight'] === 1.18,
   );
   const hasCustomBasePreview = previewCalls.some(
-    (call) => negativeLabCustomBaseSampleSchema.safeParse(call.args.params.base_fog_sample).success,
+    (call) => negativeLabCustomBaseSampleSchema.safeParse(call.args.params['base_fog_sample']).success,
   );
 
   if (

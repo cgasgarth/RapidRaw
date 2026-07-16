@@ -1,7 +1,7 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments, BasicAdjustment } from './adjustments';
-import { applyBasicToneCommandEnvelopeToAdjustments, type BasicToneCommandEnvelope } from './basicToneCommandBridge';
-import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
+import type { BasicAdjustment } from './adjustments';
+import type { BasicToneCommandEnvelope } from './basicToneCommandBridge';
+import type { EditTransactionRequest } from './editTransaction';
 
 export interface BasicToneCommitIdentity {
   adjustmentRevision: number;
@@ -17,7 +17,6 @@ export interface BasicToneEditTransactionState {
 }
 
 export interface BasicToneCommandEditTransactionState extends BasicToneEditTransactionState {
-  adjustmentSnapshot: { readonly value: Adjustments };
   editDocumentV2: EditDocumentV2;
 }
 
@@ -84,12 +83,34 @@ export const buildBasicToneCommandEditTransaction = (
       `basic_tone_transaction.stale_command_source:${typeof commandSource === 'string' ? commandSource : 'none'}:${identity.sourceIdentity}`,
     );
   }
-  const adjustments = applyBasicToneCommandEnvelopeToAdjustments(state.adjustmentSnapshot.value, command);
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: buildAdjustmentMutationOperations(state.adjustmentSnapshot.value, adjustments, state.editDocumentV2),
+    operations: [
+      {
+        nodeType: 'scene_global_color_tone',
+        patch: {
+          blacks: command.parameters.blackPoint,
+          contrast: command.parameters.contrast,
+          exposure: command.parameters.exposureEv,
+          highlights: command.parameters.highlights,
+          shadows: command.parameters.shadows,
+          whites: command.parameters.whitePoint,
+        },
+        type: 'patch-edit-document-node',
+      },
+      {
+        nodeType: 'detail_denoise_dehaze',
+        patch: { clarity: command.parameters.clarity },
+        type: 'patch-edit-document-node',
+      },
+      {
+        nodeType: 'color_presence',
+        patch: { saturation: command.parameters.saturation },
+        type: 'patch-edit-document-node',
+      },
+    ],
     persistence: 'commit',
     source: 'agent-command',
     transactionId: command.commandId,

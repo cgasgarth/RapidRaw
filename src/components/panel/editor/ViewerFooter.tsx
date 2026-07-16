@@ -9,6 +9,7 @@ import {
   getEditorChromeStatusChips,
   getEditorChromeStatusStripChips,
 } from '../../../utils/color/runtime/gamutWarningDisplay';
+import { selectEditDocumentNode } from '../../../utils/editDocumentSelectors';
 import {
   type EditorZoomCommand,
   type EditorZoomResolutionState,
@@ -70,7 +71,7 @@ export default function ViewerFooter({
   );
   const editor = useEditorStore(
     useShallow((state) => ({
-      adjustmentProjection: state.adjustmentSnapshot.value,
+      levels: selectEditDocumentNode(state.editDocumentV2, 'luma_levels').params['levels'],
       compare: state.compare,
       exportSoftProofRecipeId: state.exportSoftProofRecipeId,
       exportSoftProofTransform: state.exportSoftProofTransform,
@@ -109,7 +110,7 @@ export default function ViewerFooter({
     () =>
       getEditorChromeStatusStripChips(
         getEditorChromeStatusChips({
-          adjustments: editor.adjustmentProjection,
+          adjustments: { levels: editor.levels },
           gamutWarningOverlay: editor.gamutWarningOverlay,
           previewScopeStatus: editor.previewScopeStatus,
           proofContext: {

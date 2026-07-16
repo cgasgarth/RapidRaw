@@ -1,6 +1,5 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from './adjustments';
-import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
+import type { EditNodeOperation, EditTransactionRequest } from './editTransaction';
 
 export interface AgentToolCommitIdentity {
   adjustmentRevision: number;
@@ -10,7 +9,6 @@ export interface AgentToolCommitIdentity {
 
 export interface AgentToolEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
   editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
@@ -32,7 +30,7 @@ export const captureAgentToolCommitIdentity = (state: AgentToolEditTransactionSt
 export const buildAgentToolEditTransaction = (
   state: AgentToolEditTransactionState,
   identity: AgentToolCommitIdentity,
-  nextAdjustments: Adjustments,
+  operations: readonly EditNodeOperation[],
   transactionId: string,
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== identity.sourceIdentity) {
@@ -52,11 +50,7 @@ export const buildAgentToolEditTransaction = (
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: buildAdjustmentMutationOperations(
-      state.adjustmentSnapshot.value,
-      nextAdjustments,
-      state.editDocumentV2,
-    ),
+    operations,
     persistence: 'commit',
     source: 'agent-command',
     transactionId,

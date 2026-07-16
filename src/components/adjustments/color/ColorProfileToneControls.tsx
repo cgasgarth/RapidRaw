@@ -7,12 +7,7 @@ import { useCameraProfileRegistry } from '../../../hooks/editor/useCameraProfile
 import type { CameraProfileId, ToneCurveId } from '../../../schemas/color/profileToneSchemas';
 import type { RawDevelopmentReport } from '../../../schemas/imageLoaderSchemas';
 import { TextVariants } from '../../../types/typography';
-import {
-  type Adjustments,
-  ColorAdjustment,
-  DEFAULT_PARAMETRIC_CURVE,
-  INITIAL_ADJUSTMENTS,
-} from '../../../utils/adjustments';
+import { ColorAdjustment, DEFAULT_PARAMETRIC_CURVE, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../utils/profileTonePresets';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { editorChromeTokens } from '../../ui/editorChromeTokens';
@@ -214,7 +209,7 @@ export const ColorProfileToneControls = ({
   );
 };
 
-const getProfileToneLabels = (adjustments: Adjustments, t: TFunction) => {
+const getProfileToneLabels = (adjustments: ColorPanelGroupProps['adjustments'], t: TFunction) => {
   const cameraProfileOptions = [
     { key: 'camera_standard', label: t('adjustments.color.profileTone.cameraProfiles.camera_standard') },
     { key: 'camera_neutral', label: t('adjustments.color.profileTone.cameraProfiles.camera_neutral') },

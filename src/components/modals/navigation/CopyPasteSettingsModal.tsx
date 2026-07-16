@@ -234,7 +234,7 @@ export function CopyPasteSettingsDraft({ initialSettings, onClose, onSave, show 
                 {COPY_PASTE_NODE_GROUPS.map(([section, descriptors]) => (
                   <div key={section}>
                     <UiText variant={TextVariants.heading} className="mb-2">
-                      {t(`editor.adjustmentSnapshot.value.sections.${section}`, { defaultValue: capitalize(section) })}
+                      {t(`editor.editDocumentV2.sections.${section}`, { defaultValue: capitalize(section) })}
                     </UiText>
                     {descriptors?.map((descriptor) => {
                       const isChecked = localSettings.selectedNodeIds.includes(descriptor.nodeType);

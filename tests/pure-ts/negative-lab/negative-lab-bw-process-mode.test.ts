@@ -14,8 +14,8 @@ describe('Negative Lab B&W silver process mode', () => {
     const catalog = negativeLabBuiltInUiPresetCatalogSchema.parse(NEGATIVE_LAB_BUILT_IN_UI_PRESET_CATALOG);
     const bw = catalog.presets.find((preset) => preset.processFamily === 'black_and_white_silver_negative');
     expect(bw).toBeDefined();
-    expect(bw?.params.process_family).toBe('black_and_white_silver_negative');
-    expect(bw?.params.color_finish?.enabled ?? false).toBe(false);
+    expect(bw?.params['process_family']).toBe('black_and_white_silver_negative');
+    expect(bw?.params['color_finish']?.enabled ?? false).toBe(false);
   });
 
   test('params reject an unsupported process family and preserve C-41 defaults', () => {

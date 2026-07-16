@@ -1,6 +1,5 @@
-import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from './adjustments';
-import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
+import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
+import type { EditTransactionRequest } from './editTransaction';
 
 export interface AgentEditGraphCommitIdentity {
   adjustmentRevision: number;
@@ -10,7 +9,6 @@ export interface AgentEditGraphCommitIdentity {
 
 export interface AgentEditGraphEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
   editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
@@ -34,7 +32,7 @@ export const captureAgentEditGraphCommitIdentity = (
 export const buildAgentEditGraphEditTransaction = (
   state: AgentEditGraphEditTransactionState,
   identity: AgentEditGraphCommitIdentity,
-  nextAdjustments: Adjustments,
+  patch: Readonly<Partial<EditDocumentNodeParamsV2<'scene_global_color_tone'>>>,
   transactionId: string,
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== identity.sourceIdentity) {
@@ -56,11 +54,7 @@ export const buildAgentEditGraphEditTransaction = (
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
     imageSessionId: identity.imageSessionId,
-    operations: buildAdjustmentMutationOperations(
-      state.adjustmentSnapshot.value,
-      nextAdjustments,
-      state.editDocumentV2,
-    ),
+    operations: [{ nodeType: 'scene_global_color_tone', patch, type: 'patch-edit-document-node' }],
     persistence: 'commit',
     source: 'agent-command',
     transactionId,

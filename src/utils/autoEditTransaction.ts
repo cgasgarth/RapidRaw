@@ -1,16 +1,81 @@
-import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
+import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { AdjustmentSnapshot } from './adjustmentSnapshots';
 import { publishAdjustmentSnapshot } from './adjustmentSnapshots';
-import type { Adjustments } from './adjustments';
-import {
-  buildAdjustmentMutationOperations,
-  type EditTransactionRequest,
-  reduceEditTransaction,
-} from './editTransaction';
+import { selectEditDocumentNode } from './editDocumentSelectors';
+import { type EditNodeOperation, type EditTransactionRequest, reduceEditTransaction } from './editTransaction';
+
+export interface AutoEditAdjustmentProposal {
+  blackWhiteMixer: EditDocumentNodeParamsV2<'black_white_mixer'>['blackWhiteMixer'];
+  blacks: number;
+  brightness: number;
+  centré: number;
+  clarity: number;
+  contrast: number;
+  dehaze: number;
+  exposure: number;
+  highlights: number;
+  shadows: number;
+  vibrance: number;
+  vignetteAmount: number;
+  whiteBalanceTechnical: EditDocumentNodeParamsV2<'camera_input'>['whiteBalanceTechnical'];
+  whites: number;
+}
+
+export const selectAutoEditAdjustmentProposal = (document: EditDocumentV2): AutoEditAdjustmentProposal => ({
+  blackWhiteMixer: selectEditDocumentNode(document, 'black_white_mixer').params['blackWhiteMixer'],
+  ...selectEditDocumentNode(document, 'scene_global_color_tone').params,
+  centré: selectEditDocumentNode(document, 'detail_denoise_dehaze').params['centré'],
+  clarity: selectEditDocumentNode(document, 'detail_denoise_dehaze').params['clarity'],
+  dehaze: selectEditDocumentNode(document, 'detail_denoise_dehaze').params['dehaze'],
+  vibrance: selectEditDocumentNode(document, 'color_presence').params['vibrance'],
+  vignetteAmount: selectEditDocumentNode(document, 'display_creative').params['vignetteAmount'],
+  whiteBalanceTechnical: selectEditDocumentNode(document, 'camera_input').params['whiteBalanceTechnical'],
+});
+
+const buildAutoEditNodeOperations = (adjustments: AutoEditAdjustmentProposal): readonly EditNodeOperation[] => [
+  {
+    nodeType: 'scene_global_color_tone',
+    patch: {
+      blacks: adjustments.blacks,
+      brightness: adjustments.brightness,
+      contrast: adjustments.contrast,
+      exposure: adjustments.exposure,
+      highlights: adjustments.highlights,
+      shadows: adjustments.shadows,
+      whites: adjustments.whites,
+    },
+    type: 'patch-edit-document-node',
+  },
+  {
+    nodeType: 'detail_denoise_dehaze',
+    patch: { centré: adjustments.centré, clarity: adjustments.clarity, dehaze: adjustments.dehaze },
+    type: 'patch-edit-document-node',
+  },
+  {
+    nodeType: 'color_presence',
+    patch: { vibrance: adjustments.vibrance },
+    type: 'patch-edit-document-node',
+  },
+  {
+    nodeType: 'display_creative',
+    patch: { vignetteAmount: adjustments.vignetteAmount },
+    type: 'patch-edit-document-node',
+  },
+  {
+    nodeType: 'camera_input',
+    patch: { whiteBalanceTechnical: adjustments.whiteBalanceTechnical },
+    type: 'patch-edit-document-node',
+  },
+  {
+    nodeType: 'black_white_mixer',
+    patch: { blackWhiteMixer: adjustments.blackWhiteMixer },
+    type: 'patch-edit-document-node',
+  },
+  { receipt: null, type: 'set-reference-match-application-receipt' },
+];
 
 export interface AutoEditProposalBase {
   adjustmentRevision: number;
-  adjustments: Adjustments;
   editDocumentV2: EditDocumentV2;
   graphRevision: string;
   imageSessionId: string;
@@ -19,8 +84,7 @@ export interface AutoEditProposalBase {
 
 export interface AutoEditProposalState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
-  editDocumentV2: EditDocumentV2;
+  readonly editDocumentV2: EditDocumentV2;
   historyIndex: number;
   imageSession: { id: string } | null;
   imageSessionId: number;
@@ -34,7 +98,6 @@ export const captureAutoEditProposalBase = (state: AutoEditProposalState): AutoE
   state.selectedImage?.isReady === true
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        adjustments: state.adjustmentSnapshot.value,
         editDocumentV2: state.editDocumentV2,
         graphRevision: `history_${String(state.historyIndex)}`,
         imageSessionId: currentAutoEditImageSessionId(state),
@@ -69,7 +132,7 @@ export interface AutoEditPreviewSession {
 }
 
 interface AutoEditPreviewInput {
-  adjustments: Adjustments;
+  adjustments: AutoEditAdjustmentProposal;
   base: AutoEditProposalBase;
   committedSnapshot: AdjustmentSnapshot;
   currentAdjustmentRevision: number;
@@ -117,13 +180,13 @@ export const createAutoEditPreviewSession = ({
           baseAdjustmentRevision: base.adjustmentRevision,
           history: 'none',
           imageSessionId: base.imageSessionId,
-          operations: buildAdjustmentMutationOperations(base.adjustments, adjustments, base.editDocumentV2),
+          operations: buildAutoEditNodeOperations(adjustments),
           persistence: 'preview-only',
           source: 'auto-edit',
           transactionId: `auto-edit-preview:${proposalId}`,
         },
         base.imageSessionId,
-      ).afterEditDocumentV2,
+      ).after,
     ),
   };
 };
@@ -165,13 +228,13 @@ export const clearAutoEditPreviewSession = (
 
 export const buildAutoEditTransactionRequest = (
   base: AutoEditProposalBase,
-  adjustments: Adjustments,
+  adjustments: AutoEditAdjustmentProposal,
   transactionId: string,
 ): EditTransactionRequest => ({
   baseAdjustmentRevision: base.adjustmentRevision,
   history: 'single-entry',
   imageSessionId: base.imageSessionId,
-  operations: buildAdjustmentMutationOperations(base.adjustments, adjustments, base.editDocumentV2),
+  operations: buildAutoEditNodeOperations(adjustments),
   persistence: 'commit',
   source: 'auto-edit',
   transactionId,

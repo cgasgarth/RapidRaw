@@ -287,17 +287,17 @@ export const useAgentSelectedImageWorkspaceController = ({
     DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
   );
   const [status, setStatus] = useState<AgentSelectedImageWorkspaceActionStatus>('idle');
-  const currentAdjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const currentAdjustments = useEditorStore((state) => state.editDocumentV2);
   const selectedCommandPlan = useMemo(
     () =>
       buildAgentReviewedAdjustmentCommandPlan({
         commandId: selectedCommandId,
-        sourceAdjustments: currentAdjustments,
+        sourceEditDocumentV2: currentAdjustments,
       }),
     [currentAdjustments, selectedCommandId],
   );
   const editorGraphRevision = useEditorStore((state) => `history_${state.historyIndex}`);
-  const editorRecipeInputs = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const editorRecipeInputs = useEditorStore((state) => state.editDocumentV2);
 
   const selectedImageReady = selectedImage !== null && selectedImage.isReady;
   const operationPending =

@@ -4,13 +4,14 @@ import userEvent from '@testing-library/user-event';
 import i18next from 'i18next';
 import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
+import { editDocumentSourceArtifactsV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { Mask, type SubMask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots.ts';
 import { type AiPatch, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2.ts';
 
 const invoke = mock(async () => null);
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
@@ -45,7 +46,9 @@ const imageSession = createEditorImageSession({ generation: 8, path: sourcePath,
 
 afterEach(() => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'source_artifacts', {
+    aiPatches: editDocumentSourceArtifactsV2Schema.parse({ aiPatches: adjustments.aiPatches }).aiPatches,
+  });
   act(() => {
     useEditorStore.getState().hydrateEditorRenderAuthority({
       activeAiPatchContainerId: null,
@@ -69,7 +72,9 @@ describe('AI panel command-owned selection', () => {
       ...structuredClone(INITIAL_ADJUSTMENTS),
       aiPatches: [edit('first', ['one', 'middle', 'last']), edit('second', [])],
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'source_artifacts', {
+      aiPatches: editDocumentSourceArtifactsV2Schema.parse({ aiPatches: adjustments.aiPatches }).aiPatches,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       activeAiPatchContainerId: 'first',
       activeAiSubMaskId: null,
@@ -128,7 +133,10 @@ describe('AI panel command-owned selection', () => {
     await user.click(deleteButton);
 
     const state = useEditorStore.getState();
-    expect(state.adjustmentSnapshot.value.aiPatches[0]?.subMasks.map((subMask) => subMask.id)).toEqual(['one', 'last']);
+    expect(state.editDocumentV2.sourceArtifacts.aiPatches[0]?.subMasks.map((subMask) => subMask.id)).toEqual([
+      'one',
+      'last',
+    ]);
     expect(state.activeAiPatchContainerId).toBe('first');
     expect(state.activeAiSubMaskId).toBe('last');
     expect(required<HTMLElement>(container, '[data-testid="inpaint-target-last"]').getAttribute('aria-pressed')).toBe(

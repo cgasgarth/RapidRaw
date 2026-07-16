@@ -154,7 +154,7 @@ export const buildAgentBasicToneDryRunPreviewArtifacts = async ({
     previewRef: beforeArtifact.artifactId,
     purpose: 'detail_review',
     recipeSeed: {
-      adjustments: editor.adjustmentSnapshot.value,
+      adjustments: editor.editDocumentV2,
       graphRevision: graphRevisionBefore,
       imagePath,
     },

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 
 import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
@@ -6,15 +7,14 @@ import {
   toneColorMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import { Invokes } from '../../../tauri/commands';
-import type { Adjustments } from '../../adjustments';
 import {
   type BasicToneAdjustmentPayload,
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
 } from '../../basicToneCommandBridge';
 import { captureBasicToneCommitIdentity } from '../../basicToneEditTransaction';
-import { invokeWithSchema } from '../../tauriSchemaInvoke';
+import { selectEditDocumentControlValue, selectEditDocumentNode } from '../../editDocumentSelectors';
+import { patchEditDocumentV2Node } from '../../editDocumentV2';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import {
   type AgentLiveBasicTonePixel,
@@ -45,8 +45,6 @@ const agentToneAdjustmentPatchSchema = z
   .refine((patch) => Object.keys(patch).length > 0, { message: 'At least one tone adjustment is required.' });
 
 export type AgentToneAdjustmentPatch = z.infer<typeof agentToneAdjustmentPatchSchema>;
-
-const previewBufferResponseSchema = z.instanceof(ArrayBuffer);
 
 export type AgentToneAdjustmentPromptDraft =
   | {
@@ -204,19 +202,22 @@ const PREVIEW_PROOF_PIXELS: readonly AgentLiveBasicTonePixel[] = Array.from(
 );
 
 const buildRequestedBasicTone = (
-  base: Adjustments,
+  base: EditDocumentV2,
   patch: z.infer<typeof agentToneAdjustmentPatchSchema>,
-): BasicToneAdjustmentPayload => ({
-  blacks: patch.blacks ?? base.blacks,
-  brightness: base.brightness,
-  clarity: patch.clarity ?? base.clarity,
-  contrast: patch.contrast ?? base.contrast,
-  exposure: patch.exposure ?? base.exposure,
-  highlights: patch.highlights ?? base.highlights,
-  saturation: patch.saturation ?? base.saturation,
-  shadows: patch.shadows ?? base.shadows,
-  whites: patch.whites ?? base.whites,
-});
+): BasicToneAdjustmentPayload => {
+  const global = selectEditDocumentNode(base, 'scene_global_color_tone').params;
+  return {
+    blacks: patch.blacks ?? global.blacks,
+    brightness: global.brightness,
+    clarity: patch.clarity ?? selectEditDocumentNode(base, 'detail_denoise_dehaze').params['clarity'],
+    contrast: patch.contrast ?? global.contrast,
+    exposure: patch.exposure ?? global.exposure,
+    highlights: patch.highlights ?? global.highlights,
+    saturation: patch.saturation ?? selectEditDocumentNode(base, 'color_presence').params['saturation'],
+    shadows: patch.shadows ?? global.shadows,
+    whites: patch.whites ?? global.whites,
+  };
+};
 
 const BASIC_TONE_ADJUSTMENT_PATCH_KEYS = [
   'blacks',
@@ -239,7 +240,7 @@ const includesAny = (normalizedPrompt: string, patterns: readonly string[]): boo
 
 export const buildAgentToneAdjustmentPromptDraft = (
   prompt: string,
-  baseAdjustments: Adjustments,
+  baseAdjustments: BasicToneAdjustmentPayload,
 ): AgentToneAdjustmentPromptDraft => {
   const normalizedPrompt = prompt.toLowerCase();
   const brightenRequested = includesAny(normalizedPrompt, [
@@ -296,38 +297,20 @@ export const buildAgentToneAdjustmentPromptDraft = (
   };
 };
 
-const setPatchedToneAdjustments = (
-  base: Adjustments,
-  patch: z.infer<typeof agentToneAdjustmentPatchSchema>,
-): Adjustments => {
-  const adjustments = { ...base };
-  for (const [key, value] of Object.entries(patch)) {
-    if (value !== undefined) adjustments[key as keyof Adjustments] = value as Adjustments[keyof Adjustments];
-  }
-  return adjustments;
-};
-
-const renderAgentToneDryRunPreview = async ({
-  baseAdjustments,
-  patch,
-  path,
-}: {
-  baseAdjustments: Adjustments;
-  patch: AgentToneAdjustmentPatch;
-  path: string;
-}): Promise<string> => {
-  const adjustments = setPatchedToneAdjustments(baseAdjustments, patch);
-  const buffer = await invokeWithSchema(
-    Invokes.GeneratePreviewForPath,
-    {
-      jsAdjustments: structuredClone(adjustments),
-      path,
-      targetResolution: 1536,
-    },
-    previewBufferResponseSchema,
-  );
-  if (buffer.byteLength === 0) throw new Error('Agent tone preview renderer returned an empty image.');
-  return URL.createObjectURL(new Blob([buffer], { type: 'image/jpeg' }));
+const applyTonePatchToDocument = (document: EditDocumentV2, patch: AgentToneAdjustmentPatch): EditDocumentV2 => {
+  let next = patchEditDocumentV2Node(document, 'scene_global_color_tone', {
+    ...(patch.blacks === undefined ? {} : { blacks: patch.blacks }),
+    ...(patch.contrast === undefined ? {} : { contrast: patch.contrast }),
+    ...(patch.exposure === undefined ? {} : { exposure: patch.exposure }),
+    ...(patch.highlights === undefined ? {} : { highlights: patch.highlights }),
+    ...(patch.shadows === undefined ? {} : { shadows: patch.shadows }),
+    ...(patch.whites === undefined ? {} : { whites: patch.whites }),
+  });
+  if (patch.clarity !== undefined)
+    next = patchEditDocumentV2Node(next, 'detail_denoise_dehaze', { clarity: patch.clarity });
+  if (patch.saturation !== undefined)
+    next = patchEditDocumentV2Node(next, 'color_presence', { saturation: patch.saturation });
+  return next;
 };
 
 const getSnapshotGraphAndRecipe = () => {
@@ -463,7 +446,7 @@ export const dryRunAgentToneAdjustment = async (
   if (imagePath === undefined) throw new Error('Cannot dry-run agent tone adjustment without a selected image.');
 
   const command = buildBasicToneCommandEnvelope(
-    buildRequestedBasicTone(initialState.adjustmentSnapshot.value, parsedRequest.adjustments),
+    buildRequestedBasicTone(initialState.editDocumentV2, parsedRequest.adjustments),
     buildBasicToneImageCommandContext({
       expectedGraphRevision: parsedRequest.expectedGraphRevision,
       imagePath,
@@ -573,19 +556,18 @@ export const applyAgentToneAdjustment = async (
     operationId: parsedRequest.operationId,
     sessionId: parsedRequest.sessionId,
   });
-  const requestedAdjustments = buildRequestedBasicTone(
-    initialState.adjustmentSnapshot.value,
-    parsedRequest.adjustments,
-  );
+  const requestedAdjustments = buildRequestedBasicTone(initialState.editDocumentV2, parsedRequest.adjustments);
   const dryRunCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, { dryRun: true });
   const applyCommand = buildBasicToneCommandEnvelope(requestedAdjustments, context, {
     acceptedDryRunPlanHash: acceptedReceipt.basicTonePlanHash,
     acceptedDryRunPlanId: acceptedReceipt.basicTonePlanId,
     dryRun: false,
   });
-  const nextAdjustments = setPatchedToneAdjustments(initialState.adjustmentSnapshot.value, parsedRequest.adjustments);
+  const nextAdjustments = applyTonePatchToDocument(initialState.editDocumentV2, parsedRequest.adjustments);
   const adjustedFields = getAdjustedFields(parsedRequest.adjustments).filter(
-    (key) => initialState.adjustmentSnapshot.value[key] !== nextAdjustments[key],
+    (key) =>
+      selectEditDocumentControlValue(initialState.editDocumentV2, key) !==
+      selectEditDocumentControlValue(nextAdjustments, key),
   );
   let mutation: z.infer<typeof toneColorMutationResultV1Schema> | undefined;
   if (adjustedFields.length > 0) {

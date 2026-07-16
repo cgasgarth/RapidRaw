@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import type {
+  EditDocumentNodeParamsV2,
+  EditDocumentV2,
+} from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import type { RawEngineLocalAppServerBridge } from '../../../../packages/rawengine-schema/src/localAppServerBridge';
 import {
   type ToneColorMutationResultV1,
@@ -10,10 +14,10 @@ import { channelMixerSettingsSchema } from '../../../schemas/color/channelMixerS
 import { colorBalanceRgbSettingsSchema } from '../../../schemas/color/colorBalanceRgbSchemas';
 import { cameraProfileIdSchema, toneCurveIdSchema } from '../../../schemas/color/profileToneSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import { getDefaultParametricCurve } from '../../adjustments';
 import { buildAgentToolEditTransaction, captureAgentToolCommitIdentity } from '../../agentToolEditTransaction';
 import { technicalWhiteBalanceSchema } from '../../color/whiteBalance';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../profileTonePresets';
 import {
   applySelectiveColorCommandEnvelopeToAdjustments,
@@ -240,12 +244,36 @@ const AGENT_COLOR_PIPELINE = {
   workingSpace: 'acescg_linear_v1',
 } as const satisfies SelectiveColorCommandColorPipeline;
 
+type AgentColorView = EditDocumentNodeParamsV2<'black_white_mixer'> &
+  EditDocumentNodeParamsV2<'camera_input'> &
+  EditDocumentNodeParamsV2<'channel_mixer'> &
+  EditDocumentNodeParamsV2<'color_balance_rgb'> &
+  EditDocumentNodeParamsV2<'color_calibration'> &
+  EditDocumentNodeParamsV2<'color_presence'> &
+  EditDocumentNodeParamsV2<'perceptual_grading'> &
+  EditDocumentNodeParamsV2<'scene_curve'> &
+  EditDocumentNodeParamsV2<'selective_color_mixer'> &
+  EditDocumentNodeParamsV2<'skin_tone_uniformity'>;
+
+const selectAgentColorView = (document: EditDocumentV2): AgentColorView => ({
+  ...selectEditDocumentNode(document, 'black_white_mixer').params,
+  ...selectEditDocumentNode(document, 'camera_input').params,
+  ...selectEditDocumentNode(document, 'channel_mixer').params,
+  ...selectEditDocumentNode(document, 'color_balance_rgb').params,
+  ...selectEditDocumentNode(document, 'color_calibration').params,
+  ...selectEditDocumentNode(document, 'color_presence').params,
+  ...selectEditDocumentNode(document, 'perceptual_grading').params,
+  ...selectEditDocumentNode(document, 'scene_curve').params,
+  ...selectEditDocumentNode(document, 'selective_color_mixer').params,
+  ...selectEditDocumentNode(document, 'skin_tone_uniformity').params,
+});
+
 const applyColorPatchToAdjustments = (
-  base: Adjustments,
+  base: AgentColorView,
   patch: AgentColorPatch,
   { includeSelectiveColor }: { includeSelectiveColor: boolean } = { includeSelectiveColor: true },
-): Adjustments => {
-  const next: Adjustments = { ...base };
+): AgentColorView => {
+  const next: AgentColorView = { ...base };
   if (patch.whiteBalanceTechnical !== undefined)
     next.whiteBalanceTechnical = structuredClone(patch.whiteBalanceTechnical);
   if (patch.vibrance !== undefined) next.vibrance = patch.vibrance;
@@ -313,8 +341,8 @@ const estimateChangedPixels = ({
   before,
   imageArea,
 }: {
-  after: Adjustments;
-  before: Adjustments;
+  after: AgentColorView;
+  before: AgentColorView;
   imageArea: number;
 }) => {
   const changedFieldCount = COLOR_PATCH_KEYS.filter(
@@ -323,7 +351,10 @@ const estimateChangedPixels = ({
   return changedFieldCount === 0 ? 0 : Math.max(1, Math.round((imageArea / 384) * changedFieldCount));
 };
 
-const buildSelectiveColorPayloads = (base: Adjustments, patch: AgentColorPatch): SelectiveColorAdjustmentPayload[] => {
+const buildSelectiveColorPayloads = (
+  base: EditDocumentNodeParamsV2<'selective_color_mixer'>,
+  patch: AgentColorPatch,
+): SelectiveColorAdjustmentPayload[] => {
   const payloads: SelectiveColorAdjustmentPayload[] = [];
   for (const rangeKey of SELECTIVE_COLOR_RANGE_KEYS) {
     const adjustment = patch.hsl?.[rangeKey] ?? base.hsl[rangeKey];
@@ -406,7 +437,9 @@ export const applyAgentColor = async (
   if (commitIdentity === null) throw new Error('Agent color apply requires a selected image session.');
 
   const undoGraphRevision = `history_${state.historyIndex}`;
-  const selectiveColorPayloads = buildSelectiveColorPayloads(state.adjustmentSnapshot.value, parsedRequest.color);
+  const beforeAdjustments = selectAgentColorView(state.editDocumentV2);
+  const selectiveBase = selectEditDocumentNode(state.editDocumentV2, 'selective_color_mixer').params;
+  const selectiveColorPayloads = buildSelectiveColorPayloads(selectiveBase, parsedRequest.color);
   const { applyCommands, mutations: typedMutations } = await dispatchSelectiveColorPayloads({
     bridge,
     expectedGraphRevision: undoGraphRevision,
@@ -415,23 +448,95 @@ export const applyAgentColor = async (
     payloads: selectiveColorPayloads,
     sessionId: parsedRequest.sessionId,
   });
-  const typedAdjustments = applyCommands.reduce(
+  const typedSelectiveColor = applyCommands.reduce(
     (adjustments, applyCommand) => applySelectiveColorCommandEnvelopeToAdjustments(adjustments, applyCommand),
-    state.adjustmentSnapshot.value,
+    selectiveBase,
   );
-  const nextAdjustments = applyColorPatchToAdjustments(typedAdjustments, parsedRequest.color, {
-    includeSelectiveColor: false,
-  });
+  const nextAdjustments = applyColorPatchToAdjustments(
+    { ...beforeAdjustments, ...typedSelectiveColor },
+    parsedRequest.color,
+    {
+      includeSelectiveColor: false,
+    },
+  );
   const currentState = useEditorStore.getState();
   currentState.applyEditTransaction(
-    buildAgentToolEditTransaction(currentState, commitIdentity, nextAdjustments, `${parsedRequest.operationId}_apply`),
+    buildAgentToolEditTransaction(
+      currentState,
+      commitIdentity,
+      [
+        {
+          nodeType: 'color_presence',
+          patch: { saturation: nextAdjustments.saturation, vibrance: nextAdjustments.vibrance },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'camera_input',
+          patch: {
+            cameraProfile: nextAdjustments.cameraProfile,
+            whiteBalanceTechnical: nextAdjustments.whiteBalanceTechnical,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'scene_curve',
+          patch: {
+            ...(nextAdjustments.curveMode === undefined ? {} : { curveMode: nextAdjustments.curveMode }),
+            ...(nextAdjustments.parametricCurve === undefined
+              ? {}
+              : { parametricCurve: nextAdjustments.parametricCurve }),
+            toneCurve: nextAdjustments.toneCurve,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'selective_color_mixer',
+          patch: {
+            hsl: nextAdjustments.hsl,
+            selectiveColorRangeControls: nextAdjustments.selectiveColorRangeControls,
+          },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'black_white_mixer',
+          patch: { blackWhiteMixer: nextAdjustments.blackWhiteMixer },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'channel_mixer',
+          patch: { channelMixer: nextAdjustments.channelMixer },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'color_balance_rgb',
+          patch: { colorBalanceRgb: nextAdjustments.colorBalanceRgb },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'color_calibration',
+          patch: { colorCalibration: nextAdjustments.colorCalibration },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'perceptual_grading',
+          patch: { colorGrading: nextAdjustments.colorGrading },
+          type: 'patch-edit-document-node',
+        },
+        {
+          nodeType: 'skin_tone_uniformity',
+          patch: { skinToneUniformity: nextAdjustments.skinToneUniformity },
+          type: 'patch-edit-document-node',
+        },
+      ],
+      `${parsedRequest.operationId}_apply`,
+    ),
   );
 
   const afterSnapshot = buildAgentImageContextSnapshot();
   const adjustedFields = COLOR_PATCH_KEYS.filter(
     (key) =>
       parsedRequest.color[key] !== undefined &&
-      JSON.stringify(state.adjustmentSnapshot.value[key]) !== JSON.stringify(nextAdjustments[key]),
+      JSON.stringify(beforeAdjustments[key]) !== JSON.stringify(nextAdjustments[key]),
   );
   const previewAfter =
     adjustedFields.length === 0
@@ -452,7 +557,7 @@ export const applyAgentColor = async (
     beforePreviewHash: snapshot.initialPreview.renderHash,
     changedPixelCount: estimateChangedPixels({
       after: nextAdjustments,
-      before: state.adjustmentSnapshot.value,
+      before: beforeAdjustments,
       imageArea: selectedImage.width * selectedImage.height,
     }),
     previewAfter: {

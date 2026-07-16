@@ -1,13 +1,7 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import {
-  createDefaultEditDocumentV2,
-  editDocumentV2ToLegacyAdjustments,
-  legacyAdjustmentsToEditDocumentV2,
-} from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   applyEditorTeardownIfCurrent,
   buildEditorTeardownTransaction,
@@ -33,10 +27,11 @@ const selectedImage = {
 
 describe('editor teardown transaction', () => {
   const defaultDocument = createDefaultEditDocumentV2();
-  const defaultAdjustments = editDocumentV2ToLegacyAdjustments(defaultDocument);
   beforeEach(() => {
-    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), contrast: 12, exposure: 1.4 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(defaultDocument, 'scene_global_color_tone', {
+      contrast: 12,
+      exposure: 1.4,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       activeMaskContainerId: 'mask-container-A',
       activeMaskId: 'mask-A',
@@ -44,7 +39,7 @@ describe('editor teardown transaction', () => {
       editDocumentV2,
       finalPreviewUrl: 'blob:image-a-preview',
       hasRenderedFirstFrame: true,
-      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
+      history: [createDefaultEditDocumentV2(), editDocumentV2],
       historyCheckpoints: [{ createdAt: '2026-07-15T00:00:00.000Z', historyIndex: 1, id: 'a', label: 'A' }],
       historyIndex: 1,
       imageSession: session,
@@ -156,12 +151,12 @@ describe('editor teardown transaction', () => {
       transformedOriginalUrl: null,
       uncroppedAdjustedPreviewUrl: null,
     });
-    expect(after.adjustmentSnapshot.value).toEqual(defaultAdjustments);
+    expect(after.editDocumentV2).toEqual(defaultDocument);
     expect(after.history).toEqual([defaultDocument]);
     expect(after.historyCheckpoints).toEqual([]);
 
     after.undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(defaultAdjustments);
+    expect(useEditorStore.getState().editDocumentV2).toEqual(defaultDocument);
     expect(useEditorStore.getState().selectedImage).toBeNull();
   });
 
@@ -172,8 +167,9 @@ describe('editor teardown transaction', () => {
     const request = buildEditorTeardownTransaction(imageA, identity, 'folder-switch');
     const pathB = '/fixtures/teardown-B.CR3';
     const sessionB = createEditorImageSession({ generation: 71, path: pathB, source: 'cold-load' });
-    const adjustmentsB = { ...imageA.adjustmentSnapshot.value, exposure: 2.2 };
-    const editDocumentB = legacyAdjustmentsToEditDocumentV2(adjustmentsB);
+    const editDocumentB = patchEditDocumentV2Node(imageA.editDocumentV2, 'scene_global_color_tone', {
+      exposure: 2.2,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 6,
       finalPreviewUrl: 'blob:image-b-preview',
@@ -192,7 +188,7 @@ describe('editor teardown transaction', () => {
     const after = useEditorStore.getState();
     expect(after.imageSession).toBe(sessionB);
     expect(after.selectedImage).toBe(before.selectedImage);
-    expect(after.adjustmentSnapshot.value).toEqual(adjustmentsB);
+    expect(after.editDocumentV2).toEqual(editDocumentB);
     expect(after.history).toBe(before.history);
     expect(after.finalPreviewUrl).toBe('blob:image-b-preview');
   });
@@ -209,7 +205,7 @@ describe('editor teardown transaction', () => {
     if (identity === null) throw new Error('Expected fallback teardown identity.');
     expect(applyEditorTeardownIfCurrent(legacy, identity, 'legacy-exit')).toBeTrue();
     expect(useEditorStore.getState()).toMatchObject({ imageSession: null, selectedImage: null });
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toEqual(defaultAdjustments);
+    expect(useEditorStore.getState().editDocumentV2).toEqual(defaultDocument);
   });
 
   test('clears an already-neutral session without inventing an adjustment revision', () => {
@@ -249,12 +245,12 @@ describe('editor teardown transaction', () => {
       selectedImage: { ...selectedImage, isReady: false, path: pathB },
     });
     const reentered = useEditorStore.getState();
-    const hydrated = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: -0.6 };
+    const hydrated = patchEditDocumentV2Node(defaultDocument, 'scene_global_color_tone', { exposure: -0.6 });
     reentered.applyEditTransaction(
       buildImageOpenHydrationEditTransaction(
         reentered,
         { adjustmentRevision: reentered.adjustmentRevision, imageSessionId: sessionB.id, path: pathB },
-        legacyAdjustmentsToEditDocumentV2(hydrated),
+        hydrated,
         're-enter-hydration',
       ),
     );
@@ -262,8 +258,8 @@ describe('editor teardown transaction', () => {
     const after = useEditorStore.getState();
     expect(after.imageSession).toBe(sessionB);
     expect(after.selectedImage?.path).toBe(pathB);
-    expect(after.adjustmentSnapshot.value.exposure).toBe(-0.6);
-    expect(after.adjustmentSnapshot.value.contrast).toBe(0);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(-0.6);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['contrast']).toBe(0);
     expect(after.history).toEqual([after.editDocumentV2]);
   });
 });

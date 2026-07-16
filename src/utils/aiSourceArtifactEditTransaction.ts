@@ -1,3 +1,4 @@
+import { editDocumentSourceArtifactsV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { AiPatch } from './adjustments';
 import type { EditTransactionRequest } from './editTransaction';
 
@@ -16,6 +17,7 @@ export const buildAiSourceArtifactEditTransaction = (
   const sourcePath = state.selectedImage?.path;
   const session = state.imageSession;
   if (sourcePath === undefined || session === null || session.path !== sourcePath) return null;
+  const sourceArtifacts = editDocumentSourceArtifactsV2Schema.parse({ aiPatches: structuredClone(aiPatches) });
 
   return {
     baseAdjustmentRevision: state.adjustmentRevision,
@@ -24,7 +26,7 @@ export const buildAiSourceArtifactEditTransaction = (
     operations: [
       {
         nodeType: 'source_artifacts',
-        patch: { aiPatches: structuredClone(aiPatches) },
+        patch: sourceArtifacts,
         type: 'patch-edit-document-node',
       },
     ],

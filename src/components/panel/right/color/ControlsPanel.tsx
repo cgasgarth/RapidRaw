@@ -25,7 +25,11 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
-import { getEditDocumentNodeTypesForEditorSection } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
+import {
+  type EditDocumentNodeTypeV2,
+  type EditDocumentV2CopyPayload,
+  getEditDocumentNodeTypesForEditorSection,
+} from '../../../../../packages/rawengine-schema/src/editDocumentV2';
 
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
@@ -46,7 +50,6 @@ import { Invokes } from '../../../../tauri/commands';
 import { TextVariants } from '../../../../types/typography';
 import {
   ActiveChannel,
-  ADJUSTMENT_SECTIONS,
   type Adjustments,
   BasicAdjustment,
   CreativeAdjustment,
@@ -57,7 +60,6 @@ import {
   LensAdjustment,
   type ParametricCurve,
   type ParametricCurveSettings,
-  pickAdjustmentValues,
   TransformAdjustment,
 } from '../../../../utils/adjustments';
 import {
@@ -68,6 +70,7 @@ import {
   createAutoEditPreviewSession,
   currentAutoEditImageSessionId,
   isCurrentAutoEditProposalRequest,
+  selectAutoEditAdjustmentProposal,
   setAutoEditPreviewBypass,
 } from '../../../../utils/autoEditTransaction';
 import {
@@ -82,18 +85,28 @@ import {
   isDetailBooleanNodeAdjustment,
   isDetailNumberNodeAdjustment,
 } from '../../../../utils/detailEditTransaction';
+import {
+  selectEditDocumentControlValue,
+  selectEditDocumentGeometry,
+  selectEditDocumentNode,
+} from '../../../../utils/editDocumentSelectors';
+import { copyEditDocumentV2Nodes, createDefaultEditDocumentV2 } from '../../../../utils/editDocumentV2';
+import type { EditNodeOperation } from '../../../../utils/editTransaction';
 import { formatUnknownError } from '../../../../utils/errorFormatting';
 import { deriveEffectiveDisclosureState } from '../../../../utils/searchDisclosureState';
 import { invokeWithSchema } from '../../../../utils/tauriSchemaInvoke';
 import { getLensCorrectionAvailability } from '../../../../utils/transformLensControls';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import { AutoEditReviewPopover } from '../../../adjustments/AutoEditReviewPopover';
-import BasicAdjustments from '../../../adjustments/Basic';
-import CurveGraph from '../../../adjustments/Curves';
-import DetailsPanel from '../../../adjustments/Details';
-import EffectsPanel from '../../../adjustments/Effects';
+import BasicAdjustments, { type BasicAdjustmentUpdate, type BasicAdjustmentView } from '../../../adjustments/Basic';
+import CurveGraph, { type CurveAdjustmentUpdater, type CurveAdjustmentView } from '../../../adjustments/Curves';
+import DetailsPanel, { type DetailAdjustmentUpdate, type DetailAdjustmentView } from '../../../adjustments/Details';
+import EffectsPanel, { type EffectAdjustmentUpdate, type EffectAdjustmentView } from '../../../adjustments/Effects';
 import ReferenceMatchPanel from '../../../adjustments/ReferenceMatchPanel';
-import TransformLens from '../../../adjustments/TransformLens';
+import TransformLens, {
+  type TransformLensAdjustmentUpdate,
+  type TransformLensAdjustmentView,
+} from '../../../adjustments/TransformLens';
 import { OPTION_SEPARATOR, type Option, Panel } from '../../../ui/AppProperties';
 import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
 import { editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
@@ -124,6 +137,32 @@ interface DevelopPanelControl {
   searchText: string;
   sectionName: AdjustmentSectionName;
 }
+
+const projectOwnedParams = <Params extends object>(current: Params, next: object): Params => {
+  const projected = structuredClone(current);
+  for (const key of Object.keys(current)) Reflect.set(projected, key, Reflect.get(next, key));
+  return projected;
+};
+
+const hasViewChanged = (current: object, next: object): boolean => JSON.stringify(current) !== JSON.stringify(next);
+
+const getAdjustmentSectionNodeTypes = (sectionName: AdjustmentSectionName): readonly EditDocumentNodeTypeV2[] =>
+  sectionName === 'transformLens'
+    ? ['geometry', 'lens_correction']
+    : getEditDocumentNodeTypesForEditorSection(sectionName);
+
+const copyPayloadToReplaceOperations = (payload: EditDocumentV2CopyPayload): EditNodeOperation[] =>
+  Object.entries(payload.nodes).flatMap(([nodeType, node]) =>
+    node === undefined
+      ? []
+      : [
+          {
+            node: structuredClone(node),
+            nodeType: nodeType as EditDocumentNodeTypeV2,
+            type: 'replace-edit-document-node' as const,
+          },
+        ],
+  );
 
 type NumericAdjustmentKey = keyof {
   [Key in keyof Adjustments as Adjustments[Key] extends number ? Key : never]: Adjustments[Key];
@@ -160,8 +199,8 @@ const normalizeDevelopPanelSearchText = (value: string) =>
 const escapeDevelopPanelSelectorValue = (value: string): string =>
   value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
 
-const getLumaParametricCurve = (adjustments: Adjustments): ParametricCurveSettings =>
-  (adjustments.parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve)?.[ActiveChannel.Luma] ?? {
+const getLumaParametricCurve = (parametricCurve: ParametricCurve | undefined): ParametricCurveSettings =>
+  (parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve)?.[ActiveChannel.Luma] ?? {
     blackLevel: 0,
     darks: 0,
     highlights: 0,
@@ -218,7 +257,7 @@ export default function Controls() {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
-  const { setAdjustments, setEditorSectionEnabled, handleLutSelect } = useEditorActions();
+  const { commitEditNodeOperations, setEditorSectionEnabled, handleLutSelect } = useEditorActions();
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
   const [autoEditProposal, setAutoEditProposal] = useState<AutoEditProposalV1 | null>(null);
   const [autoEditSelectedGroups, setAutoEditSelectedGroups] = useState<Set<AutoEditGroup>>(new Set());
@@ -265,7 +304,7 @@ export default function Controls() {
   } = useEditorStore(
     useShallow((state) => ({
       adjustmentRevision: state.adjustmentRevision,
-      adjustments: state.adjustmentSnapshot.value,
+      adjustments: state.editDocumentV2,
       editDocumentV2: state.editDocumentV2,
       copiedSectionAdjustments: state.copiedSectionAdjustments,
       histogram: state.histogram,
@@ -273,6 +312,110 @@ export default function Controls() {
       selectedImageSessionId: currentAutoEditImageSessionId(state),
       setEditor: state.setEditor,
     })),
+  );
+
+  const setBasicAdjustments = useCallback(
+    (update: BasicAdjustmentUpdate) => {
+      const document = useEditorStore.getState().editDocumentV2;
+      const global = selectEditDocumentNode(document, 'scene_global_color_tone').params;
+      const viewTransform = selectEditDocumentNode(document, 'scene_to_view_transform').params;
+      const toneEqualizer = selectEditDocumentNode(document, 'tone_equalizer').params;
+      const current: BasicAdjustmentView = { ...global, ...viewTransform, ...toneEqualizer };
+      const next = typeof update === 'function' ? update(current) : { ...current, ...update };
+      const operations: EditNodeOperation[] = [];
+      const nextGlobal = projectOwnedParams(global, next);
+      const nextViewTransform = projectOwnedParams(viewTransform, next);
+      const nextToneEqualizer = projectOwnedParams(toneEqualizer, next);
+      if (hasViewChanged(global, nextGlobal)) {
+        operations.push({ nodeType: 'scene_global_color_tone', patch: nextGlobal, type: 'patch-edit-document-node' });
+      }
+      if (hasViewChanged(viewTransform, nextViewTransform)) {
+        operations.push({
+          nodeType: 'scene_to_view_transform',
+          patch: nextViewTransform,
+          type: 'patch-edit-document-node',
+        });
+      }
+      if (hasViewChanged(toneEqualizer, nextToneEqualizer)) {
+        operations.push({ nodeType: 'tone_equalizer', patch: nextToneEqualizer, type: 'patch-edit-document-node' });
+      }
+      if (operations.length > 0) commitEditNodeOperations(operations);
+    },
+    [commitEditNodeOperations],
+  );
+
+  const setCurveAdjustments = useCallback(
+    (update: CurveAdjustmentUpdater) => {
+      const current = selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_curve').params;
+      const next: CurveAdjustmentView = update(current);
+      if (hasViewChanged(current, next)) {
+        commitEditNodeOperations([{ nodeType: 'scene_curve', patch: next, type: 'patch-edit-document-node' }]);
+      }
+    },
+    [commitEditNodeOperations],
+  );
+
+  const setTransformLensAdjustments = useCallback(
+    (update: TransformLensAdjustmentUpdate) => {
+      const document = useEditorStore.getState().editDocumentV2;
+      const geometry = selectEditDocumentGeometry(document);
+      const lens = selectEditDocumentNode(document, 'lens_correction').params;
+      const current: TransformLensAdjustmentView = { ...geometry, ...lens };
+      const next = typeof update === 'function' ? update(current) : { ...current, ...update };
+      const nextGeometry = projectOwnedParams(geometry, next);
+      const nextLens = projectOwnedParams(lens, next);
+      const operations: EditNodeOperation[] = [];
+      if (hasViewChanged(geometry, nextGeometry)) {
+        operations.push({ nodeType: 'geometry', patch: nextGeometry, type: 'patch-edit-document-node' });
+      }
+      if (hasViewChanged(lens, nextLens)) {
+        operations.push({ nodeType: 'lens_correction', patch: nextLens, type: 'patch-edit-document-node' });
+      }
+      if (operations.length > 0) commitEditNodeOperations(operations);
+    },
+    [commitEditNodeOperations],
+  );
+
+  const setDetailAdjustments = useCallback(
+    (update: DetailAdjustmentUpdate) => {
+      const document = useEditorStore.getState().editDocumentV2;
+      const detail = selectEditDocumentNode(document, 'detail_denoise_dehaze').params;
+      const lens = selectEditDocumentNode(document, 'lens_correction').params;
+      const current: DetailAdjustmentView = { ...detail, ...lens };
+      const next = typeof update === 'function' ? update(current) : { ...current, ...update };
+      const nextDetail = projectOwnedParams(detail, next);
+      const nextLens = projectOwnedParams(lens, next);
+      const operations: EditNodeOperation[] = [];
+      if (hasViewChanged(detail, nextDetail)) {
+        operations.push({ nodeType: 'detail_denoise_dehaze', patch: nextDetail, type: 'patch-edit-document-node' });
+      }
+      if (hasViewChanged(lens, nextLens)) {
+        operations.push({ nodeType: 'lens_correction', patch: nextLens, type: 'patch-edit-document-node' });
+      }
+      if (operations.length > 0) commitEditNodeOperations(operations);
+    },
+    [commitEditNodeOperations],
+  );
+
+  const setEffectAdjustments = useCallback(
+    (update: EffectAdjustmentUpdate) => {
+      const document = useEditorStore.getState().editDocumentV2;
+      const display = selectEditDocumentNode(document, 'display_creative').params;
+      const film = selectEditDocumentNode(document, 'film_emulation').params;
+      const current: EffectAdjustmentView = { ...display, ...film };
+      const next = typeof update === 'function' ? update(current) : { ...current, ...update };
+      const nextDisplay = projectOwnedParams(display, next);
+      const nextFilm = projectOwnedParams(film, next);
+      const operations: EditNodeOperation[] = [];
+      if (hasViewChanged(display, nextDisplay)) {
+        operations.push({ nodeType: 'display_creative', patch: nextDisplay, type: 'patch-edit-document-node' });
+      }
+      if (hasViewChanged(film, nextFilm)) {
+        operations.push({ nodeType: 'film_emulation', patch: nextFilm, type: 'patch-edit-document-node' });
+      }
+      if (operations.length > 0) commitEditNodeOperations(operations);
+    },
+    [commitEditNodeOperations],
   );
 
   const clearCurrentAutoEditPreview = useCallback(() => {
@@ -298,7 +441,7 @@ export default function Controls() {
               expectedImageSessionId: base.imageSessionId,
               expectedGraphRevision: base.graphRevision,
               resultingGraphRevision: `history_${String(useEditorStore.getState().historyIndex + 1)}`,
-              currentAdjustments: base.adjustments,
+              currentAdjustments: selectAutoEditAdjustmentProposal(base.editDocumentV2),
               proposal,
               selectedGroups: [...groups],
               impact,
@@ -310,7 +453,10 @@ export default function Controls() {
         if (!isCurrentAutoEditProposalRequest(state, base, serial, autoEditRequestSerial.current)) {
           return;
         }
-        const previewAdjustments = mergeAutoEditAdjustments(base.adjustments, preview.adjustments);
+        const previewAdjustments = mergeAutoEditAdjustments(
+          selectAutoEditAdjustmentProposal(base.editDocumentV2),
+          preview.adjustments,
+        );
         const previewSession = createAutoEditPreviewSession({
           adjustments: previewAdjustments,
           base,
@@ -348,7 +494,7 @@ export default function Controls() {
             expectedImagePath: image.path,
             imageSessionId: base.imageSessionId,
             graphRevision: base.graphRevision,
-            currentAdjustments: base.adjustments,
+            currentAdjustments: selectAutoEditAdjustmentProposal(base.editDocumentV2),
             cameraProfileIdentity: image.rawDevelopmentReport?.cameraProfile ?? null,
           },
         },
@@ -401,7 +547,7 @@ export default function Controls() {
               expectedImageSessionId: base.imageSessionId,
               expectedGraphRevision: base.graphRevision,
               resultingGraphRevision,
-              currentAdjustments: base.adjustments,
+              currentAdjustments: selectAutoEditAdjustmentProposal(base.editDocumentV2),
               proposal,
               selectedGroups: [...groups],
               impact: autoEditImpact,
@@ -413,7 +559,10 @@ export default function Controls() {
         if (!isCurrentAutoEditProposalRequest(state, base, serial, autoEditRequestSerial.current)) {
           return;
         }
-        const nextAdjustments = mergeAutoEditAdjustments(base.adjustments, applied.adjustments);
+        const nextAdjustments = mergeAutoEditAdjustments(
+          selectAutoEditAdjustmentProposal(base.editDocumentV2),
+          applied.adjustments,
+        );
         const transactionRequest = buildAutoEditTransactionRequest(
           base,
           nextAdjustments,
@@ -468,14 +617,24 @@ export default function Controls() {
   );
 
   const activeClippingStatusChips = useMemo(
-    () => getEditorClippingStatusChips(adjustments).filter((chip) => chip.active),
+    () =>
+      getEditorClippingStatusChips({
+        levels: selectEditDocumentNode(adjustments, 'luma_levels').params['levels'],
+      }).filter((chip) => chip.active),
     [adjustments],
   );
   const clippingWarningState =
     activeClippingStatusChips.length === 0 ? 'clean' : activeClippingStatusChips.map((chip) => chip.id).join(' ');
-  const editedSectionCount = ADJUSTMENT_SECTION_NAMES.filter((sectionName) =>
-    hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[sectionName], adjustments),
-  ).length;
+  const hasSectionChanges = useCallback(
+    (sectionName: AdjustmentSectionName) => {
+      const defaults = createDefaultEditDocumentV2();
+      return getAdjustmentSectionNodeTypes(sectionName).some(
+        (nodeType) => JSON.stringify(adjustments.nodes[nodeType]) !== JSON.stringify(defaults.nodes[nodeType]),
+      );
+    },
+    [adjustments],
+  );
+  const editedSectionCount = ADJUSTMENT_SECTION_NAMES.filter(hasSectionChanges).length;
   const panelStatus: InspectorPanelStatus | undefined =
     editedSectionCount > 0
       ? {
@@ -510,7 +669,12 @@ export default function Controls() {
     const buildSearchText = (sectionName: AdjustmentSectionName, label: string, aliases: string[] = []) =>
       normalizeDevelopPanelSearchText([getAdjustmentSectionLabel(t, sectionName), label, ...aliases].join(' '));
 
-    const handleNumericAdjustmentChange = (key: NumericAdjustmentKey, value: number, truncate = false) => {
+    const handleNumericAdjustmentChange = (
+      sectionName: AdjustmentSectionName,
+      key: NumericAdjustmentKey,
+      value: number,
+      truncate = false,
+    ) => {
       const nextValue = truncate ? Math.trunc(value) : value;
       if (isDetailNumberNodeAdjustment(key)) {
         const state = useEditorStore.getState();
@@ -531,7 +695,13 @@ export default function Controls() {
         );
         return;
       }
-      setAdjustments((prev: Adjustments) => ({ ...prev, [key]: nextValue }));
+      if (sectionName === 'basic') {
+        setBasicAdjustments((prev) => ({ ...prev, [key]: nextValue }));
+      } else if (sectionName === 'transformLens') {
+        setTransformLensAdjustments((prev) => ({ ...prev, [key]: nextValue }));
+      } else if (sectionName === 'effects') {
+        setEffectAdjustments((prev) => ({ ...prev, [key]: nextValue }));
+      }
     };
 
     const handleBooleanAdjustmentChange = (key: keyof Adjustments, value: boolean) => {
@@ -554,12 +724,12 @@ export default function Controls() {
         );
         return;
       }
-      setAdjustments((prev: Adjustments) => ({ ...prev, [key]: value }));
+      setDetailAdjustments((prev) => ({ ...prev, [key]: value }));
     };
 
     const handleLumaParametricCurveChange = (key: keyof ParametricCurveSettings, value: number) => {
-      setAdjustments((prev: Adjustments) => {
-        const currentParametricCurve = (prev.parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve) as ParametricCurve;
+      setCurveAdjustments((prev) => {
+        const currentParametricCurve = prev.parametricCurve ?? INITIAL_ADJUSTMENTS.parametricCurve;
         const currentLumaCurve = currentParametricCurve[ActiveChannel.Luma];
         return {
           ...prev,
@@ -605,7 +775,7 @@ export default function Controls() {
       truncate?: boolean;
     }): DevelopPanelControl => ({
       id,
-      isDirty: adjustments[key] !== INITIAL_ADJUSTMENTS[key],
+      isDirty: selectEditDocumentControlValue(adjustments, key) !== INITIAL_ADJUSTMENTS[key],
       label,
       render: () => (
         <AdjustmentSlider
@@ -618,12 +788,12 @@ export default function Controls() {
           min={min}
           onDragStateChange={onDragStateChange}
           onValueChange={(value) => {
-            handleNumericAdjustmentChange(key, value, truncate);
+            handleNumericAdjustmentChange(sectionName, key, value, truncate);
           }}
           step={step}
           {...(suffix === undefined ? {} : { suffix })}
           testId={`develop-pinned-control-${id}`}
-          value={Number(adjustments[key] ?? 0)}
+          value={Number(selectEditDocumentControlValue(adjustments, key) ?? 0)}
         />
       ),
       searchText: buildSearchText(sectionName, label, aliases),
@@ -645,8 +815,10 @@ export default function Controls() {
       max: number;
       min: number;
     }): DevelopPanelControl => {
-      const lumaCurve = getLumaParametricCurve(adjustments);
-      const defaultLumaCurve = getLumaParametricCurve(INITIAL_ADJUSTMENTS);
+      const lumaCurve = getLumaParametricCurve(
+        selectEditDocumentNode(adjustments, 'scene_curve').params['parametricCurve'],
+      );
+      const defaultLumaCurve = getLumaParametricCurve(INITIAL_ADJUSTMENTS.parametricCurve);
       return {
         id,
         isDirty: lumaCurve[key] !== defaultLumaCurve[key],
@@ -790,7 +962,9 @@ export default function Controls() {
       }),
     ];
 
-    const lensAvailability = getLensCorrectionAvailability(adjustments.lensDistortionParams);
+    const lensAvailability = getLensCorrectionAvailability(
+      selectEditDocumentNode(adjustments, 'lens_correction').params['lensDistortionParams'],
+    );
     const transformLensControls: DevelopPanelControl[] = [
       sliderControl({
         aliases: ['keystone', 'perspective'],
@@ -872,7 +1046,9 @@ export default function Controls() {
       }),
       sliderControl({
         aliases: ['lens', 'profile'],
-        disabled: !lensAvailability.distortion || !adjustments.lensDistortionEnabled,
+        disabled:
+          !lensAvailability.distortion ||
+          !selectEditDocumentNode(adjustments, 'lens_correction').params['lensDistortionEnabled'],
         fillOrigin: 'min',
         id: LensAdjustment.LensDistortionAmount,
         key: LensAdjustment.LensDistortionAmount,
@@ -886,7 +1062,8 @@ export default function Controls() {
       }),
       sliderControl({
         aliases: ['lens', 'ca', 'chromatic aberration'],
-        disabled: !lensAvailability.tca || !adjustments.lensTcaEnabled,
+        disabled:
+          !lensAvailability.tca || !selectEditDocumentNode(adjustments, 'lens_correction').params['lensTcaEnabled'],
         fillOrigin: 'min',
         id: LensAdjustment.LensTcaAmount,
         key: LensAdjustment.LensTcaAmount,
@@ -900,7 +1077,9 @@ export default function Controls() {
       }),
       sliderControl({
         aliases: ['lens', 'vignette'],
-        disabled: !lensAvailability.vignetting || !adjustments.lensVignetteEnabled,
+        disabled:
+          !lensAvailability.vignetting ||
+          !selectEditDocumentNode(adjustments, 'lens_correction').params['lensVignetteEnabled'],
         fillOrigin: 'min',
         id: LensAdjustment.LensVignetteAmount,
         key: LensAdjustment.LensVignetteAmount,
@@ -917,11 +1096,13 @@ export default function Controls() {
     const detailControls: DevelopPanelControl[] = [
       {
         id: DetailsAdjustment.DeblurEnabled,
-        isDirty: adjustments.deblurEnabled !== INITIAL_ADJUSTMENTS.deblurEnabled,
+        isDirty:
+          selectEditDocumentNode(adjustments, 'detail_denoise_dehaze').params['deblurEnabled'] !==
+          INITIAL_ADJUSTMENTS.deblurEnabled,
         label: t('adjustments.details.enableDeblur'),
         render: () => (
           <Switch
-            checked={adjustments.deblurEnabled}
+            checked={selectEditDocumentNode(adjustments, 'detail_denoise_dehaze').params['deblurEnabled']}
             chrome="editor"
             className="min-h-5"
             label={t('adjustments.details.enableDeblur')}
@@ -934,7 +1115,7 @@ export default function Controls() {
         sectionName: 'details',
       },
       sliderControl({
-        disabled: !adjustments.deblurEnabled,
+        disabled: !selectEditDocumentNode(adjustments, 'detail_denoise_dehaze').params['deblurEnabled'],
         fillOrigin: 'min',
         id: DetailsAdjustment.DeblurStrength,
         key: DetailsAdjustment.DeblurStrength,
@@ -947,7 +1128,7 @@ export default function Controls() {
       }),
       sliderControl({
         defaultValue: 0.8,
-        disabled: !adjustments.deblurEnabled,
+        disabled: !selectEditDocumentNode(adjustments, 'detail_denoise_dehaze').params['deblurEnabled'],
         id: DetailsAdjustment.DeblurSigmaPx,
         key: DetailsAdjustment.DeblurSigmaPx,
         label: t('adjustments.details.blurRadius'),
@@ -1136,7 +1317,16 @@ export default function Controls() {
     ];
 
     return [...basicControls, ...curveControls, ...transformLensControls, ...detailControls, ...effectControls];
-  }, [adjustments, onDragStateChange, setAdjustments, t]);
+  }, [
+    adjustments,
+    onDragStateChange,
+    setBasicAdjustments,
+    setCurveAdjustments,
+    setDetailAdjustments,
+    setEffectAdjustments,
+    setTransformLensAdjustments,
+    t,
+  ]);
 
   const normalizedDevelopPanelSearchQuery = useMemo(
     () => normalizeDevelopPanelSearchText(developPanelSearchQuery),
@@ -1281,23 +1471,29 @@ export default function Controls() {
   };
 
   const handleResetAdjustments = () => {
-    const resetValues = pickAdjustmentValues(Object.values(ADJUSTMENT_SECTIONS).flat(), INITIAL_ADJUSTMENTS);
-
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      ...resetValues,
-    }));
+    const nodeTypes = ADJUSTMENT_SECTION_NAMES.flatMap(getAdjustmentSectionNodeTypes);
+    commitEditNodeOperations(
+      copyPayloadToReplaceOperations(copyEditDocumentV2Nodes(createDefaultEditDocumentV2(), nodeTypes)),
+    );
   };
 
   const handleResetClippingEndpoints = () => {
-    setAdjustments((prev: Adjustments) => ({
-      ...prev,
-      levels: {
-        ...prev.levels,
-        inputBlack: INITIAL_ADJUSTMENTS.levels.inputBlack,
-        inputWhite: INITIAL_ADJUSTMENTS.levels.inputWhite,
+    const currentLevels = selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'luma_levels').params[
+      'levels'
+    ];
+    commitEditNodeOperations([
+      {
+        nodeType: 'luma_levels',
+        patch: {
+          levels: {
+            ...currentLevels,
+            inputBlack: INITIAL_ADJUSTMENTS.levels.inputBlack,
+            inputWhite: INITIAL_ADJUSTMENTS.levels.inputWhite,
+          },
+        },
+        type: 'patch-edit-document-node',
       },
-    }));
+    ]);
   };
 
   const handleToggleSection = (section: AdjustmentSectionName) => {
@@ -1316,11 +1512,13 @@ export default function Controls() {
   };
 
   const buildSectionActions = (sectionName: AdjustmentSectionName): AdjustmentSectionActions => {
-    const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
+    const nodeTypes = getAdjustmentSectionNodeTypes(sectionName);
 
     const handleCopy = () => {
-      const adjustmentsToCopy = pickAdjustmentValues(sectionKeys, adjustments, { requireExistingKey: true });
-      setCopiedSectionAdjustments({ section: sectionName, values: adjustmentsToCopy });
+      setCopiedSectionAdjustments({
+        payload: copyEditDocumentV2Nodes(useEditorStore.getState().editDocumentV2, nodeTypes),
+        section: sectionName,
+      });
     };
 
     const handlePaste = () => {
@@ -1328,18 +1526,12 @@ export default function Controls() {
       if (!copiedSection || copiedSection.section !== sectionName) {
         return;
       }
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        ...copiedSection.values,
-      }));
+      commitEditNodeOperations(copyPayloadToReplaceOperations(copiedSection.payload));
     };
 
     const handleReset = () => {
-      const resetValues = pickAdjustmentValues(sectionKeys, INITIAL_ADJUSTMENTS);
-      setAdjustments((prev: Adjustments) => ({
-        ...prev,
-        ...resetValues,
-      }));
+      const payload = copyEditDocumentV2Nodes(createDefaultEditDocumentV2(), nodeTypes);
+      commitEditNodeOperations(copyPayloadToReplaceOperations(payload));
     };
 
     const copiedSection = copiedSectionAdjustments;
@@ -1427,8 +1619,12 @@ export default function Controls() {
               </div>
             )}
             <BasicAdjustments
-              adjustments={adjustments}
-              setAdjustments={setAdjustments}
+              adjustments={{
+                ...selectEditDocumentNode(adjustments, 'scene_global_color_tone').params,
+                ...selectEditDocumentNode(adjustments, 'scene_to_view_transform').params,
+                ...selectEditDocumentNode(adjustments, 'tone_equalizer').params,
+              }}
+              setAdjustments={setBasicAdjustments}
               appSettings={appSettings}
               onDragStateChange={onDragStateChange}
             />
@@ -1437,8 +1633,8 @@ export default function Controls() {
       case 'curves':
         return (
           <CurveGraph
-            adjustments={adjustments}
-            setAdjustments={setAdjustments}
+            adjustments={selectEditDocumentNode(adjustments, 'scene_curve').params}
+            setAdjustments={setCurveAdjustments}
             histogram={histogram}
             theme={theme}
             onDragStateChange={onDragStateChange}
@@ -1447,17 +1643,23 @@ export default function Controls() {
       case 'transformLens':
         return (
           <TransformLens
-            adjustments={adjustments}
+            adjustments={{
+              ...adjustments.geometry,
+              ...selectEditDocumentNode(adjustments, 'lens_correction').params,
+            }}
             selectedImage={selectedImage}
-            setAdjustments={setAdjustments}
+            setAdjustments={setTransformLensAdjustments}
             onDragStateChange={onDragStateChange}
           />
         );
       case 'details':
         return (
           <DetailsPanel
-            adjustments={adjustments}
-            setAdjustments={setAdjustments}
+            adjustments={{
+              ...selectEditDocumentNode(adjustments, 'detail_denoise_dehaze').params,
+              ...selectEditDocumentNode(adjustments, 'lens_correction').params,
+            }}
+            setAdjustments={setDetailAdjustments}
             appSettings={appSettings}
             onDragStateChange={onDragStateChange}
           />
@@ -1465,8 +1667,11 @@ export default function Controls() {
       case 'effects':
         return (
           <EffectsPanel
-            adjustments={adjustments}
-            setAdjustments={setAdjustments}
+            adjustments={{
+              ...selectEditDocumentNode(adjustments, 'display_creative').params,
+              ...selectEditDocumentNode(adjustments, 'film_emulation').params,
+            }}
+            setAdjustments={setEffectAdjustments}
             isForMask={false}
             handleLutSelect={(path) => {
               void handleLutSelect(path);
@@ -1740,7 +1945,7 @@ export default function Controls() {
                 canToggleVisibility={canToggleVisibility}
                 headerActions={sectionActions.headerActions}
                 isContentVisible={isContentVisible}
-                isDirty={hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[sectionName], adjustments)}
+                isDirty={hasSectionChanges(sectionName)}
                 isOpen={effectiveCollapsibleSectionsState[sectionName]}
                 onContextMenu={(event: MouseEvent<HTMLDivElement>) => {
                   handleSectionContextMenu(event, sectionName);

@@ -1,19 +1,18 @@
 import {
+  EDIT_DOCUMENT_NODE_DESCRIPTORS,
   type EditDocumentEditorSection,
+  type EditDocumentNodeEnvelopeV2,
+  type EditDocumentNodeParamsV2,
   type EditDocumentNodeTypeV2,
   type EditDocumentV2,
-  editDocumentV2Schema,
-  getEditDocumentNodeDescriptor,
+  editDocumentProvenanceV2Schema,
   getEditDocumentNodeTypesForEditorSection,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from './adjustments';
 import {
-  editDocumentV2ToLegacyAdjustments,
-  legacyAdjustmentsToEditDocumentV2,
-  pasteEditDocumentV2Node,
-  setEditDocumentV2NodeEnabled,
-  updateEditDocumentV2Node,
-} from './editDocumentV2';
+  type LayerStackSidecarPersistenceEnvelopeV1,
+  layerStackSidecarPersistenceEnvelopeV1Schema,
+} from '../../packages/rawengine-schema/src/layerStackSidecarPersistence';
+import { pasteEditDocumentV2Node, patchEditDocumentV2Node, setEditDocumentV2NodeEnabled } from './editDocumentV2';
 import type { EditHistoryCheckpoint } from './editHistory';
 
 /** The caller's intent, kept explicit so new mutation paths can be audited. */
@@ -31,8 +30,7 @@ export type EditMutationSource =
   | 'agent-command'
   | 'reset'
   | 'history'
-  | 'hydration'
-  | 'migration';
+  | 'hydration';
 
 export type EditTransactionHistory =
   | 'single-entry'
@@ -43,23 +41,36 @@ export type EditTransactionHistory =
   | 'reset';
 export type EditTransactionPersistence = 'commit' | 'native-committed' | 'preview-only';
 
-/**
- * Operations intentionally describe adjustment intent rather than a store update.
- * Every operation produces a new EditDocumentV2. The flat adjustment object is a
- * read-only compatibility projection and is never transaction authority.
- */
+type PatchEditDocumentNodeOperation = {
+  [NodeType in EditDocumentNodeTypeV2]: {
+    type: 'patch-edit-document-node';
+    nodeType: NodeType;
+    patch: Readonly<Partial<EditDocumentNodeParamsV2<NodeType>>>;
+  };
+}[EditDocumentNodeTypeV2];
+
+type ReplaceEditDocumentNodeOperation = {
+  [NodeType in EditDocumentNodeTypeV2]: {
+    type: 'replace-edit-document-node';
+    nodeType: NodeType;
+    node: EditDocumentNodeEnvelopeV2;
+  };
+}[EditDocumentNodeTypeV2];
+
+/** Every operation targets one typed node/domain or replaces the complete typed authority. */
 export type EditNodeOperation =
-  | {
-      type: 'patch-edit-document-node';
-      nodeType: EditDocumentNodeTypeV2;
-      patch: Readonly<Record<string, unknown>>;
-    }
+  | PatchEditDocumentNodeOperation
   | { type: 'set-edit-document-node-enabled'; nodeType: EditDocumentNodeTypeV2; enabled: boolean }
-  | { type: 'replace-edit-document-node'; nodeType: EditDocumentNodeTypeV2; node: unknown }
-  | { type: 'replace-edit-document'; editDocumentV2: EditDocumentV2 }
-  /** Temporary flat intent adapters; the reducer immediately lowers these into document authority. */
-  | { type: 'patch-adjustments'; patch: Partial<Adjustments> }
-  | { type: 'replace-adjustments'; adjustments: Adjustments };
+  | {
+      type: 'set-reference-match-application-receipt';
+      receipt: EditDocumentV2['provenance']['referenceMatchApplicationReceipt'];
+    }
+  | {
+      type: 'set-layer-stack-artifacts';
+      rawEngineArtifacts: LayerStackSidecarPersistenceEnvelopeV1['rawEngineArtifacts'] | null;
+    }
+  | ReplaceEditDocumentNodeOperation
+  | { type: 'replace-edit-document'; editDocumentV2: EditDocumentV2 };
 
 export const buildEditorSectionNodeEnablementOperations = (
   document: EditDocumentV2,
@@ -100,10 +111,8 @@ export interface EditTransactionResult {
   transactionId: string;
   imageSessionId: string;
   source: EditMutationSource;
-  before: Adjustments;
-  after: Adjustments;
-  beforeEditDocumentV2: EditDocumentV2;
-  afterEditDocumentV2: EditDocumentV2;
+  before: EditDocumentV2;
+  after: EditDocumentV2;
   changedKeys: readonly string[];
   nextAdjustmentRevision: number;
   noOp: boolean;
@@ -142,27 +151,6 @@ export const buildEditTransactionPersistenceContext = (
     'nextAdjustmentRevision' in result ? result.nextAdjustmentRevision : result.adjustmentRevision,
 });
 
-const assertNodePatch = (nodeType: EditDocumentNodeTypeV2, patch: Readonly<Record<string, unknown>>): void => {
-  const descriptor = getEditDocumentNodeDescriptor(nodeType);
-  if (descriptor === undefined) throw new Error(`edit_transaction.unknown_node:${nodeType}`);
-  for (const [key, value] of Object.entries(patch)) {
-    if (!descriptor.legacyFields.some((field) => field === key)) {
-      throw new Error(`edit_transaction.field_not_owned:${nodeType}:${key}`);
-    }
-    if (typeof value === 'number' && !Number.isFinite(value)) {
-      throw new Error(`edit_transaction.invalid_value:${nodeType}.${key}`);
-    }
-  }
-};
-
-const assertFiniteLegacyPatch = (patch: Partial<Adjustments>): void => {
-  for (const [key, value] of Object.entries(patch)) {
-    if (typeof value === 'number' && !Number.isFinite(value)) {
-      throw new Error(`edit_transaction.invalid_value:${key}`);
-    }
-  }
-};
-
 export const sameAdjustmentValue = (before: unknown, after: unknown): boolean => {
   if (Object.is(before, after)) return true;
   if (Array.isArray(before) || Array.isArray(after)) {
@@ -187,100 +175,31 @@ export const sameAdjustmentValue = (before: unknown, after: unknown): boolean =>
 export const areEditDocumentsEqual = (before: EditDocumentV2 | undefined, after: EditDocumentV2 | undefined): boolean =>
   before !== undefined && after !== undefined && sameAdjustmentValue(before, after);
 
-const isEditDocumentV2 = (value: EditDocumentV2 | Adjustments): value is EditDocumentV2 =>
-  editDocumentV2Schema.safeParse(value).success;
-
-const changedKeys = (before: Adjustments, after: Adjustments): string[] =>
-  [...new Set([...Object.keys(before), ...Object.keys(after)])].filter(
-    (key) => !sameAdjustmentValue(before[key as keyof Adjustments], after[key as keyof Adjustments]),
-  );
-
-/**
- * Project only one authoritative node back through the compatibility surface.
- * Unmigrated domains still live in the flat bag, so rebuilding that whole bag
- * from a document captured before their latest edit would erase valid state.
- */
-const replaceLegacyAdjustmentsPreservingNodeEnablement = (
-  adjustments: Adjustments,
-  currentDocument: EditDocumentV2,
-): EditDocumentV2 => {
-  let replacement = legacyAdjustmentsToEditDocumentV2(adjustments);
-  for (const nodeType of Object.keys(replacement.nodes) as EditDocumentNodeTypeV2[]) {
-    // Effects has an explicit flat compatibility field; every other enabled
-    // bit remains node-owned across a legacy flat mutation boundary.
-    if (nodeType === 'display_creative') continue;
-    const enabled = currentDocument.nodes[nodeType]?.enabled;
-    if (enabled !== undefined) replacement = setEditDocumentV2NodeEnabled(replacement, nodeType, enabled);
+const changedDocumentPaths = (before: EditDocumentV2, after: EditDocumentV2): readonly string[] => {
+  const paths: string[] = [];
+  for (const { nodeType } of EDIT_DOCUMENT_NODE_DESCRIPTORS) {
+    const beforeNode = before.nodes[nodeType];
+    const afterNode = after.nodes[nodeType];
+    if (beforeNode === afterNode) continue;
+    if (beforeNode?.enabled !== afterNode?.enabled) paths.push(`nodes.${nodeType}.enabled`);
+    const beforeParams = beforeNode?.params ?? {};
+    const afterParams = afterNode?.params ?? {};
+    for (const key of new Set([...Object.keys(beforeParams), ...Object.keys(afterParams)])) {
+      if (!sameAdjustmentValue(beforeParams[key], afterParams[key])) paths.push(`nodes.${nodeType}.params.${key}`);
+    }
   }
-  return replacement;
-};
-
-/** Route a focused migrated-node edit without widening it back into flat replacement authority. */
-export const buildAdjustmentMutationOperations = (
-  before: Adjustments,
-  after: Adjustments,
-  currentDocument: EditDocumentV2 = legacyAdjustmentsToEditDocumentV2(before),
-): readonly EditNodeOperation[] => {
-  const keys = changedKeys(before, after);
-  if (keys.length === 1 && keys[0] === 'effectsEnabled') {
-    return [
-      {
-        enabled: after.effectsEnabled,
-        nodeType: 'display_creative',
-        type: 'set-edit-document-node-enabled',
-      },
-    ];
-  }
-  const focusedNodeType = (
-    [
-      'black_white_mixer',
-      'scene_global_color_tone',
-      'scene_to_view_transform',
-      'color_presence',
-      'camera_input',
-      'color_calibration',
-      'channel_mixer',
-      'color_balance_rgb',
-      'luma_levels',
-      'selective_color_mixer',
-      'scene_curve',
-      'tone_equalizer',
-      'point_color',
-      'lens_correction',
-      'perceptual_grading',
-      'geometry',
-    ] as const
-  ).find((nodeType) => {
-    const descriptor = getEditDocumentNodeDescriptor(nodeType);
-    return (
-      descriptor !== undefined &&
-      keys.length > 0 &&
-      keys.every((key) => descriptor.legacyFields.some((field) => field === key))
-    );
-  });
-  if (focusedNodeType === undefined) return [{ adjustments: after, type: 'replace-adjustments' }];
-  return [
-    {
-      type: 'patch-edit-document-node',
-      nodeType: focusedNodeType,
-      patch: Object.fromEntries(keys.map((key) => [key, after[key]])),
-    },
-  ];
+  if (!sameAdjustmentValue(before.provenance, after.provenance)) paths.push('provenance');
+  if (!sameAdjustmentValue(before.extensions, after.extensions)) paths.push('extensions');
+  return paths;
 };
 
 /** Reduce one revision-checked request without touching Zustand or persistence. */
 export const reduceEditTransaction = (
-  currentDocumentOrLegacyProjection: EditDocumentV2 | Adjustments,
+  currentEditDocumentV2: EditDocumentV2,
   currentAdjustmentRevision: number,
   request: EditTransactionRequest,
   currentImageSessionId?: string,
-  authoritativeDocument?: EditDocumentV2,
 ): EditTransactionResult => {
-  const currentEditDocumentV2 =
-    authoritativeDocument ??
-    (isEditDocumentV2(currentDocumentOrLegacyProjection)
-      ? currentDocumentOrLegacyProjection
-      : legacyAdjustmentsToEditDocumentV2(currentDocumentOrLegacyProjection));
   if (request.baseAdjustmentRevision !== currentAdjustmentRevision) {
     throw new Error(
       `edit_transaction.stale_base:${String(request.baseAdjustmentRevision)}:${String(currentAdjustmentRevision)}`,
@@ -291,44 +210,44 @@ export const reduceEditTransaction = (
     throw new Error(`edit_transaction.stale_session:${request.imageSessionId}:${currentImageSessionId}`);
   }
 
-  const before = editDocumentV2ToLegacyAdjustments(currentEditDocumentV2);
   let afterEditDocumentV2 = currentEditDocumentV2;
-  const documentChangedKeys: string[] = [];
   for (const operation of request.operations) {
     if (operation.type === 'replace-edit-document') {
-      afterEditDocumentV2 = structuredClone(operation.editDocumentV2);
-      continue;
-    }
-    if (operation.type === 'replace-adjustments') {
-      afterEditDocumentV2 = replaceLegacyAdjustmentsPreservingNodeEnablement(
-        structuredClone(operation.adjustments),
-        afterEditDocumentV2,
-      );
-      continue;
-    }
-    if (operation.type === 'patch-adjustments') {
-      assertFiniteLegacyPatch(operation.patch);
-      const currentProjection = editDocumentV2ToLegacyAdjustments(afterEditDocumentV2);
-      afterEditDocumentV2 = replaceLegacyAdjustmentsPreservingNodeEnablement(
-        { ...currentProjection, ...structuredClone(operation.patch) },
-        afterEditDocumentV2,
-      );
+      afterEditDocumentV2 = operation.editDocumentV2;
       continue;
     }
     if (operation.type === 'patch-edit-document-node') {
-      assertNodePatch(operation.nodeType, operation.patch);
-      const patchedDocument = updateEditDocumentV2Node(afterEditDocumentV2, operation.nodeType, (params) => ({
-        ...params,
-        ...structuredClone(operation.patch),
-      }));
-      afterEditDocumentV2 = patchedDocument;
+      afterEditDocumentV2 = patchEditDocumentV2Node(afterEditDocumentV2, operation.nodeType, operation.patch);
       continue;
     }
     if (operation.type === 'set-edit-document-node-enabled') {
-      const previousEnabled = afterEditDocumentV2.nodes[operation.nodeType]?.enabled;
       afterEditDocumentV2 = setEditDocumentV2NodeEnabled(afterEditDocumentV2, operation.nodeType, operation.enabled);
-      if (previousEnabled !== undefined && previousEnabled !== operation.enabled) {
-        documentChangedKeys.push(`nodes.${operation.nodeType}.enabled`);
+      continue;
+    }
+    if (operation.type === 'set-reference-match-application-receipt') {
+      if (afterEditDocumentV2.provenance.referenceMatchApplicationReceipt !== operation.receipt) {
+        const provenance = editDocumentProvenanceV2Schema.parse({
+          referenceMatchApplicationReceipt: operation.receipt,
+        });
+        afterEditDocumentV2 = {
+          ...afterEditDocumentV2,
+          provenance,
+        };
+      }
+      continue;
+    }
+    if (operation.type === 'set-layer-stack-artifacts') {
+      const rawEngineArtifacts =
+        operation.rawEngineArtifacts === null
+          ? null
+          : layerStackSidecarPersistenceEnvelopeV1Schema.parse({
+              rawEngineArtifacts: operation.rawEngineArtifacts,
+            }).rawEngineArtifacts;
+      if (!sameAdjustmentValue(afterEditDocumentV2.extensions['rawEngineArtifacts'], rawEngineArtifacts)) {
+        const extensions = { ...afterEditDocumentV2.extensions };
+        if (rawEngineArtifacts === null) delete extensions['rawEngineArtifacts'];
+        else extensions['rawEngineArtifacts'] = rawEngineArtifacts;
+        afterEditDocumentV2 = { ...afterEditDocumentV2, extensions };
       }
       continue;
     }
@@ -349,48 +268,9 @@ export const reduceEditTransaction = (
     }
   }
 
-  const after = editDocumentV2ToLegacyAdjustments(afterEditDocumentV2);
-  const flatChangedKeys = changedKeys(before, after);
-  for (const nodeType of Object.keys({
-    ...currentEditDocumentV2.nodes,
-    ...afterEditDocumentV2.nodes,
-  }) as EditDocumentNodeTypeV2[]) {
-    if (currentEditDocumentV2.nodes[nodeType]?.enabled !== afterEditDocumentV2.nodes[nodeType]?.enabled) {
-      documentChangedKeys.push(`nodes.${nodeType}.enabled`);
-    }
-  }
-  if (
-    flatChangedKeys.length === 0 &&
-    documentChangedKeys.length === 0 &&
-    !sameAdjustmentValue(currentEditDocumentV2, afterEditDocumentV2)
-  ) {
-    documentChangedKeys.push('editDocumentV2');
-  }
-  const keys = [...new Set([...flatChangedKeys, ...documentChangedKeys])];
+  const keys = changedDocumentPaths(currentEditDocumentV2, afterEditDocumentV2);
   const invalidatedStages: EditInvalidationStage[] = keys.length === 0 ? [] : ['preview', 'navigator', 'thumbnail'];
-  if (
-    keys.some((key) =>
-      [
-        'aspectRatio',
-        'crop',
-        'rotation',
-        'orientationSteps',
-        'flipHorizontal',
-        'flipVertical',
-        'lensCorrectionMode',
-        'lensDistortionAmount',
-        'lensDistortionEnabled',
-        'lensDistortionParams',
-        'lensMaker',
-        'lensModel',
-        'lensTcaAmount',
-        'lensTcaEnabled',
-        'lensVignetteAmount',
-        'lensVignetteEnabled',
-        'perspectiveCorrection',
-      ].includes(key),
-    )
-  ) {
+  if (keys.some((key) => key.startsWith('nodes.geometry.') || key.startsWith('nodes.lens_correction.'))) {
     invalidatedStages.push('geometry');
   }
   const invalidatedProvenance = keys.length === 0 ? [] : ['reference-match', 'auto-edit', 'derived-render'];
@@ -399,10 +279,8 @@ export const reduceEditTransaction = (
     transactionId: request.transactionId,
     imageSessionId: request.imageSessionId,
     source: request.source,
-    before,
-    after,
-    beforeEditDocumentV2: currentEditDocumentV2,
-    afterEditDocumentV2,
+    before: currentEditDocumentV2,
+    after: afterEditDocumentV2,
     changedKeys: keys,
     nextAdjustmentRevision,
     noOp: keys.length === 0,

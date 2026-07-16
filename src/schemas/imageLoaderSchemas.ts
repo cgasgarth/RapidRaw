@@ -1,18 +1,6 @@
 import { z } from 'zod';
 import { rawInputTransformReceiptV2Schema } from '../../packages/rawengine-schema/src/color/rawInputTransformSchemas';
 import { editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from '../utils/adjustments';
-
-const legacyAdjustmentSnapshotSchema = z.custom<Partial<Adjustments>>(
-  (value) => typeof value === 'object' && value !== null && !Array.isArray(value),
-  { message: 'Expected adjustment snapshot object' },
-);
-
-const nullAdjustmentSnapshotSchema = z
-  .object({
-    is_null: z.literal(true),
-  })
-  .loose();
 
 const exifSchema = z.record(z.string(), z.string()).nullable();
 
@@ -306,7 +294,6 @@ export const rawCameraProfileProvenanceReceiptSchema = z
 
 export const loadedMetadataSchema = z
   .object({
-    adjustments: z.union([legacyAdjustmentSnapshotSchema, nullAdjustmentSnapshotSchema]).nullable().optional(),
     editDocumentV2: editDocumentV2Schema.nullable().optional(),
   })
   .loose();
@@ -428,11 +415,6 @@ export type ImageOpenUpdate = z.infer<typeof imageOpenUpdateSchema>;
 export type ProgressiveImageFrameReceipt = z.infer<typeof progressiveImageFrameReceiptSchema>;
 export type RawCameraProfileProvenanceReceipt = z.infer<typeof rawCameraProfileProvenanceReceiptSchema>;
 export type RawDevelopmentReport = z.infer<typeof rawDevelopmentReportSchema>;
-
-export const isNullAdjustmentSnapshot = (
-  value: LoadedMetadata['adjustments'],
-): value is z.infer<typeof nullAdjustmentSnapshotSchema> =>
-  typeof value === 'object' && value !== null && 'is_null' in value && value.is_null === true;
 
 export const parseLoadedMetadata = (value: unknown): LoadedMetadata => loadedMetadataSchema.parse(value);
 

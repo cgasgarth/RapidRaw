@@ -1,13 +1,13 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerRetouchCommand } from '../components/panel/editor/viewerRetouchHandlesController';
 import { Mask } from '../components/panel/right/layers/Masks';
-import type { Adjustments, MaskContainer, RetouchCloneSource } from './adjustments';
+import type { MaskContainer, RetouchCloneSource } from './adjustments';
+import { selectEditDocumentAiPatches, selectEditDocumentMasks } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 import { buildLayerEditTransactionRequest } from './layers/layerEditTransaction';
 
 export interface RetouchHandleEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustmentSnapshot: { readonly value: Adjustments };
   readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSessionId: number;
@@ -125,15 +125,17 @@ export const buildRetouchHandleEditTransaction = (
   imageSize: { readonly height: number; readonly width: number },
   transactionId: string,
 ): EditTransactionRequest => {
-  const matches = state.adjustmentSnapshot.value.masks.filter((layer) => layer.id === command.key.layerId);
+  const currentMasks = selectEditDocumentMasks(state.editDocumentV2);
+  const matches = currentMasks.filter((layer) => layer.id === command.key.layerId);
   const matchedLayer = matches[0];
   if (matches.length !== 1 || matchedLayer === undefined) return rejectRetouchHandle('missing_or_duplicate_layer');
   assertCurrent(state, command, matchedLayer, imageSize);
-  const adjustments: Adjustments = {
-    ...state.adjustmentSnapshot.value,
-    masks: state.adjustmentSnapshot.value.masks.map((layer) =>
-      layer.id === command.key.layerId ? updateLayer(layer, command, imageSize) : layer,
-    ),
-  };
-  return buildLayerEditTransactionRequest(state, adjustments, transactionId);
+  const masks = currentMasks.map((layer) =>
+    layer.id === command.key.layerId ? updateLayer(layer, command, imageSize) : layer,
+  );
+  return buildLayerEditTransactionRequest(
+    state,
+    { aiPatches: selectEditDocumentAiPatches(state.editDocumentV2), masks },
+    transactionId,
+  );
 };

@@ -139,9 +139,9 @@ const waitForRenderedDeblur = async (page: Page, expected: { enabled: boolean; s
     if (
       call.success &&
       call.data.endedAtMs !== null &&
-      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params.deblurEnabled === expected.enabled &&
-      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params.deblurSigmaPx === expected.sigmaPx &&
-      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params.deblurStrength === expected.strength
+      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params['deblurEnabled'] === expected.enabled &&
+      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params['deblurSigmaPx'] === expected.sigmaPx &&
+      call.data.args.request.editDocumentV2.nodes.detail_denoise_dehaze.params['deblurStrength'] === expected.strength
     )
       return;
     await page.waitForTimeout(50);

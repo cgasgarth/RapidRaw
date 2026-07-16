@@ -1,7 +1,9 @@
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { SubMask } from '../../components/panel/right/layers/Masks';
 import type { RenderSize } from '../../hooks/viewport/useImageRenderSize';
 import type { MaskOverlaySettings } from '../../schemas/masks/maskOverlaySchemas';
 import type { Adjustments, AiPatch, MaskContainer } from '../adjustments';
+import { selectEditDocumentGeometry, selectEditDocumentNode } from '../editDocumentSelectors';
 import { normalizeMaskOverlaySettings } from './maskOverlayModes';
 import { toMaskParameterRecord } from './maskParameterAccess';
 
@@ -16,8 +18,8 @@ export type MaskPreviewDefinition =
 
 export interface MaskOverlayInvokePayload {
   cropOffset: [number, number];
+  editDocumentV2: EditDocumentV2;
   height: number;
-  jsAdjustments: Adjustments;
   maskDef: MaskPreviewDefinition;
   overlaySettings: MaskOverlaySettings;
   scale: number;
@@ -25,7 +27,7 @@ export interface MaskOverlayInvokePayload {
 }
 
 export interface BuildMaskOverlayInvokePayloadParams {
-  jsAdjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   maskDef: MaskPreviewDefinition;
   maskOverlaySettings: MaskOverlaySettings;
   patchesSentToBackend: ReadonlySet<string>;
@@ -34,7 +36,7 @@ export interface BuildMaskOverlayInvokePayloadParams {
 
 export interface BuildMaskOverlayTriggerHashParams {
   activeMaskDef: MaskPreviewDefinition | undefined;
-  adjustments: Adjustments;
+  editDocumentV2: EditDocumentV2;
   imageRenderSize: Pick<RenderSize, 'height' | 'width'>;
   maskOverlaySettings: MaskOverlaySettings;
 }
@@ -45,31 +47,6 @@ export interface BuildMaskOverlayRequestIdentityParams {
   selectedImagePath: string | null | undefined;
   triggerHash: string | null;
 }
-
-const MASK_OVERLAY_GEOMETRY_KEYS = [
-  'crop',
-  'rotation',
-  'flipHorizontal',
-  'flipVertical',
-  'orientationSteps',
-  'transformDistortion',
-  'transformVertical',
-  'transformHorizontal',
-  'transformRotate',
-  'transformAspect',
-  'transformScale',
-  'transformXOffset',
-  'transformYOffset',
-  'lensDistortionAmount',
-  'lensVignetteAmount',
-  'lensTcaAmount',
-  'lensDistortionParams',
-  'lensMaker',
-  'lensModel',
-  'lensDistortionEnabled',
-  'lensTcaEnabled',
-  'lensVignetteEnabled',
-] as const satisfies ReadonlyArray<keyof Adjustments>;
 
 const stripBackendMaskDataFromSubMasks = (
   subMasks: Array<SubMask> | undefined,
@@ -87,22 +64,19 @@ const stripBackendMaskDataFromSubMasks = (
   });
 };
 
-const stripMaskPayloadsForOverlay = <T extends MaskPreviewDefinition | Adjustments>(
+const stripMaskPayloadsForOverlay = <T extends EditDocumentV2 | MaskPreviewDefinition>(
   value: T,
   patchesSentToBackend: ReadonlySet<string>,
 ): T => {
   const clone = structuredClone(value);
 
-  if ('masks' in clone) {
-    clone.masks.forEach((mask: unknown) => {
-      stripBackendMaskDataFromSubMasks((mask as { subMasks: Array<SubMask> }).subMasks, patchesSentToBackend);
-    });
-  }
-
-  if ('aiPatches' in clone) {
-    clone.aiPatches.forEach((patch: AiPatch) => {
-      stripBackendMaskDataFromSubMasks(patch.subMasks, patchesSentToBackend);
-    });
+  if ('layers' in clone) {
+    for (const mask of clone.layers.masks) {
+      stripBackendMaskDataFromSubMasks(mask.subMasks as SubMask[], patchesSentToBackend);
+    }
+    for (const patch of clone.sourceArtifacts.aiPatches) {
+      stripBackendMaskDataFromSubMasks(patch.subMasks as SubMask[], patchesSentToBackend);
+    }
   }
 
   const subMasks = 'subMasks' in clone ? clone.subMasks : undefined;
@@ -114,7 +88,7 @@ const stripMaskPayloadsForOverlay = <T extends MaskPreviewDefinition | Adjustmen
 };
 
 export const buildMaskOverlayInvokePayload = ({
-  jsAdjustments,
+  editDocumentV2,
   maskDef,
   maskOverlaySettings,
   patchesSentToBackend,
@@ -124,11 +98,12 @@ export const buildMaskOverlayInvokePayload = ({
 
   const overlaySettings = normalizeMaskOverlaySettings(maskOverlaySettings);
   if (overlaySettings.mode === 'hidden') return null;
+  const crop = selectEditDocumentGeometry(editDocumentV2).crop;
 
   return {
-    cropOffset: [jsAdjustments.crop?.x || 0, jsAdjustments.crop?.y || 0],
+    cropOffset: [crop?.x ?? 0, crop?.y ?? 0],
+    editDocumentV2: stripMaskPayloadsForOverlay(editDocumentV2, patchesSentToBackend),
     height: Math.round(renderSize.height),
-    jsAdjustments: stripMaskPayloadsForOverlay(jsAdjustments, patchesSentToBackend),
     maskDef: stripMaskPayloadsForOverlay(maskDef, patchesSentToBackend),
     overlaySettings,
     scale: renderSize.scale,
@@ -138,16 +113,14 @@ export const buildMaskOverlayInvokePayload = ({
 
 export const buildMaskOverlayTriggerHash = ({
   activeMaskDef,
-  adjustments,
+  editDocumentV2,
   imageRenderSize,
   maskOverlaySettings,
 }: BuildMaskOverlayTriggerHashParams): string | null => {
   if (!activeMaskDef) return null;
 
-  const geometry: Partial<Record<keyof Adjustments, unknown>> = {};
-  MASK_OVERLAY_GEOMETRY_KEYS.forEach((key) => {
-    geometry[key] = adjustments[key];
-  });
+  const geometry = selectEditDocumentGeometry(editDocumentV2);
+  const lens = selectEditDocumentNode(editDocumentV2, 'lens_correction').params;
 
   const subMasks = activeMaskDef.subMasks.map((subMask: SubMask) => {
     const rest: Omit<SubMask, 'parameters'> = {
@@ -182,6 +155,7 @@ export const buildMaskOverlayTriggerHash = ({
     geometry,
     id: activeMaskDef.id,
     invert: activeMaskDef.invert,
+    lens,
     maskOverlaySettings: normalizeMaskOverlaySettings(maskOverlaySettings),
     opacity: 'opacity' in activeMaskDef ? activeMaskDef.opacity : 100,
     renderSize: { h: imageRenderSize.height, w: imageRenderSize.width },

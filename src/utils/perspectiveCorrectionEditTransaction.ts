@@ -1,5 +1,7 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { perspectiveCorrectionSettingsSchema } from '../../packages/rawengine-schema/src/geometry/perspective/perspectiveSchemas';
 import type { Adjustments } from './adjustments';
+import { selectEditDocumentGeometry } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface PerspectiveCorrectionCommitIdentity {
@@ -10,7 +12,7 @@ export interface PerspectiveCorrectionCommitIdentity {
 
 export interface PerspectiveCorrectionEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'perspectiveCorrection'> };
+  editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -74,7 +76,7 @@ export const buildPerspectiveCorrectionEditTransaction = (
 ): EditTransactionRequest => {
   assertCurrentPerspectiveCorrectionIdentity(state, identity);
   const perspectiveCorrection = perspectiveCorrectionSettingsSchema.parse({
-    ...state.adjustmentSnapshot.value.perspectiveCorrection,
+    ...selectEditDocumentGeometry(state.editDocumentV2).perspectiveCorrection,
     ...structuredClone(patch),
   });
   return {

@@ -2,21 +2,21 @@ import { afterEach, describe, expect, test } from 'bun:test';
 
 import { readLayerStackSidecarsFromSidecar } from '../../../packages/rawengine-schema/src';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { selectEditDocumentAiPatches, selectEditDocumentMasks } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   applyColorRangeLocalAdjustmentLayerFlow,
   buildColorRangeProposalSourcePixels,
   createColorRangeLocalAdjustmentLayerDraft,
 } from '../../../src/utils/layers/colorRangeLocalAdjustmentCommandFlow';
 import { buildLayerEditTransactionRequest } from '../../../src/utils/layers/layerEditTransaction';
-import { persistLayerStackSidecarInAdjustments } from '../../../src/utils/layers/layerStackSidecarAdjustments';
+import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../src/utils/layers/layerStackSidecarAdjustments';
 import { createColorRangeMaskParameters } from '../../../src/utils/mask/colorRangeMaskParameters';
 
 const imagePath = '/fixtures/color-range-transaction.ARW';
 
 const seedStore = () => {
-  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     activeMaskContainerId: null,
     activeMaskId: null,
@@ -28,8 +28,8 @@ const seedStore = () => {
     imageSessionId: 17,
     lastEditApplicationReceipt: null,
     transformedOriginalUrl: 'blob:color-range-original',
-    editDocumentV2: publishAdjustmentSnapshot(null, adjustments).editDocumentV2,
-    history: [publishAdjustmentSnapshot(null, adjustments).editDocumentV2],
+    editDocumentV2,
+    history: [editDocumentV2],
   });
 };
 
@@ -47,7 +47,7 @@ const buildColorRangeAdjustments = (operationId: string) => {
     name: 'Oranges local adjustment',
     parameters,
   });
-  const flow = applyColorRangeLocalAdjustmentLayerFlow(state.adjustmentSnapshot.value.masks, {
+  const flow = applyColorRangeLocalAdjustmentLayerFlow(selectEditDocumentMasks(state.editDocumentV2), {
     colorRangeParameters: parameters,
     context: {
       graphRevision: `history_${String(state.historyIndex)}`,
@@ -71,10 +71,7 @@ const buildColorRangeAdjustments = (operationId: string) => {
     },
   });
 
-  return persistLayerStackSidecarInAdjustments(
-    { ...state.adjustmentSnapshot.value, masks: flow.masks },
-    flow.toneResult.sidecar,
-  );
+  return persistLayerStackSidecarInEditDocumentCandidate(state.editDocumentV2, flow.masks, flow.toneResult.sidecar);
 };
 
 afterEach(seedStore);
@@ -110,8 +107,8 @@ describe('Color range local adjustment EditTransaction boundary', () => {
     });
     expect(committed.finalPreviewUrl).toBeNull();
     expect(committed.transformedOriginalUrl).toBeNull();
-    expect(committed.adjustmentSnapshot.value.masks.map((mask) => mask.id)).toEqual(['color-range-layer']);
-    expect(readLayerStackSidecarsFromSidecar(committed.adjustmentSnapshot.value)).toMatchObject([
+    expect(committed.editDocumentV2.layers.masks.map((mask) => mask.id)).toEqual(['color-range-layer']);
+    expect(readLayerStackSidecarsFromSidecar(committed.editDocumentV2.extensions)).toMatchObject([
       { sourceImagePath: imagePath },
     ]);
   });
@@ -125,7 +122,15 @@ describe('Color range local adjustment EditTransaction boundary', () => {
     useEditorStore.setState({ finalPreviewUrl: 'blob:color-range-current' });
     const current = useEditorStore.getState();
     const result = current.applyEditTransaction(
-      buildLayerEditTransactionRequest(current, current.adjustmentSnapshot.value, 'color-range-no-op'),
+      buildLayerEditTransactionRequest(
+        current,
+        {
+          aiPatches: selectEditDocumentAiPatches(current.editDocumentV2),
+          masks: selectEditDocumentMasks(current.editDocumentV2),
+          rawEngineArtifacts: current.editDocumentV2.extensions['rawEngineArtifacts'],
+        },
+        'color-range-no-op',
+      ),
     );
     const committed = useEditorStore.getState();
 
@@ -145,18 +150,20 @@ describe('Color range local adjustment EditTransaction boundary', () => {
       buildColorRangeAdjustments('color-range-stale'),
       'color-range-stale',
     );
-    base.applyEditTransaction(
-      buildLayerEditTransactionRequest(
-        base,
-        { ...base.adjustmentSnapshot.value, exposure: 0.5 },
-        'newer-editor-transaction',
-      ),
-    );
+    base.applyEditTransaction({
+      baseAdjustmentRevision: base.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: 'editor-image-session:17',
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure: 0.5 }, type: 'patch-edit-document-node' }],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: 'newer-editor-transaction',
+    });
 
     expect(() => useEditorStore.getState().applyEditTransaction(stale)).toThrow('edit_transaction.stale_base:0:1');
     const committed = useEditorStore.getState();
-    expect(committed.adjustmentSnapshot.value.exposure).toBe(0.5);
-    expect(committed.adjustmentSnapshot.value.masks).toEqual([]);
-    expect(readLayerStackSidecarsFromSidecar(committed.adjustmentSnapshot.value)).toEqual([]);
+    expect(committed.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.5);
+    expect(committed.editDocumentV2.layers.masks).toEqual([]);
+    expect(readLayerStackSidecarsFromSidecar(committed.editDocumentV2.extensions)).toEqual([]);
   });
 });

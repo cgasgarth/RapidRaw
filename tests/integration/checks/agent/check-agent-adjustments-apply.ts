@@ -210,8 +210,8 @@ if (
   state.history[state.historyIndex]?.whiteBalanceTechnical.kelvin !== technicalWhiteBalance.kelvin ||
   state.history[state.historyIndex]?.whiteBalanceTechnical.duv !== technicalWhiteBalance.duv ||
   state.history[state.historyIndex]?.vibrance !== 10 ||
-  state.editDocumentV2.nodes.camera_input?.params.whiteBalanceTechnical.kelvin !== technicalWhiteBalance.kelvin ||
-  state.editDocumentV2.nodes.camera_input.params.whiteBalanceTechnical.duv !== technicalWhiteBalance.duv
+  state.editDocumentV2.nodes.camera_input?.params['whiteBalanceTechnical'].kelvin !== technicalWhiteBalance.kelvin ||
+  state.editDocumentV2.nodes.camera_input.params['whiteBalanceTechnical'].duv !== technicalWhiteBalance.duv
 ) {
   throw new Error('agent.adjustments.apply did not atomically persist extra global color fields in history and graph.');
 }

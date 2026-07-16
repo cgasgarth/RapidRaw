@@ -6,7 +6,10 @@ import { chromium, type Page } from '@playwright/test';
 import { z } from 'zod';
 
 import { allocateFreeTcpPort } from '../../../../scripts/lib/dev-server-port';
-import { EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES } from '../../../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  EDIT_DOCUMENT_V2_COPYABLE_NODE_TYPES,
+} from '../../../../src/utils/editDocumentV2';
 
 const host = '127.0.0.1';
 const port = await allocateFreeTcpPort(host);
@@ -212,7 +215,7 @@ try {
   );
   if (
     pasteSave.adjustments.exposure !== 0.65 ||
-    pasteSave.editDocumentV2.nodes.scene_global_color_tone.params.exposure !== 0.65 ||
+    pasteSave.editDocumentV2.nodes.scene_global_color_tone.params['exposure'] !== 0.65 ||
     !pasteSave.editDocumentV2.nodes.scene_global_color_tone.enabled ||
     pasteSave.transaction.nextAdjustmentRevision !== pasteSave.transaction.baseAdjustmentRevision + 1
   ) {

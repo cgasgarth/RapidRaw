@@ -7,6 +7,7 @@ import {
   type CameraInputParameters,
   type CameraInputPatch,
 } from '../../utils/cameraInputEditTransaction';
+import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
 
 type CameraInputPatchUpdate = CameraInputPatch | ((current: Readonly<CameraInputParameters>) => CameraInputPatch);
 
@@ -32,7 +33,10 @@ export const useCameraInputEditCommit = (enabled = true) => {
       const currentIdentity = identityRef.current;
       if (currentIdentity === null) return null;
       const state = useEditorStore.getState();
-      const patch = typeof update === 'function' ? update(state.adjustmentSnapshot.value) : update;
+      const patch =
+        typeof update === 'function'
+          ? update(selectEditDocumentNode(state.editDocumentV2, 'camera_input').params)
+          : update;
       const result = applyEditTransaction(
         buildCameraInputEditTransaction(state, currentIdentity, patch, crypto.randomUUID()),
       );

@@ -1,15 +1,14 @@
-import type { Adjustments } from '../../adjustments';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 
-export const buildAgentColorRecipeHashInput = (adjustments: Adjustments) => ({
-  blackWhiteMixer: adjustments.blackWhiteMixer,
-  channelMixer: adjustments.channelMixer,
-  colorBalanceRgb: adjustments.colorBalanceRgb,
-  colorCalibration: adjustments.colorCalibration,
-  colorGrading: adjustments.colorGrading,
-  hsl: adjustments.hsl,
-  saturation: adjustments.saturation,
-  selectiveColorRangeControls: adjustments.selectiveColorRangeControls,
-  skinToneUniformity: adjustments.skinToneUniformity,
-  whiteBalanceTechnical: adjustments.whiteBalanceTechnical,
-  vibrance: adjustments.vibrance,
+export const buildAgentColorRecipeHashInput = (document: EditDocumentV2) => ({
+  ...selectEditDocumentNode(document, 'black_white_mixer').params,
+  ...selectEditDocumentNode(document, 'camera_input').params,
+  ...selectEditDocumentNode(document, 'channel_mixer').params,
+  ...selectEditDocumentNode(document, 'color_balance_rgb').params,
+  ...selectEditDocumentNode(document, 'color_calibration').params,
+  ...selectEditDocumentNode(document, 'color_presence').params,
+  ...selectEditDocumentNode(document, 'perceptual_grading').params,
+  ...selectEditDocumentNode(document, 'selective_color_mixer').params,
+  ...selectEditDocumentNode(document, 'skin_tone_uniformity').params,
 });

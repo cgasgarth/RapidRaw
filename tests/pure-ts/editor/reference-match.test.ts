@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildLayerStackSidecarFromMasks,
   materializeMasksFromLayerStackSidecar,
@@ -18,7 +19,7 @@ import {
   type ReferenceHistogramSummary,
   type ReferenceMatchGroup,
   type ReferenceMatchReference,
-  resolveReferenceMatchRenderAdjustments,
+  resolveReferenceMatchRenderDocument,
   selectReferenceMatchReferences,
   summarizeReferenceHistogram,
   validateReferenceMatchApplicationIdentities,
@@ -375,36 +376,37 @@ describe('color-managed reference matching', () => {
   });
 
   test('renders a preview only for its exact target and committed graph revision', () => {
-    const previewAdjustments = { ...INITIAL_ADJUSTMENTS, exposure: 1.25 };
+    const committed = createDefaultEditDocumentV2();
+    const previewDocument = patchEditDocumentV2Node(committed, 'scene_global_color_tone', { exposure: 1.25 });
     const preview = {
-      adjustments: previewAdjustments,
       baseAdjustmentRevision: 7,
+      editDocumentV2: previewDocument,
       targetPath: '/photos/target.ARW',
     };
     expect(
-      resolveReferenceMatchRenderAdjustments({
+      resolveReferenceMatchRenderDocument({
         adjustmentRevision: 7,
-        committed: INITIAL_ADJUSTMENTS,
+        committed,
         preview,
         targetPath: '/photos/target.ARW',
       }),
-    ).toBe(previewAdjustments);
+    ).toBe(previewDocument);
     expect(
-      resolveReferenceMatchRenderAdjustments({
+      resolveReferenceMatchRenderDocument({
         adjustmentRevision: 8,
-        committed: INITIAL_ADJUSTMENTS,
+        committed,
         preview,
         targetPath: '/photos/target.ARW',
       }),
-    ).toBe(INITIAL_ADJUSTMENTS);
+    ).toBe(committed);
     expect(
-      resolveReferenceMatchRenderAdjustments({
+      resolveReferenceMatchRenderDocument({
         adjustmentRevision: 7,
-        committed: INITIAL_ADJUSTMENTS,
+        committed,
         preview,
         targetPath: '/photos/other.ARW',
       }),
-    ).toBe(INITIAL_ADJUSTMENTS);
+    ).toBe(committed);
   });
 
   test('reports clipping, proof/profile incompatibility, and localized-analysis limits without replacing profile', () => {

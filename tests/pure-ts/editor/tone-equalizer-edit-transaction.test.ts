@@ -2,10 +2,10 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentToneEqualizerV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import type { BasicToneCommitIdentity } from '../../../src/utils/basicToneEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildToneEqualizerEditTransaction,
   isCurrentToneEqualizerAsyncRequest,
@@ -35,7 +35,7 @@ const identity = (overrides: Partial<BasicToneCommitIdentity> = {}): BasicToneCo
 describe('tone equalizer edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -60,18 +60,25 @@ describe('tone equalizer edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result).toMatchObject({ changedKeys: ['toneEqualizer'], nextAdjustmentRevision: 1, noOp: false });
-    expect(
-      editDocumentToneEqualizerV2Schema.parse(result.afterEditDocumentV2.nodes['tone_equalizer']?.params).toneEqualizer,
-    ).toEqual({
-      ...INITIAL_ADJUSTMENTS.toneEqualizer,
-      enabled: true,
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.tone_equalizer.params.toneEqualizer'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
     });
-    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
+    expect(editDocumentToneEqualizerV2Schema.parse(result.after.nodes['tone_equalizer']?.params).toneEqualizer).toEqual(
+      {
+        ...INITIAL_ADJUSTMENTS.toneEqualizer,
+        enabled: true,
+      },
+    );
+    expect(result.after.nodes['scene_curve']).toBe(result.before.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.toneEqualizer.enabled).toBe(false);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'tone_equalizer').params['toneEqualizer']
+        .enabled,
+    ).toBe(false);
   });
 
   test('rejects stale source, session, and revision before constructing a node transaction', () => {

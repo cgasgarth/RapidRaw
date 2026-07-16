@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import type { EditDocumentNodeParamsV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 
-import type { Adjustments, HueSatLum } from './adjustments';
+import type { HueSatLum } from './adjustments';
 import type { SelectiveColorRangeControl } from './selectiveColorRanges';
 
 const SELECTIVE_COLOR_COMMAND_SCHEMA_VERSION = 1;
@@ -249,7 +250,10 @@ const parseSelectiveColorCommandEnvelope = (command: unknown): SelectiveColorCom
   return selectiveColorCommandEnvelopeSchema.parse(command);
 };
 
-export const applySelectiveColorCommandEnvelopeToAdjustments = (base: Adjustments, command: unknown): Adjustments => {
+export const applySelectiveColorCommandEnvelopeToAdjustments = (
+  base: EditDocumentNodeParamsV2<'selective_color_mixer'>,
+  command: unknown,
+): EditDocumentNodeParamsV2<'selective_color_mixer'> => {
   const parsedCommand = parseSelectiveColorCommandEnvelope(command);
   const rangeKey = HSL_BAND_TO_COMMAND_RANGE[parsedCommand.parameters.band];
   const rangeControl: SelectiveColorRangeControl | undefined = parsedCommand.parameters.rangeControl;

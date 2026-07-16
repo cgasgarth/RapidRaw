@@ -114,7 +114,7 @@ export const buildNegativeLabConversionPlanResult = (
     profileApplyProof,
     profileProvenanceHash,
     proof: {
-      densityAlgorithm: profile.params.print_curve_algorithm,
+      densityAlgorithm: profile.params['print_curve_algorithm'],
       deterministic: true,
       generatedFrom: 'src/utils/negative-lab/negativeLabMeasuredProfileRuntime.ts',
       runtimeConversionHelper: 'src/utils/negative-lab/negativeLabDensityConversion.ts',

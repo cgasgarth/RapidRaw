@@ -13,6 +13,7 @@ import {
   buildColorCalibrationEditTransaction,
   type ColorCalibrationCommitIdentity,
 } from '../../../utils/colorCalibrationEditTransaction';
+import { selectEditDocumentNode } from '../../../utils/editDocumentSelectors';
 import { buildLevelsEditTransaction, type LevelsCommitIdentity } from '../../../utils/levelsEditTransaction';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
@@ -47,7 +48,9 @@ export const ColorAdvancedControls = ({
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
-  const authoritativeLevels = useEditorStore((state) => state.adjustmentSnapshot.value.levels);
+  const authoritativeLevels = useEditorStore(
+    (state) => selectEditDocumentNode(state.editDocumentV2, 'luma_levels').params['levels'],
+  );
   const commitIdentity = useMemo<ColorCalibrationCommitIdentity | null>(
     () =>
       selectedImagePath !== null ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath } : null,

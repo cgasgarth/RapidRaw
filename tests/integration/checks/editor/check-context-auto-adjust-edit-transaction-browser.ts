@@ -140,7 +140,7 @@ const waitForRenderedExposure = async (page: Page, exposure: number) => {
     if (
       parsed.success &&
       parsed.data.endedAtMs !== null &&
-      parsed.data.args.request.editDocumentV2.nodes.scene_global_color_tone.params.exposure === exposure
+      parsed.data.args.request.editDocumentV2.nodes.scene_global_color_tone.params['exposure'] === exposure
     )
       return;
     await page.waitForTimeout(50);

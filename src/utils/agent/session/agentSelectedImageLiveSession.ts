@@ -32,6 +32,7 @@ import {
   agentSelectedImageRollbackReadinessSchema,
 } from '../../../schemas/agent/agentSelectedImageRecoverySchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { selectAutoEditAdjustmentProposal } from '../../autoEditTransaction';
 import {
   buildAgentReviewedAdjustmentCommandPlan,
   DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
@@ -1044,7 +1045,7 @@ export const startAgentSelectedImageLiveSessionDryRun = async ({
       reviewedCommand ??
         buildAgentReviewedAdjustmentCommandPlan({
           commandId: DEFAULT_AGENT_REVIEWED_ADJUSTMENT_COMMAND_ID,
-          sourceAdjustments: useEditorStore.getState().adjustmentSnapshot.value,
+          sourceEditDocumentV2: useEditorStore.getState().editDocumentV2,
         }).receipt,
     ),
     sessionId,
@@ -1621,11 +1622,9 @@ export const runAgentSelectedImageApplyTransaction = (
       ) {
         throw new Error('Selected-image commit parity rejected a non-atomic history transaction.');
       }
+      const appliedAdjustments = selectAutoEditAdjustmentProposal(state.editDocumentV2);
       for (const [key, expected] of Object.entries(draft.adjustments)) {
-        if (
-          expected !== undefined &&
-          state.adjustmentSnapshot.value[key as keyof typeof state.adjustmentSnapshot.value] !== expected
-        ) {
+        if (expected !== undefined && appliedAdjustments[key as keyof typeof appliedAdjustments] !== expected) {
           throw new Error(`Selected-image commit parity rejected adjustment mismatch: ${key}.`);
         }
       }

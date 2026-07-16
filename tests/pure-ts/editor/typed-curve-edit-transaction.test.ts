@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentSceneCurveV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS, type SceneCurveSettingsV1 } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import type { SceneCurveSettingsV1 } from '../../../src/utils/adjustments';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildTypedCurveEditTransaction,
   captureTypedCurveCommitIdentity,
@@ -43,8 +43,9 @@ const sceneCurve: SceneCurveSettingsV1 = {
 
 describe('typed curve edit transaction', () => {
   beforeEach(() => {
-    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.35 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: 0.35,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -69,10 +70,11 @@ describe('typed curve edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result.after).toMatchObject({ exposure: 0.35, rawEngineEditGraphVersion: 2, sceneCurveV1: sceneCurve });
-    expect(
-      editDocumentSceneCurveV2Schema.parse(result.afterEditDocumentV2.nodes['scene_curve']?.params).sceneCurveV1,
-    ).toEqual(sceneCurve);
+    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.35);
+    expect(result.after.nodes['scene_curve']?.params['sceneCurveV1']).toEqual(sceneCurve);
+    expect(editDocumentSceneCurveV2Schema.parse(result.after.nodes['scene_curve']?.params).sceneCurveV1).toEqual(
+      sceneCurve,
+    );
     expect(result).toMatchObject({ nextAdjustmentRevision: 1, noOp: false });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -82,20 +84,15 @@ describe('typed curve edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
-      exposure: 0.35,
-      rawEngineEditGraphVersion: 1,
-    });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.sceneCurveV1).toBeUndefined();
+    const undone = useEditorStore.getState().editDocumentV2;
+    expect(selectEditDocumentNode(undone, 'scene_global_color_tone').params['exposure']).toBe(0.35);
+    expect(selectEditDocumentNode(undone, 'scene_curve').params['sceneCurveV1']).toBeUndefined();
   });
 
   test('commits an Output curve to the same authoritative node without replacing the Scene domain', () => {
-    const withScene = {
-      ...useEditorStore.getState().adjustmentSnapshot.value,
-      rawEngineEditGraphVersion: 2,
+    const editDocumentV2 = patchEditDocumentV2Node(useEditorStore.getState().editDocumentV2, 'scene_curve', {
       sceneCurveV1: sceneCurve,
-    };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(withScene);
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       editDocumentV2,
       history: [editDocumentV2],
@@ -118,15 +115,14 @@ describe('typed curve edit transaction', () => {
       buildTypedCurveEditTransaction(state, identity(), { curve: outputCurve, domain: 'output' }, 'output'),
     );
 
-    expect(result.after.sceneCurveV1).toEqual(sceneCurve);
-    expect(result.after.outputCurveV1).toEqual(outputCurve);
-    expect(editDocumentSceneCurveV2Schema.parse(result.afterEditDocumentV2.nodes['scene_curve']?.params)).toMatchObject(
-      {
-        outputCurveV1: outputCurve,
-        sceneCurveV1: sceneCurve,
-      },
-    );
-    expect(result.changedKeys).toEqual(['outputCurveV1']);
+    const curveParams = editDocumentSceneCurveV2Schema.parse(result.after.nodes['scene_curve']?.params);
+    expect(curveParams.sceneCurveV1).toEqual(sceneCurve);
+    expect(curveParams.outputCurveV1).toEqual(outputCurve);
+    expect(editDocumentSceneCurveV2Schema.parse(result.after.nodes['scene_curve']?.params)).toMatchObject({
+      outputCurveV1: outputCurve,
+      sceneCurveV1: sceneCurve,
+    });
+    expect(result.changedKeys).toEqual(['nodes.scene_curve.params.outputCurveV1']);
   });
 
   test('captures identity, rejects stale commits, validates curve shape, and preserves exact no-ops', () => {
@@ -167,8 +163,9 @@ describe('typed curve edit transaction', () => {
       ),
     ).toThrow();
 
-    const current = { ...state.adjustmentSnapshot.value, rawEngineEditGraphVersion: 2, sceneCurveV1: sceneCurve };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(current);
+    const editDocumentV2 = patchEditDocumentV2Node(state.editDocumentV2, 'scene_curve', {
+      sceneCurveV1: sceneCurve,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       editDocumentV2,
       history: [editDocumentV2],
@@ -184,12 +181,9 @@ describe('typed curve edit transaction', () => {
   });
 
   test('commits through the canonical fallback session and rejects its successor', () => {
-    const current = {
-      ...useEditorStore.getState().adjustmentSnapshot.value,
-      rawEngineEditGraphVersion: 2,
+    const editDocumentV2 = patchEditDocumentV2Node(useEditorStore.getState().editDocumentV2, 'scene_curve', {
       sceneCurveV1: sceneCurve,
-    };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(current);
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       editDocumentV2,
       finalPreviewUrl: 'blob:fallback-curve-before',
@@ -221,7 +215,11 @@ describe('typed curve edit transaction', () => {
     const result = state.applyEditTransaction(
       buildTypedCurveEditTransaction(state, fallbackIdentity, { curve: nextCurve, domain: 'scene' }, 'fallback-curve'),
     );
-    expect(result).toMatchObject({ changedKeys: ['sceneCurveV1'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.scene_curve.params.sceneCurveV1'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       finalPreviewUrl: null,
       historyIndex: 1,
@@ -233,7 +231,9 @@ describe('typed curve edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.sceneCurveV1).toEqual(sceneCurve);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_curve').params['sceneCurveV1'],
+    ).toEqual(sceneCurve);
     expect(() =>
       buildTypedCurveEditTransaction(
         { ...state, imageSessionId: 42 },

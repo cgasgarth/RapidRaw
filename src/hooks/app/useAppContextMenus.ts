@@ -82,7 +82,6 @@ import {
   selectedBatchAutoAdjustDisposition,
   shouldCompensateBatchAutoAdjustPersistence,
 } from '../../utils/batchAutoAdjustTransaction';
-import { editDocumentV2ToLegacyAdjustments } from '../../utils/editDocumentV2';
 import { buildEditorPersistenceRequest } from '../../utils/editorPersistenceEffectRunner';
 import { createFocusStackSourcePreflightMetadata } from '../../utils/focusStackSourcePreflight';
 import { findAlbumById } from '../../utils/folderTreeUtils';
@@ -573,8 +572,6 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 path: editor.selectedImage.path,
               }
             : null;
-        const capturedAdjustments =
-          capturedSelection === null ? null : structuredClone(editor.adjustmentSnapshot.value);
         const capturedEditDocumentV2 = capturedSelection === null ? null : structuredClone(editor.editDocumentV2);
         let successorBaseline: BatchAutoAdjustSuccessorBaseline | null = null;
         const stopTrackingSuccessor =
@@ -592,7 +589,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                   return;
                 }
                 successorBaseline = {
-                  adjustments: structuredClone(state.adjustmentSnapshot.value),
+                  editDocumentV2: structuredClone(state.editDocumentV2),
                   identity: {
                     adjustmentRevision: state.adjustmentRevision,
                     imageSessionId: session.id,
@@ -606,8 +603,8 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
 
         void (async () => {
           let expectedBaseRevision: string | null = null;
-          if (capturedSelection !== null && capturedAdjustments !== null && capturedEditDocumentV2 !== null) {
-            const matchingSave = await awaitMatchingEditorSave(capturedSelection.path, capturedAdjustments);
+          if (capturedSelection !== null && capturedEditDocumentV2 !== null) {
+            const matchingSave = await awaitMatchingEditorSave(capturedSelection.path, capturedEditDocumentV2);
             const barrierReceipt =
               matchingSave ??
               (await invokeWithSchema(
@@ -636,7 +633,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             if (result.status === 'applied') globalImageCache.delete(result.path);
           }
 
-          if (capturedSelection !== null && capturedAdjustments !== null) {
+          if (capturedSelection !== null && capturedEditDocumentV2 !== null) {
             const selectedResult = results.find((result) => result.path === capturedSelection.path);
             const current = useEditorStore.getState();
             const currentSelection: BatchAutoAdjustSelectionIdentity | null = current.selectedImage
@@ -656,11 +653,6 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 );
                 if (committed.status === 'applied' || committed.status === 'no_op') {
                   if (committed.status === 'applied') globalImageCache.delete(committed.path);
-                  if (useLibraryStore.getState().libraryActivePath === committed.path) {
-                    setLibrary({
-                      libraryActiveAdjustments: editDocumentV2ToLegacyAdjustments(committed.receipt.editDocumentV2),
-                    });
-                  }
                   const latest = useEditorStore.getState();
                   const latestSelection: BatchAutoAdjustSelectionIdentity | null = latest.selectedImage
                     ? {
@@ -681,36 +673,34 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                       hydrationProtection.transactionId,
                     );
                   }
-                  const acceptedAdjustments = editDocumentV2ToLegacyAdjustments(committed.receipt.editDocumentV2);
+                  const acceptedEditDocumentV2 = committed.receipt.editDocumentV2;
                   const reconciledHistoryBaseline = resolveBatchAutoAdjustReconciledHistoryBaseline({
-                    acceptedAdjustments,
+                    acceptedEditDocumentV2,
                     captured: capturedSelection,
-                    capturedAdjustments,
+                    capturedEditDocumentV2,
                     current: latestSelection,
-                    currentAdjustments: latest.selectedImage ? latest.adjustmentSnapshot.value : null,
+                    currentEditDocumentV2: latest.selectedImage ? latest.editDocumentV2 : null,
                   });
                   const acceptanceIdentity =
                     reconciledHistoryBaseline === null
                       ? resolveBatchAutoAdjustAcceptanceIdentity({
                           captured: capturedSelection,
-                          capturedAdjustments,
+                          capturedEditDocumentV2,
                           current: latestSelection,
-                          currentAdjustments: latest.selectedImage ? latest.adjustmentSnapshot.value : null,
+                          currentEditDocumentV2: latest.selectedImage ? latest.editDocumentV2 : null,
                           currentSource: latest.imageSession?.source ?? null,
                           successorBaseline,
                         })
                       : latestSelection;
                   if (acceptanceIdentity !== null) {
                     const transaction = buildSelectedBatchAutoAdjustTransaction({
-                      acceptedAdjustments,
+                      acceptedEditDocumentV2,
                       captured: capturedSelection,
                       current: acceptanceIdentity,
-                      currentAdjustments: latest.adjustmentSnapshot.value,
                       currentEditDocumentV2: latest.editDocumentV2,
-                      ...(reconciledHistoryBaseline === null ? {} : { historyBaseline: reconciledHistoryBaseline }),
-                      ...(reconciledHistoryBaseline === null || capturedEditDocumentV2 === null
+                      ...(reconciledHistoryBaseline === null
                         ? {}
-                        : { historyEditDocumentBaseline: capturedEditDocumentV2 }),
+                        : { historyEditDocumentBaseline: reconciledHistoryBaseline }),
                       result: committed,
                     });
                     if (transaction !== null) latest.applyEditTransaction(transaction);
@@ -722,23 +712,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
             }
           }
 
-          const currentLibraryPath = useLibraryStore.getState().libraryActivePath;
-          const libraryResult = results.find(
-            (result) => result.path === currentLibraryPath && result.status !== 'failed',
-          );
-          if (libraryResult?.status === 'applied') {
-            setLibrary({
-              libraryActiveAdjustments: editDocumentV2ToLegacyAdjustments(libraryResult.receipt.editDocumentV2),
-            });
-          }
-
           const failures = results.filter((result) => result.status === 'failed');
           if (failures.length > 0) {
             toast.error(t('contextMenus.toasts.failedApplyAuto', { err: failures[0]?.errorMessage }));
           }
         })()
           .catch((err: unknown) => {
-            if (capturedSelection !== null && capturedAdjustments !== null) {
+            if (capturedSelection !== null && capturedEditDocumentV2 !== null) {
               const current = useEditorStore.getState();
               const currentSelection: BatchAutoAdjustSelectionIdentity | null = current.selectedImage
                 ? {
@@ -752,14 +732,12 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
                 shouldCompensateBatchAutoAdjustPersistence({
                   barrierPersisted,
                   captured: capturedSelection,
-                  capturedAdjustments,
+                  capturedEditDocumentV2,
                   current: currentSelection,
-                  currentAdjustments: current.selectedImage ? current.adjustmentSnapshot.value : null,
+                  currentEditDocumentV2: current.selectedImage ? current.editDocumentV2 : null,
                 })
               ) {
-                if (capturedEditDocumentV2 !== null) {
-                  debouncedSave(capturedSelection.path, capturedAdjustments, capturedEditDocumentV2);
-                }
+                debouncedSave(capturedSelection.path, capturedEditDocumentV2);
               }
             }
             console.error('Failed to apply auto adjustments to paths:', err);

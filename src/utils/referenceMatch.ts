@@ -1,3 +1,4 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { MatchLookApplicationReceiptV1 } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import { matchLookProposalV1Schema } from '../../packages/rawengine-schema/src/referenceMatchRuntime';
 import {
@@ -142,6 +143,11 @@ export type ReferenceMatchAdjustmentKey =
   | 'whiteBalanceDuv'
   | 'whiteBalanceKelvin';
 
+export type ReferenceMatchGlobalAdjustments = Pick<
+  Adjustments,
+  'contrast' | 'exposure' | 'saturation' | 'vibrance' | 'whiteBalanceTechnical'
+>;
+
 export interface ReferenceMatchDiff {
   current: number;
   group: ReferenceMatchGroup;
@@ -164,15 +170,15 @@ export interface ReferenceMatchProposal {
 }
 
 export interface ReferenceMatchPreviewCandidate {
-  adjustments: Adjustments;
   baseAdjustmentRevision: number;
+  editDocumentV2: EditDocumentV2;
   targetPath: string;
 }
 
 const REFERENCE_MATCH_LAYER_KEYS = new Set<ReferenceMatchAdjustmentKey>(['exposure', 'contrast', 'saturation']);
 
 export const getReferenceMatchAdjustmentValue = (
-  adjustments: Adjustments,
+  adjustments: ReferenceMatchGlobalAdjustments,
   key: ReferenceMatchAdjustmentKey,
 ): number => {
   if (key === 'whiteBalanceKelvin') return adjustments.whiteBalanceTechnical.kelvin;
@@ -364,7 +370,7 @@ export const createReferenceMatchProposal = ({
   targetProfile,
   targetProofFingerprint,
 }: {
-  adjustments: Adjustments;
+  adjustments: ReferenceMatchGlobalAdjustments;
   mode: ReferenceMatchMode;
   references: readonly ReferenceMatchReference[];
   target: ReferenceHistogramSummary;
@@ -491,17 +497,17 @@ export const createReferenceMatchProposal = ({
   });
 };
 
-export const applyReferenceMatchProposal = ({
+export const applyReferenceMatchProposal = <AdjustmentsType extends ReferenceMatchGlobalAdjustments>({
   adjustments,
   enabledGroups,
   impact,
   proposal,
 }: {
-  adjustments: Adjustments;
+  adjustments: AdjustmentsType;
   enabledGroups: ReadonlySet<ReferenceMatchGroup>;
   impact: number;
   proposal: ReferenceMatchProposal;
-}): Adjustments => {
+}): AdjustmentsType => {
   const amount = clamp(impact, 0, 100) / 100;
   const next = { ...adjustments };
   let whiteBalanceKelvin = adjustments.whiteBalanceTechnical.kelvin;
@@ -541,7 +547,7 @@ export const createReferenceMatchAppliedDiffs = ({
   impact,
   proposal,
 }: {
-  adjustments: Adjustments;
+  adjustments: ReferenceMatchGlobalAdjustments;
   enabledGroups: ReadonlySet<ReferenceMatchGroup>;
   impact: number;
   proposal: ReferenceMatchProposal;
@@ -561,17 +567,17 @@ export const createReferenceMatchAppliedDiffs = ({
     .sort((left, right) => left.key.localeCompare(right.key));
 };
 
-export const resolveReferenceMatchRenderAdjustments = ({
+export const resolveReferenceMatchRenderDocument = ({
   adjustmentRevision,
   committed,
   preview,
   targetPath,
 }: {
   adjustmentRevision: number;
-  committed: Adjustments;
+  committed: EditDocumentV2;
   preview: ReferenceMatchPreviewCandidate | null;
   targetPath: string | null;
-}): Adjustments =>
+}): EditDocumentV2 =>
   preview?.baseAdjustmentRevision === adjustmentRevision && preview.targetPath === targetPath
-    ? preview.adjustments
+    ? preview.editDocumentV2
     : committed;

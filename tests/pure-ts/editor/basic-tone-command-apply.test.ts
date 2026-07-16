@@ -15,7 +15,7 @@ import {
   buildBasicToneImageCommandContext,
 } from '../../../src/utils/basicToneCommandBridge';
 import { captureBasicToneCommitIdentity } from '../../../src/utils/basicToneEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const imagePath = '/fixtures/basic-tone-command-apply/DSC_4792.ARW';
 const requestedAdjustments: BasicToneAdjustmentPayload = {
@@ -32,7 +32,7 @@ const requestedAdjustments: BasicToneAdjustmentPayload = {
 
 const seedEditor = () => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -162,7 +162,7 @@ describe('basic tone command apply path', () => {
     expect(dryRun.parameterDiff.some((diff) => diff.path === '/parameters/exposureEv')).toBe(true);
 
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value).toBe(before.adjustmentSnapshot.value);
+    expect(after.editDocumentV2).toBe(before.editDocumentV2);
     expect(after.history).toEqual([before.editDocumentV2]);
     expect(after.historyIndex).toBe(0);
     expect(after.lastBasicToneCommand).toBeNull();
@@ -186,9 +186,9 @@ describe('basic tone command apply path', () => {
     expect(mutation.commandId).toBe(applyCommand.commandId);
 
     const applied = useEditorStore.getState();
-    expect(applied.adjustmentSnapshot.value.exposure).toBe(0.65);
-    expect(applied.adjustmentSnapshot.value.highlights).toBe(-31);
-    expect(applied.adjustmentSnapshot.value.whites).toBe(27);
+    expect(applied.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.65);
+    expect(applied.editDocumentV2.nodes['scene_global_color_tone']!.params['highlights']).toBe(-31);
+    expect(applied.editDocumentV2.nodes['scene_global_color_tone']!.params['whites']).toBe(27);
     expect(applied.history).toHaveLength(2);
     expect(applied.historyIndex).toBe(1);
     expect(applied.history[1]).toEqual(applied.editDocumentV2);
@@ -197,7 +197,11 @@ describe('basic tone command apply path', () => {
     expect(applied.lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
       baseAdjustmentRevision: 0,
-      changedKeys: expect.arrayContaining(['exposure', 'highlights', 'whites']),
+      changedKeys: expect.arrayContaining([
+        'nodes.scene_global_color_tone.params.exposure',
+        'nodes.scene_global_color_tone.params.highlights',
+        'nodes.scene_global_color_tone.params.whites',
+      ]),
       persistence: 'commit',
       source: 'agent-command',
       transactionId: applyCommand.commandId,
@@ -216,14 +220,14 @@ describe('basic tone command apply path', () => {
 
     applied.undo();
     const undone = useEditorStore.getState();
-    expect(undone.adjustmentSnapshot.value).toEqual(publishAdjustmentSnapshot(null, undone.history[0]!).value);
+    expect(undone.editDocumentV2).toEqual(publishAdjustmentSnapshot(null, undone.history[0]!).editDocumentV2);
     expect(undone.historyIndex).toBe(0);
     expect(undone.history).toHaveLength(2);
     expect(undone.finalPreviewUrl).toBeNull();
 
     undone.redo();
     const redone = useEditorStore.getState();
-    expect(redone.adjustmentSnapshot.value.exposure).toBe(0.65);
+    expect(redone.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.65);
     expect(redone.historyIndex).toBe(1);
     expect(redone.uncroppedAdjustedPreviewUrl).toBeNull();
   });
@@ -346,7 +350,7 @@ const commitInterveningExposure = (exposure: number) => {
     baseAdjustmentRevision: state.adjustmentRevision,
     history: 'coalesced-interaction',
     imageSessionId: state.imageSession?.id ?? '',
-    operations: [{ patch: { exposure }, type: 'patch-adjustments' }],
+    operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure }, type: 'patch-edit-document-node' }],
     persistence: 'commit',
     source: 'manual-control',
     transactionId: 'intervening-coalesced-edit',

@@ -2,9 +2,8 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import type { ViewerParametricMaskTargetKey } from '../../../src/components/panel/editor/viewerParametricMaskTargetInteractionController';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildParametricMaskTargetEditTransaction } from '../../../src/utils/parametricMaskTargetEditTransaction';
 
 const sourcePath = '/fixture/parametric-mask-target.ARW';
@@ -68,7 +67,13 @@ describe('parametric mask target edit transaction', () => {
         },
       ],
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'layers',
+      { masks: adjustments.masks },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -92,12 +97,12 @@ describe('parametric mask target edit transaction', () => {
     const result = useEditorStore.getState().applyEditTransaction(request);
 
     expect(result).toMatchObject({
-      changedKeys: ['masks'],
+      changedKeys: ['nodes.layers.params.masks'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'layer-command',
     });
-    expect(result.after.masks[0]?.subMasks[0]?.parameters).toEqual(parameters);
+    expect(result.after.layers.masks[0]?.subMasks[0]?.parameters).toEqual(parameters);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -107,11 +112,11 @@ describe('parametric mask target edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.masks[0]?.subMasks[0]?.parameters).toEqual({
+    expect(useEditorStore.getState().editDocumentV2.layers.masks[0]?.subMasks[0]?.parameters).toEqual({
       isInitialDraw: true,
       range: 0.2,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
   });
 
   test('rejects stale session, source, graph, geometry, tool, and mask identities', () => {

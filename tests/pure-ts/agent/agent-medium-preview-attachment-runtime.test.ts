@@ -11,13 +11,13 @@ import {
   decodeAgentJpegDimensions,
   sha256ForAgentPreviewBytes,
 } from '../../../src/utils/agent/context/agentMediumPreviewAttachmentRuntime';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const fixturePath = new URL('../../../docs/baseline/render/rapidraw-vite-empty-root-2026-06-10.jpg', import.meta.url);
 const selectedPath = '/fixtures/agent-medium-preview-attachment/DSC_5015.ARW';
 
 const seedEditor = () => {
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     finalPreviewUrl: 'blob:agent-medium-preview-attachment',
     historyIndex: 0,

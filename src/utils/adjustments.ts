@@ -35,7 +35,7 @@ import {
 } from './selectiveColorRanges';
 
 export type JsonPrimitive = boolean | null | number | string;
-export type JsonValue = JsonPrimitive | { [key: string]: JsonValue } | Array<JsonValue>;
+export type JsonValue = JsonPrimitive | { readonly [key: string]: JsonValue } | ReadonlyArray<JsonValue>;
 
 export enum ActiveChannel {
   Blue = 'blue',

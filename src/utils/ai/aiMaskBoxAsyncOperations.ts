@@ -1,12 +1,19 @@
 import { toast } from 'react-toastify';
 import { z } from 'zod';
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerAiMaskBoxCommand } from '../../components/panel/editor/viewerAiMaskBoxInteractionController';
 import type { SubMask } from '../../components/panel/right/layers/Masks';
 import { AiProviderId, type AiProviderId as AiProviderIdType } from '../../schemas/ai/aiProviderSchemas';
 import { parseAiPatchDataJson } from '../../schemas/masks/aiMaskingSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { Invokes } from '../../tauri/commands';
-import type { Adjustments, AiPatch } from '../adjustments';
+import type { AiPatch } from '../adjustments';
+import {
+  selectEditDocumentGeometry,
+  selectEditDocumentMasks,
+  selectEditDocumentNode,
+  selectEditDocumentSourceArtifacts,
+} from '../editDocumentSelectors';
 import { formatUnknownError } from '../errorFormatting';
 import { mergeMaskParameters } from '../mask/maskParameterAccess';
 import { invokeWithSchema } from '../tauriSchemaInvoke';
@@ -45,29 +52,16 @@ export interface AiMaskBoxAsyncRequest {
   readonly isLatestOperation: () => boolean;
 }
 
-const getTransformAdjustments = (adjustments: Adjustments) => ({
-  transformDistortion: adjustments.transformDistortion,
-  transformVertical: adjustments.transformVertical,
-  transformHorizontal: adjustments.transformHorizontal,
-  transformRotate: adjustments.transformRotate,
-  transformAspect: adjustments.transformAspect,
-  transformScale: adjustments.transformScale,
-  transformXOffset: adjustments.transformXOffset,
-  transformYOffset: adjustments.transformYOffset,
-  lensDistortionAmount: adjustments.lensDistortionAmount,
-  lensVignetteAmount: adjustments.lensVignetteAmount,
-  lensTcaAmount: adjustments.lensTcaAmount,
-  lensDistortionParams: adjustments.lensDistortionParams,
-  lensMaker: adjustments.lensMaker,
-  lensModel: adjustments.lensModel,
-  lensDistortionEnabled: adjustments.lensDistortionEnabled,
-  lensTcaEnabled: adjustments.lensTcaEnabled,
-  lensVignetteEnabled: adjustments.lensVignetteEnabled,
+const getTransformAdjustments = (document: EditDocumentV2) => ({
+  ...selectEditDocumentGeometry(document),
+  ...selectEditDocumentNode(document, 'lens_correction').params,
 });
 
-const findCommandSubMask = (adjustments: Adjustments, command: ViewerAiMaskBoxCommand): SubMask | null => {
-  const containers = adjustments[command.key.containerFamily];
-  const siblingContainers = command.key.containerFamily === 'masks' ? adjustments.aiPatches : adjustments.masks;
+const findCommandSubMask = (document: EditDocumentV2, command: ViewerAiMaskBoxCommand): SubMask | null => {
+  const masks = selectEditDocumentMasks(document);
+  const aiPatches = selectEditDocumentSourceArtifacts(document).aiPatches;
+  const containers = command.key.containerFamily === 'masks' ? masks : aiPatches;
+  const siblingContainers = command.key.containerFamily === 'masks' ? aiPatches : masks;
   if (
     siblingContainers.some(
       (container) =>
@@ -86,12 +80,7 @@ export const runQuickEraseBoxOperation = async (
   { command, isCurrent, isLatestOperation }: AiMaskBoxAsyncRequest,
   getToken: () => Promise<string | null>,
 ): Promise<void> => {
-  const {
-    selectedImage,
-    adjustmentSnapshot: { value: adjustments },
-    patchResidency,
-    setEditor,
-  } = useEditorStore.getState();
+  const { selectedImage, editDocumentV2: adjustments, patchResidency, setEditor } = useEditorStore.getState();
   if (!isCurrent() || !selectedImage?.path || command.key.containerFamily !== 'aiPatches') return;
   const subMaskToUpdate = findCommandSubMask(adjustments, command);
   if (subMaskToUpdate === null) return;
@@ -106,11 +95,11 @@ export const runQuickEraseBoxOperation = async (
       {
         jsAdjustments: getTransformAdjustments(adjustments),
         endPoint: [command.endPoint.x, command.endPoint.y],
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
+        flipHorizontal: selectEditDocumentGeometry(adjustments).flipHorizontal,
+        flipVertical: selectEditDocumentGeometry(adjustments).flipVertical,
+        orientationSteps: selectEditDocumentGeometry(adjustments).orientationSteps,
         path: selectedImage.path,
-        rotation: adjustments.rotation,
+        rotation: selectEditDocumentGeometry(adjustments).rotation,
         startPoint: [command.startPoint.x, command.startPoint.y],
       },
       aiSubjectMaskParametersSchema,
@@ -123,7 +112,7 @@ export const runQuickEraseBoxOperation = async (
     };
     const updatedAdjustmentsForBackend = {
       ...adjustments,
-      aiPatches: adjustments.aiPatches.map((patch: AiPatch) =>
+      aiPatches: selectEditDocumentSourceArtifacts(adjustments).aiPatches.map((patch: AiPatch) =>
         patch.id === patchId
           ? {
               ...patch,
@@ -146,8 +135,7 @@ export const runQuickEraseBoxOperation = async (
       },
       generativePatchDataJsonSchema,
     );
-    if (!isCurrent() || findCommandSubMask(useEditorStore.getState().adjustmentSnapshot.value, command) === null)
-      return;
+    if (!isCurrent() || findCommandSubMask(useEditorStore.getState().editDocumentV2, command) === null) return;
     const newPatchData = parseAiPatchDataJson(newPatchDataJson);
     patchResidency.remove(patchId);
     useEditorStore.getState().applyAiEditCommand(({ aiPatches }) => {
@@ -182,12 +170,7 @@ export const runAiSubjectBoxOperation = async (
   { command, commitParameters, isCurrent, isLatestOperation }: AiMaskBoxAsyncRequest,
   aiProvider: AiProviderIdType,
 ): Promise<void> => {
-  const {
-    selectedImage,
-    adjustmentSnapshot: { value: adjustments },
-    patchResidency,
-    setEditor,
-  } = useEditorStore.getState();
+  const { selectedImage, editDocumentV2: adjustments, patchResidency, setEditor } = useEditorStore.getState();
   if (!isCurrent() || !selectedImage?.path || findCommandSubMask(adjustments, command) === null) return;
   setEditor({ isGeneratingAiMask: true });
 
@@ -216,11 +199,11 @@ export const runAiSubjectBoxOperation = async (
       {
         jsAdjustments: getTransformAdjustments(adjustments),
         endPoint: [command.endPoint.x, command.endPoint.y],
-        flipHorizontal: adjustments.flipHorizontal,
-        flipVertical: adjustments.flipVertical,
-        orientationSteps: adjustments.orientationSteps,
+        flipHorizontal: selectEditDocumentGeometry(adjustments).flipHorizontal,
+        flipVertical: selectEditDocumentGeometry(adjustments).flipVertical,
+        orientationSteps: selectEditDocumentGeometry(adjustments).orientationSteps,
         path: selectedImage.path,
-        rotation: adjustments.rotation,
+        rotation: selectEditDocumentGeometry(adjustments).rotation,
         startPoint: [command.startPoint.x, command.startPoint.y],
       },
       aiSubjectMaskParametersSchema,

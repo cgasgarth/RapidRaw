@@ -7,7 +7,6 @@ import { Invokes } from '../tauri/commands';
 import type { PreviewQualityDecision } from './adaptivePreviewQuality';
 import type { AdjustmentSnapshot, PatchResidencySnapshot } from './adjustmentSnapshots';
 import { beginAppOperation, logAppOperationFailure, logAppOperationSuccess } from './appEventLogger';
-import { prepareEditDocumentV2ForRender } from './editDocumentV2';
 import {
   buildFilmPreviewRenderIdentity,
   type FilmRenderLease,
@@ -189,30 +188,7 @@ const executeNativeEditedPreview = async (
   payload: ReturnType<PreparedAdjustmentPayloadCache['prepare']>['payload'],
   identity: PreviewOperationIdentity,
 ): Promise<Omit<ExecutedEditedPreview, 'newlySentPatchIds'>> => {
-  const editDocumentV2 = prepareEditDocumentV2ForRender(payload, request.snapshot.editDocumentV2, [
-    'black_white_mixer',
-    'camera_input',
-    'color_calibration',
-    'channel_mixer',
-    'color_balance_rgb',
-    'selective_color_mixer',
-    'skin_tone_uniformity',
-    'detail_denoise_dehaze',
-    'display_creative',
-    'film_emulation',
-    'geometry',
-    'lens_correction',
-    'luma_levels',
-    'layers',
-    'perceptual_grading',
-    'point_color',
-    'scene_curve',
-    'scene_global_color_tone',
-    'scene_to_view_transform',
-    'source_decode',
-    'source_artifacts',
-    'tone_equalizer',
-  ]);
+  const editDocumentV2 = currentRenderEditDocumentV2Schema.parse(payload);
   if (request.proof !== null && request.kind === 'settled') {
     const proofRequest = {
       activeWaveformChannel: request.activeWaveformChannel,
@@ -249,7 +225,7 @@ const executeNativeEditedPreview = async (
       request: applyAdjustmentsInvokeSchema.parse({
         activeWaveformChannel: request.activeWaveformChannel,
         computeWaveform: request.computeWaveform,
-        editDocumentV2,
+        editDocumentV2: payload,
         expectedImagePath: request.session.sourceImagePath,
         isInteractive: request.kind === 'interactive',
         previewOperationIdentity: identity,
@@ -377,7 +353,7 @@ export class EditedPreviewEffectRunner<T> {
 
     const filmRenderIdentity = buildFilmPreviewRenderIdentity({
       adjustmentRevision: request.snapshot.renderRevision,
-      adjustments: request.snapshot.value,
+      editDocumentV2: request.snapshot.editDocumentV2,
       backend: request.viewerScope.backend,
       displayGeneration: request.session.displayGeneration,
       imageSessionId: request.session.imageSessionId,

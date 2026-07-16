@@ -1,4 +1,6 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
+import { selectEditDocumentNode } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface PointColorCommitIdentity {
@@ -9,7 +11,7 @@ export interface PointColorCommitIdentity {
 
 export interface PointColorEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'pointColor'> };
+  editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -54,7 +56,10 @@ export const buildPointColorEditTransaction = (
       {
         nodeType: 'point_color',
         patch: {
-          pointColor: { ...structuredClone(state.adjustmentSnapshot.value.pointColor), ...structuredClone(patch) },
+          pointColor: {
+            ...structuredClone(selectEditDocumentNode(state.editDocumentV2, 'point_color').params['pointColor']),
+            ...structuredClone(patch),
+          },
         },
         type: 'patch-edit-document-node',
       },

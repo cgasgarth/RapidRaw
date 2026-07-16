@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildPointColorEditTransaction,
   isCurrentPointColorIdentity,
@@ -33,7 +34,7 @@ const identity = (overrides: Partial<PointColorCommitIdentity> = {}): PointColor
 describe('point color edit transaction', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -58,13 +59,19 @@ describe('point color edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(result).toMatchObject({ changedKeys: ['pointColor'], nextAdjustmentRevision: 1, noOp: false });
-    expect(result.afterEditDocumentV2.nodes['point_color']?.params).toMatchObject({ pointColor: { enabled: true } });
-    expect(result.afterEditDocumentV2.nodes['scene_curve']).toBe(result.beforeEditDocumentV2.nodes['scene_curve']);
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.point_color.params.pointColor'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
+    expect(result.after.nodes['point_color']?.params).toMatchObject({ pointColor: { enabled: true } });
+    expect(result.after.nodes['scene_curve']).toBe(result.before.nodes['scene_curve']);
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.pointColor.enabled).toBe(false);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'point_color').params['pointColor'].enabled,
+    ).toBe(false);
   });
 
   test('rejects stale source, session, and revision before constructing a node transaction', () => {
@@ -116,7 +123,11 @@ describe('point color edit transaction', () => {
     const result = state.applyEditTransaction(
       buildPointColorEditTransaction(state, fallbackIdentity, { enabled: true }, 'fallback-point-color'),
     );
-    expect(result).toMatchObject({ changedKeys: ['pointColor'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.point_color.params.pointColor'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       finalPreviewUrl: null,
       historyIndex: 1,
@@ -127,7 +138,9 @@ describe('point color edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.pointColor.enabled).toBeFalse();
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'point_color').params['pointColor'].enabled,
+    ).toBeFalse();
 
     expect(isCurrentPointColorIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

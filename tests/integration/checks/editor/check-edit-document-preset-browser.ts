@@ -164,7 +164,7 @@ try {
     ),
   );
   if (
-    savedPreset.editDocumentV2.nodes.scene_global_color_tone?.params.exposure !== 0.85 ||
+    savedPreset.editDocumentV2.nodes.scene_global_color_tone?.params['exposure'] !== 0.85 ||
     savedPreset.editDocumentV2.nodes.geometry !== undefined ||
     savedPreset.editDocumentV2.nodes.layers !== undefined ||
     savedPreset.editDocumentV2.nodes.source_artifacts !== undefined
@@ -258,7 +258,7 @@ try {
   const previewIdentity = Reflect.get(previewCall, 'previewIdentity');
   if (
     Reflect.get(previewAdjustments, 'exposure') !==
-      configuredPreset.editDocumentV2.nodes.scene_global_color_tone?.params.exposure ||
+      configuredPreset.editDocumentV2.nodes.scene_global_color_tone?.params['exposure'] ||
     selectedImagePath === null ||
     Reflect.get(previewCall, 'expectedImagePath') !== selectedImagePath ||
     Reflect.get(previewIdentity, 'sourceImagePath') !== Reflect.get(previewCall, 'expectedImagePath') ||

@@ -185,8 +185,8 @@ if (
   failures.push('agent tone apply did not publish one source-bound EditTransaction receipt.');
 }
 if (
-  state.editDocumentV2.nodes.scene_global_color_tone?.params.exposure !== 0.42 ||
-  state.editDocumentV2.nodes.detail_denoise_dehaze?.params.clarity !== 18
+  state.editDocumentV2.nodes.scene_global_color_tone?.params['exposure'] !== 0.42 ||
+  state.editDocumentV2.nodes.detail_denoise_dehaze?.params['clarity'] !== 18
 ) {
   failures.push('agent tone apply did not update canonical tone and detail nodes.');
 }

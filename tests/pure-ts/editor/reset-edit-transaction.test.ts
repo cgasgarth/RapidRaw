@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  setEditDocumentV2NodeEnabled,
+} from '../../../src/utils/editDocumentV2';
 import {
   assertResetAdjustmentsResultCoverage,
   buildResetEditTransaction,
@@ -28,7 +31,11 @@ const selectedImage = {
 };
 const receipt = resetAdjustmentsResultsSchema.parse([
   {
-    adjustments: { whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical) },
+    editDocumentV2: setEditDocumentV2NodeEnabled(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', { aspectRatio: 1.5 }),
+      'display_creative',
+      false,
+    ),
     path: sourcePath,
     renderGeneration: 9,
     revision: `sha256:${'a'.repeat(64)}`,
@@ -45,7 +52,13 @@ describe('Reset edit transaction', () => {
       exposure: 1.25,
       sectionVisibility: { basic: true, color: true, curves: true, details: false },
     };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = setEditDocumentV2NodeEnabled(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'display_creative',
+      adjustments.effectsEnabled,
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 4,
       editDocumentV2,
@@ -54,7 +67,7 @@ describe('Reset edit transaction', () => {
       imageSession: session,
       lastEditApplicationReceipt: null,
       selectedImage,
-      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
+      history: [createDefaultEditDocumentV2(), editDocumentV2],
     });
   });
 
@@ -62,16 +75,14 @@ describe('Reset edit transaction', () => {
     const state = useEditorStore.getState();
     const identity = captureResetEditCommitIdentity(state, sourcePath);
     if (identity === null) throw new Error('Expected Reset identity');
-    const request = buildResetEditTransaction(state, identity, receipt, selectedImage, 'reset-native');
+    const request = buildResetEditTransaction(state, identity, receipt, 'reset-native');
     const result = state.applyEditTransaction(request);
 
     expect(request).toMatchObject({ history: 'reset', persistence: 'native-committed', source: 'reset' });
-    expect(result.after).toMatchObject({
-      aiPatches: [],
-      aspectRatio: 1.5,
-      effectsEnabled: false,
-      exposure: 0,
-    });
+    expect(result.after.sourceArtifacts.aiPatches).toEqual([]);
+    expect(result.after.geometry.aspectRatio).toBe(1.5);
+    expect(result.after.nodes['display_creative']?.enabled).toBeFalse();
+    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0);
     expect(result.after).not.toHaveProperty('sectionVisibility');
     expect(result.applicationReceipt).toMatchObject({
       adjustmentRevision: 5,
@@ -80,7 +91,7 @@ describe('Reset edit transaction', () => {
       transactionId: 'reset-native',
     });
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 5, historyIndex: 0 });
-    expect(useEditorStore.getState().history).toEqual([result.afterEditDocumentV2]);
+    expect(useEditorStore.getState().history).toEqual([result.after]);
   });
 
   test('rejects stale source, session, revision, and mismatched native receipts', () => {
@@ -95,36 +106,17 @@ describe('Reset edit transaction', () => {
         { ...state, selectedImage: { isReady: true, path: '/fixture/B.ARW' } },
         identity,
         receipt,
-        selectedImage,
         'stale-source',
       ),
     ).toThrow('reset_edit_transaction.stale_source');
     expect(() =>
-      buildResetEditTransaction(
-        { ...state, imageSession: { id: 'successor' } },
-        identity,
-        receipt,
-        selectedImage,
-        'stale-session',
-      ),
+      buildResetEditTransaction({ ...state, imageSession: { id: 'successor' } }, identity, receipt, 'stale-session'),
     ).toThrow('reset_edit_transaction.stale_session');
     expect(() =>
-      buildResetEditTransaction(
-        { ...state, adjustmentRevision: 5 },
-        identity,
-        receipt,
-        selectedImage,
-        'stale-revision',
-      ),
+      buildResetEditTransaction({ ...state, adjustmentRevision: 5 }, identity, receipt, 'stale-revision'),
     ).toThrow('reset_edit_transaction.stale_revision');
     expect(() =>
-      buildResetEditTransaction(
-        state,
-        identity,
-        { ...receipt, path: '/fixture/B.ARW' },
-        selectedImage,
-        'wrong-receipt',
-      ),
+      buildResetEditTransaction(state, identity, { ...receipt, path: '/fixture/B.ARW' }, 'wrong-receipt'),
     ).toThrow('reset_edit_transaction.receipt_source');
   });
 
@@ -140,9 +132,9 @@ describe('Reset edit transaction', () => {
     );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+      editDocumentV2: createDefaultEditDocumentV2(),
       historyIndex: 0,
-      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS)],
+      history: [createDefaultEditDocumentV2()],
     });
     const state = useEditorStore.getState();
     const identity = captureResetEditCommitIdentity(state, sourcePath);
@@ -151,8 +143,7 @@ describe('Reset edit transaction', () => {
       buildResetEditTransaction(
         state,
         identity,
-        { ...receipt, adjustments: structuredClone(INITIAL_ADJUSTMENTS) },
-        { height: 0, width: 0 },
+        { ...receipt, editDocumentV2: createDefaultEditDocumentV2() },
         'reset-no-op',
       ),
     );
@@ -180,7 +171,7 @@ describe('Reset edit transaction', () => {
     expect(isCurrentResetEditCommitIdentity({ ...state, imageSessionId: 126 }, identity)).toBeFalse();
     expect(isCurrentResetEditCommitIdentity({ ...state, adjustmentRevision: 5 }, identity)).toBeFalse();
 
-    const request = buildResetEditTransaction(state, identity, receipt, selectedImage, 'fallback-reset-native');
+    const request = buildResetEditTransaction(state, identity, receipt, 'fallback-reset-native');
     const result = state.applyEditTransaction(request);
     expect(request).toMatchObject({ history: 'reset', persistence: 'native-committed' });
     expect(result).toMatchObject({ nextAdjustmentRevision: 5, noOp: false, source: 'reset' });
@@ -194,13 +185,7 @@ describe('Reset edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(1);
     expect(() =>
-      buildResetEditTransaction(
-        { ...state, imageSessionId: 126 },
-        identity,
-        receipt,
-        selectedImage,
-        'stale-reopened-a',
-      ),
+      buildResetEditTransaction({ ...state, imageSessionId: 126 }, identity, receipt, 'stale-reopened-a'),
     ).toThrow('reset_edit_transaction.stale_session');
   });
 });

@@ -1,14 +1,11 @@
-import type { Adjustments } from '../../adjustments';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 import { stableAgentPreviewHash } from '../context/agentPreviewEnvelope';
 
-export const buildAgentCurveLevelsRecipeHashInput = (adjustments: Adjustments) => ({
-  curveMode: adjustments.curveMode,
-  curves: adjustments.curves,
-  levels: adjustments.levels,
-  parametricCurve: adjustments.parametricCurve,
-  pointCurves: adjustments.pointCurves,
-  toneCurve: adjustments.toneCurve,
+export const buildAgentCurveLevelsRecipeHashInput = (document: EditDocumentV2) => ({
+  ...selectEditDocumentNode(document, 'luma_levels').params,
+  ...selectEditDocumentNode(document, 'scene_curve').params,
 });
 
-const hashAgentCurveLevelsRecipeInput = (adjustments: Adjustments): string =>
-  stableAgentPreviewHash(JSON.stringify(buildAgentCurveLevelsRecipeHashInput(adjustments)));
+const hashAgentCurveLevelsRecipeInput = (document: EditDocumentV2): string =>
+  stableAgentPreviewHash(JSON.stringify(buildAgentCurveLevelsRecipeHashInput(document)));

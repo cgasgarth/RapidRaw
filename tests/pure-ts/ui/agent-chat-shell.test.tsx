@@ -176,7 +176,14 @@ describe('agent chat shell', () => {
     ]);
 
     await user.click(required<HTMLButtonElement>(container, '[data-testid="agent-live-prompt-apply"]'));
-    await waitFor(() => expect(composer.dataset['livePromptStatus']).toBe('applied'));
+    await waitFor(() => {
+      if (composer.dataset['livePromptStatus'] === 'failed') {
+        throw new Error(
+          container.querySelector('[data-testid="agent-live-prompt-error"]')?.textContent ?? 'Agent apply failed.',
+        );
+      }
+      expect(composer.dataset['livePromptStatus']).toBe('applied');
+    });
     expect(required<HTMLElement>(container, '[data-testid="agent-photographer-result"]').dataset['proposalState']).toBe(
       'applied',
     );

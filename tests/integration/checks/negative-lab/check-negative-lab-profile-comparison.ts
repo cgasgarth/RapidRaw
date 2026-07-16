@@ -79,7 +79,7 @@ for (const row of comparisonRows) {
   assert.match(row.renderEvidence.metricHash, /^fnv1a32:[a-f0-9]{8}$/u);
   assert.ok(row.renderEvidence.warningCodes.length > 0, `${row.profile.presetId} should expose warning codes`);
   assert.equal(row.renderEvidence.outputTag, 'preview_display');
-  assert.equal(row.renderEvidence.densityAlgorithm, row.profile.params.print_curve_algorithm);
+  assert.equal(row.renderEvidence.densityAlgorithm, row.profile.params['print_curve_algorithm']);
 }
 
 const selectedProfilePlan = buildNegativeLabProfileBoundPlanIdentity(

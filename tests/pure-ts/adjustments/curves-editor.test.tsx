@@ -5,6 +5,7 @@ import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import CurveGraph, {
+  type CurveAdjustmentView,
   clientPointToCurvePoint,
   constrainCurvePoint,
   constrainParametricSplit,
@@ -13,8 +14,9 @@ import { Theme } from '../../../src/components/ui/AppProperties.tsx';
 import { ContextMenuProvider } from '../../../src/context/ContextMenuContext.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
-import { type Adjustments, bindTypedCurveGraphVersion, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors.ts';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2.ts';
 
 test('curve graph geometry maps clients consistently and clamps outside coordinates', () => {
   expect(clientPointToCurvePoint(110, 220, { left: 10, top: 20, width: 200, height: 200 })).toEqual({
@@ -56,7 +58,7 @@ test('parametric split constraints retain ten percent region gaps', () => {
 });
 
 test('point curve exposes professional controls and keyboard point editing', async () => {
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const { container } = await renderCurveEditor(changes);
 
   expect(container.querySelector('[data-testid="curves-editor"]')).not.toBeNull();
@@ -82,7 +84,7 @@ test('point curve exposes professional controls and keyboard point editing', asy
 });
 
 test('scene and output domains persist typed V2 curve points without changing legacy curves', async () => {
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   const legacy = structuredClone(initial.curves);
   const { container } = await renderCurveEditor(changes, initial);
@@ -90,7 +92,6 @@ test('scene and output domains persist typed V2 curve points without changing le
   await click(getButton(container, 'Scene'));
   expect(container.querySelector('[data-curve-domain="scene"]')).not.toBeNull();
   await click(getButton(container, 'Add point'));
-  expect(currentAdjustments().rawEngineEditGraphVersion).toBe(2);
   expect(currentAdjustments().sceneCurveV1?.points).toEqual([
     { xEv: -16, yEv: -16 },
     { xEv: 0, yEv: 0 },
@@ -148,12 +149,11 @@ test('scene and output domains persist typed V2 curve points without changing le
     { input: 0, output: 0 },
     { input: 1, output: 1 },
   ]);
-  expect(currentAdjustments().rawEngineEditGraphVersion).toBe(2);
   expect(currentAdjustments().curves).toEqual(legacy);
 });
 
 test('output curve editing and reset retain extended HDR target identity and headroom', async () => {
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   initial.rawEngineEditGraphVersion = 2;
   initial.outputCurveV1 = {
@@ -183,11 +183,10 @@ test('output curve editing and reset retain extended HDR target identity and hea
       { input: 10, output: 10 },
     ],
   });
-  expect(currentAdjustments().rawEngineEditGraphVersion).toBe(2);
 });
 
 test('typed curve editor enforces the native 32-point limit before mutation', async () => {
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   initial.rawEngineEditGraphVersion = 2;
   initial.sceneCurveV1 = {
@@ -206,7 +205,7 @@ test('typed curve editor enforces the native 32-point limit before mutation', as
 });
 
 test('legacy curve editor enforces the native 16-point limit before mutation', async () => {
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   initial.curves.luma = Array.from({ length: 16 }, (_, index) => {
     const value = (255 * index) / 15;
@@ -224,7 +223,7 @@ test('legacy curve editor enforces the native 16-point limit before mutation', a
 });
 
 test('numeric point editing commits valid changes and Escape does not add history', async () => {
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const initialAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
   initialAdjustments.curves.luma[0] = { x: 0, y: 0.4 };
   const { container, getByRole } = await renderCurveEditor(changes, initialAdjustments);
@@ -263,7 +262,7 @@ test('numeric point editing commits valid changes and Escape does not add histor
 });
 
 test('mode, channel, and point deletion operate on their existing curve models', async () => {
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const initialAdjustments = structuredClone(INITIAL_ADJUSTMENTS);
   initialAdjustments.curves.luma = [
     { x: 0, y: 0 },
@@ -319,7 +318,7 @@ test('point interaction emits one start and one finish when released outside the
 
 test('channel and mode commands finish an active draft synchronously without timers', async () => {
   const dragStates: boolean[] = [];
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const { container } = await renderCurveEditor(changes, INITIAL_ADJUSTMENTS, dragStates);
   const point = container.querySelector<SVGCircleElement>('circle[role="button"]');
   if (!point) throw new Error('Expected an accessible curve point.');
@@ -343,7 +342,7 @@ test('channel and mode commands finish an active draft synchronously without tim
 
 test('Escape rolls a point interaction back and finishes exactly once', async () => {
   const dragStates: boolean[] = [];
-  const changes: Adjustments[] = [];
+  const changes: CurveAdjustmentView[] = [];
   const initial = structuredClone(INITIAL_ADJUSTMENTS);
   initial.curves.luma = [
     { x: 0, y: 0 },
@@ -405,8 +404,8 @@ test('parametric split pointer cancellation uses the same exact finish path', as
   expect(dragStates).toEqual([true, false]);
 });
 
-function CurveHarness({ changes, dragStates }: { changes: Adjustments[]; dragStates: boolean[] }) {
-  const adjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+function CurveHarness({ changes, dragStates }: { changes: CurveAdjustmentView[]; dragStates: boolean[] }) {
+  const adjustments = useEditorStore((state) => selectEditDocumentNode(state.editDocumentV2, 'scene_curve').params);
   return createElement(
     'div',
     null,
@@ -414,11 +413,10 @@ function CurveHarness({ changes, dragStates }: { changes: Adjustments[]; dragSta
       adjustments,
       histogram: null,
       setAdjustments: (updater) => {
-        const next = bindTypedCurveGraphVersion(
-          updater(useEditorStore.getState().adjustmentSnapshot.value),
-        ) as Adjustments;
+        const current = useEditorStore.getState().editDocumentV2;
+        const next = updater(selectEditDocumentNode(current, 'scene_curve').params);
         changes.push(next);
-        const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(next);
+        const editDocumentV2 = patchEditDocumentV2Node(current, 'scene_curve', next);
         useEditorStore.getState().hydrateEditorRenderAuthority({
           editDocumentV2,
           history: [editDocumentV2],
@@ -433,12 +431,14 @@ function CurveHarness({ changes, dragStates }: { changes: Adjustments[]; dragSta
       {
         'data-testid': 'parent-curve-update',
         onClick: () => {
-          const previous = useEditorStore.getState().adjustmentSnapshot.value;
+          const previous = useEditorStore.getState().editDocumentV2;
+          const previousParams = selectEditDocumentNode(previous, 'scene_curve').params;
+          const curves = previousParams.curves;
           const next = {
-            ...previous,
-            curves: { ...previous.curves, luma: [{ x: 0, y: 37 }, ...previous.curves.luma.slice(1)] },
+            ...previousParams,
+            curves: { ...curves, luma: [{ x: 0, y: 37 }, ...curves.luma.slice(1)] },
           };
-          const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(next);
+          const editDocumentV2 = patchEditDocumentV2Node(previous, 'scene_curve', next);
           useEditorStore.getState().hydrateEditorRenderAuthority({
             editDocumentV2,
             history: [editDocumentV2],
@@ -453,14 +453,23 @@ function CurveHarness({ changes, dragStates }: { changes: Adjustments[]; dragSta
 }
 
 async function renderCurveEditor(
-  changes: Adjustments[],
+  changes: CurveAdjustmentView[],
   initialAdjustments = INITIAL_ADJUSTMENTS,
   dragStates: boolean[] = [],
 ) {
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({ lng: 'en', resources: { en: { translation: en } } });
   const adjustments = structuredClone(initialAdjustments);
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const defaults = selectEditDocumentNode(createDefaultEditDocumentV2(), 'scene_curve').params;
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_curve', {
+    curveMode: adjustments.curveMode ?? defaults.curveMode,
+    curves: adjustments.curves,
+    parametricCurve: adjustments.parametricCurve ?? defaults.parametricCurve,
+    pointCurves: adjustments.pointCurves ?? defaults.pointCurves,
+    toneCurve: adjustments.toneCurve,
+    ...(adjustments.sceneCurveV1 === undefined ? {} : { sceneCurveV1: adjustments.sceneCurveV1 }),
+    ...(adjustments.outputCurveV1 === undefined ? {} : { outputCurveV1: adjustments.outputCurveV1 }),
+  });
   const sourcePath = '/fixture/curves-editor.ARW';
   const imageSession = createEditorImageSession({ generation: 29, path: sourcePath, source: 'cache' });
   useEditorStore.getState().hydrateEditorRenderAuthority({
@@ -496,7 +505,7 @@ async function renderCurveEditor(
   return view;
 }
 
-const currentAdjustments = () => useEditorStore.getState().adjustmentSnapshot.value;
+const currentAdjustments = () => selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_curve').params;
 
 async function click(button: HTMLButtonElement) {
   await act(async () => {

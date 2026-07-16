@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildImageOpenHydrationEditTransaction,
   canContinueImageOpenHydration,
@@ -15,12 +14,14 @@ const session = createEditorImageSession({ generation: 42, path, source: 'cold-l
 describe('decoded image-open hydration edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.2 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: adjustments.exposure,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 8,
       editDocumentV2,
       finalPreviewUrl: 'blob:pre-hydration-preview',
-      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
+      history: [createDefaultEditDocumentV2(), editDocumentV2],
       historyCheckpoints: [{ createdAt: '2026-07-15T00:00:00.000Z', historyIndex: 1, id: 'old', label: 'Old' }],
       historyIndex: 1,
       imageSession: session,
@@ -49,13 +50,24 @@ describe('decoded image-open hydration edit transaction', () => {
     const request = buildImageOpenHydrationEditTransaction(
       state,
       identity,
-      legacyAdjustmentsToEditDocumentV2({ ...decoded, aspectRatio: 1.5 }),
+      patchEditDocumentV2Node(
+        patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+          contrast: decoded.contrast,
+          exposure: decoded.exposure,
+        }),
+        'geometry',
+        { aspectRatio: 1.5 },
+      ),
       'decoded-hydration',
     );
 
     state.applyEditTransaction(request);
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value).toMatchObject({ aspectRatio: 1.5, contrast: 18, exposure: 0.35 });
+    expect(after.editDocumentV2.geometry.aspectRatio).toBe(1.5);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params).toMatchObject({
+      contrast: 18,
+      exposure: 0.35,
+    });
     expect(after.adjustmentRevision).toBe(9);
     expect(after.history).toEqual([after.editDocumentV2]);
     expect(after.historyIndex).toBe(0);
@@ -80,7 +92,7 @@ describe('decoded image-open hydration edit transaction', () => {
       baseAdjustmentRevision: staleIdentity.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { exposure: 2.1 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure: 2.1 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-user-edit',
@@ -91,13 +103,15 @@ describe('decoded image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         newer,
         staleIdentity,
-        legacyAdjustmentsToEditDocumentV2(staleDecoded),
+        patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+          exposure: staleDecoded.exposure,
+        }),
         'stale-decoded',
       ),
     ).toThrow('image_open_hydration.stale_identity');
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(2.1);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(2.1);
     expect(canContinueImageOpenHydration(useEditorStore.getState(), staleIdentity)).toBeFalse();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.aspectRatio).toBeNull();
+    expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBeNull();
     expect(useEditorStore.getState().history).toHaveLength(3);
   });
 
@@ -114,8 +128,9 @@ describe('decoded image-open hydration edit transaction', () => {
       imageSessionId: session.id,
       operations: [
         {
-          adjustments: { ...metadataState.adjustmentSnapshot.value, contrast: 9 },
-          type: 'replace-adjustments',
+          nodeType: 'scene_global_color_tone',
+          patch: { contrast: 9 },
+          type: 'patch-edit-document-node',
         },
       ],
       persistence: 'native-committed',
@@ -134,12 +149,12 @@ describe('decoded image-open hydration edit transaction', () => {
     const aspectOnly = buildImageOpenHydrationEditTransaction(
       current,
       { ...originalIdentity, adjustmentRevision: current.adjustmentRevision },
-      legacyAdjustmentsToEditDocumentV2({ ...current.adjustmentSnapshot.value, aspectRatio: 1.5 }),
+      patchEditDocumentV2Node(current.editDocumentV2, 'geometry', { aspectRatio: 1.5 }),
       'fresh-aspect',
     );
     current.applyEditTransaction(aspectOnly);
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
-      aspectRatio: 1.5,
+    expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBe(1.5);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params).toMatchObject({
       contrast: 9,
       exposure: 1.2,
     });

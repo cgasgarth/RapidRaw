@@ -6,7 +6,11 @@ import { useEditorStore } from '../../../src/store/useEditorStore';
 import { useUIStore } from '../../../src/store/useUIStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  setEditDocumentV2NodeEnabled,
+} from '../../../src/utils/editDocumentV2';
 import {
   createDefaultEditorWorkspacePreferences,
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
@@ -198,7 +202,13 @@ describe('editor workspace preferences', () => {
   test('collapses Effects as a workspace-only preference with zero edit side effects', () => {
     const storage = installStorage();
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), effectsEnabled: false, grainAmount: 42 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = setEditDocumentV2NodeEnabled(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'display_creative', {
+        grainAmount: adjustments.grainAmount,
+      }),
+      'display_creative',
+      adjustments.effectsEnabled,
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 7,
       editDocumentV2,

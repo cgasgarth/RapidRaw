@@ -1697,7 +1697,7 @@ function NegativeLabSession({
   const runtimePreviewArtifactStatus = hasCurrentRuntimePreview ? 'rendered_positive_preview' : 'pending_render';
   const runtimePreviewBaseFogStatus = baseFogEstimate === null ? 'pending_base_fog' : 'base_fog_estimated';
   const runtimePreviewDensityStatus =
-    selectedProfile?.params.print_curve_algorithm === undefined ? 'density_curve_pending' : 'density_curve_selected';
+    selectedProfile?.params['print_curve_algorithm'] === undefined ? 'density_curve_pending' : 'density_curve_selected';
   const runtimePreviewAutoMeter = runtimePreviewDryRunResult?.dryRun.proof?.runtimePreview.autoMeter;
   const beforeAfterReview = buildNegativeLabBeforeAfterReviewModel({
     acceptedDryRunPlanHash: runtimePreviewDryRunResult?.acceptedDryRunPlanHash ?? null,
@@ -2558,7 +2558,7 @@ function NegativeLabSession({
       print_curve_algorithm: 'negative_density_print_v2',
       print_curve_output_tag: 'preview_display',
       print_curve_v2: {
-        ...params.print_curve_v2,
+        ...params['print_curve_v2'],
         [key]: value,
       },
     };

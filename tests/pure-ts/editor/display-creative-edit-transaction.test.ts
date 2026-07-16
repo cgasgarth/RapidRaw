@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { editDocumentDisplayCreativeV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { CreativeAdjustment, Effect, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildDisplayCreativeEditTransaction,
@@ -11,7 +10,7 @@ import {
   type DisplayCreativeCommitIdentity,
   isDisplayCreativeNodeAdjustment,
 } from '../../../src/utils/displayCreativeEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/display-creative-controls.ARW';
 const session = createEditorImageSession({ generation: 19, path: sourcePath, source: 'cache' });
@@ -37,7 +36,13 @@ const identity = (overrides: Partial<DisplayCreativeCommitIdentity> = {}): Displ
 describe('display creative edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.4, flipHorizontal: true };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: adjustments.exposure,
+      }),
+      'geometry',
+      { flipHorizontal: adjustments.flipHorizontal },
+    );
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -65,18 +70,15 @@ describe('display creative edit transaction', () => {
       { nodeType: 'display_creative', patch: { vignetteAmount: -32 }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['vignetteAmount'],
+      changedKeys: ['nodes.display_creative.params.vignetteAmount'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes['geometry']).toEqual(result.beforeEditDocumentV2.nodes['geometry']);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']).toEqual(
-      result.beforeEditDocumentV2.nodes['scene_global_color_tone'],
-    );
+    expect(result.after.nodes['geometry']).toEqual(result.before.nodes['geometry']);
+    expect(result.after.nodes['scene_global_color_tone']).toEqual(result.before.nodes['scene_global_color_tone']);
     expect(
-      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params)
-        .vignetteAmount,
+      editDocumentDisplayCreativeV2Schema.parse(result.after.nodes['display_creative']?.params).vignetteAmount,
     ).toBe(-32);
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -86,9 +88,9 @@ describe('display creative edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.vignetteAmount).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.4);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']!.params['vignetteAmount']).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
+    expect(useEditorStore.getState().editDocumentV2.geometry.flipHorizontal).toBe(true);
   });
 
   test('commits a zero LUT intensity without falling back to the display default', () => {
@@ -97,16 +99,15 @@ describe('display creative edit transaction', () => {
       buildDisplayCreativeEditTransaction(state, identity(), Effect.LutIntensity, 0, 'display-creative-lut-zero'),
     );
 
-    expect(result.changedKeys).toEqual(['lutIntensity']);
-    expect(result.after.lutIntensity).toBe(0);
-    expect(
-      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params)
-        .lutIntensity,
-    ).toBe(0);
+    expect(result.changedKeys).toEqual(['nodes.display_creative.params.lutIntensity']);
+    expect(result.after.nodes['display_creative']?.params['lutIntensity']).toBe(0);
+    expect(editDocumentDisplayCreativeV2Schema.parse(result.after.nodes['display_creative']?.params).lutIntensity).toBe(
+      0,
+    );
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.lutIntensity).toBe(100);
+    expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']!.params['lutIntensity']).toBe(100);
   });
 
   test('owns display controls, exact no-ops, and rejects stale identity', () => {
@@ -185,9 +186,7 @@ describe('display creative edit transaction', () => {
         type: 'patch-edit-document-node',
       },
     ]);
-    expect(
-      editDocumentDisplayCreativeV2Schema.parse(result.afterEditDocumentV2.nodes['display_creative']?.params),
-    ).toMatchObject({
+    expect(editDocumentDisplayCreativeV2Schema.parse(result.after.nodes['display_creative']?.params)).toMatchObject({
       grainAmount: 28,
       grainRoughness: 50,
       grainSize: 34,
@@ -223,7 +222,7 @@ describe('display creative edit transaction', () => {
           'fallback-display',
         ),
       );
-    expect(result).toMatchObject({ changedKeys: ['vignetteAmount'], noOp: false });
+    expect(result).toMatchObject({ changedKeys: ['nodes.display_creative.params.vignetteAmount'], noOp: false });
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       imageSessionId: fallbackIdentity.imageSessionId,
       transactionId: 'fallback-display',

@@ -4,7 +4,11 @@ import { createElement } from 'react';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  setEditDocumentV2NodeEnabled,
+} from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/auto-reset-fallback-actions.ARW';
 const autoPatch = {
@@ -33,7 +37,7 @@ const invoke = mock(async (command: string) => {
   if (command === 'reset_adjustments_for_paths') {
     return [
       {
-        adjustments: { whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical) },
+        editDocumentV2: createDefaultEditDocumentV2(),
         path: sourcePath,
         renderGeneration: 12,
         revision: `sha256:${'b'.repeat(64)}`,
@@ -47,7 +51,13 @@ const { useEditorActions } = await import('../../../src/hooks/editor/useEditorAc
 
 test('useEditorActions routes Auto Adjust and native Reset through fallback authority', async () => {
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), effectsEnabled: false, exposure: 0.6 };
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = setEditDocumentV2NodeEnabled(
+    patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: adjustments.exposure,
+    }),
+    'display_creative',
+    adjustments.effectsEnabled,
+  );
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -88,8 +98,8 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
       source: 'auto-edit',
     },
   });
-  expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.35);
-  expect(useEditorStore.getState().adjustmentSnapshot.value.effectsEnabled).toBeFalse();
+  expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.35);
+  expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']!.enabled).toBeFalse();
 
   useEditorStore.setState({ finalPreviewUrl: 'blob:fallback-reset-action-before' });
   await act(async () => actions?.handleResetAdjustments([sourcePath]));
@@ -103,7 +113,7 @@ test('useEditorActions routes Auto Adjust and native Reset through fallback auth
       source: 'reset',
     },
   });
-  expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
-  expect(useEditorStore.getState().adjustmentSnapshot.value.effectsEnabled).toBeFalse();
+  expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
+  expect(useEditorStore.getState().editDocumentV2.nodes['display_creative']!.enabled).toBeTrue();
   expect(invoke).toHaveBeenCalledTimes(2);
 });

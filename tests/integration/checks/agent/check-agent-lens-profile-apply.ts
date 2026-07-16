@@ -15,7 +15,7 @@ import {
   agentLensProfileApplyRequestSchema,
   applyAgentLensProfile,
 } from '../../../../src/utils/agent/tools/agentLensProfileApplyTool.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   handleRawEngineAppServerHostRequestAsync,
@@ -63,7 +63,7 @@ const lensProfileResultSchema = z
   })
   .passthrough();
 
-const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+const editDocumentV2 = createDefaultEditDocumentV2();
 useEditorStore.getState().hydrateEditorRenderAuthority({
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-lens-before',
@@ -173,13 +173,13 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustmentSnapshot.value.lensCorrectionMode !== 'manual' ||
-  state.adjustmentSnapshot.value.lensDistortionAmount !== 87 ||
-  state.adjustmentSnapshot.value.lensMaker !== 'Sony' ||
-  state.adjustmentSnapshot.value.lensModel !== 'FE 24-70mm F2.8 GM II' ||
-  state.adjustmentSnapshot.value.lensTcaAmount !== 94 ||
-  state.adjustmentSnapshot.value.lensVignetteAmount !== 112 ||
-  state.adjustmentSnapshot.value.lensDistortionParams?.k1 !== 0.12
+  state.editDocumentV2.nodes['lens_correction']!.params['lensCorrectionMode'] !== 'manual' ||
+  state.editDocumentV2.nodes['lens_correction']!.params['lensDistortionAmount'] !== 87 ||
+  state.editDocumentV2.nodes['lens_correction']!.params['lensMaker'] !== 'Sony' ||
+  state.editDocumentV2.nodes['lens_correction']!.params['lensModel'] !== 'FE 24-70mm F2.8 GM II' ||
+  state.editDocumentV2.nodes['lens_correction']!.params['lensTcaAmount'] !== 94 ||
+  state.editDocumentV2.nodes['lens_correction']!.params['lensVignetteAmount'] !== 112 ||
+  state.editDocumentV2.nodes['lens_correction']!.params['lensDistortionParams']?.k1 !== 0.12
 ) {
   throw new Error('agent.lens_profile.apply did not mutate representative lens/profile adjustments.');
 }
@@ -196,9 +196,9 @@ if (
   throw new Error('agent.lens_profile.apply did not publish one source-bound EditTransaction receipt.');
 }
 if (
-  state.editDocumentV2.nodes.lens_correction?.params.lensDistortionAmount !== 87 ||
-  state.editDocumentV2.nodes.lens_correction.params.lensMaker !== 'Sony' ||
-  state.editDocumentV2.nodes.lens_correction.params.lensVignetteAmount !== 112
+  state.editDocumentV2.nodes.lens_correction?.params['lensDistortionAmount'] !== 87 ||
+  state.editDocumentV2.nodes.lens_correction.params['lensMaker'] !== 'Sony' ||
+  state.editDocumentV2.nodes.lens_correction.params['lensVignetteAmount'] !== 112
 ) {
   throw new Error('agent.lens_profile.apply did not update the canonical lens node.');
 }

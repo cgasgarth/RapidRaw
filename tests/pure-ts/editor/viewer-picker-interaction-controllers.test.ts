@@ -7,11 +7,11 @@ import {
   type ViewerPickerCurrentContext,
   type ViewerPickerSessionKey,
 } from '../../../src/components/panel/editor/viewerPickerInteractionControllers';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import type { PointColorPickerResponse } from '../../../src/utils/color/pointColorPicker';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import type { ToneEqualizerPickerResponse } from '../../../src/utils/toneEqualizerPicker';
 
-const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+const editDocumentV2 = createDefaultEditDocumentV2();
 const toneKey = (operationGeneration = 1): ViewerPickerSessionKey & { toolId: 'tone-equalizer' } => ({
   adjustmentRevision: 2,
   geometryEpoch: 4,
@@ -60,9 +60,9 @@ describe('viewer picker interaction controllers', () => {
   test('owns one picker session and commits a result that arrives before tone release', () => {
     const controller = createViewerPickerInteractionController();
     expect(
-      controller.beginToneEqualizer({ adjustments, clientY: 180, key: toneKey(), point, pointerId: 7 }),
+      controller.beginToneEqualizer({ editDocumentV2, clientY: 180, key: toneKey(), point, pointerId: 7 }),
     ).toMatchObject([{ kind: 'sample-tone-equalizer', normalizedImagePoint: { x: 0.25, y: 0.75 } }]);
-    expect(controller.beginPointColor({ adjustments, key: pointKey(2), point, pointerId: 8 })).toEqual([]);
+    expect(controller.beginPointColor({ editDocumentV2, key: pointKey(2), point, pointerId: 8 })).toEqual([]);
     expect(controller.receiveToneEqualizer(toneKey(), toneResult, current()).map(({ kind }) => kind)).toEqual([
       'publish-tone-equalizer-receipt',
     ]);
@@ -78,7 +78,7 @@ describe('viewer picker interaction controllers', () => {
     const synchronizer = createViewerPickerContextSynchronizer(controller);
     expect(synchronizer.synchronize(current(null))).toEqual([]);
     expect(synchronizer.synchronize(current())).toEqual([]);
-    controller.beginToneEqualizer({ adjustments, clientY: 180, key: toneKey(), point, pointerId: 7 });
+    controller.beginToneEqualizer({ editDocumentV2, clientY: 180, key: toneKey(), point, pointerId: 7 });
     expect(synchronizer.synchronize(current())).toEqual([]);
     expect(controller.overlays()).toHaveLength(1);
     expect(synchronizer.synchronize({ ...current(), geometryEpoch: 5 })).toEqual([
@@ -89,7 +89,7 @@ describe('viewer picker interaction controllers', () => {
 
   test('retains a released tone session until its current async result arrives', () => {
     const controller = createViewerPickerInteractionController();
-    controller.beginToneEqualizer({ adjustments, clientY: 200, key: toneKey(), point, pointerId: 3 });
+    controller.beginToneEqualizer({ editDocumentV2, clientY: 200, key: toneKey(), point, pointerId: 3 });
     expect(controller.release(3, 280)).toEqual([]);
     expect(controller.receiveToneEqualizer(toneKey(), toneResult, current())).toMatchObject([
       { kind: 'publish-tone-equalizer-receipt' },
@@ -101,7 +101,7 @@ describe('viewer picker interaction controllers', () => {
   test('cancels deterministically and ignores results after blur, Escape, or capture loss', () => {
     for (const _reason of ['blur', 'escape', 'lostpointercapture', 'unmount']) {
       const controller = createViewerPickerInteractionController();
-      controller.beginToneEqualizer({ adjustments, clientY: 100, key: toneKey(), point, pointerId: 2 });
+      controller.beginToneEqualizer({ editDocumentV2, clientY: 100, key: toneKey(), point, pointerId: 2 });
       expect(controller.cancel()).toEqual([{ kind: 'clear-tone-equalizer-receipt' }]);
       expect(controller.receiveToneEqualizer(toneKey(), toneResult, current())).toEqual([]);
     }
@@ -123,7 +123,7 @@ describe('viewer picker interaction controllers', () => {
     for (const successor of successors) expect(isViewerPickerSessionCurrent(key, successor)).toBe(false);
 
     const controller = createViewerPickerInteractionController();
-    controller.beginToneEqualizer({ adjustments, clientY: 100, key, point, pointerId: 1 });
+    controller.beginToneEqualizer({ editDocumentV2, clientY: 100, key, point, pointerId: 1 });
     for (const successor of successors) expect(controller.receiveToneEqualizer(key, toneResult, successor)).toEqual([]);
     expect(controller.receiveToneEqualizer({ ...key, operationGeneration: 2 }, toneResult, current())).toEqual([]);
     expect(controller.receiveToneEqualizer(key, { ...toneResult, graphRevision: 'graph:10' }, current())).toEqual([]);
@@ -131,7 +131,7 @@ describe('viewer picker interaction controllers', () => {
 
   test('commits one point-color sample and deactivates the one-shot tool', () => {
     const controller = createViewerPickerInteractionController();
-    expect(controller.beginPointColor({ adjustments, key: pointKey(), point, pointerId: 9 })[0]).toMatchObject({
+    expect(controller.beginPointColor({ editDocumentV2, key: pointKey(), point, pointerId: 9 })[0]).toMatchObject({
       kind: 'sample-point-color',
       normalizedImagePoint: { x: 0.25, y: 0.75 },
     });
@@ -147,7 +147,7 @@ describe('viewer picker interaction controllers', () => {
   test('uses the exact command coordinate for its declarative overlay at any geometry', () => {
     const mapped = resolveViewerPickerPoint({ x: 0.125, y: 0.6 }, { height: 500, width: 1000, x: 44, y: 22 });
     const controller = createViewerPickerInteractionController();
-    const [sample] = controller.beginPointColor({ adjustments, key: pointKey(), point: mapped, pointerId: 1 });
+    const [sample] = controller.beginPointColor({ editDocumentV2, key: pointKey(), point: mapped, pointerId: 1 });
     const [overlay] = controller.overlays();
     expect(sample).toMatchObject({ normalizedImagePoint: { x: 0.125, y: 0.6 } });
     expect(overlay).toMatchObject({

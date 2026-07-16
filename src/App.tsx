@@ -51,6 +51,7 @@ import { useLibraryStore } from './store/useLibraryStore';
 import { useProcessStore } from './store/useProcessStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { useUIStore } from './store/useUIStore';
+import { selectEditDocumentGeometry } from './utils/editDocumentSelectors';
 import { findAlbumById } from './utils/folderTreeUtils';
 import { getViteEnv } from './utils/frontendEnv.mjs';
 import { globalImageCache } from './utils/ImageLRUCache';
@@ -193,20 +194,20 @@ function App() {
       : 520;
 
   const getDynamicCompactPanelHeight = () => {
-    const { originalSize, adjustmentSnapshot } = useEditorStore.getState();
-    const adjustments = adjustmentSnapshot.value;
+    const { originalSize, editDocumentV2 } = useEditorStore.getState();
+    const geometry = selectEditDocumentGeometry(editDocumentV2);
     const halfScreenHeight = viewportSize.height > 0 ? Math.round(viewportSize.height * 0.5) : 340;
 
     if (!selectedImage || originalSize.width === 0 || originalSize.height === 0 || viewportSize.width === 0) {
       return halfScreenHeight;
     }
     let effectiveRatio = originalSize.width / originalSize.height;
-    const orientationSteps = adjustments.orientationSteps;
+    const orientationSteps = geometry.orientationSteps;
     if (orientationSteps % 2 !== 0) {
       effectiveRatio = originalSize.height / originalSize.width;
     }
-    if (adjustments.aspectRatio && adjustments.aspectRatio > 0) {
-      effectiveRatio = adjustments.aspectRatio;
+    if (geometry.aspectRatio && geometry.aspectRatio > 0) {
+      effectiveRatio = geometry.aspectRatio;
     }
     const desiredImageHeight = viewportSize.width / effectiveRatio;
     const topUiEstimation = windowChrome.compactTopUiHeight;

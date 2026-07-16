@@ -1,10 +1,7 @@
-import type { Adjustments } from './adjustments';
+import type { EditDocumentNodeParamsV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { EditTransactionRequest } from './editTransaction';
 
-export type CameraInputParameters = Pick<
-  Adjustments,
-  'cameraProfile' | 'cameraProfileAmount' | 'whiteBalanceTechnical'
->;
+export type CameraInputParameters = EditDocumentNodeParamsV2<'camera_input'>;
 export type CameraInputPatch = Partial<CameraInputParameters>;
 
 export interface CameraInputCommitIdentity {

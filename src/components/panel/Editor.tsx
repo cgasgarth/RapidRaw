@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Crop, PercentCrop } from 'react-image-crop';
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useAiMasking } from '../../hooks/ai/useAiMasking';
 import { useWgpuTransformSync } from '../../hooks/editor/useWgpuTransformSync';
 import { useEditorViewportPhysics } from '../../hooks/viewport/useEditorViewportPhysics';
@@ -44,6 +45,11 @@ import {
   resolveNextCropForGeometryChange,
   updateCropDraft,
 } from '../../utils/cropUtils';
+import {
+  selectEditDocumentGeometry,
+  selectEditDocumentMasks,
+  selectEditDocumentSourceArtifacts,
+} from '../../utils/editDocumentSelectors';
 import { resolveComparePaneLayout } from '../../utils/editorCompare';
 import { WHEEL_SNAP_DELAY_MS } from '../../utils/editorGestureMath';
 import { createEditorOverlayGeometry, overlayPoint, overlayRect } from '../../utils/editorOverlayGeometry';
@@ -75,7 +81,7 @@ import {
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
 import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
-import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
+import { resolveReferenceMatchRenderDocument } from '../../utils/referenceMatch';
 import { buildRetouchHandleEditTransaction } from '../../utils/retouchHandleEditTransaction';
 import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
 import {
@@ -201,8 +207,10 @@ export default function Editor({
   const editorImageSessionGeneration = useEditorStore((s) => s.imageSessionId);
   const maskOverlayImageSessionId =
     editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`;
-  const adjustments = useEditorStore((s) => s.adjustmentSnapshot.value);
   const editDocumentV2 = useEditorStore((s) => s.editDocumentV2);
+  const adjustments = selectEditDocumentGeometry(editDocumentV2);
+  const masks = selectEditDocumentMasks(editDocumentV2);
+  const aiPatches = selectEditDocumentSourceArtifacts(editDocumentV2).aiPatches;
   const committedAdjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
   const basicToneSliderInteraction = useEditorStore((s) => s.basicToneSliderInteraction);
@@ -223,13 +231,13 @@ export default function Editor({
   const referenceMatchPreview = useEditorStore((s) => s.referenceMatchPreview);
   const renderAdjustments =
     autoEditRenderSnapshot === adjustmentSnapshot
-      ? resolveReferenceMatchRenderAdjustments({
+      ? resolveReferenceMatchRenderDocument({
           adjustmentRevision,
-          committed: adjustments,
+          committed: editDocumentV2,
           preview: referenceMatchPreview,
           targetPath: selectedImage?.path ?? null,
         })
-      : (autoEditRenderSnapshot.value as Adjustments);
+      : autoEditRenderSnapshot.editDocumentV2;
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -1005,19 +1013,15 @@ export default function Editor({
 
   const activeSubMask = useMemo(() => {
     if (isMasking && activeMaskId) {
-      const container = adjustments.masks.find((c: MaskContainer) =>
-        c.subMasks.some((sm: SubMask) => sm.id === activeMaskId),
-      );
+      const container = masks.find((c: MaskContainer) => c.subMasks.some((sm: SubMask) => sm.id === activeMaskId));
       return container?.subMasks.find((sm) => sm.id === activeMaskId);
     }
     if (isAiEditing && activeAiSubMaskId) {
-      const container = adjustments.aiPatches.find((c: AiPatch) =>
-        c.subMasks.some((sm: SubMask) => sm.id === activeAiSubMaskId),
-      );
+      const container = aiPatches.find((c: AiPatch) => c.subMasks.some((sm: SubMask) => sm.id === activeAiSubMaskId));
       return container?.subMasks.find((sm: SubMask) => sm.id === activeAiSubMaskId);
     }
     return null;
-  }, [adjustments.masks, adjustments.aiPatches, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
+  }, [masks, aiPatches, activeMaskId, activeAiSubMaskId, isMasking, isAiEditing]);
   const activeSubMaskParameters = useMemo(
     () => toMaskParameterRecord(activeSubMask?.parameters),
     [activeSubMask?.parameters],
@@ -1091,12 +1095,12 @@ export default function Editor({
     () =>
       isMasking &&
       activeMaskContainerId !== null &&
-      adjustments.masks.some(
+      masks.some(
         (mask) =>
           mask.id === activeMaskContainerId &&
           (mask.retouchCloneSource !== undefined || mask.retouchRemoveSource !== undefined),
       ),
-    [activeMaskContainerId, adjustments.masks, isMasking],
+    [activeMaskContainerId, masks, isMasking],
   );
 
   const activeViewerTool = useMemo<ViewerActiveTool>(() => {
@@ -1587,10 +1591,10 @@ export default function Editor({
   }, [setEditor]);
 
   const requestMaskOverlay = useCallback(
-    (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentAdjustments: Adjustments) => {
+    (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentEditDocumentV2: EditDocumentV2) => {
       const { maskOverlaySettings: currentMaskOverlaySettings, patchResidency } = useEditorStore.getState();
       maskOverlayBinding.request({
-        adjustments: currentAdjustments,
+        editDocumentV2: currentEditDocumentV2,
         maskDef,
         maskOverlaySettings: currentMaskOverlaySettings,
         patchesSentToBackend: patchResidency.snapshot().residentIds,
@@ -1610,9 +1614,9 @@ export default function Editor({
               adjustments: {},
               opacity: 100,
             };
-      requestMaskOverlay(normalizedDef, imageRenderSize, adjustments);
+      requestMaskOverlay(normalizedDef, imageRenderSize, renderAdjustments);
     },
-    [imageRenderSize, adjustments, requestMaskOverlay],
+    [imageRenderSize, renderAdjustments, requestMaskOverlay],
   );
 
   const croppedDimensionsRef = useRef(croppedDimensions);
@@ -1641,16 +1645,16 @@ export default function Editor({
   const overlayTriggerHash = useMemo(() => {
     let activeMaskDef: MaskContainer | AiPatch | undefined;
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
-      activeMaskDef = adjustments.masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
+      activeMaskDef = masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
     } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
-      activeMaskDef = adjustments.aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+      activeMaskDef = aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
     }
 
     if (!activeMaskDef) return null;
 
     return buildMaskOverlayTriggerHash({
       activeMaskDef,
-      adjustments,
+      editDocumentV2: renderAdjustments,
       imageRenderSize: { height: imageRenderSize.height, width: imageRenderSize.width },
       maskOverlaySettings,
     });
@@ -1658,7 +1662,7 @@ export default function Editor({
     activeRightPanel,
     activeMaskContainerId,
     activeAiPatchContainerId,
-    adjustments,
+    renderAdjustments,
     maskOverlaySettings,
     imageRenderSize.width,
     imageRenderSize.height,
@@ -1668,7 +1672,7 @@ export default function Editor({
     let maskDefForOverlay: MaskPreviewDefinition | null = null;
 
     if (activeRightPanel === Panel.Masks && activeMaskContainerId) {
-      const activeMask = adjustments.masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
+      const activeMask = masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
       if (activeMask) {
         maskDefForOverlay = {
           ...activeMask,
@@ -1676,7 +1680,7 @@ export default function Editor({
         };
       }
     } else if (activeRightPanel === Panel.Ai && activeAiPatchContainerId) {
-      const activePatch = adjustments.aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
+      const activePatch = aiPatches.find((p: AiPatch) => p.id === activeAiPatchContainerId);
       if (activePatch) {
         maskDefForOverlay = {
           ...activePatch,
@@ -1688,7 +1692,7 @@ export default function Editor({
 
     if (!maskDefForOverlay) return;
     const frame = requestAnimationFrame(() => {
-      requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
+      requestMaskOverlay(maskDefForOverlay, imageRenderSize, renderAdjustments);
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -1700,7 +1704,7 @@ export default function Editor({
     activeMaskContainerId,
     activeAiPatchContainerId,
     imageRenderSize,
-    adjustments,
+    renderAdjustments,
   ]);
 
   useEffect(() => {
@@ -2281,7 +2285,7 @@ export default function Editor({
             <Suspense fallback={null}>
               <ImageCanvas
                 appSettings={appSettings}
-                adjustments={renderAdjustments}
+                editDocumentV2={renderAdjustments}
                 exportSoftProofRecipeId={exportSoftProofRecipeId}
                 exportSoftProofTransform={exportSoftProofTransform}
                 finalPreviewUrl={finalPreviewUrl}

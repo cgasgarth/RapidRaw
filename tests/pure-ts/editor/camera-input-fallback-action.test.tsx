@@ -5,13 +5,15 @@ import { useCameraInputEditCommit } from '../../../src/hooks/editor/useCameraInp
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/camera-input-fallback-action.ARW';
 
 test('camera input hook dispatches from a selected-image fallback session', () => {
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.35 };
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+    exposure: adjustments.exposure,
+  });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -42,11 +44,11 @@ test('camera input hook dispatches from a selected-image fallback session', () =
   render(createElement(Harness));
 
   act(() => commitCameraInput?.({ cameraProfile: 'camera_neutral', cameraProfileAmount: 74 }));
-  expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+  expect(useEditorStore.getState().editDocumentV2.nodes['camera_input']?.params).toMatchObject({
     cameraProfile: 'camera_neutral',
     cameraProfileAmount: 74,
-    exposure: 0.35,
   });
+  expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.35);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:71',
     source: 'manual-control',

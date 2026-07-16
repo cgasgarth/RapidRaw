@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
-import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   loadMaskOverlaySettingsPreference,
   nextMaskOverlayHotkeySettings,
@@ -80,7 +81,7 @@ test('mask overlay invoke payload carries normalized overlay settings and refine
   };
 
   const payload = buildMaskOverlayInvokePayload({
-    jsAdjustments: INITIAL_ADJUSTMENTS,
+    editDocumentV2: createDefaultEditDocumentV2(),
     maskDef,
     maskOverlaySettings: { edgeThreshold: 0.65, mode: 'white', opacity: 0.4 },
     patchesSentToBackend: new Set(['mask-1']),
@@ -101,7 +102,7 @@ test('mask overlay invoke payload carries normalized overlay settings and refine
 
   const triggerHash = buildMaskOverlayTriggerHash({
     activeMaskDef: maskDef,
-    adjustments: INITIAL_ADJUSTMENTS,
+    editDocumentV2: createDefaultEditDocumentV2(),
     imageRenderSize: { height: 240, width: 320 },
     maskOverlaySettings: { edgeThreshold: 0.65, mode: 'white', opacity: 0.4 },
   });

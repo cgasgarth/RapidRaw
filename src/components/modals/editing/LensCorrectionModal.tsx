@@ -17,13 +17,15 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
+import type { EditDocumentNodeParamsV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 
 import { useModalTransition } from '../../../hooks/ui/useModalTransition';
 import { usePreviewViewport } from '../../../hooks/viewport/usePreviewViewport';
+import { useEditorStore } from '../../../store/useEditorStore';
 import { Invokes } from '../../../tauri/commands';
 import { type PreviewGeometryParams, requestPreviewGeometry } from '../../../tauri/previewGeometry';
 import { TextColors, TextVariants } from '../../../types/typography';
-import type { Adjustments } from '../../../utils/adjustments';
+import type { MaskContainer } from '../../../utils/adjustments';
 import { parseExifMetadataNumber } from '../../../utils/metadataPanelContracts';
 import { throttle } from '../../../utils/timing';
 import type { SelectedImage } from '../../ui/AppProperties';
@@ -74,7 +76,7 @@ interface LensCorrectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApply: (newParams: LensParams) => void;
-  currentAdjustments: Adjustments;
+  currentAdjustments: LensCorrectionModalAdjustmentView;
   selectedImage: SelectedImage | null;
 }
 
@@ -91,7 +93,10 @@ const DEFAULT_PARAMS: LensParams = {
   lensDistortionParams: null,
 };
 
-export function buildLensCorrectionDraft(currentAdjustments: Adjustments): LensParams {
+type LensCorrectionModalAdjustmentView = EditDocumentNodeParamsV2<'geometry'> &
+  EditDocumentNodeParamsV2<'lens_correction'> & { masks: readonly MaskContainer[] };
+
+export function buildLensCorrectionDraft(currentAdjustments: LensCorrectionModalAdjustmentView): LensParams {
   return {
     lensCorrectionMode: currentAdjustments.lensCorrectionMode,
     lensMaker: currentAdjustments.lensMaker,
@@ -304,7 +309,7 @@ export function LensCorrectionSession({
           const result = await requestPreviewGeometry({
             sourceIdentity: selectedImage?.path ?? 'no-image',
             params: fullParams,
-            adjustments: currentAdjustments,
+            editDocumentV2: useEditorStore.getState().editDocumentV2,
             showLines: false,
           });
           if (!requestGate.current.isCurrent('preview', requestId)) return;
@@ -573,7 +578,7 @@ export function LensCorrectionSession({
       void requestPreviewGeometry({
         sourceIdentity: selectedImage?.path ?? 'no-image',
         params: fullParams,
-        adjustments: currentAdjustments,
+        editDocumentV2: useEditorStore.getState().editDocumentV2,
         showLines: false,
       })
         .then((result) => {

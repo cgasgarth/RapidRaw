@@ -6,11 +6,10 @@ import type {
 } from '../../../packages/rawengine-schema/src/editCommandBus';
 import { RawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import { applyAgentDetailEffects } from '../../../src/utils/agent/tools/agentDetailEffectsApplyTool';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixtures/agent-detail-effects.ARW';
 const session = createEditorImageSession({ generation: 52, path: sourcePath, source: 'cache' });
@@ -49,7 +48,7 @@ class DeferredDetailEffectsBridge extends RawEngineLocalAppServerBridge {
 describe('agent detail/effects EditTransaction bridge', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -96,7 +95,7 @@ describe('agent detail/effects EditTransaction bridge', () => {
       baseAdjustmentRevision: state.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { exposure: 0.2 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { exposure: 0.2 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'intervening-detail-effects-edit',
@@ -105,8 +104,8 @@ describe('agent detail/effects EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.exposure).toBe(0.2);
-    expect(after.adjustmentSnapshot.value.clarity).toBe(INITIAL_ADJUSTMENTS.clarity);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.2);
+    expect(after.editDocumentV2.nodes['detail_denoise_dehaze']!.params['clarity']).toBe(INITIAL_ADJUSTMENTS.clarity);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-detail-effects-edit');
   });
 

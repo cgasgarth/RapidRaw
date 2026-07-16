@@ -47,6 +47,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+import { editDocumentLayersV2Schema } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
@@ -75,7 +76,12 @@ import {
   type LayerBlendMode,
   type MaskContainer,
 } from '../../../../utils/adjustments';
-import { lowerEditDocumentV2CopyPayloadToLegacyAdjustments } from '../../../../utils/editDocumentV2';
+import {
+  selectEditDocumentGeometry,
+  selectEditDocumentMasks,
+  selectEditDocumentNode,
+} from '../../../../utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../../utils/editDocumentV2';
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../../utils/editorSubMaskFactory';
 import { readBrushLocalAdjustmentReceipt } from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
 import { readColorRangeLocalAdjustmentReceipt } from '../../../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
@@ -128,11 +134,16 @@ import {
   writeObjectPromptCanvasState,
 } from '../../../../utils/mask/objectMaskPromptCanvas';
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
-import BasicAdjustments from '../../../adjustments/Basic';
+import BasicAdjustments, { type BasicAdjustmentUpdate, type BasicAdjustmentView } from '../../../adjustments/Basic';
 import ColorPanel from '../../../adjustments/Color';
-import CurveGraph, { type ChannelConfig } from '../../../adjustments/Curves';
-import DetailsPanel from '../../../adjustments/Details';
-import EffectsPanel from '../../../adjustments/Effects';
+import CurveGraph, {
+  type ChannelConfig,
+  type CurveAdjustmentUpdater,
+  type CurveAdjustmentView,
+} from '../../../adjustments/Curves';
+import type { AdjustmentUpdate, ColorPanelAdjustmentView } from '../../../adjustments/color/types';
+import DetailsPanel, { type DetailAdjustmentUpdate, type DetailAdjustmentView } from '../../../adjustments/Details';
+import EffectsPanel, { type EffectAdjustmentUpdate, type EffectAdjustmentView } from '../../../adjustments/Effects';
 import {
   type AppSettings,
   type BrushSettings,
@@ -189,6 +200,30 @@ const maskPanelRowActionClassName =
   'flex h-6 w-6 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45';
 const maskPanelCardClassName = professionalInspectorDensityTokens.card.nestedPanel;
 const maskPanelInputClassName = `${editorChromeTokens.input.base} ${editorChromeTokens.input.compact}`;
+
+const DEFAULT_MASK_COLOR_PANEL_VIEW: ColorPanelAdjustmentView = (() => {
+  const document = createDefaultEditDocumentV2();
+  return {
+    ...selectEditDocumentNode(document, 'black_white_mixer').params,
+    ...selectEditDocumentNode(document, 'camera_input').params,
+    ...selectEditDocumentNode(document, 'channel_mixer').params,
+    ...selectEditDocumentNode(document, 'color_balance_rgb').params,
+    ...selectEditDocumentNode(document, 'color_calibration').params,
+    ...selectEditDocumentNode(document, 'color_presence').params,
+    ...selectEditDocumentNode(document, 'luma_levels').params,
+    ...selectEditDocumentNode(document, 'perceptual_grading').params,
+    ...selectEditDocumentNode(document, 'point_color').params,
+    ...selectEditDocumentNode(document, 'scene_curve').params,
+    ...selectEditDocumentNode(document, 'selective_color_mixer').params,
+    ...selectEditDocumentNode(document, 'skin_tone_uniformity').params,
+  };
+})();
+
+const buildMaskColorPanelView = (adjustments: Adjustments): ColorPanelAdjustmentView =>
+  Object.assign(
+    structuredClone(DEFAULT_MASK_COLOR_PANEL_VIEW),
+    Object.fromEntries(Object.entries(adjustments).filter((entry) => entry[1] !== undefined)),
+  );
 
 function LazyMaskPanelFallback({ testId = 'mask-panel-lazy-fallback' }: { testId?: string }) {
   return (
@@ -264,13 +299,24 @@ type SubMaskPatch = Partial<SubMask>;
 type MaskPropertyValue = boolean | LayerBlendMode | number;
 type MaskAdjustmentPatch = Partial<Adjustments>;
 type MaskAdjustmentUpdater = MaskAdjustmentPatch | ((adjustments: Adjustments) => Adjustments);
-type AdjustmentsUpdater = (updater: (adjustments: Adjustments) => Adjustments) => void;
+type MaskContainersUpdater = (updater: (masks: Array<MaskContainer>) => Array<MaskContainer>) => void;
 type MaskContainerWithId = MaskContainer;
 type SetState<T> = (value: T | ((previous: T) => T)) => void;
 type PresetMenuItem = UserPreset;
 
-const presetMaskAdjustments = (item: PresetMenuItem): Partial<Adjustments> | null =>
-  item.preset === undefined ? null : lowerEditDocumentV2CopyPayloadToLegacyAdjustments(item.preset.editDocumentV2);
+const presetMaskAdjustments = (item: PresetMenuItem): Partial<Adjustments> | null => {
+  if (item.preset === undefined) return null;
+  const allowedFields = new Set(Object.values(ADJUSTMENT_SECTIONS).flat());
+  const patch: MaskAdjustmentPatch = {};
+  for (const node of Object.values(item.preset.editDocumentV2.nodes)) {
+    if (node === undefined) continue;
+    for (const [key, value] of Object.entries(node.params)) {
+      if (allowedFields.has(key)) writeAdjustmentPatchValue(patch, key, value);
+    }
+    if (node.type === 'display_creative') writeAdjustmentPatchValue(patch, 'effectsEnabled', node.enabled);
+  }
+  return patch;
+};
 
 const getPanelMaskParameterNumber = (parameters: unknown, key: PanelMaskParameterKey, fallback = 0): number =>
   getMaskParameterNumber(parameters, key, fallback);
@@ -360,6 +406,22 @@ interface CopiedSectionAdjustments {
   values: MaskAdjustmentPatch;
 }
 
+const mergeDefinedMaskAdjustmentValues = <View extends object>(defaults: View, current: Adjustments): View => {
+  const view = structuredClone(defaults);
+  for (const [key, value] of Object.entries(current)) {
+    if (value !== undefined && Object.hasOwn(view, key)) Reflect.set(view, key, value);
+  }
+  return view;
+};
+
+const mergeMaskViewIntoAdjustments = (current: Adjustments, view: object): Adjustments => {
+  const merged = structuredClone(current);
+  for (const [key, value] of Object.entries(view)) {
+    if (value !== undefined) Reflect.set(merged, key, structuredClone(value));
+  }
+  return merged;
+};
+
 interface DraggableGridItemProps {
   activeMaskContainerId: string | null;
   isDraggable: boolean;
@@ -396,7 +458,7 @@ interface ContainerRowProps {
   onToggle: () => void;
   presets: Array<PresetMenuItem>;
   renamingId: string | null;
-  setAdjustments: AdjustmentsUpdater;
+  setMaskContainers: MaskContainersUpdater;
   setIsMaskControlHovered: (isHovered: boolean) => void;
   setRenamingId: (id: string | null) => void;
   setTempName: (name: string) => void;
@@ -440,7 +502,7 @@ interface MaskListProps {
   presets: Array<PresetMenuItem>;
   renamingId: string | null;
   rootDroppableRef: (element: HTMLElement | null) => void;
-  setAdjustments: AdjustmentsUpdater;
+  setMaskContainers: MaskContainersUpdater;
   setIsMaskControlHovered: (isHovered: boolean) => void;
   setRenamingId: (id: string | null) => void;
   setTempName: (name: string) => void;
@@ -1352,7 +1414,7 @@ const EMPTY_MASK_EXPANDED_SECTIONS: string[] = [];
 
 export function MasksPanel() {
   const { t } = useTranslation();
-  const { setAdjustments, handleLutSelect } = useEditorActions();
+  const { handleLutSelect } = useEditorActions();
   const {
     handleGenerateAiDepthMask,
     handleGenerateAiForegroundMask,
@@ -1393,6 +1455,7 @@ export function MasksPanel() {
     isGeneratingAiMask,
     maskOverlaySettings,
     previewScopeStatus,
+    showClipping,
     selectedImage,
     isWaveformVisible,
     waveform,
@@ -1404,7 +1467,7 @@ export function MasksPanel() {
     useShallow((state) => ({
       activeMaskContainerId: state.activeMaskContainerId,
       activeMaskId: state.activeMaskId,
-      adjustments: state.adjustmentSnapshot.value,
+      adjustments: selectEditDocumentMasks(state.editDocumentV2),
       editDocumentV2: state.editDocumentV2,
       brushSettings: state.brushSettings,
       copiedMask: state.copiedMask,
@@ -1412,6 +1475,7 @@ export function MasksPanel() {
       isGeneratingAiMask: state.isGeneratingAiMask,
       maskOverlaySettings: state.maskOverlaySettings,
       previewScopeStatus: state.previewScopeStatus,
+      showClipping: state.showClipping,
       selectedImage: state.selectedImage,
       isWaveformVisible: state.isWaveformVisible,
       waveform: state.waveform,
@@ -1421,6 +1485,7 @@ export function MasksPanel() {
       applyEditTransaction: state.applyEditTransaction,
     })),
   );
+  const mutableAdjustments = useMemo(() => [...adjustments], [adjustments]);
 
   const { isResizingWaveform, onToggleWaveform, setActiveWaveformChannel, handleWaveformResize } =
     useWaveformControls();
@@ -1487,7 +1552,7 @@ export function MasksPanel() {
   }, [setMaskOverlaySettings]);
   const onSelectContainer = useCallback(
     (id: string | null) => {
-      const masks = useEditorStore.getState().adjustmentSnapshot.value.masks;
+      const masks = selectEditDocumentMasks(useEditorStore.getState().editDocumentV2);
       const selection = resolveMaskSelection(masks, { containerId: id, subMaskId: null });
       setEditor({ activeMaskContainerId: selection.containerId, activeMaskId: selection.subMaskId });
       if (selection.containerId !== null) {
@@ -1500,7 +1565,7 @@ export function MasksPanel() {
   const onSelectMask = useCallback(
     (id: string | null) => {
       const state = useEditorStore.getState();
-      const selection = resolveMaskSelection(state.adjustmentSnapshot.value.masks, {
+      const selection = resolveMaskSelection(selectEditDocumentMasks(state.editDocumentV2), {
         containerId: state.activeMaskContainerId,
         subMaskId: id,
       });
@@ -1542,7 +1607,7 @@ export function MasksPanel() {
   const commitMaskGraphCommand = useCallback(
     (command: (masks: Array<MaskContainer>) => MaskGraphCommandResult | null): MaskGraphCommandResult | null => {
       const state = useEditorStore.getState();
-      const result = command(state.adjustmentSnapshot.value.masks);
+      const result = command([...selectEditDocumentMasks(state.editDocumentV2)]);
       if (result === null) return null;
       const committed = validateMaskGraphCommand(result);
       applyEditTransaction({
@@ -1550,7 +1615,13 @@ export function MasksPanel() {
         imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
         baseAdjustmentRevision: state.adjustmentRevision,
         source: 'layer-command',
-        operations: [{ type: 'patch-edit-document-node', nodeType: 'layers', patch: { masks: committed.masks } }],
+        operations: [
+          {
+            type: 'patch-edit-document-node',
+            nodeType: 'layers',
+            patch: editDocumentLayersV2Schema.parse({ masks: committed.masks }),
+          },
+        ],
         history: 'single-entry',
         persistence: 'commit',
       });
@@ -1581,30 +1652,30 @@ export function MasksPanel() {
   );
 
   const { showContextMenu } = useContextMenu();
-  const { presets } = usePresets(adjustments, editDocumentV2);
+  const { presets } = usePresets(editDocumentV2);
 
   const { setNodeRef: setRootDroppableRef, isOver: isRootOver } = useDroppable({ id: 'mask-list-root' });
 
-  const activeContainer = adjustments.masks.find((m) => m.id === activeMaskContainerId);
+  const activeContainer = adjustments.find((m) => m.id === activeMaskContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeMaskId);
   const layerMaskProvenanceViews = useMemo(
     () =>
       Object.fromEntries(
-        adjustments.masks.map((mask) => [
+        adjustments.map((mask) => [
           mask.id,
           deriveLayerMaskProvenanceView({
             layerId: mask.id,
-            masks: adjustments.masks,
+            masks: adjustments,
             receipt: layerMaskProvenanceReceipts[mask.id],
             sourceGraphRevision: layerMaskSourceGraphRevision,
           }),
         ]),
       ),
-    [adjustments.masks, layerMaskProvenanceReceipts, layerMaskSourceGraphRevision],
+    [adjustments, layerMaskProvenanceReceipts, layerMaskSourceGraphRevision],
   );
   const activeLayerMaskProvenanceView =
     activeContainer === undefined ? null : (layerMaskProvenanceViews[activeContainer.id] ?? null);
-  const isSettingsPanelReady = activeContainer !== undefined || adjustments.masks.length > 0;
+  const isSettingsPanelReady = activeContainer !== undefined || adjustments.length > 0;
   const markMaskPanelProvenanceStale = useCallback(
     (reason: LayerMaskProvenanceInvalidationReason, layerIds?: string[]) => {
       markLayerMaskProvenanceStale({ ...(layerIds === undefined ? {} : { layerIds }), reason });
@@ -1619,7 +1690,9 @@ export function MasksPanel() {
     false;
   const isAiMask =
     activeSubMaskData &&
-    [Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
+    new Set<Mask>([Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky, Mask.AiDepth]).has(
+      activeSubMaskData.type,
+    );
 
   useEffect(() => {
     const timer = setTimeout(
@@ -1677,7 +1750,7 @@ export function MasksPanel() {
       type,
       imageDimensions: selectedImage,
       mode,
-      orientationSteps: adjustments.orientationSteps,
+      orientationSteps: selectEditDocumentGeometry(editDocumentV2).orientationSteps,
       personPart,
       faceName: t('masks.types.face'),
     });
@@ -1687,7 +1760,7 @@ export function MasksPanel() {
     const type = typeof maskTypeOrType === 'string' ? maskTypeOrType : maskTypeOrType.type;
     const personPart = typeof maskTypeOrType === 'string' ? undefined : maskTypeOrType.personPart;
     const subMask = createMaskLogic(type, SubMaskMode.Additive, personPart);
-    const count = useEditorStore.getState().adjustmentSnapshot.value.masks.length + 1;
+    const count = selectEditDocumentMasks(useEditorStore.getState().editDocumentV2).length + 1;
     const newContainer = {
       ...INITIAL_MASK_CONTAINER,
       id: crypto.randomUUID(),
@@ -1799,7 +1872,7 @@ export function MasksPanel() {
         },
       }));
 
-    const container = targetContainerId ? adjustments.masks.find((m) => m.id === targetContainerId) : null;
+    const container = targetContainerId ? adjustments.find((m) => m.id === targetContainerId) : null;
     const hasComponents = container && container.subMasks.length > 0;
 
     const buildModeSubmenu = (label: string, icon: LucideIcon, mode: SubMaskMode): Option => ({
@@ -1851,12 +1924,12 @@ export function MasksPanel() {
 
   const updateContainer = (id: string, data: MaskContainerPatch) => {
     if (data.adjustments !== undefined) {
-      const current = useEditorStore.getState().adjustmentSnapshot.value;
+      const current = selectEditDocumentMasks(useEditorStore.getState().editDocumentV2);
       const next = applyMaskContainerAdjustmentCandidate(current, id, data.adjustments);
       if (next === current) return;
       markMaskPanelProvenanceStale('source_state_changed', [id]);
       commitMaskGraphCommand(() => ({
-        masks: next.masks,
+        masks: [...next],
         selection: {
           containerId: useEditorStore.getState().activeMaskContainerId,
           subMaskId: useEditorStore.getState().activeMaskId,
@@ -1890,7 +1963,7 @@ export function MasksPanel() {
       data.mode !== undefined ||
       data.type !== undefined
     ) {
-      const parentLayerId = adjustments.masks.find((mask) => mask.subMasks.some((subMask) => subMask.id === id))?.id;
+      const parentLayerId = adjustments.find((mask) => mask.subMasks.some((subMask) => subMask.id === id))?.id;
       markMaskPanelProvenanceStale('mask_alpha_changed', parentLayerId === undefined ? undefined : [parentLayerId]);
     }
     commitMaskGraphCommand((masks) => {
@@ -1998,7 +2071,7 @@ export function MasksPanel() {
     cloneContainerForPaste: (container) => cloneMaskContainerData(container, { rename: false }),
     cloneSubMaskForDuplicate: (subMask, options) => cloneSubMaskData(subMask, options),
     cloneSubMaskForPaste: (subMask) => cloneSubMaskData(subMask, { rename: false }),
-    containers: adjustments.masks,
+    containers: mutableAdjustments,
     copiedContainer: copiedMask,
     copiedSubMask,
     insertContainer: insertMaskContainer,
@@ -2034,7 +2107,7 @@ export function MasksPanel() {
         if (overData?.type === 'Container' && overItem) {
           handleAddSubMask(overItem.id, creationMaskType);
         } else if (overData?.type === 'SubMask') {
-          const container = adjustments.masks.find((m) => m.id === overData.parentId);
+          const container = adjustments.find((m) => m.id === overData.parentId);
           const parentId = overData.parentId;
           if (container && over && parentId) {
             const targetIndex = container.subMasks.findIndex((sm) => sm.id === over.id);
@@ -2045,7 +2118,7 @@ export function MasksPanel() {
         }
       };
 
-      if (adjustments.masks.length > 0) {
+      if (adjustments.length > 0) {
         setPendingAction(() => creationFn);
       } else {
         creationFn();
@@ -2199,7 +2272,7 @@ export function MasksPanel() {
               className={editorChromeTokens.statusChip.base}
               data-testid="mask-panel-mask-count"
             >
-              {adjustments.masks.length}
+              {adjustments.length}
             </UiText>
           </div>
           <div className="flex items-center gap-1">
@@ -2227,7 +2300,7 @@ export function MasksPanel() {
         <Suspense fallback={<LayerStackPanelFallback />}>
           <LayerStackPanel
             activeMaskContainerId={activeMaskContainerId}
-            masks={adjustments.masks}
+            masks={mutableAdjustments}
             onSelectMaskContainer={onSelectContainer}
             onSetMaskContainers={(nextMasks: Array<MaskContainer>) => {
               const state = useEditorStore.getState();
@@ -2258,12 +2331,9 @@ export function MasksPanel() {
                   previewScopeStatus={previewScopeStatus}
                   displayMode={activeWaveformChannel}
                   setDisplayMode={setActiveWaveformChannel}
-                  showClipping={adjustments.showClipping || false}
+                  showClipping={showClipping}
                   onToggleClipping={() => {
-                    setAdjustments((prev: Adjustments) => ({
-                      ...prev,
-                      showClipping: !prev.showClipping,
-                    }));
+                    setEditor((state) => ({ showClipping: !state.showClipping }));
                   }}
                 />
               </div>
@@ -2274,7 +2344,7 @@ export function MasksPanel() {
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-2">
           <AnimatePresence mode="wait">
-            {adjustments.masks.length === 0 ? (
+            {adjustments.length === 0 ? (
               <motion.div
                 key="empty-masks-grid"
                 initial={{ opacity: 0 }}
@@ -2323,7 +2393,7 @@ export function MasksPanel() {
                 activeMaskContainerId={activeMaskContainerId}
                 activeMaskId={activeMaskId}
                 analyzingSubMaskId={analyzingSubMaskId}
-                containers={adjustments.masks}
+                containers={mutableAdjustments}
                 copiedMask={copiedMask}
                 copiedSubMask={copiedSubMask}
                 copyMaskToClipboard={copyMaskToClipboard}
@@ -2357,7 +2427,12 @@ export function MasksPanel() {
                 presets={presets}
                 renamingId={renamingId}
                 rootDroppableRef={setRootDroppableRef}
-                setAdjustments={setAdjustments}
+                setMaskContainers={(updater) => {
+                  commitMaskGraphCommand((masks) => ({
+                    masks: updater(masks),
+                    selection: { containerId: activeMaskContainerId, subMaskId: activeMaskId },
+                  }));
+                }}
                 setIsMaskControlHovered={setIsMaskControlHovered}
                 setRenamingId={setRenamingId}
                 setTempName={setTempName}
@@ -2454,7 +2529,7 @@ export function MasksPanel() {
                             onClick={() => {
                               recordLayerMaskPreviewReceipt({
                                 appliedCommandId: `mask_panel_preview_${layerMaskSourceGraphRevision}`,
-                                masks: adjustments.masks,
+                                masks: mutableAdjustments,
                               });
                             }}
                             type="button"
@@ -2781,7 +2856,7 @@ function MaskList({
   presets,
   renamingId,
   rootDroppableRef,
-  setAdjustments,
+  setMaskContainers,
   setIsMaskControlHovered,
   setRenamingId,
   setTempName,
@@ -2850,7 +2925,7 @@ function MaskList({
             copyMaskToClipboard={copyMaskToClipboard}
             copiedMask={copiedMask}
             presets={presets}
-            setAdjustments={setAdjustments}
+            setMaskContainers={setMaskContainers}
             activeDragItem={activeDragItem}
             activeMaskId={activeMaskId}
             onSelectContainer={onSelectContainer}
@@ -2910,7 +2985,7 @@ function ContainerRow({
   copyMaskToClipboard,
   copiedMask,
   presets,
-  setAdjustments,
+  setMaskContainers,
   activeDragItem,
   activeMaskId,
   onSelectContainer,
@@ -2950,11 +3025,9 @@ function ContainerRow({
   const handleRenameSubmit = () => {
     if (tempName.trim()) {
       const newName = tempName.trim();
-      setAdjustments((prev: Adjustments) => {
-        const updatedMasks = prev.masks.map((mask: MaskContainer) =>
-          mask.id === container.id ? { ...mask, name: newName } : mask,
-        );
-        return { ...prev, masks: updatedMasks };
+      setMaskContainers((masks) => {
+        const updatedMasks = masks.map((mask) => (mask.id === container.id ? { ...mask, name: newName } : mask));
+        return updatedMasks;
       });
     }
     setRenamingId(null);
@@ -3595,6 +3668,7 @@ function SettingsPanel({
   const displayContainer = container || placeholderContainer;
   const displayEditNodes = displayContainer.editNodes;
   const displayAdjustments: Adjustments = { ...INITIAL_ADJUSTMENTS, ...displayContainer.adjustments };
+  const displayColorAdjustments = buildMaskColorPanelView(displayAdjustments);
 
   const handleApplyPresetToMask = (presetAdjustments: Partial<Adjustments>) => {
     if (!container) return;
@@ -3899,33 +3973,118 @@ function SettingsPanel({
   };
 
   const renderAdjustmentSection = (sectionName: string) => {
-    const sharedProps = {
-      adjustments: displayAdjustments,
-      setAdjustments: setMaskContainerAdjustments,
-      isForMask: true,
-      onDragStateChange,
+    const defaults = createDefaultEditDocumentV2();
+    const basicDefaults: BasicAdjustmentView = {
+      ...selectEditDocumentNode(defaults, 'scene_global_color_tone').params,
+      ...selectEditDocumentNode(defaults, 'scene_to_view_transform').params,
+      ...selectEditDocumentNode(defaults, 'tone_equalizer').params,
+    };
+    const curveDefaults = selectEditDocumentNode(defaults, 'scene_curve').params;
+    const detailDefaults: DetailAdjustmentView = {
+      ...selectEditDocumentNode(defaults, 'detail_denoise_dehaze').params,
+      ...selectEditDocumentNode(defaults, 'lens_correction').params,
+    };
+    const effectDefaults: EffectAdjustmentView = {
+      ...selectEditDocumentNode(defaults, 'display_creative').params,
+      ...selectEditDocumentNode(defaults, 'film_emulation').params,
+    };
+    const basicView = mergeDefinedMaskAdjustmentValues(basicDefaults, displayAdjustments);
+    const curveView = mergeDefinedMaskAdjustmentValues<CurveAdjustmentView>(curveDefaults, displayAdjustments);
+    const detailView = mergeDefinedMaskAdjustmentValues(detailDefaults, displayAdjustments);
+    const effectView = mergeDefinedMaskAdjustmentValues(effectDefaults, displayAdjustments);
+    const setMaskBasicAdjustments = (update: BasicAdjustmentUpdate) => {
+      setMaskContainerAdjustments((current) => {
+        const currentView = mergeDefinedMaskAdjustmentValues(basicDefaults, current);
+        const next = typeof update === 'function' ? update(currentView) : { ...currentView, ...update };
+        return mergeMaskViewIntoAdjustments(current, next);
+      });
+    };
+    const setMaskCurveAdjustments = (update: CurveAdjustmentUpdater) => {
+      setMaskContainerAdjustments((current) =>
+        mergeMaskViewIntoAdjustments(
+          current,
+          update(mergeDefinedMaskAdjustmentValues<CurveAdjustmentView>(curveDefaults, current)),
+        ),
+      );
+    };
+    const setMaskDetailAdjustments = (update: DetailAdjustmentUpdate) => {
+      setMaskContainerAdjustments((current) => {
+        const currentView = mergeDefinedMaskAdjustmentValues(detailDefaults, current);
+        const next = typeof update === 'function' ? update(currentView) : { ...currentView, ...update };
+        return mergeMaskViewIntoAdjustments(current, next);
+      });
+    };
+    const setMaskEffectAdjustments = (update: EffectAdjustmentUpdate) => {
+      setMaskContainerAdjustments((current) => {
+        const currentView = mergeDefinedMaskAdjustmentValues(effectDefaults, current);
+        const next = typeof update === 'function' ? update(currentView) : { ...currentView, ...update };
+        return mergeMaskViewIntoAdjustments(current, next);
+      });
+    };
+    const setMaskColorAdjustments = (updater: AdjustmentUpdate) => {
+      setMaskContainerAdjustments((current) => {
+        const currentView = buildMaskColorPanelView(current);
+        const nextView = typeof updater === 'function' ? updater(currentView) : { ...currentView, ...updater };
+        return Object.assign(
+          { ...current },
+          Object.fromEntries(Object.entries(nextView).filter((entry) => entry[1] !== undefined)),
+        );
+      });
     };
 
     switch (sectionName) {
       case 'basic':
-        return <BasicAdjustments {...sharedProps} appSettings={appSettings} />;
+        return (
+          <BasicAdjustments
+            adjustments={basicView}
+            appSettings={appSettings}
+            isForMask
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setMaskBasicAdjustments}
+          />
+        );
       case 'curves':
         return (
           <CurveGraph
-            adjustments={displayAdjustments}
+            adjustments={curveView}
             histogram={histogram}
             isForMask
-            setAdjustments={setMaskContainerAdjustments}
+            setAdjustments={setMaskCurveAdjustments}
             theme={appSettings?.theme ?? Theme.Dark}
             onDragStateChange={onDragStateChange}
           />
         );
       case 'color':
-        return <ColorPanel {...sharedProps} appSettings={appSettings} />;
+        return (
+          <ColorPanel
+            adjustments={displayColorAdjustments}
+            appSettings={appSettings}
+            isForMask
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setMaskColorAdjustments}
+          />
+        );
       case 'details':
-        return <DetailsPanel {...sharedProps} appSettings={appSettings} />;
+        return (
+          <DetailsPanel
+            adjustments={detailView}
+            appSettings={appSettings}
+            isForMask
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setMaskDetailAdjustments}
+          />
+        );
       case 'effects':
-        return <EffectsPanel {...sharedProps} appSettings={appSettings} handleLutSelect={handleLutSelect} />;
+        return (
+          <EffectsPanel
+            adjustments={effectView}
+            appSettings={appSettings}
+            handleLutSelect={handleLutSelect}
+            isForMask
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setMaskEffectAdjustments}
+          />
+        );
       default:
         return null;
     }

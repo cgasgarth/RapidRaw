@@ -15,13 +15,7 @@ import {
   PatchResidencyTracker,
   publishAdjustmentSnapshot,
 } from '../utils/adjustmentSnapshots';
-import {
-  type Adjustments,
-  type BasicAdjustment,
-  DisplayMode,
-  INITIAL_ADJUSTMENTS,
-  type MaskContainer,
-} from '../utils/adjustments';
+import { type Adjustments, type BasicAdjustment, DisplayMode, type MaskContainer } from '../utils/adjustments';
 import { type AiEditCommand, type AiEditSelection, resolveAiEditSelection } from '../utils/aiEditSelection';
 import { buildAiSourceArtifactEditTransaction } from '../utils/aiSourceArtifactEditTransaction';
 import type { AutoEditPreviewSession } from '../utils/autoEditTransaction';
@@ -35,19 +29,13 @@ import {
   reduceBasicToneSliderInteractionPreview,
 } from '../utils/basicToneSliderInteraction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
-import {
-  createDefaultEditDocumentV2,
-  type EditDocumentV2CopyPayload,
-  editDocumentV2ToLegacyAdjustments,
-} from '../utils/editDocumentV2';
+import { selectEditDocumentSourceArtifacts } from '../utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, type EditDocumentV2CopyPayload } from '../utils/editDocumentV2';
 import {
   createEditHistoryCheckpoint,
   type EditHistoryCheckpoint,
-  goToEditHistoryIndex,
   pushEditHistoryEntryWithCheckpoints,
-  redoEditHistory,
   renameEditHistoryCheckpoint,
-  undoEditHistory,
 } from '../utils/editHistory';
 import {
   DEFAULT_EDITOR_COMPARE_STATE,
@@ -92,7 +80,7 @@ export interface InteractivePatch {
 
 export interface CopiedSectionAdjustments {
   section: string;
-  values: Partial<Adjustments>;
+  payload: EditDocumentV2CopyPayload;
 }
 
 interface PresetApplication {
@@ -168,8 +156,8 @@ interface ProvisionalPreviewFrame {
 }
 
 interface ReferenceMatchPreview {
-  adjustments: Adjustments;
   baseAdjustmentRevision: number;
+  editDocumentV2: EditDocumentV2;
   enabledGroups: ReferenceMatchGroup[];
   impact: number;
   proposalFingerprint: string;
@@ -224,6 +212,7 @@ interface EditorState {
   previewScopeRecoveryError: string | null;
   gamutWarningOverlay: GamutWarningOverlayPayload | null;
   isGamutWarningOverlayVisible: boolean;
+  showClipping: boolean;
   isExportSoftProofEnabled: boolean;
   exportSoftProofRecipeId: string | null;
   exportSoftProofTransform: ExportSoftProofTransformState | null;
@@ -382,13 +371,13 @@ const publishEditDocumentState = (state: EditorState, editDocumentV2: EditDocume
 
 const resolveAiSelectionState = (
   state: EditorState,
-  adjustments: Adjustments,
+  aiPatches: ReadonlyArray<Adjustments['aiPatches'][number]>,
   requested: AiEditSelection = {
     containerId: state.activeAiPatchContainerId,
     subMaskId: state.activeAiSubMaskId,
   },
 ) => {
-  const selection = resolveAiEditSelection(adjustments.aiPatches, requested);
+  const selection = resolveAiEditSelection(aiPatches, requested);
   return {
     activeAiPatchContainerId: selection.containerId,
     activeAiSubMaskId: selection.subMaskId,
@@ -478,7 +467,7 @@ const applyEditorStateUpdate = (
       update.lastEditApplicationReceipt = null;
       Object.assign(
         update,
-        resolveAiSelectionState(state, update.adjustmentSnapshot.value, {
+        resolveAiSelectionState(state, selectEditDocumentSourceArtifacts(update.editDocumentV2).aiPatches, {
           containerId:
             'activeAiPatchContainerId' in update
               ? (update.activeAiPatchContainerId ?? null)
@@ -489,7 +478,7 @@ const applyEditorStateUpdate = (
     } else if ('activeAiPatchContainerId' in update || 'activeAiSubMaskId' in update) {
       Object.assign(
         update,
-        resolveAiSelectionState(state, state.adjustmentSnapshot.value, {
+        resolveAiSelectionState(state, selectEditDocumentSourceArtifacts(state.editDocumentV2).aiPatches, {
           containerId:
             'activeAiPatchContainerId' in update
               ? (update.activeAiPatchContainerId ?? null)
@@ -614,6 +603,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   previewScopeRecoveryError: null,
   gamutWarningOverlay: null,
   isGamutWarningOverlayVisible: false,
+  showClipping: false,
   isExportSoftProofEnabled: false,
   exportSoftProofRecipeId: null,
   exportSoftProofTransform: null,
@@ -809,24 +799,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       );
       const reconcilesHydratedNativeCommit =
         nativeHistoryBaseline !== undefined && !areEditDocumentsEqual(state.editDocumentV2, nativeHistoryBaseline);
-      if (
-        reconcilesHydratedNativeCommit &&
-        !areEditDocumentsEqual(state.editDocumentV2, nextResult.afterEditDocumentV2)
-      ) {
+      if (reconcilesHydratedNativeCommit && !areEditDocumentsEqual(state.editDocumentV2, nextResult.after)) {
         throw new Error('edit_transaction.native_history_baseline_mismatch');
       }
       if (
         historyTargetIndex !== undefined &&
-        !areEditDocumentsEqual(state.history[historyTargetIndex], nextResult.afterEditDocumentV2)
+        !areEditDocumentsEqual(state.history[historyTargetIndex], nextResult.after)
       ) {
         throw new Error('edit_transaction.history_target_mismatch');
       }
       if (
         compensationHistory !== undefined &&
-        !areEditDocumentsEqual(
-          compensationHistory.entries[compensationHistory.historyIndex],
-          nextResult.afterEditDocumentV2,
-        )
+        !areEditDocumentsEqual(compensationHistory.entries[compensationHistory.historyIndex], nextResult.after)
       ) {
         throw new Error('edit_transaction.compensation_edit_document_history_target_mismatch');
       }
@@ -854,7 +838,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (request.history === 'reset') {
           return {
             ...historyNavigationPreviewInvalidation,
-            history: [structuredClone(nextResult.afterEditDocumentV2)],
+            history: [structuredClone(nextResult.after)],
             historyCheckpoints: [],
             historyIndex: 0,
           };
@@ -871,11 +855,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                 historyIndex: compensationHistory.historyIndex,
               }
             : request.history === 'reset'
-              ? { history: [nextResult.afterEditDocumentV2], checkpoints: [], historyIndex: 0 }
+              ? { history: [nextResult.after], checkpoints: [], historyIndex: 0 }
               : coalescedReceipt
                 ? {
                     history: currentHistory.map((entry, index) =>
-                      index === state.historyIndex ? nextResult.afterEditDocumentV2 : entry,
+                      index === state.historyIndex ? nextResult.after : entry,
                     ),
                     checkpoints: state.historyCheckpoints,
                     historyIndex: state.historyIndex,
@@ -889,12 +873,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
                         )
                       : currentHistory,
                     state.historyIndex,
-                    nextResult.afterEditDocumentV2,
+                    nextResult.after,
                     state.historyCheckpoints,
                   );
       return {
         ...historyNavigationPreviewInvalidation,
-        ...publishEditDocumentState(state, nextResult.afterEditDocumentV2),
+        ...publishEditDocumentState(state, nextResult.after),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
         basicToneSliderInteraction: null,
         isSliderDragging: false,
@@ -902,7 +886,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         history: nextHistory.history,
         historyCheckpoints: nextHistory.checkpoints,
         historyIndex: historyTargetIndex ?? nextHistory.historyIndex,
-        ...(historyTargetIndex === undefined ? {} : resolveAiSelectionState(state, nextResult.after)),
+        ...(historyTargetIndex === undefined
+          ? {}
+          : resolveAiSelectionState(state, selectEditDocumentSourceArtifacts(nextResult.after).aiPatches)),
       };
     });
     if (!result) throw new Error('edit_transaction.not_applied');
@@ -933,7 +919,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           latestValue: value,
           previewSnapshot: publishAdjustmentSnapshot(
             interaction.previewSnapshot ?? state.adjustmentSnapshot,
-            result.afterEditDocumentV2,
+            result.after,
           ),
         },
       };
@@ -968,7 +954,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   applyAiEditCommand: (command) => {
     const state = get();
     const result = command({
-      aiPatches: state.adjustmentSnapshot.value.aiPatches,
+      aiPatches: selectEditDocumentSourceArtifacts(state.editDocumentV2).aiPatches,
       selection: {
         containerId: state.activeAiPatchContainerId,
         subMaskId: state.activeAiSubMaskId,
@@ -1086,7 +1072,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       historyCheckpoints: [],
       historyIndex: 0,
       ...publishEditDocumentState(state, initialState),
-      ...resolveAiSelectionState(state, editDocumentV2ToLegacyAdjustments(initialState)),
+      ...resolveAiSelectionState(state, selectEditDocumentSourceArtifacts(initialState).aiPatches),
     }));
   },
 

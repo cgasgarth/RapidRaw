@@ -3,12 +3,14 @@ import { act, render as testingRender } from '@testing-library/react';
 import i18next from 'i18next';
 import { createElement, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-
+import type { EditDocumentNodeTypeV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import type { ColorPanelAdjustmentView } from '../../../src/components/adjustments/color/types';
+import { selectColorPanelAdjustmentView } from '../../../src/components/panel/right/color/ColorWorkspacePanel';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../../src/utils/colorWorkspaceNavigation';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const invoke = mock(() => new Promise<unknown>(() => {}));
 mock.module('@tauri-apps/api/core', () => ({ invoke }));
@@ -62,33 +64,41 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
     container.querySelector('[data-testid="black-white-mixer-controls"]')?.getAttribute('data-commit-image-session'),
   ).toBe('editor-image-session:91');
   act(() => getButton(container, 'black-white-mixer-toggle').click());
-  expect(useEditorStore.getState().adjustmentSnapshot.value.blackWhiteMixer.enabled).toBeTrue();
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'black_white_mixer').params['blackWhiteMixer']
+      .enabled,
+  ).toBeTrue();
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:91',
     source: 'manual-control',
   });
 
   act(() => getButton(container, 'color-balance-toggle').click());
-  expect(useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb).toMatchObject({
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
+  ).toMatchObject({
     enabled: true,
     midtones: { red: 10 },
   });
   expect(requireEditNode('color_balance_rgb').params['colorBalanceRgb']).toEqual(
-    useEditorStore.getState().adjustmentSnapshot.value.colorBalanceRgb,
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_balance_rgb').params['colorBalanceRgb'],
   );
   expect(requireEditNode('channel_mixer').params).not.toHaveProperty('colorBalanceRgb');
 
   act(() => getButton(container, 'channel-mixer-toggle').click());
-  expect(useEditorStore.getState().adjustmentSnapshot.value.channelMixer.enabled).toBeTrue();
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'channel_mixer').params['channelMixer'].enabled,
+  ).toBeTrue();
   const hslHue = container.querySelector('[data-testid="selective-color-range-controls"] input[type="range"]');
   if (!(hslHue instanceof window.HTMLInputElement)) throw new Error('missing selective-color HSL slider');
   act(() => {
     hslHue.value = '21';
     hslHue.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
-  expect(useEditorStore.getState().adjustmentSnapshot.value.hsl.reds.hue).toBe(21);
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params['hsl'].reds.hue,
+  ).toBe(21);
   expect(requireEditNode('selective_color_mixer').params).toMatchObject({ hsl: { reds: { hue: 21 } } });
-  expect(useEditorStore.getState().editDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('hsl');
   expect(useEditorStore.getState().history).toHaveLength(5);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     adjustmentRevision: 4,
@@ -122,7 +132,10 @@ test('ColorAdvancedControls slider commits calibration through fallback authorit
     tint.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value.colorCalibration.shadowsTint).toBe(24);
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'color_calibration').params['colorCalibration']
+      .shadowsTint,
+  ).toBe(24);
   expect(useEditorStore.getState().history).toHaveLength(2);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
     imageSessionId: 'editor-image-session:92',
@@ -147,9 +160,10 @@ test('ColorAdvancedControls Levels actions commit through the luma Levels node',
   );
 
   act(() => getButton(container, 'color-levels-toggle').click());
-  expect(useEditorStore.getState().adjustmentSnapshot.value.levels.enabled).toBeTrue();
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'luma_levels').params['levels'].enabled,
+  ).toBeTrue();
   expect(requireEditNode('luma_levels').params).toMatchObject({ levels: { enabled: true } });
-  expect(useEditorStore.getState().editDocumentV2.extensions['legacyAdjustments']).not.toHaveProperty('levels');
 
   const inputBlack = container.querySelector('[data-testid="color-levels-controls"] input[type="range"]');
   if (!(inputBlack instanceof window.HTMLInputElement)) throw new Error('missing Levels input-black slider');
@@ -158,7 +172,9 @@ test('ColorAdvancedControls Levels actions commit through the luma Levels node',
     inputBlack.dispatchEvent(new window.Event('input', { bubbles: true }));
   });
 
-  expect(useEditorStore.getState().adjustmentSnapshot.value.levels.inputBlack).toBe(0.08);
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'luma_levels').params['levels'].inputBlack,
+  ).toBe(0.08);
   expect(requireEditNode('luma_levels').params).toMatchObject({ levels: { enabled: true, inputBlack: 0.08 } });
   expect(useEditorStore.getState().history).toHaveLength(3);
   expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
@@ -169,9 +185,8 @@ test('ColorAdvancedControls Levels actions commit through the luma Levels node',
   expect(genericSetter).not.toHaveBeenCalled();
 });
 
-function initializeFallbackStore(imageSessionId: number): Adjustments {
-  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+function initializeFallbackStore(imageSessionId: number): ColorPanelAdjustmentView {
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
     editDocumentV2,
@@ -183,13 +198,11 @@ function initializeFallbackStore(imageSessionId: number): Adjustments {
     selectedImage,
     history: [editDocumentV2],
   });
-  return adjustments;
+  return selectColorPanelAdjustmentView(editDocumentV2);
 }
 
-function requireEditNode(nodeType: string) {
-  const node = useEditorStore.getState().editDocumentV2.nodes[nodeType];
-  if (node === undefined) throw new Error(`Expected ${nodeType} edit node.`);
-  return node;
+function requireEditNode<NodeType extends EditDocumentNodeTypeV2>(nodeType: NodeType) {
+  return selectEditDocumentNode(useEditorStore.getState().editDocumentV2, nodeType);
 }
 
 function render(element: React.ReactElement): HTMLElement {

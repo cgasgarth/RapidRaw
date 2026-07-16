@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildEditHistoryItems,
   createEditHistoryCheckpoint,
@@ -53,7 +53,9 @@ describe('edit history checkpoints', () => {
     );
     const renamed = renameEditHistoryCheckpoint(checkpoints, 'checkpoint-2', 'Client proof candidate');
 
-    const documents = history.map(legacyAdjustmentsToEditDocumentV2);
+    const documents = history.map(({ contrast, exposure }) =>
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { contrast, exposure }),
+    );
     expect(buildEditHistoryItems(documents, renamed).map((item) => item.label)).toEqual([
       'Initial State',
       'Exposure',
@@ -75,11 +77,16 @@ describe('edit history checkpoints', () => {
       'checkpoint-2',
       '2026-07-01T12:00:00.000Z',
     );
-    const documents = history.map(legacyAdjustmentsToEditDocumentV2);
+    const documents = history.map(({ contrast, exposure }) =>
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { contrast, exposure }),
+    );
     const pushed = pushEditHistoryEntryWithCheckpoints(
       documents,
       1,
-      legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, exposure: 0.35, highlights: -20 }),
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        exposure: 0.35,
+        highlights: -20,
+      }),
       checkpoints,
     );
 
@@ -95,9 +102,14 @@ describe('edit history checkpoints', () => {
     const contrastEdit = { ...exposureEdit, contrast: 18 };
 
     useEditorStore.getState().hydrateEditorRenderAuthority({
-      editDocumentV2: legacyAdjustmentsToEditDocumentV2(contrastEdit),
+      editDocumentV2: patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        contrast: contrastEdit.contrast,
+        exposure: contrastEdit.exposure,
+      }),
       finalPreviewUrl: 'blob:stale-history-preview',
-      history: [initial, exposureEdit, contrastEdit].map(legacyAdjustmentsToEditDocumentV2),
+      history: [initial, exposureEdit, contrastEdit].map(({ contrast, exposure }) =>
+        patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { contrast, exposure }),
+      ),
       historyCheckpoints: [],
       historyIndex: 2,
       uncroppedAdjustedPreviewUrl: 'blob:stale-uncropped-preview',
@@ -106,7 +118,10 @@ describe('edit history checkpoints', () => {
     useEditorStore.getState().goToHistoryIndex(1);
 
     const state = useEditorStore.getState();
-    expect(state.adjustmentSnapshot.value).toEqual(exposureEdit);
+    expect(state.editDocumentV2.nodes['scene_global_color_tone']!.params).toMatchObject({
+      contrast: 0,
+      exposure: 0.35,
+    });
     expect(state.finalPreviewUrl).toBeNull();
     expect(state.historyIndex).toBe(1);
     expect(state.history).toHaveLength(3);

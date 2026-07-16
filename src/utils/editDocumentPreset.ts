@@ -7,11 +7,9 @@ import {
   editDocumentV2CopyPayloadSchema,
 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Preset } from '../components/ui/AppProperties';
-import { type Adjustments, bindTypedCurveGraphVersion, INITIAL_ADJUSTMENTS } from './adjustments';
 import {
   copyEditDocumentV2Nodes,
-  legacyAdjustmentsToEditDocumentV2,
-  lowerEditDocumentV2CopyPayloadToLegacyAdjustments,
+  createDefaultEditDocumentV2,
   pasteEditDocumentV2Node,
   selectEditDocumentV2CopyPayload,
 } from './editDocumentV2';
@@ -77,7 +75,7 @@ export const configureEditDocumentPresetPayload = (
   includeCropTransform: boolean,
   presetType: 'style' | 'tool',
 ): EditDocumentV2CopyPayload | null => {
-  const defaults = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+  const defaults = createDefaultEditDocumentV2();
   const existing = resolveEditDocumentPresetPayload(preset, defaults);
   if (existing === null) return null;
   const complete = createEditDocumentPresetPayload(defaults, includeCropTransform, 'style');
@@ -214,15 +212,15 @@ export const parseExternalPresetImportResult = (
 /** Compile current preset authority for the native renderer's adjustment request contract. */
 export const buildPresetPreviewAdjustments = (
   preset: Pick<Preset, 'editDocumentV2' | 'includeCropTransform'>,
-): Adjustments | null => {
-  const defaults = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+): EditDocumentV2 | null => {
+  const defaults = createDefaultEditDocumentV2();
   const payload = resolveEditDocumentPresetPayload(preset, defaults);
-  return payload === null
-    ? null
-    : {
-        ...structuredClone(INITIAL_ADJUSTMENTS),
-        ...bindTypedCurveGraphVersion(lowerEditDocumentV2CopyPayloadToLegacyAdjustments(payload)),
-      };
+  if (payload === null) return null;
+  return Object.entries(payload.nodes).reduce(
+    (document, [nodeType, node]) =>
+      node === undefined ? document : pasteEditDocumentV2Node(document, nodeType as EditDocumentNodeTypeV2, node),
+    defaults,
+  );
 };
 
 export interface PresetEditTransactionState {

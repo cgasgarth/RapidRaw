@@ -19,28 +19,30 @@ import type { AiPeopleMaskPart } from '../../../../schemas/masks/aiMaskingSchema
 
 export type SubMaskParameters = Record<string, unknown>;
 
-export enum Mask {
-  AiDepth = 'ai-depth',
-  AiForeground = 'ai-foreground',
-  AiObject = 'ai-object',
-  AiPerson = 'ai-person',
-  AiSky = 'ai-sky',
-  AiSubject = 'ai-subject',
-  All = 'all',
-  Brush = 'brush',
-  Flow = 'flow',
-  Color = 'color',
-  Linear = 'linear',
-  Luminance = 'luminance',
-  QuickEraser = 'quick-eraser',
-  Radial = 'radial',
-}
+export const Mask = {
+  AiDepth: 'ai-depth',
+  AiForeground: 'ai-foreground',
+  AiObject: 'ai-object',
+  AiPerson: 'ai-person',
+  AiSky: 'ai-sky',
+  AiSubject: 'ai-subject',
+  All: 'all',
+  Brush: 'brush',
+  Color: 'color',
+  Flow: 'flow',
+  Linear: 'linear',
+  Luminance: 'luminance',
+  QuickEraser: 'quick-eraser',
+  Radial: 'radial',
+} as const;
+export type Mask = (typeof Mask)[keyof typeof Mask];
 
-export enum SubMaskMode {
-  Additive = 'additive',
-  Subtractive = 'subtractive',
-  Intersect = 'intersect',
-}
+export const SubMaskMode = {
+  Additive: 'additive',
+  Intersect: 'intersect',
+  Subtractive: 'subtractive',
+} as const;
+export type SubMaskMode = (typeof SubMaskMode)[keyof typeof SubMaskMode];
 
 export enum ToolType {
   Brush = 'brush',
@@ -60,9 +62,9 @@ export interface SubMask {
   id: string;
   invert: boolean;
   mode: SubMaskMode;
-  name?: string;
+  name?: string | undefined;
   opacity: number;
-  parameters?: SubMaskParameters;
+  parameters?: SubMaskParameters | undefined;
   type: Mask;
   visible: boolean;
 }

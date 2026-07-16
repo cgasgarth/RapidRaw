@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { filmEmulationNodeV1Schema } from '../../../packages/rawengine-schema/src/index';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { REFERENCE_FILM_PROFILE_REF } from '../../../src/utils/film-look/filmEmulationOperation';
 import {
   buildFilmCacheKeys,
@@ -22,7 +22,9 @@ const enabledFilmNode = filmEmulationNodeV1Schema.parse({
 
 const input = (overrides: Partial<FilmPreviewRenderIdentityInput> = {}): FilmPreviewRenderIdentityInput => ({
   adjustmentRevision: 4,
-  adjustments: { ...structuredClone(INITIAL_ADJUSTMENTS), filmEmulation: enabledFilmNode },
+  editDocumentV2: patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'film_emulation', {
+    filmEmulation: enabledFilmNode,
+  }),
   backend: 'cpu',
   displayGeneration: 2,
   imageSessionId: 7,
@@ -61,19 +63,18 @@ describe('Film render quality scheduling', () => {
     const baseKeys = buildFilmCacheKeys(base);
     const mixed = identity({
       adjustmentRevision: 5,
-      adjustments: {
-        ...baseInput.adjustments,
+      editDocumentV2: patchEditDocumentV2Node(baseInput.editDocumentV2, 'film_emulation', {
         filmEmulation: { ...enabledFilmNode, mix: 0.5 },
-      },
+      }),
     });
     const upstream = identity({
       adjustmentRevision: 5,
-      adjustments: { ...baseInput.adjustments, exposure: 1 },
+      editDocumentV2: patchEditDocumentV2Node(baseInput.editDocumentV2, 'scene_global_color_tone', { exposure: 1 }),
     });
     const interactive = identity({ quality: 'interactive_drag_v1' });
     const geometry = identity({
       adjustmentRevision: 5,
-      adjustments: { ...baseInput.adjustments, rotation: 2 },
+      editDocumentV2: patchEditDocumentV2Node(baseInput.editDocumentV2, 'geometry', { rotation: 2 }),
       viewportRevision: 12,
     });
 
@@ -101,7 +102,11 @@ describe('Film render quality scheduling', () => {
 
   test('disabled Film bypasses Film scheduling entirely', () => {
     const disabled = buildFilmPreviewRenderIdentity(
-      input({ adjustments: { ...input().adjustments, filmEmulation: { ...enabledFilmNode, enabled: false } } }),
+      input({
+        editDocumentV2: patchEditDocumentV2Node(input().editDocumentV2, 'film_emulation', {
+          filmEmulation: { ...enabledFilmNode, enabled: false },
+        }),
+      }),
     );
     expect(disabled).toBeNull();
   });

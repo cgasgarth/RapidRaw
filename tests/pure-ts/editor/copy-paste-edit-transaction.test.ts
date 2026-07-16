@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, test } from 'bun:test';
 
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   buildCopyPasteEditTransaction,
@@ -9,9 +8,11 @@ import {
   captureCopyPasteCompensationTarget,
   classifyCopyPasteNativeCompletion,
 } from '../../../src/utils/copyPasteEditTransaction';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
 import {
   copyEditDocumentV2Nodes,
-  legacyAdjustmentsToEditDocumentV2,
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
   setEditDocumentV2NodeEnabled,
 } from '../../../src/utils/editDocumentV2';
 import {
@@ -34,15 +35,18 @@ const selectedImage = {
   width: 4000,
 };
 
-const exposurePayload = (state: { adjustmentSnapshot: { value: typeof INITIAL_ADJUSTMENTS } }, exposure: number) =>
-  copyEditDocumentV2Nodes(legacyAdjustmentsToEditDocumentV2({ ...state.adjustmentSnapshot.value, exposure }), [
+const exposurePayload = (state: { editDocumentV2: ReturnType<typeof createDefaultEditDocumentV2> }, exposure: number) =>
+  copyEditDocumentV2Nodes(patchEditDocumentV2Node(state.editDocumentV2, 'scene_global_color_tone', { exposure }), [
     'scene_global_color_tone',
   ]);
 
 describe('copy/paste edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), brightness: 0.2, exposure: 0.1 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      brightness: adjustments.brightness,
+      exposure: adjustments.exposure,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -69,9 +73,12 @@ describe('copy/paste edit transaction', () => {
         type: 'replace-edit-document-node',
       },
     ]);
-    expect(result.afterEditDocumentV2.nodes['geometry']).toEqual(result.beforeEditDocumentV2.nodes['geometry']);
-    expect(result.afterEditDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.75);
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ brightness: 0.2, exposure: 0.75 });
+    expect(result.after.nodes['geometry']).toEqual(result.before.nodes['geometry']);
+    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.75);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params).toMatchObject({
+      brightness: 0.2,
+      exposure: 0.75,
+    });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
       adjustmentRevision: 1,
@@ -82,36 +89,41 @@ describe('copy/paste edit transaction', () => {
     expect(classifyCopyPasteNativeCompletion(useEditorStore.getState(), targetPath, persistence)).toBe('current');
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ brightness: 0.2, exposure: 0.1 });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params).toMatchObject({
+      brightness: 0.2,
+      exposure: 0.1,
+    });
     expect(useEditorStore.getState().historyIndex).toBe(0);
     useEditorStore.getState().redo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ brightness: 0.2, exposure: 0.75 });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params).toMatchObject({
+      brightness: 0.2,
+      exposure: 0.75,
+    });
     expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.75);
   });
 
   test('does not mutate an unselected sibling node in the same editor section', () => {
     const state = useEditorStore.getState();
-    const sourceDocument = legacyAdjustmentsToEditDocumentV2({
-      ...state.adjustmentSnapshot.value,
-      exposure: 1.5,
-      whiteBalanceTechnical: {
-        ...state.adjustmentSnapshot.value.whiteBalanceTechnical,
-        kelvin: 7_200,
+    const sourceDocument = patchEditDocumentV2Node(
+      patchEditDocumentV2Node(state.editDocumentV2, 'scene_global_color_tone', { exposure: 1.5 }),
+      'camera_input',
+      {
+        whiteBalanceTechnical: {
+          ...selectEditDocumentNode(state.editDocumentV2, 'camera_input').params['whiteBalanceTechnical'],
+          kelvin: 7_200,
+        },
       },
-    });
+    );
     const source = copyEditDocumentV2Nodes(sourceDocument, ['scene_global_color_tone']);
     const cameraInputBefore = state.editDocumentV2.nodes['camera_input'];
     const result = state.applyEditTransaction(
       buildCopyPasteEditTransaction(state, targetPath, source, 'paste-selected-node'),
     );
 
-    expect(result.after).toMatchObject({
-      exposure: 1.5,
-      whiteBalanceTechnical: state.adjustmentSnapshot.value.whiteBalanceTechnical,
-    });
-    expect(result.afterEditDocumentV2.nodes['camera_input']).toBe(cameraInputBefore);
-    expect(result.afterEditDocumentV2.nodes['camera_input']?.params['whiteBalanceTechnical']).toEqual(
-      state.adjustmentSnapshot.value.whiteBalanceTechnical,
+    expect(result.after.nodes['scene_global_color_tone']?.params['exposure']).toBe(1.5);
+    expect(result.after.nodes['camera_input']).toBe(cameraInputBefore);
+    expect(result.after.nodes['camera_input']?.params['whiteBalanceTechnical']).toEqual(
+      state.editDocumentV2.nodes['camera_input']!.params['whiteBalanceTechnical'],
     );
   });
 
@@ -170,7 +182,9 @@ describe('copy/paste edit transaction', () => {
       baseAdjustmentRevision: 1,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { contrast: 0.25 }, type: 'patch-adjustments' }],
+      operations: [
+        { nodeType: 'scene_global_color_tone', patch: { contrast: 0.25 }, type: 'patch-edit-document-node' },
+      ],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-edit',
@@ -249,7 +263,7 @@ describe('copy/paste edit transaction', () => {
       historyIndex: beforeMalformed.historyIndex,
       lastEditApplicationReceipt: { transactionId: 'paste-failure' },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0.75);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.75);
     expect(useEditorStore.getState().history).toEqual(beforeMalformed.history);
     expect(useEditorStore.getState().historyCheckpoints).toEqual(beforeMalformed.historyCheckpoints);
     const capturedEntry = target.history[0];
@@ -274,7 +288,10 @@ describe('copy/paste edit transaction', () => {
         transactionId: 'paste-failure:compensate',
       },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ brightness: 0.2, exposure: 0.1 });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
+      brightness: 0.2,
+      exposure: 0.1,
+    });
     expect(useEditorStore.getState().history).toEqual(expectedHistory);
     expect(useEditorStore.getState().historyCheckpoints).toEqual(expectedCheckpoints);
     expect(useEditorStore.getState().editDocumentV2.nodes['scene_curve']?.enabled).toBeFalse();
@@ -289,7 +306,10 @@ describe('copy/paste edit transaction', () => {
       historyIndex: 0,
       lastEditApplicationReceipt: { transactionId: 'paste-failure:compensate' },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ brightness: 0.2, exposure: 0.1 });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
+      brightness: 0.2,
+      exposure: 0.1,
+    });
     expect(useEditorStore.getState().history).toEqual(expectedHistory);
     expect(useEditorStore.getState().historyCheckpoints).toEqual(expectedCheckpoints);
 
@@ -308,13 +328,18 @@ describe('copy/paste edit transaction', () => {
       baseAdjustmentRevision: newerState.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { contrast: 0.25 }, type: 'patch-adjustments' }],
+      operations: [
+        { nodeType: 'scene_global_color_tone', patch: { contrast: 0.25 }, type: 'patch-edit-document-node' },
+      ],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'newer-after-paste',
     });
 
     expect(buildCopyPastePersistenceCompensation(useEditorStore.getState(), nextPersistence, nextTarget)).toBeNull();
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ contrast: 0.25, exposure: 0.5 });
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
+      contrast: 0.25,
+      exposure: 0.5,
+    });
   });
 });

@@ -5,13 +5,17 @@ import { useEditorActions } from '../../../src/hooks/editor/useEditorActions';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/orientation-rotate-action.ARW';
 
 test('useEditorActions routes rotate through one geometry transaction', () => {
   const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), aspectRatio: 4 / 3, exposure: 0.25 };
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(
+    patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', { aspectRatio: adjustments.aspectRatio }),
+    'scene_global_color_tone',
+    { exposure: adjustments.exposure },
+  );
   const session = createEditorImageSession({ generation: 51, path: sourcePath, source: 'cache' });
   useEditorStore.getState().hydrateEditorRenderAuthority({
     adjustmentRevision: 0,
@@ -44,12 +48,12 @@ test('useEditorActions routes rotate through one geometry transaction', () => {
 
   act(() => handleRotate?.(90));
   const after = useEditorStore.getState();
-  expect(after.adjustmentSnapshot.value).toMatchObject({
+  expect(after.editDocumentV2.geometry).toMatchObject({
     aspectRatio: 3 / 4,
-    exposure: 0.25,
     orientationSteps: 1,
     rotation: 0,
   });
+  expect(after.editDocumentV2.nodes['scene_global_color_tone']?.params['exposure']).toBe(0.25);
   expect(after.history).toHaveLength(2);
   expect(after.lastEditApplicationReceipt).toMatchObject({
     adjustmentRevision: 1,

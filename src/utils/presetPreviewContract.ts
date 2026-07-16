@@ -1,6 +1,5 @@
 import { z } from 'zod';
-
-import type { Adjustments } from './adjustments';
+import { type EditDocumentV2, editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 
 const positiveIntegerSchema = z.number().int().positive().safe();
 
@@ -20,7 +19,7 @@ export const presetPreviewInvokeArgsSchema = z
     request: z
       .object({
         expectedImagePath: z.string().trim().min(1),
-        jsAdjustments: z.record(z.string(), z.unknown()),
+        editDocumentV2: editDocumentV2Schema,
         previewIdentity: presetPreviewIdentitySchema,
       })
       .strict(),
@@ -62,7 +61,7 @@ export class PresetPreviewAuthority {
     this.latestRequestByPreset.clear();
   }
 
-  issue(presetId: string, adjustments: Adjustments): z.infer<typeof presetPreviewInvokeArgsSchema> {
+  issue(presetId: string, editDocumentV2: EditDocumentV2): z.infer<typeof presetPreviewInvokeArgsSchema> {
     if (this.currentSession === null) throw new Error('Preset preview requires a current image session.');
     const identity: PresetPreviewIdentity = {
       imageSessionId: this.currentSession.imageSessionId,
@@ -74,7 +73,7 @@ export class PresetPreviewAuthority {
     return presetPreviewInvokeArgsSchema.parse({
       request: {
         expectedImagePath: this.currentSession.sourceImagePath,
-        jsAdjustments: adjustments,
+        editDocumentV2,
         previewIdentity: identity,
       },
     });

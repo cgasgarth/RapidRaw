@@ -17,7 +17,7 @@ import {
   RAPIDRAW_PRESET_FORMAT,
   RAPIDRAW_PRESET_SCHEMA_VERSION,
 } from '../../../src/utils/editDocumentPreset';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 let unmount: (() => Promise<void>) | null = null;
 
@@ -161,11 +161,7 @@ test('same-source close and reopen replaces each shell draft before it becomes v
 
 function preset(id: string, name: string, presetType: 'style' | 'tool'): Preset {
   return {
-    editDocumentV2: createEditDocumentPresetPayload(
-      legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
-      false,
-      presetType,
-    ),
+    editDocumentV2: createEditDocumentPresetPayload(createDefaultEditDocumentV2(), false, presetType),
     format: RAPIDRAW_PRESET_FORMAT,
     id,
     includeCropTransform: false,

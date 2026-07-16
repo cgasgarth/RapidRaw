@@ -1,11 +1,9 @@
 import { expect, test } from 'bun:test';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
 import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
 import { type ImageCacheEntry, ImageLRUCache } from '../../../src/utils/ImageLRUCache.ts';
 import { PreviewUrlReleaseAuthority } from '../../../src/utils/previewUrlReleaseAuthority.ts';
 
 const makeEntry = (finalPreviewUrl: string | null, uncroppedPreviewUrl: string | null): ImageCacheEntry => ({
-  adjustments: structuredClone(INITIAL_ADJUSTMENTS),
   editDocumentV2: createDefaultEditDocumentV2(),
   histogram: null,
   waveform: null,

@@ -207,7 +207,7 @@ if (
   afterLayerState.adjustmentRevision !== baselineAdjustmentRevision + 1 ||
   afterLayerState.lastEditApplicationReceipt?.source !== 'agent-command' ||
   afterLayerState.lastEditApplicationReceipt.transactionId !== 'agent_subject_lift_apply' ||
-  afterLayerState.editDocumentV2.nodes.layers?.params.masks[0]?.id !== 'agent_subject_lift'
+  afterLayerState.editDocumentV2.nodes.layers?.params['masks'][0]?.id !== 'agent_subject_lift'
 ) {
   throw new Error('agent.layer.create did not publish one canonical EditTransaction receipt.');
 }

@@ -1,15 +1,15 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { AdjustmentSnapshot } from './adjustmentSnapshots';
-import type { Adjustments, BasicAdjustment } from './adjustments';
+import type { BasicAdjustment } from './adjustments';
 import {
   assertBasicToneCommitIdentity,
   type BasicToneCommitIdentity,
   type BasicToneEditTransactionState,
 } from './basicToneEditTransaction';
+import { selectEditDocumentNode } from './editDocumentSelectors';
 import { type EditTransactionRequest, reduceEditTransaction } from './editTransaction';
 
 export interface BasicToneSliderInteraction {
-  baseAdjustments: Adjustments;
   baseEditDocumentV2: EditDocumentV2;
   identity: BasicToneCommitIdentity;
   interactionId: string;
@@ -19,7 +19,6 @@ export interface BasicToneSliderInteraction {
 }
 
 export interface BasicToneSliderInteractionState extends BasicToneEditTransactionState {
-  adjustmentSnapshot: { readonly value: Adjustments };
   editDocumentV2: EditDocumentV2;
 }
 
@@ -31,12 +30,11 @@ export const beginBasicToneSliderInteraction = (
 ): BasicToneSliderInteraction => {
   assertBasicToneCommitIdentity(state, identity);
   return {
-    baseAdjustments: structuredClone(state.adjustmentSnapshot.value),
     baseEditDocumentV2: structuredClone(state.editDocumentV2),
     identity,
     interactionId,
     key,
-    latestValue: state.adjustmentSnapshot.value[key],
+    latestValue: selectEditDocumentNode(state.editDocumentV2, 'scene_global_color_tone').params[key],
     previewSnapshot: null,
   };
 };

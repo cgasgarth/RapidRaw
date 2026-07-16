@@ -1,9 +1,12 @@
 import { z } from 'zod';
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from './adjustments';
-import { type AutoEditProposalBase, buildAutoEditTransactionRequest } from './autoEditTransaction';
-import { mergeAutoEditAdjustments } from './autoEditWorkflow';
+import {
+  type AutoEditAdjustmentProposal,
+  type AutoEditProposalBase,
+  buildAutoEditTransactionRequest,
+} from './autoEditTransaction';
 import { technicalWhiteBalanceSchema } from './color/whiteBalance';
+import { selectEditDocumentNode } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 
 const percentAdjustmentSchema = z.number().finite().min(-100).max(100);
@@ -35,8 +38,7 @@ export interface ContextAutoAdjustBase extends AutoEditProposalBase {
 
 export interface ContextAutoAdjustEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
-  editDocumentV2: EditDocumentV2;
+  readonly editDocumentV2: EditDocumentV2;
   historyIndex: number;
   imageSession: { id: string } | null;
   imageSessionId: number;
@@ -52,7 +54,6 @@ export const captureContextAutoAdjustBase = (
   state.selectedImage?.isReady === true
     ? {
         adjustmentRevision: state.adjustmentRevision,
-        adjustments: structuredClone(state.adjustmentSnapshot.value),
         editDocumentV2: structuredClone(state.editDocumentV2),
         graphRevision: `history_${String(state.historyIndex)}`,
         imageSessionId: currentImageSessionId(state),
@@ -92,12 +93,14 @@ export const buildContextAutoAdjustEditTransaction = (
       `context_auto_adjust_transaction.stale_revision:${String(base.adjustmentRevision)}:${String(state.adjustmentRevision)}`,
     );
   }
-  const adjustments = mergeAutoEditAdjustments(base.adjustments, {
+  const blackWhite = selectEditDocumentNode(base.editDocumentV2, 'black_white_mixer').params;
+  const adjustments: AutoEditAdjustmentProposal = {
+    blackWhiteMixer: blackWhite.blackWhiteMixer,
     ...patch,
     whiteBalanceTechnical: {
       ...patch.whiteBalanceTechnical,
       inputSemantics: base.inputSemantics,
     },
-  });
+  };
   return buildAutoEditTransactionRequest(base, adjustments, transactionId);
 };

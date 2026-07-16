@@ -5,14 +5,13 @@ import {
   sceneGlobalColorToneParamsV2Schema,
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { BasicAdjustment, ColorAdjustment } from '../../../src/utils/adjustments';
+import { BasicAdjustment, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   type BasicToneCommitIdentity,
   buildBasicToneEditTransaction,
   captureBasicToneCommitIdentity,
 } from '../../../src/utils/basicToneEditTransaction';
-import { createDefaultEditDocumentV2, updateEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
-import { buildAdjustmentMutationOperations } from '../../../src/utils/editTransaction';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
 
 const sourcePath = '/fixture/basic-tone.ARW';
@@ -38,10 +37,10 @@ const identity = (overrides: Partial<BasicToneCommitIdentity> = {}): BasicToneCo
 
 describe('basic tone edit transaction', () => {
   beforeEach(() => {
-    const editDocumentV2 = updateEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', (geometry) => ({
-      ...geometry,
-      flipHorizontal: true,
-    }));
+    const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), flipHorizontal: true };
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+      flipHorizontal: adjustments.flipHorizontal,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -63,15 +62,14 @@ describe('basic tone edit transaction', () => {
       { nodeType: 'scene_global_color_tone', patch: { exposure: 0.65 }, type: 'patch-edit-document-node' },
     ]);
     expect(result).toMatchObject({
-      changedKeys: ['exposure'],
+      changedKeys: ['nodes.scene_global_color_tone.params.exposure'],
       nextAdjustmentRevision: 1,
       noOp: false,
       source: 'manual-control',
     });
-    expect(result.afterEditDocumentV2.nodes['geometry']).toEqual(result.beforeEditDocumentV2.nodes['geometry']);
+    expect(result.after.nodes['geometry']).toEqual(result.before.nodes['geometry']);
     expect(
-      sceneGlobalColorToneParamsV2Schema.parse(result.afterEditDocumentV2.nodes['scene_global_color_tone']?.params)
-        .exposure,
+      sceneGlobalColorToneParamsV2Schema.parse(result.after.nodes['scene_global_color_tone']?.params).exposure,
     ).toBe(0.65);
     expect(result.invalidatedStages).not.toContain('geometry');
     expect(useEditorStore.getState().history).toHaveLength(2);
@@ -82,8 +80,8 @@ describe('basic tone edit transaction', () => {
     });
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.flipHorizontal).toBe(true);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.geometry.flipHorizontal).toBe(true);
   });
 
   test('supports every Basic field, exact no-ops, and stale source/session/revision rejection', () => {
@@ -135,8 +133,13 @@ describe('basic tone edit transaction', () => {
   test('commits Color Presence as one persistent node across reopen and Undo/Redo', () => {
     const state = useEditorStore.getState();
     const beforeGeometry = state.editDocumentV2.nodes['geometry'];
-    const next = { ...state.adjustmentSnapshot.value, hue: 32, vibrance: 44 };
-    const operations = buildAdjustmentMutationOperations(state.adjustmentSnapshot.value, next);
+    const operations = [
+      {
+        nodeType: 'color_presence' as const,
+        patch: { [ColorAdjustment.Hue]: 32, [ColorAdjustment.Vibrance]: 44 },
+        type: 'patch-edit-document-node' as const,
+      },
+    ];
     expect(operations).toEqual([
       {
         nodeType: 'color_presence',
@@ -154,19 +157,13 @@ describe('basic tone edit transaction', () => {
       source: 'manual-control',
       transactionId: 'color-presence',
     });
-    expect(
-      editDocumentColorPresenceV2Schema.parse(result.afterEditDocumentV2.nodes['color_presence']?.params),
-    ).toMatchObject({
+    expect(editDocumentColorPresenceV2Schema.parse(result.after.nodes['color_presence']?.params)).toMatchObject({
       hue: 32,
       saturation: 0,
       vibrance: 44,
     });
-    expect(result.afterEditDocumentV2.nodes['geometry']).toBe(beforeGeometry);
-    expect(result.afterEditDocumentV2.extensions).toEqual({});
-    const reopened = hydrateImageOpenEditDocumentV2(
-      { adjustments: structuredClone(result.after), editDocumentV2: structuredClone(result.afterEditDocumentV2) },
-      structuredClone(result.after),
-    );
+    expect(result.after.nodes['geometry']).toBe(beforeGeometry);
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: structuredClone(result.after) });
     expect(editDocumentColorPresenceV2Schema.parse(reopened.nodes['color_presence']?.params)).toMatchObject({
       hue: 32,
       saturation: 0,
@@ -220,7 +217,11 @@ describe('basic tone edit transaction', () => {
     const result = state.applyEditTransaction(
       buildBasicToneEditTransaction(state, fallbackIdentity, BasicAdjustment.Exposure, 0.8, 'fallback-basic'),
     );
-    expect(result).toMatchObject({ changedKeys: ['exposure'], nextAdjustmentRevision: 1, noOp: false });
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.scene_global_color_tone.params.exposure'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
     expect(useEditorStore.getState()).toMatchObject({
       finalPreviewUrl: null,
       historyIndex: 1,
@@ -232,7 +233,7 @@ describe('basic tone edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
     expect(() =>
       buildBasicToneEditTransaction(
         { ...state, imageSessionId: 38 },

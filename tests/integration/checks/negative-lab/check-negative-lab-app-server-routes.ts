@@ -534,7 +534,7 @@ if (
   stockFamilyConversionResult.commandName !== expectedStockFamilyConversionCommandName ||
   stockFamilyConversionResult.stockFamily.genericPresetId !== 'negative_lab.generic.c41.portrait.v1' ||
   stockFamilyConversionResult.conversionPlan.presetId !== 'negative_lab.generic.c41.portrait.v1' ||
-  stockFamilyConversionResult.conversionPlan.params.base_fog_sample?.x !== sampleRect.x ||
+  stockFamilyConversionResult.conversionPlan.params['base_fog_sample']?.x !== sampleRect.x ||
   stockFamilyConversionResult.conversionPlan.profileApplyProof.parameterDiffs.length === 0 ||
   !stockFamilyConversionResult.conversionPlan.profileApplyProof.touchedParameterGroups.includes('rgb_balance') ||
   !stockFamilyConversionResult.conversionPlan.profileApplyProof.warningCodes.includes('generic_starting_point_only') ||

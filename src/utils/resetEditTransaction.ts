@@ -1,17 +1,10 @@
 import { z } from 'zod';
-
-import { type Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from './adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from './editDocumentV2';
+import { type EditDocumentV2, editDocumentV2Schema } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { EditTransactionRequest } from './editTransaction';
-
-const resetAdjustmentDocumentSchema = z.custom<Partial<Adjustments>>(
-  (value) => typeof value === 'object' && value !== null && !Array.isArray(value),
-  'Reset adjustments must be an object',
-);
 
 const resetAdjustmentsResultSchema = z
   .object({
-    adjustments: resetAdjustmentDocumentSchema,
+    editDocumentV2: editDocumentV2Schema,
     path: z.string().min(1),
     renderGeneration: z.number().int().nonnegative(),
     revision: z.string().regex(/^sha256:[0-9a-f]{64}$/u),
@@ -41,7 +34,7 @@ export interface ResetEditCommitIdentity {
 
 export interface ResetEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
+  readonly editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { isReady: boolean; path: string } | null;
@@ -74,7 +67,6 @@ export const buildResetEditTransaction = (
   state: ResetEditTransactionState,
   identity: ResetEditCommitIdentity,
   result: ResetAdjustmentsResult,
-  dimensions: { height: number; width: number },
   transactionId: string,
 ): EditTransactionRequest => {
   if (result.path !== identity.sourceIdentity) {
@@ -94,29 +86,13 @@ export const buildResetEditTransaction = (
     );
   }
 
-  const normalized = normalizeLoadedAdjustments(result.adjustments);
-  const resultVisibility = result.adjustments['sectionVisibility'];
-  const legacyEffectsEnabled =
-    resultVisibility !== null && typeof resultVisibility === 'object' && !Array.isArray(resultVisibility)
-      ? (resultVisibility as Readonly<Record<string, unknown>>)['effects']
-      : undefined;
-  if (!Object.hasOwn(result.adjustments, 'effectsEnabled') && legacyEffectsEnabled === undefined) {
-    normalized.effectsEnabled = state.adjustmentSnapshot.value.effectsEnabled;
-  }
-  const aspectRatio = dimensions.width > 0 && dimensions.height > 0 ? dimensions.width / dimensions.height : null;
-  const resetAdjustments: Adjustments = {
-    ...structuredClone(INITIAL_ADJUSTMENTS),
-    ...normalized,
-    aiPatches: [],
-    aspectRatio,
-  };
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'reset',
     imageSessionId: identity.imageSessionId,
     operations: [
       {
-        editDocumentV2: legacyAdjustmentsToEditDocumentV2(resetAdjustments),
+        editDocumentV2: result.editDocumentV2,
         type: 'replace-edit-document',
       },
     ],

@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import type { EditDocumentNodeParamsV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 
-import type { Adjustments } from './adjustments';
+type ToneEqualizerSettings = EditDocumentNodeParamsV2<'tone_equalizer'>['toneEqualizer'];
 
 export const toneEqualizerPlacementResponseSchema = z
   .object({
@@ -36,32 +37,24 @@ export const isToneEqualizerPickerResultCurrent = (
   current.active && result.graphRevision === current.graphRevision && result.sourceIdentity === current.sourceIdentity;
 
 export const applyToneEqualizerPickerSelection = (
-  adjustments: Adjustments,
+  toneEqualizer: ToneEqualizerSettings,
   result: ToneEqualizerPickerResponse,
-): Adjustments => ({
-  ...adjustments,
-  rawEngineEditGraphVersion: 2,
-  toneEqualizer: {
-    ...adjustments.toneEqualizer,
-    previewMode: 2,
-    selectedBand: result.primaryBand,
-  },
+): ToneEqualizerSettings => ({
+  ...toneEqualizer,
+  previewMode: 2,
+  selectedBand: result.primaryBand,
 });
 
 export const applyToneEqualizerTargetedDelta = (
-  adjustments: Adjustments,
+  toneEqualizer: ToneEqualizerSettings,
   result: ToneEqualizerPickerResponse,
   deltaEv: number,
-): Adjustments => ({
-  ...adjustments,
-  rawEngineEditGraphVersion: 2,
-  toneEqualizer: {
-    ...adjustments.toneEqualizer,
-    bandEv: adjustments.toneEqualizer.bandEv.map((value, index) =>
-      Math.max(-4, Math.min(4, value + deltaEv * (result.contributingWeights[index] ?? 0))),
-    ) as Adjustments['toneEqualizer']['bandEv'],
-    enabled: true,
-    previewMode: 2,
-    selectedBand: result.primaryBand,
-  },
+): ToneEqualizerSettings => ({
+  ...toneEqualizer,
+  bandEv: toneEqualizer.bandEv.map((value, index) =>
+    Math.max(-4, Math.min(4, value + deltaEv * (result.contributingWeights[index] ?? 0))),
+  ) as ToneEqualizerSettings['bandEv'],
+  enabled: true,
+  previewMode: 2,
+  selectedBand: result.primaryBand,
 });

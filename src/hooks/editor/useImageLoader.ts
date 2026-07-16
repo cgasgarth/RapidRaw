@@ -1,17 +1,17 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect } from 'react';
 import { toast } from 'react-toastify';
-
 import { parseImageOpenUpdate, parseLoadedMetadata } from '../../schemas/imageLoaderSchemas';
 import { isEditorImageSessionCurrent, useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
+import { selectEditDocumentGeometry } from '../../utils/editDocumentSelectors';
 import { updateEditDocumentV2Node } from '../../utils/editDocumentV2';
 import { isSelectedImageLoadErrorCurrent } from '../../utils/editorImageLoadError';
 import { formatUnknownError } from '../../utils/errorFormatting';
 import { upsertReopenedDerivedOutputReceipt } from '../../utils/hdrDerivedSourceReopen';
-import { hydrateImageOpenAdjustments, hydrateImageOpenEditDocumentV2 } from '../../utils/imageOpenAdjustmentHydration';
+import { hydrateImageOpenEditDocumentV2 } from '../../utils/imageOpenAdjustmentHydration';
 import {
   buildImageOpenHydrationEditTransaction,
   canContinueImageOpenHydration,
@@ -48,13 +48,12 @@ export function useImageLoader() {
         if (!isEditorImageSessionCurrent(sessionId) || metadata.path !== selectedImagePath) return;
         if (isNativeCommittedHydrationSession(sessionId)) return;
         acceptImageOpenMetadataRevision(metadata.path, metadata.metadataFingerprint);
-        const hydratedAdjustments = hydrateImageOpenAdjustments(metadata.metadata, selectedImagePath);
         const state = useEditorStore.getState();
         state.applyEditTransaction(
           buildImageOpenHydrationEditTransaction(
             state,
             { adjustmentRevision: state.adjustmentRevision, imageSessionId: sessionId, path: selectedImagePath },
-            hydrateImageOpenEditDocumentV2(metadata.metadata, hydratedAdjustments),
+            hydrateImageOpenEditDocumentV2(metadata.metadata),
             `image-open-hydration:${sessionId}:${metadata.metadataFingerprint}`,
           ),
         );
@@ -132,9 +131,9 @@ export function useImageLoader() {
             selectedImagePath,
             openResult.metadataFingerprint,
           );
-          const decodedAdjustments =
+          const decodedEditDocument =
             shouldHydrateDecodedMetadata && !isNativeCommittedHydrationSession(sessionId)
-              ? hydrateImageOpenAdjustments(loadedMetadata, selectedImagePath)
+              ? hydrateImageOpenEditDocumentV2(loadedMetadata)
               : null;
 
           const { width, height } = loadImageResult;
@@ -161,20 +160,24 @@ export function useImageLoader() {
 
           const current = useEditorStore.getState();
           const canHydrateDecodedAdjustments =
-            decodedAdjustments !== null && current.adjustmentRevision === decodedHydrationIdentity.adjustmentRevision;
+            decodedEditDocument !== null && current.adjustmentRevision === decodedHydrationIdentity.adjustmentRevision;
           const canHydrateAspectRatio =
-            !current.adjustmentSnapshot.value.aspectRatio &&
-            !current.adjustmentSnapshot.value.crop &&
+            !selectEditDocumentGeometry(current.editDocumentV2).aspectRatio &&
+            !selectEditDocumentGeometry(current.editDocumentV2).crop &&
             canContinueImageOpenHydration(current, decodedHydrationIdentity);
           const hydrationBase = canHydrateDecodedAdjustments
-            ? decodedAdjustments
+            ? decodedEditDocument
             : canHydrateAspectRatio
-              ? current.adjustmentSnapshot.value
+              ? current.editDocumentV2
               : null;
           if (hydrationBase !== null) {
-            const hydratedAdjustments =
-              !hydrationBase.aspectRatio && !hydrationBase.crop
-                ? { ...hydrationBase, aspectRatio: width / height }
+            const hydratedGeometry = selectEditDocumentGeometry(hydrationBase);
+            const hydratedDocument =
+              hydratedGeometry.aspectRatio === null && hydratedGeometry.crop === null
+                ? updateEditDocumentV2Node(hydrationBase, 'geometry', (params) => ({
+                    ...params,
+                    aspectRatio: width / height,
+                  }))
                 : hydrationBase;
             current.applyEditTransaction(
               buildImageOpenHydrationEditTransaction(
@@ -185,10 +188,10 @@ export function useImageLoader() {
                   path: selectedImagePath,
                 },
                 canHydrateDecodedAdjustments
-                  ? hydrateImageOpenEditDocumentV2(loadedMetadata, hydratedAdjustments)
+                  ? hydratedDocument
                   : updateEditDocumentV2Node(current.editDocumentV2, 'geometry', (params) => ({
                       ...params,
-                      aspectRatio: hydratedAdjustments.aspectRatio,
+                      aspectRatio: selectEditDocumentGeometry(hydratedDocument).aspectRatio,
                     })),
                 canHydrateDecodedAdjustments
                   ? `decoded-open:${sessionId}:${openResult.metadataFingerprint}`

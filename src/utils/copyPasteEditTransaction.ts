@@ -10,8 +10,7 @@ import type {
 
 export interface CopyPasteEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
-  editDocumentV2: EditDocumentV2;
+  readonly editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;

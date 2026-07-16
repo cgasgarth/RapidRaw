@@ -1,18 +1,19 @@
 import { describe, expect, test } from 'bun:test';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { areAdjustmentsEqual } from '../../../src/utils/adjustmentsSnapshot';
+import { areEditDocumentsEqual } from '../../../src/utils/adjustmentsSnapshot';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 describe('adjustment snapshots', () => {
   test('treats identical adjustment payloads as unchanged', () => {
-    expect(areAdjustmentsEqual(INITIAL_ADJUSTMENTS, structuredClone(INITIAL_ADJUSTMENTS))).toBe(true);
+    const document = createDefaultEditDocumentV2();
+    expect(areEditDocumentsEqual(document, structuredClone(document))).toBe(true);
   });
 
   test('treats an edit as changed', () => {
     expect(
-      areAdjustmentsEqual(INITIAL_ADJUSTMENTS, {
-        ...INITIAL_ADJUSTMENTS,
-        exposure: INITIAL_ADJUSTMENTS.exposure + 0.25,
-      }),
+      areEditDocumentsEqual(
+        createDefaultEditDocumentV2(),
+        patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure: 0.25 }),
+      ),
     ).toBe(false);
   });
 });

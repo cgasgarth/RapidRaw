@@ -1,4 +1,4 @@
-import type { Adjustments } from './adjustments';
+import type { EditDocumentNodeParamsV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { EditTransactionRequest } from './editTransaction';
 
 export const MANUAL_LENS_CORRECTION_ADJUSTMENTS = [
@@ -10,11 +10,14 @@ export const MANUAL_LENS_CORRECTION_ADJUSTMENTS = [
   'lensTcaEnabled',
   'lensVignetteAmount',
   'lensVignetteEnabled',
-] as const satisfies ReadonlyArray<keyof Adjustments>;
+] as const satisfies ReadonlyArray<keyof EditDocumentNodeParamsV2<'lens_correction'>>;
 
 export type ManualLensCorrectionAdjustment = (typeof MANUAL_LENS_CORRECTION_ADJUSTMENTS)[number];
 export type LensProfilePatch = Partial<
-  Pick<Adjustments, 'lensCorrectionMode' | 'lensDistortionParams' | 'lensMaker' | 'lensModel'>
+  Pick<
+    EditDocumentNodeParamsV2<'lens_correction'>,
+    'lensCorrectionMode' | 'lensDistortionParams' | 'lensMaker' | 'lensModel'
+  >
 >;
 
 export interface LensCorrectionCommitIdentity {
@@ -44,7 +47,7 @@ export const captureLensCorrectionCommitIdentity = (
         sourceIdentity: state.selectedImage.path,
       };
 
-export const isManualLensCorrectionAdjustment = (key: keyof Adjustments): key is ManualLensCorrectionAdjustment =>
+export const isManualLensCorrectionAdjustment = (key: string): key is ManualLensCorrectionAdjustment =>
   MANUAL_LENS_CORRECTION_ADJUSTMENTS.some((candidate) => candidate === key);
 
 export const isCurrentLensCorrectionIdentity = (
@@ -87,7 +90,7 @@ export const buildLensCorrectionEditTransaction = <Key extends ManualLensCorrect
   state: LensCorrectionEditTransactionState,
   identity: LensCorrectionCommitIdentity,
   key: Key,
-  value: Adjustments[Key],
+  value: EditDocumentNodeParamsV2<'lens_correction'>[Key],
   transactionId: string,
 ): EditTransactionRequest => {
   assertCurrentLensCorrectionIdentity(state, identity);

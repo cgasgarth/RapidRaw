@@ -6,7 +6,6 @@ import type {
 } from '../../../packages/rawengine-schema/src/editCommandBus';
 import { RawEngineLocalAppServerBridge } from '../../../packages/rawengine-schema/src/localAppServerBridge';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { buildAgentImageContextSnapshot } from '../../../src/utils/agent/context/agentImageContextSnapshot';
 import { applyAgentGeometry } from '../../../src/utils/agent/tools/agentGeometryApplyTool';
@@ -14,7 +13,7 @@ import {
   buildAgentToolEditTransaction,
   captureAgentToolCommitIdentity,
 } from '../../../src/utils/agentToolEditTransaction';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixtures/agent-geometry.ARW';
 const session = createEditorImageSession({ generation: 41, path: sourcePath, source: 'cache' });
@@ -55,7 +54,7 @@ class DeferredGeometryBridge extends RawEngineLocalAppServerBridge {
 describe('agent geometry EditTransaction bridge', () => {
   beforeEach(() => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       editDocumentV2,
@@ -102,7 +101,7 @@ describe('agent geometry EditTransaction bridge', () => {
       baseAdjustmentRevision: state.adjustmentRevision,
       history: 'single-entry',
       imageSessionId: session.id,
-      operations: [{ patch: { contrast: 14 }, type: 'patch-adjustments' }],
+      operations: [{ nodeType: 'scene_global_color_tone', patch: { contrast: 14 }, type: 'patch-edit-document-node' }],
       persistence: 'commit',
       source: 'manual-control',
       transactionId: 'intervening-geometry-edit',
@@ -111,8 +110,8 @@ describe('agent geometry EditTransaction bridge', () => {
 
     await expect(pending).rejects.toThrow('agent_tool_transaction.stale_revision:0:1');
     const after = useEditorStore.getState();
-    expect(after.adjustmentSnapshot.value.contrast).toBe(14);
-    expect(after.adjustmentSnapshot.value.rotation).toBe(0);
+    expect(after.editDocumentV2.nodes['scene_global_color_tone']!.params['contrast']).toBe(14);
+    expect(after.editDocumentV2.geometry.rotation).toBe(0);
     expect(after.lastEditApplicationReceipt?.transactionId).toBe('intervening-geometry-edit');
   });
 
@@ -120,12 +119,14 @@ describe('agent geometry EditTransaction bridge', () => {
     const state = useEditorStore.getState();
     const identity = captureAgentToolCommitIdentity(state);
     if (identity === null) throw new Error('Expected seeded agent-tool identity.');
-    const nextAdjustments = { ...state.adjustmentSnapshot.value, rotation: 2 };
+    const operations = [
+      { nodeType: 'geometry' as const, patch: { rotation: 2 }, type: 'patch-edit-document-node' as const },
+    ];
     expect(() =>
       buildAgentToolEditTransaction(
         { ...state, selectedImage: { path: '/fixtures/other.ARW' } },
         identity,
-        nextAdjustments,
+        operations,
         'stale-source',
       ),
     ).toThrow(`agent_tool_transaction.stale_source:${sourcePath}:/fixtures/other.ARW`);
@@ -133,7 +134,7 @@ describe('agent geometry EditTransaction bridge', () => {
       buildAgentToolEditTransaction(
         { ...state, imageSession: { id: 'other-session' } },
         identity,
-        nextAdjustments,
+        operations,
         'stale-session',
       ),
     ).toThrow(`agent_tool_transaction.stale_session:${session.id}:other-session`);

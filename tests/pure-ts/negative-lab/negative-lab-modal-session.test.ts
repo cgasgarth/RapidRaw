@@ -29,7 +29,7 @@ describe('Negative Lab modal session initialization', () => {
     expect(opened.isOpen).toBe(true);
     expect(opened.targetPaths).toEqual(['/roll/b.dng', '/roll/c.dng']);
     expect(opened.session?.session.targetPaths).toEqual(['/roll/b.dng', '/roll/c.dng']);
-    expect(opened.session?.session.recipeState.params.exposure).toBe(1.25);
+    expect(opened.session?.session.recipeState.params['exposure']).toBe(1.25);
   });
 
   test('same-path reopen creates a fresh transient operation identity without resetting persisted state', () => {

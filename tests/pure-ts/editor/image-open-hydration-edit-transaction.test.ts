@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, test } from 'bun:test';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore';
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { areAdjustmentsEqual } from '../../../src/utils/adjustmentsSnapshot';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { areEditDocumentsEqual } from '../../../src/utils/adjustmentsSnapshot';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildImageOpenHydrationEditTransaction,
   publishCurrentImageOpenHydration,
@@ -28,12 +28,14 @@ const selectedImage = {
 describe('image-open hydration edit transaction', () => {
   beforeEach(() => {
     const adjustments = { ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 0.8 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      exposure: adjustments.exposure,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 5,
       editDocumentV2,
       finalPreviewUrl: 'blob:stale-prior-image-preview',
-      history: [legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS), editDocumentV2],
+      history: [createDefaultEditDocumentV2(), editDocumentV2],
       historyCheckpoints: [{ createdAt: '2026-07-15T00:00:00.000Z', historyIndex: 1, id: 'prior', label: 'Prior' }],
       historyIndex: 1,
       imageSession: session,
@@ -72,7 +74,10 @@ describe('image-open hydration edit transaction', () => {
     const request = buildImageOpenHydrationEditTransaction(
       state,
       { adjustmentRevision: state.adjustmentRevision, imageSessionId: session.id, path },
-      legacyAdjustmentsToEditDocumentV2(hydrated),
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        contrast: hydrated.contrast,
+        exposure: hydrated.exposure,
+      }),
       'hydrate-current',
     );
 
@@ -88,8 +93,16 @@ describe('image-open hydration edit transaction', () => {
         transactionId: 'hydrate-current',
       },
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ contrast: 14, exposure: 0.25 });
-    expect(useEditorStore.getState().history).toEqual([legacyAdjustmentsToEditDocumentV2(hydrated)]);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params).toMatchObject({
+      contrast: 14,
+      exposure: 0.25,
+    });
+    expect(useEditorStore.getState().history).toEqual([
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+        contrast: hydrated.contrast,
+        exposure: hydrated.exposure,
+      }),
+    ]);
     expect(useEditorStore.getState().historyCheckpoints).toEqual([]);
   });
 
@@ -99,7 +112,7 @@ describe('image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         beforeStale,
         { adjustmentRevision: beforeStale.adjustmentRevision, imageSessionId: 'editor-image-session:stale', path },
-        legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+        createDefaultEditDocumentV2(),
         'hydrate-stale-session',
       ),
     ).toThrow('image_open_hydration.stale_identity');
@@ -107,7 +120,7 @@ describe('image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         beforeStale,
         { adjustmentRevision: beforeStale.adjustmentRevision, imageSessionId: session.id, path: '/fixtures/other.ARW' },
-        legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+        createDefaultEditDocumentV2(),
         'hydrate-stale-path',
       ),
     ).toThrow('image_open_hydration.stale_identity');
@@ -115,13 +128,13 @@ describe('image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         beforeStale,
         { adjustmentRevision: beforeStale.adjustmentRevision - 1, imageSessionId: session.id, path },
-        legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS),
+        createDefaultEditDocumentV2(),
         'hydrate-stale-revision',
       ),
     ).toThrow('image_open_hydration.stale_identity');
     const afterStale = useEditorStore.getState();
     expect(afterStale.adjustmentRevision).toBe(beforeStale.adjustmentRevision);
-    expect(afterStale.adjustmentSnapshot.value).toBe(beforeStale.adjustmentSnapshot.value);
+    expect(afterStale.editDocumentV2).toBe(beforeStale.editDocumentV2);
     expect(afterStale.history).toBe(beforeStale.history);
     expect(afterStale.lastEditApplicationReceipt).toBe(beforeStale.lastEditApplicationReceipt);
     expect(afterStale.finalPreviewUrl).toBe(beforeStale.finalPreviewUrl);
@@ -156,7 +169,9 @@ describe('image-open hydration edit transaction', () => {
       buildImageOpenHydrationEditTransaction(
         initial,
         { adjustmentRevision: initial.adjustmentRevision, imageSessionId: session.id, path },
-        legacyAdjustmentsToEditDocumentV2(cachedAdjustments),
+        patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+          exposure: cachedAdjustments.exposure,
+        }),
         'hydrate-cache',
       ),
     );
@@ -167,14 +182,18 @@ describe('image-open hydration edit transaction', () => {
     expect(useEditorStore.getState().finalPreviewUrl).toBe('blob:matching-cache-preview');
 
     const cached = useEditorStore.getState();
-    expect(cached.adjustmentSnapshot.value.exposure).toBe(0.4);
+    expect(cached.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
     expect(useEditorStore.getState().finalPreviewUrl).toBe('blob:matching-cache-preview');
     const authoritativeAdjustments = { ...cachedAdjustments, contrast: 12 };
-    expect(areAdjustmentsEqual(cached.adjustmentSnapshot.value, authoritativeAdjustments)).toBeFalse();
+    const authoritativeDocument = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+      contrast: authoritativeAdjustments.contrast,
+      exposure: authoritativeAdjustments.exposure,
+    });
+    expect(areEditDocumentsEqual(cached.editDocumentV2, authoritativeDocument)).toBeFalse();
     const backgroundTransaction = buildImageOpenHydrationEditTransaction(
       cached,
       { adjustmentRevision: cached.adjustmentRevision, imageSessionId: session.id, path },
-      legacyAdjustmentsToEditDocumentV2(authoritativeAdjustments),
+      authoritativeDocument,
       'hydrate-background-metadata',
     );
     cached.applyEditTransaction(backgroundTransaction);
@@ -183,8 +202,11 @@ describe('image-open hydration edit transaction', () => {
       historyIndex: 0,
       uncroppedAdjustedPreviewUrl: null,
     });
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({ contrast: 12, exposure: 0.4 });
-    expect(useEditorStore.getState().history).toEqual([legacyAdjustmentsToEditDocumentV2(authoritativeAdjustments)]);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params).toMatchObject({
+      contrast: 12,
+      exposure: 0.4,
+    });
+    expect(useEditorStore.getState().history).toEqual([authoritativeDocument]);
   });
 
   test('blocks every current-image publication when image A completes after image B opens', () => {
@@ -197,7 +219,7 @@ describe('image-open hydration edit transaction', () => {
     const imageBPath = '/fixtures/newer-image-B.CR3';
     const imageBSession = createEditorImageSession({ generation: 13, path: imageBPath, source: 'cold-load' });
     const imageBHistory = [
-      legacyAdjustmentsToEditDocumentV2({ ...structuredClone(INITIAL_ADJUSTMENTS), exposure: 1.25 }),
+      patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', { exposure: 1.25 }),
     ];
     const imageBDocument = imageBHistory[0];
     if (imageBDocument === undefined) throw new Error('Expected image B history authority.');

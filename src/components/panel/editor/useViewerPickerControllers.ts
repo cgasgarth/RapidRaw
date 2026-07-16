@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useUIStore } from '../../../store/useUIStore';
-import type { Adjustments } from '../../../utils/adjustments';
 import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
 import type { EditorPresentationDescriptor } from '../../../utils/editorPresentationDescriptor';
 import { mapViewerPointToImage } from '../../../utils/viewerSampler';
@@ -20,7 +20,7 @@ import {
 
 interface UseViewerPickerControllersInput {
   readonly adjustmentRevision: number;
-  readonly adjustments: Adjustments;
+  readonly editDocumentV2: EditDocumentV2;
   readonly geometry: EditorOverlayGeometry;
   readonly imageSessionId: string;
   readonly onCommit: (command: ViewerPickerCommitResult) => void;
@@ -35,7 +35,7 @@ export interface ViewerPickerControllers {
 
 export const useViewerPickerControllers = ({
   adjustmentRevision,
-  adjustments,
+  editDocumentV2,
   geometry,
   imageSessionId,
   onCommit,
@@ -73,7 +73,7 @@ export const useViewerPickerControllers = ({
             void pickerCommands
               .samplePointColor({
                 graphRevision: command.key.sourceRevision,
-                jsAdjustments: command.adjustments,
+                editDocumentV2: command.editDocumentV2,
                 normalizedImagePoint: command.normalizedImagePoint,
                 sourceIdentity: command.key.sourceIdentity,
               })
@@ -90,7 +90,7 @@ export const useViewerPickerControllers = ({
             void pickerCommands
               .sampleToneEqualizer({
                 graphRevision: command.key.sourceRevision,
-                jsAdjustments: command.adjustments,
+                editDocumentV2: command.editDocumentV2,
                 normalizedImagePoint: command.normalizedImagePoint,
                 sourceIdentity: command.key.sourceIdentity,
               })
@@ -224,13 +224,13 @@ export const useViewerPickerControllers = ({
       executeCommands(
         activeTool === 'point-color'
           ? controller.beginPointColor({
-              adjustments,
+              editDocumentV2,
               key: { ...key, toolId: 'point-color' },
               point,
               pointerId: event.pointerId,
             })
           : controller.beginToneEqualizer({
-              adjustments,
+              editDocumentV2,
               clientY: event.clientY,
               key: { ...key, toolId: 'tone-equalizer' },
               point,
@@ -242,7 +242,7 @@ export const useViewerPickerControllers = ({
     [
       activeTool,
       adjustmentRevision,
-      adjustments,
+      editDocumentV2,
       controller,
       executeCommands,
       geometry,

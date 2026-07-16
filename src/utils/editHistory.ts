@@ -1,6 +1,5 @@
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
-import { editDocumentV2ToLegacyAdjustments } from './editDocumentV2';
 import { sameAdjustmentValue } from './editTransaction';
 
 export interface EditHistoryCheckpoint {
@@ -227,22 +226,47 @@ export function formatEditHistoryDiffLabel(prev: Adjustments, curr: Adjustments)
   return uniqueChanged.join(', ');
 }
 
+const formatEditDocumentDiffLabel = (prev: EditDocumentV2, curr: EditDocumentV2): string => {
+  const changed: string[] = [];
+  for (const key of new Set([...Object.keys(prev.geometry), ...Object.keys(curr.geometry)])) {
+    if (!sameAdjustmentValue(Reflect.get(prev.geometry, key), Reflect.get(curr.geometry, key))) {
+      changed.push(formatAdjustmentKey(key));
+    }
+  }
+  if (!sameAdjustmentValue(prev.layers.masks, curr.layers.masks)) changed.push('Mask');
+  if (!sameAdjustmentValue(prev.sourceArtifacts.aiPatches, curr.sourceArtifacts.aiPatches)) changed.push('AI Patch');
+  for (const nodeType of new Set([...Object.keys(prev.nodes), ...Object.keys(curr.nodes)])) {
+    const previousNode = prev.nodes[nodeType];
+    const currentNode = curr.nodes[nodeType];
+    if (previousNode === undefined || currentNode === undefined) {
+      changed.push(formatAdjustmentKey(nodeType));
+      continue;
+    }
+    if (previousNode.enabled !== currentNode.enabled) changed.push(formatAdjustmentKey(nodeType));
+    for (const key of new Set([...Object.keys(previousNode.params), ...Object.keys(currentNode.params)])) {
+      if (!sameAdjustmentValue(previousNode.params[key], currentNode.params[key]))
+        changed.push(formatAdjustmentKey(key));
+    }
+  }
+  const uniqueChanged = Array.from(new Set(changed));
+  if (uniqueChanged.length === 0) return 'Adjustment';
+  if (uniqueChanged.length > 2) return `${uniqueChanged.slice(0, 2).join(', ')}...`;
+  return uniqueChanged.join(', ');
+};
+
 export function buildEditHistoryItems(
   history: Array<EditDocumentV2>,
   checkpoints: Array<EditHistoryCheckpoint>,
 ): Array<EditHistoryItem<EditDocumentV2>> {
   const checkpointsByIndex = new Map(checkpoints.map((checkpoint) => [checkpoint.historyIndex, checkpoint]));
 
-  const projections = history.map(editDocumentV2ToLegacyAdjustments);
   return history.map((adjustment, historyIndex) => {
     const checkpoint = checkpointsByIndex.get(historyIndex) ?? null;
-    const currentProjection = projections[historyIndex];
-    if (currentProjection === undefined) throw new Error(`edit_history.missing_projection:${String(historyIndex)}`);
     const label =
       checkpoint?.label.trim() ||
       (historyIndex === 0
         ? 'Initial State'
-        : formatEditHistoryDiffLabel(projections[historyIndex - 1] ?? currentProjection, currentProjection));
+        : formatEditDocumentDiffLabel(history[historyIndex - 1] ?? adjustment, adjustment));
 
     return {
       adjustment,

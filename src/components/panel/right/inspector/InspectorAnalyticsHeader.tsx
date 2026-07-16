@@ -15,12 +15,11 @@ import { type KeyboardEvent, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
-import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
 import { type PanelScopesLayout, useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { useUIStore } from '../../../../store/useUIStore';
-import { type Adjustments, DisplayMode } from '../../../../utils/adjustments';
+import { DisplayMode } from '../../../../utils/adjustments';
 import {
   buildColorOutputProofingDiagnosticRow,
   buildColorOutputProofingDiagnostics,
@@ -66,7 +65,6 @@ const stateClasses: Record<PreviewBoundWarningState | 'error' | 'loading', strin
 
 export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsHeaderProps) {
   const { t } = useTranslation();
-  const { setAdjustments } = useEditorActions();
   const {
     handleWaveformResize,
     isResizingWaveform,
@@ -78,7 +76,8 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
   const setRightPanel = useUIStore((state) => state.setRightPanel);
   const theme = useSettingsStore((state) => state.theme);
   const {
-    adjustments,
+    showClipping,
+    setEditor,
     activeWaveformChannel,
     exportSoftProofRecipeId,
     exportSoftProofTransform,
@@ -96,7 +95,8 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
     waveformHeight,
   } = useEditorStore(
     useShallow((state) => ({
-      adjustments: state.adjustmentSnapshot.value,
+      showClipping: state.showClipping,
+      setEditor: state.setEditor,
       activeWaveformChannel: state.activeWaveformChannel,
       exportSoftProofRecipeId: state.exportSoftProofRecipeId,
       exportSoftProofTransform: state.exportSoftProofTransform,
@@ -114,7 +114,7 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
       waveformHeight: state.waveformHeight,
     })),
   );
-  const clippingEnabled = adjustments.showClipping || false;
+  const clippingEnabled = showClipping;
   const currentHeight = waveformHeight || PANEL_SCOPES_HEIGHT.default;
   const activeLayoutToggle = layoutToggles[panelScopesLayout];
   const LayoutIcon = activeLayoutToggle.icon;
@@ -162,8 +162,8 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
   const recoverScopesLabel = t('export.softProofCompare.refresh');
 
   const toggleClipping = useCallback(() => {
-    setAdjustments((previous: Adjustments) => ({ ...previous, showClipping: !previous.showClipping }));
-  }, [setAdjustments]);
+    setEditor({ showClipping: !showClipping });
+  }, [setEditor, showClipping]);
 
   const openOutputControls = useCallback(() => {
     requestColorOutputFocus();

@@ -6,7 +6,7 @@ import { matchLookApplicationReceiptV1Schema } from '../../../packages/rawengine
 import { useEditorActions } from '../../../src/hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const fingerprint = (digit: string): `fnv1a64:${string}` => `fnv1a64:${digit.repeat(16)}`;
 const receipt = matchLookApplicationReceiptV1Schema.parse({
@@ -30,25 +30,33 @@ test('manual fitted-node edit clears the receipt and undo/redo restores exact pr
     exposure: 0.75,
     referenceMatchApplicationReceipt: receipt,
   };
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(applied);
+  const edited = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+    exposure: applied.exposure,
+  });
+  const editDocumentV2 = { ...edited, provenance: { referenceMatchApplicationReceipt: receipt } };
   useEditorStore.getState().hydrateEditorRenderAuthority({
     historyIndex: 0,
     selectedImage: null,
     editDocumentV2,
     history: [editDocumentV2],
   });
-  let setAdjustments: ReturnType<typeof useEditorActions>['setAdjustments'] | null = null;
+  let commitEditNodeOperations: ReturnType<typeof useEditorActions>['commitEditNodeOperations'] | null = null;
   const Harness = () => {
-    setAdjustments = useEditorActions().setAdjustments;
+    commitEditNodeOperations = useEditorActions().commitEditNodeOperations;
     return null;
   };
   render(createElement(Harness));
 
-  act(() => setAdjustments?.({ exposure: 1 }));
-  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toBeNull();
+  act(() =>
+    commitEditNodeOperations?.([
+      { nodeType: 'scene_global_color_tone', patch: { exposure: 1 }, type: 'patch-edit-document-node' },
+      { receipt: null, type: 'set-reference-match-application-receipt' },
+    ]),
+  );
+  expect(useEditorStore.getState().editDocumentV2.provenance.referenceMatchApplicationReceipt).toBeNull();
   expect(useEditorStore.getState().historyIndex).toBe(1);
   act(() => useEditorStore.getState().undo());
-  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toEqual(receipt);
+  expect(useEditorStore.getState().editDocumentV2.provenance.referenceMatchApplicationReceipt).toEqual(receipt);
   act(() => useEditorStore.getState().redo());
-  expect(useEditorStore.getState().adjustmentSnapshot.value.referenceMatchApplicationReceipt).toBeNull();
+  expect(useEditorStore.getState().editDocumentV2.provenance.referenceMatchApplicationReceipt).toBeNull();
 });

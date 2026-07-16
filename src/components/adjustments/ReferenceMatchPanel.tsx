@@ -8,8 +8,8 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
+import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
 import {
-  applyReferenceMatchProposal,
   createReferenceMatchProposal,
   describeReferenceMatchSource,
   fingerprintReferenceMatchValue,
@@ -23,9 +23,11 @@ import {
   validateReferenceMatchApplicationIdentities,
 } from '../../utils/referenceMatch';
 import {
+  applyReferenceMatchProposalToEditDocument,
   buildReferenceMatchGlobalEditTransaction,
   buildReferenceMatchLayerEditTransaction,
   captureReferenceMatchCommitIdentity,
+  selectReferenceMatchGlobalAdjustments,
 } from '../../utils/referenceMatchEditTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 
@@ -68,7 +70,7 @@ export default function ReferenceMatchPanel() {
     useShallow((state) => ({
       adjustmentSnapshot: state.adjustmentSnapshot,
       adjustmentRevision: state.adjustmentRevision,
-      adjustments: state.adjustmentSnapshot.value,
+      adjustments: state.editDocumentV2,
       dispatchCompare: state.dispatchCompare,
       finalPreviewUrl: state.finalPreviewUrl,
       histogram: state.histogram,
@@ -143,8 +145,13 @@ export default function ReferenceMatchPanel() {
     }
     setEditor({
       referenceMatchPreview: {
-        adjustments: applyReferenceMatchProposal({ adjustments, enabledGroups, impact, proposal }),
         baseAdjustmentRevision: adjustmentRevision,
+        editDocumentV2: applyReferenceMatchProposalToEditDocument({
+          document: adjustments,
+          enabledGroups,
+          impact,
+          proposal,
+        }),
         enabledGroups: [...enabledGroups].sort(),
         impact,
         proposalFingerprint: proposal.proposalFingerprint,
@@ -168,7 +175,7 @@ export default function ReferenceMatchPanel() {
     const captured = {
       availability: 'available',
       adjustmentRevision,
-      cameraProfile: adjustments.cameraProfile,
+      cameraProfile: selectEditDocumentNode(adjustments, 'camera_input').params['cameraProfile'],
       geometryFingerprint: fingerprintReferenceMatchValue(
         `${selectedImage.path}:geometry:${String(adjustmentSnapshot.geometryRevision)}`,
       ),
@@ -185,7 +192,10 @@ export default function ReferenceMatchPanel() {
       sourceRevision,
       summary: targetSummary,
       viewFingerprint: fingerprintReferenceMatchValue(
-        JSON.stringify({ toneMapper: adjustments.toneMapper, viewTransform: adjustments.viewTransform }),
+        JSON.stringify({
+          toneMapper: selectEditDocumentNode(adjustments, 'scene_to_view_transform').params['toneMapper'],
+          viewTransform: selectEditDocumentNode(adjustments, 'scene_to_view_transform').params['viewTransform'],
+        }),
       ),
       weight: 1,
     } as const;
@@ -204,11 +214,11 @@ export default function ReferenceMatchPanel() {
   const analyze = (mode: ReferenceMatchProposal['mode']) => {
     if (!targetSummary || !selectedImage) return;
     const nextProposal = createReferenceMatchProposal({
-      adjustments,
+      adjustments: selectReferenceMatchGlobalAdjustments(adjustments),
       mode,
       references: candidateReferences,
       target: targetSummary,
-      targetProfile: adjustments.cameraProfile,
+      targetProfile: selectEditDocumentNode(adjustments, 'camera_input').params['cameraProfile'],
       targetProofFingerprint: fingerprintReferenceMatchValue(`proof:${String(proofRevision)}`),
     });
     setProposal(nextProposal);

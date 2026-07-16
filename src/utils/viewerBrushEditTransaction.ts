@@ -1,5 +1,6 @@
 import type { ViewerBrushCommitResult } from '../components/panel/editor/viewerBrushCommandAdapter';
 import { Mask } from '../components/panel/right/layers/Masks';
+import { selectEditDocumentLayers, selectEditDocumentSourceArtifacts } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 import {
   buildSubMaskInteractionEditTransaction,
@@ -31,7 +32,9 @@ export const buildViewerBrushEditTransaction = (
   if (key.geometryEpoch !== state.geometryEpoch) rejectViewerBrush('stale_geometry');
 
   const containers =
-    key.containerKind === 'masks' ? state.adjustmentSnapshot.value.masks : state.adjustmentSnapshot.value.aiPatches;
+    key.containerKind === 'masks'
+      ? selectEditDocumentLayers(state.editDocumentV2).masks
+      : selectEditDocumentSourceArtifacts(state.editDocumentV2).aiPatches;
   const matchingContainers = containers.filter((container) => container.id === key.containerId);
   const matchingSubMasks = matchingContainers.flatMap((container) =>
     container.subMasks.filter((subMask) => subMask.id === key.maskId),

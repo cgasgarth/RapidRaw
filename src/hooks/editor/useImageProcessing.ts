@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { Panel } from '../../components/ui/AppProperties';
 import { findCurrentExportRecipe } from '../../schemas/export/exportRecipeSchemas';
 import { emptyTauriResponseSchema } from '../../schemas/tauriResponseSchemas';
@@ -7,9 +8,9 @@ import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import type { PreviewOperationClass, PreviewRoi } from '../../utils/adaptivePreviewQuality';
-import type { Adjustments } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
+import { selectEditDocumentGeometry, selectEditDocumentLayers } from '../../utils/editDocumentSelectors';
 import { EditedPreviewEffectRunner } from '../../utils/editedPreviewEffectRunner';
 import { getEditorZoomDpr } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
@@ -24,7 +25,7 @@ import { PreviewPresentationAdapter, type PreviewPresentationValue } from '../..
 import { PreviewRequestIntentAdapter } from '../../utils/previewRequestIntentAdapter';
 import { PreviewRequestScopeAdapter } from '../../utils/previewRequestScopeAdapter';
 import { PreviewViewportQualityController } from '../../utils/previewViewportQualityController';
-import { resolveReferenceMatchRenderAdjustments } from '../../utils/referenceMatch';
+import { resolveReferenceMatchRenderDocument } from '../../utils/referenceMatch';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import { type WgpuPreviewCommit, wgpuFramePresentationAuthority } from '../../utils/wgpuFramePresentationAuthority';
 
@@ -32,7 +33,7 @@ const previewNow = (): number => globalThis.performance?.now() ?? Date.now();
 
 export function useImageProcessing() {
   const selectedImage = useEditorStore((state) => state.selectedImage);
-  const committedAdjustments = useEditorStore((state) => state.adjustmentSnapshot.value);
+  const committedAdjustments = useEditorStore((state) => state.editDocumentV2);
   const referenceMatchPreview = useEditorStore((state) => state.referenceMatchPreview);
   const autoEditPreviewSession = useEditorStore((state) => state.autoEditPreviewSession);
   const isWaveformVisible = useEditorStore((state) => state.isWaveformVisible);
@@ -57,7 +58,7 @@ export function useImageProcessing() {
     imageSessionId: editorImageSession?.id ?? null,
     path: selectedImage?.path ?? null,
   });
-  const referenceMatchAdjustments = resolveReferenceMatchRenderAdjustments({
+  const referenceMatchAdjustments = resolveReferenceMatchRenderDocument({
     adjustmentRevision: committedAdjustmentRevision,
     committed: committedAdjustments,
     preview: referenceMatchPreview,
@@ -66,7 +67,8 @@ export function useImageProcessing() {
   const adjustments =
     renderAdjustmentSnapshot === adjustmentSnapshot
       ? referenceMatchAdjustments
-      : (renderAdjustmentSnapshot.value as Adjustments);
+      : renderAdjustmentSnapshot.editDocumentV2;
+  const renderGeometry = selectEditDocumentGeometry(adjustments);
   const compare = useEditorStore((state) => state.compare);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
   const isExportSoftProofEnabled = useEditorStore((state) => state.isExportSoftProofEnabled);
@@ -254,19 +256,19 @@ export function useImageProcessing() {
     () =>
       previewQualityController.snapshot({
         baseRenderSize,
-        crop: adjustments.crop,
+        crop: renderGeometry.crop,
         devicePixelRatio,
         enableZoomHifi: appSettings?.enableZoomHifi ?? true,
         highResZoomMultiplier: appSettings?.highResZoomMultiplier || 1,
-        orientationSteps: adjustments.orientationSteps,
+        orientationSteps: renderGeometry.orientationSteps,
         originalSize,
         previewResolution: appSettings?.editorPreviewResolution || 1920,
         transform: previewViewportTransform,
         zoomMode,
       }),
     [
-      adjustments.crop,
-      adjustments.orientationSteps,
+      renderGeometry.crop,
+      renderGeometry.orientationSteps,
       appSettings?.editorPreviewResolution,
       appSettings?.enableZoomHifi,
       appSettings?.highResZoomMultiplier,
@@ -296,7 +298,7 @@ export function useImageProcessing() {
       const operationClass: PreviewOperationClass =
         activeRightPanel === Panel.Crop
           ? 'geometry'
-          : activeRightPanel === Panel.Masks || editor.adjustmentSnapshot.value.masks.length > 0
+          : activeRightPanel === Panel.Masks || selectEditDocumentLayers(editor.editDocumentV2).masks.length > 0
             ? 'mask'
             : 'standard';
       return previewQualityController.decide({
@@ -377,11 +379,11 @@ export function useImageProcessing() {
   }, [previewQualityController, selectedImage?.path]);
 
   const generateUncroppedPreview = useCallback(
-    (currentAdjustments: Adjustments) => {
+    (currentAdjustments: EditDocumentV2) => {
       if (!selectedImage?.isReady) return;
       invokeWithSchema(
         Invokes.GenerateUncroppedPreview,
-        { jsAdjustments: currentAdjustments },
+        { editDocumentV2: currentAdjustments },
         emptyTauriResponseSchema,
       ).catch((err: unknown) => {
         console.error('Failed to generate uncropped preview:', err);

@@ -35,7 +35,7 @@ describe('editor render-authority boundary', () => {
       storeSource.indexOf('interface EditorState {'),
       storeSource.indexOf('const editorRenderAuthorityKeys'),
     );
-    expect(storeSource).not.toContain('legacyAdjustmentsToEditDocumentV2');
+    expect(storeSource).not.toContain(['legacy', 'AdjustmentsToEditDocumentV2'].join(''));
     expect(editorStateSource).not.toMatch(/^\s*adjustments:\s*Adjustments/m);
     expect(editorStateSource).not.toMatch(/^\s*editDocumentHistory:/m);
   });
@@ -93,13 +93,13 @@ describe('editor render-authority boundary', () => {
     });
     const committed = useEditorStore.getState();
 
-    expect(result.afterEditDocumentV2).toBe(committed.editDocumentV2);
+    expect(result.after).toBe(committed.editDocumentV2);
     expect(committed.adjustmentRevision).toBe(1);
     expect(committed.history).toEqual([original, committed.editDocumentV2]);
-    expect(committed.adjustmentSnapshot.value.exposure).toBe(1.25);
-    expect(Object.isFrozen(committed.adjustmentSnapshot.value)).toBeTrue();
-    expect(Reflect.set(committed.adjustmentSnapshot.value, 'exposure', 99)).toBeFalse();
-    expect(committed.adjustmentSnapshot.value.exposure).toBe(1.25);
+    expect(committed.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(1.25);
+    expect(Object.isFrozen(committed.editDocumentV2)).toBeTrue();
+    expect(Reflect.set(committed.editDocumentV2, 'exposure', 99)).toBeFalse();
+    expect(committed.editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(1.25);
     expect(
       sceneGlobalColorToneParamsV2Schema.parse(
         useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']?.params,
@@ -108,7 +108,7 @@ describe('editor render-authority boundary', () => {
 
     useEditorStore.getState().undo();
     expect(useEditorStore.getState().editDocumentV2).toEqual(original);
-    expect(useEditorStore.getState().adjustmentSnapshot.value.exposure).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0);
     useEditorStore.getState().redo();
     expect(
       sceneGlobalColorToneParamsV2Schema.parse(

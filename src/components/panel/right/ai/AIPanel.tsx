@@ -76,6 +76,7 @@ import {
   selectionAfterPatchDeletion,
   selectionAfterSubMaskDeletion,
 } from '../../../../utils/aiEditSelection';
+import { selectEditDocumentGeometry, selectEditDocumentSourceArtifacts } from '../../../../utils/editDocumentSelectors';
 import {
   cloneMaskLikeContainerForPaste,
   cloneSubMaskForPaste,
@@ -375,7 +376,9 @@ export function AIPanel() {
   const nativeCapabilities = useNativeCapabilityStore((state) => state.manifest);
   const activePatchContainerId = useEditorStore((s) => s.activeAiPatchContainerId);
   const activeSubMaskId = useEditorStore((s) => s.activeAiSubMaskId);
-  const adjustments = useEditorStore((s) => s.adjustmentSnapshot.value);
+  const editDocumentV2 = useEditorStore((s) => s.editDocumentV2);
+  const adjustments = selectEditDocumentSourceArtifacts(editDocumentV2);
+  const geometry = selectEditDocumentGeometry(editDocumentV2);
   const brushSettings = useEditorStore((s) => s.brushSettings);
   const isAIConnectorConnected = useEditorStore((s) => s.isAIConnectorConnected);
   const isGeneratingAi = useEditorStore((s) => s.isGeneratingAi);
@@ -488,7 +491,10 @@ export function AIPanel() {
     (requested: AiEditSelection, expandSelection = false) => {
       let selection: AiEditSelection = { containerId: null, subMaskId: null };
       setEditor((state) => {
-        selection = resolveAiEditSelection(state.adjustmentSnapshot.value.aiPatches, requested);
+        selection = resolveAiEditSelection(
+          selectEditDocumentSourceArtifacts(state.editDocumentV2).aiPatches,
+          requested,
+        );
         return {
           activeAiPatchContainerId: selection.containerId,
           activeAiSubMaskId: selection.subMaskId,
@@ -512,7 +518,7 @@ export function AIPanel() {
       : (adjustments.aiPatches.findLast((patch) => patch.patchData !== null) ?? null);
   const isAiMask =
     activeSubMaskData &&
-    [Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky].includes(activeSubMaskData.type);
+    new Set<Mask>([Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky]).has(activeSubMaskData.type);
   const panelStatus = useMemo<InspectorPanelStatus>(() => {
     if (selectedImage === null) {
       return { label: t('editor.ai.noImageSelected'), tone: 'neutral' };
@@ -658,7 +664,7 @@ export function AIPanel() {
     if (!selectedImage) return createSubMask(type, { width: 1000, height: 1000 }, mode);
     const subMask = createSubMask(type, selectedImage, mode);
 
-    const steps = adjustments.orientationSteps;
+    const steps = geometry.orientationSteps;
     const isRotated = steps === 1 || steps === 3;
     const imgW = isRotated ? selectedImage.height || 1000 : selectedImage.width || 1000;
     const imgH = isRotated ? selectedImage.width || 1000 : selectedImage.height || 1000;

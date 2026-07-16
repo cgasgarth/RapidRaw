@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { useEditorStore } from '../../../store/useEditorStore';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 
 import type { AgentCoreEditCommandBundleStep } from './agentCoreEditCommandBundle';
 import { classifyAgentEditIntent } from './agentEditIntentClassifier';
@@ -22,7 +23,8 @@ export type AgentEditRecipePlan = Omit<z.infer<typeof agentEditRecipePlanSchema>
 };
 
 export const planAgentEditRecipe = (prompt: string): AgentEditRecipePlan => {
-  const base = useEditorStore.getState().adjustmentSnapshot.value;
+  const base = useEditorStore.getState().editDocumentV2;
+  const globalTone = selectEditDocumentNode(base, 'scene_global_color_tone').params;
   const intent = classifyAgentEditIntent(prompt);
   const { brightenIntent, recipeKind, warmToneIntent } = intent;
 
@@ -38,9 +40,8 @@ export const planAgentEditRecipe = (prompt: string): AgentEditRecipePlan => {
       {
         kind: 'basic_tone',
         payload: {
-          ...base,
           blacks: recipeKind === 'cool_landscape_detail' ? -8 : -5,
-          brightness: base.brightness,
+          brightness: globalTone.brightness,
           clarity: recipeKind === 'cool_landscape_detail' ? 18 : 10,
           contrast: recipeKind === 'brighten_flat_raw' ? 16 : 20,
           exposure: brightenIntent ? 0.35 : 0.18,

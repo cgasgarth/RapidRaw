@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 
 import { publishAdjustmentSnapshot } from '../../../src/utils/adjustmentSnapshots';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import type { PreviewOperationIdentity } from '../../../src/utils/previewCoordinator';
 import { PreviewCoordinatorRuntime, type PreviewSurfaceUpdate } from '../../../src/utils/previewCoordinatorRuntime';
 import { PreviewOriginalCompareAdapter } from '../../../src/utils/previewOriginalCompareAdapter';
@@ -19,9 +20,10 @@ const deferred = <T>() => {
 };
 
 const source = (path: string, imageSessionId: number, proofRevision = 1, exposure = 0): PreviewRequestScopeInput => {
-  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-  adjustments.exposure = exposure;
-  const adjustmentSnapshot = publishAdjustmentSnapshot(null, adjustments);
+  const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+    exposure,
+  });
+  const adjustmentSnapshot = publishAdjustmentSnapshot(null, editDocumentV2);
   return {
     adjustmentRevision: adjustmentSnapshot.renderRevision,
     adjustmentSnapshot,
@@ -76,11 +78,14 @@ describe('preview original compare adapter', () => {
     expect(captures).toBe(1);
     expect(prepared.request).toMatchObject({
       expectedImagePath: '/fixtures/a.raw',
-      jsAdjustments: { exposure: 1.25 },
+      editDocumentV2: { schemaVersion: 2 },
       targetResolution: 1600,
       viewerSampleGraphRevision: prepared.session.graphRevision,
     });
-    expect(prepared.request.jsAdjustments).not.toBe(currentSource.adjustmentSnapshot.value);
+    expect(prepared.request.editDocumentV2).not.toBe(currentSource.adjustmentSnapshot.editDocumentV2);
+    expect(selectEditDocumentNode(prepared.request.editDocumentV2, 'scene_global_color_tone').params['exposure']).toBe(
+      1.25,
+    );
     expect(prepared.session).toMatchObject({
       displayGeneration: 1,
       proofRevision: 3,

@@ -1,10 +1,12 @@
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { Adjustments } from './adjustments';
 import type { BasicToneCommitIdentity } from './basicToneEditTransaction';
+import { selectEditDocumentNode } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface ToneEqualizerEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Pick<Adjustments, 'toneEqualizer'> };
+  editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   imageSessionId: number;
   selectedImage: { path: string } | null;
@@ -55,7 +57,7 @@ export const buildToneEqualizerEditTransaction = (
         nodeType: 'tone_equalizer',
         patch: {
           toneEqualizer: {
-            ...structuredClone(state.adjustmentSnapshot.value.toneEqualizer),
+            ...structuredClone(selectEditDocumentNode(state.editDocumentV2, 'tone_equalizer').params['toneEqualizer']),
             ...structuredClone(patch),
           },
         },

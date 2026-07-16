@@ -12,7 +12,7 @@ import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { useUIStore } from '../../../src/store/useUIStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2.ts';
 
 const selectedImage: SelectedImage = {
   exif: null,
@@ -34,7 +34,11 @@ afterEach(() => {
 describe('crop panel workflow', () => {
   test('uses compact controls and restores a canceled live crop through the existing history contract', async () => {
     const initial = { ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2 };
-    const initialDocument = legacyAdjustmentsToEditDocumentV2(initial);
+    const initialDocument = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+      aspectRatio: initial.aspectRatio,
+      orientationSteps: initial.orientationSteps,
+      rotation: initial.rotation,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       historyCheckpoints: [],
       historyIndex: 0,
@@ -60,7 +64,7 @@ describe('crop panel workflow', () => {
 
     await user.click(required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-5-4"]'));
 
-    expect(useEditorStore.getState().adjustmentSnapshot.value.aspectRatio).toBe(5 / 4);
+    expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBe(5 / 4);
     expect(required<HTMLElement>(container, '[data-testid="crop-panel-status"]').dataset['cropDirty']).toBe('true');
 
     const cancel = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
@@ -69,7 +73,7 @@ describe('crop panel workflow', () => {
     if (cancel === undefined) throw new Error('Expected Crop cancel action.');
     await user.click(cancel);
 
-    expect(useEditorStore.getState().adjustmentSnapshot.value.aspectRatio).toBe(3 / 2);
+    expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBe(3 / 2);
     expect(useEditorStore.getState().history).toHaveLength(3);
     expect(useEditorStore.getState().history.at(-1)).toEqual(initialDocument);
     expect(useEditorStore.getState().historyIndex).toBe(2);
@@ -77,7 +81,7 @@ describe('crop panel workflow', () => {
   });
 
   test('keeps invalid custom ratios visible and inaccessible to the crop model', async () => {
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2 });
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', { aspectRatio: 3 / 2 });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       historyCheckpoints: [],
       historyIndex: 0,
@@ -100,7 +104,10 @@ describe('crop panel workflow', () => {
 
   test('binds the compact groups to crop state and keyboard overlay cycling', async () => {
     const adjustments = { ...INITIAL_ADJUSTMENTS, aspectRatio: 3 / 2, rotation: 3 };
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+      aspectRatio: adjustments.aspectRatio,
+      rotation: adjustments.rotation,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       historyCheckpoints: [],
@@ -125,7 +132,7 @@ describe('crop panel workflow', () => {
     await clickControl(user, container, '[data-testid="crop-panel-overlay-rotate"]');
     fireEvent.keyDown(window, { key: 'o' });
 
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+    expect(useEditorStore.getState().editDocumentV2.geometry).toMatchObject({
       aspectRatio: 3 / 2,
       flipHorizontal: true,
       orientationSteps: 1,
@@ -137,7 +144,7 @@ describe('crop panel workflow', () => {
   });
 
   test('keeps an active custom draft through parent renders, discards it on Escape, and keys image switches', async () => {
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, aspectRatio: 1.7 });
+    const editDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', { aspectRatio: 1.7 });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       historyCheckpoints: [],
       historyIndex: 0,
@@ -161,7 +168,9 @@ describe('crop panel workflow', () => {
     expect(required<HTMLInputElement>(container, 'input[name="customW"]').value).toBe('170');
 
     act(() => {
-      const switchedDocument = legacyAdjustmentsToEditDocumentV2({ ...INITIAL_ADJUSTMENTS, aspectRatio: 0.83 });
+      const switchedDocument = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+        aspectRatio: 0.83,
+      });
       useEditorStore.getState().hydrateEditorRenderAuthority({
         selectedImage: { ...selectedImage, path: '/validation/crop-workflow-b.ARW' },
         editDocumentV2: switchedDocument,
@@ -175,7 +184,11 @@ describe('crop panel workflow', () => {
 
   test('rotates Original in one canonical history update and clears live rotation on teardown', async () => {
     const initial = { ...INITIAL_ADJUSTMENTS, aspectRatio: 4 / 3, orientationSteps: 0, rotation: 4 };
-    const initialDocument = legacyAdjustmentsToEditDocumentV2(initial);
+    const initialDocument = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', {
+      aspectRatio: initial.aspectRatio,
+      orientationSteps: initial.orientationSteps,
+      rotation: initial.rotation,
+    });
     useEditorStore.getState().hydrateEditorRenderAuthority({
       historyCheckpoints: [],
       historyIndex: 0,
@@ -186,11 +199,11 @@ describe('crop panel workflow', () => {
     });
     const { container, unmount, user } = await renderCropPanel();
     await clickControl(user, container, '[data-testid="crop-panel-straighten-toggle"]');
-    expect(useEditorStore.getState().adjustmentSnapshot.value.rotation).toBe(0);
+    expect(useEditorStore.getState().editDocumentV2.geometry.rotation).toBe(0);
     await clickControl(user, container, '[data-testid="crop-ratio-preset-original"]');
     const historyBeforeRotate = useEditorStore.getState().history.length;
     await clickControl(user, container, '[data-testid="crop-panel-rotate-right"]');
-    expect(useEditorStore.getState().adjustmentSnapshot.value).toMatchObject({
+    expect(useEditorStore.getState().editDocumentV2.geometry).toMatchObject({
       aspectRatio: 3 / 4,
       orientationSteps: 1,
     });
@@ -211,7 +224,7 @@ async function renderCropPanel() {
 }
 
 function resetStores() {
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   useEditorStore.getState().hydrateEditorRenderAuthority({
     historyCheckpoints: [],
     historyIndex: 0,

@@ -3,16 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, GitPullRequest, Loader2, Search, Users } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
+import type { EditDocumentV2CopyPayload } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { Invokes } from '../../tauri/commands';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
-import {
-  createEditDocumentPresetPayload,
-  RAPIDRAW_PRESET_FORMAT,
-  RAPIDRAW_PRESET_SCHEMA_VERSION,
-} from '../../utils/editDocumentPreset';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
+import { RAPIDRAW_PRESET_FORMAT, RAPIDRAW_PRESET_SCHEMA_VERSION } from '../../utils/editDocumentPreset';
+import { applyEditDocumentV2CopyPayload, createDefaultEditDocumentV2 } from '../../utils/editDocumentV2';
 import type { ImageFile, SupportedTypes } from '../ui/AppProperties';
 import Button from '../ui/primitives/Button';
 import Dropdown from '../ui/primitives/Dropdown';
@@ -25,7 +20,7 @@ const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/
 export interface CommunityPreset {
   name: string;
   creator: string;
-  adjustments: Partial<Adjustments>;
+  editDocumentV2: EditDocumentV2CopyPayload;
   includeMasks?: boolean;
   includeCropTransform?: boolean;
   presetType?: 'tool' | 'style';
@@ -34,13 +29,9 @@ export interface CommunityPreset {
 export const buildSaveCommunityPresetPayload = (preset: CommunityPreset) => {
   const includeCropTransform = preset.includeCropTransform === true;
   const presetType = preset.presetType ?? 'style';
-  const document = legacyAdjustmentsToEditDocumentV2({
-    ...structuredClone(INITIAL_ADJUSTMENTS),
-    ...structuredClone(preset.adjustments),
-  });
   return {
     preset: {
-      editDocumentV2: createEditDocumentPresetPayload(document, includeCropTransform, presetType),
+      editDocumentV2: structuredClone(preset.editDocumentV2),
       format: RAPIDRAW_PRESET_FORMAT,
       id: crypto.randomUUID(),
       includeCropTransform,
@@ -136,7 +127,7 @@ export const CommunityPreviewSession = ({ children, localPaths, presets, session
           imagePaths,
           presets: stablePresets.map((preset) => ({
             ...preset,
-            adjustments: { ...INITIAL_ADJUSTMENTS, ...preset.adjustments },
+            editDocumentV2: applyEditDocumentV2CopyPayload(createDefaultEditDocumentV2(), preset.editDocumentV2),
           })),
         });
         const generated: Record<string, string | null> = {};

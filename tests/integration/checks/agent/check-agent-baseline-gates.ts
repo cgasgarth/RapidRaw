@@ -29,7 +29,7 @@ import { AGENT_DETAIL_EFFECTS_APPLY_TOOL_NAME } from '../../../../src/utils/agen
 import { AGENT_GEOMETRY_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentGeometryApplyTool.ts';
 import { AGENT_LENS_PROFILE_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentLensProfileApplyTool.ts';
 import { AGENT_RETOUCH_APPLY_TOOL_NAME } from '../../../../src/utils/agent/tools/agentRetouchApplyTool.ts';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2.ts';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../../src/utils/editDocumentV2.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
   createRawEngineAppServerSupervisorState,
@@ -113,7 +113,7 @@ const assertRejected = (response: z.infer<typeof dispatchResponseSchema>, label:
   }
 };
 
-const initialEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+const initialEditDocumentV2 = createDefaultEditDocumentV2();
 useEditorStore.getState().hydrateEditorRenderAuthority({
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: null,
@@ -132,7 +132,10 @@ assertRejected(
 );
 
 const editedAdjustments = { ...INITIAL_ADJUSTMENTS, exposure: 0.2, highlights: -10 };
-const editedEditDocumentV2 = legacyAdjustmentsToEditDocumentV2(editedAdjustments);
+const editedEditDocumentV2 = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'scene_global_color_tone', {
+  exposure: editedAdjustments.exposure,
+  highlights: editedAdjustments.highlights,
+});
 useEditorStore.getState().hydrateEditorRenderAuthority({
   brushSettings: { feather: 50, size: 72, tool: ToolType.Brush },
   finalPreviewUrl: 'blob:rawengine-agent-baseline-before',

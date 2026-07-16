@@ -5,10 +5,15 @@ import { createElement, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import { ColorGradingControls } from '../../../src/components/adjustments/color/ColorGradingControls';
+import type { ColorPanelAdjustmentView } from '../../../src/components/adjustments/color/types';
+import { selectColorPanelAdjustmentView } from '../../../src/components/panel/right/color/ColorWorkspacePanel';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import { COLOR_GRADING_PRESETS } from '../../../src/utils/colorGradingPresets';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+
+const defaultColorView = (): ColorPanelAdjustmentView => selectColorPanelAdjustmentView(createDefaultEditDocumentV2());
 
 beforeEach(() => useEditorStore.getState().setEditor({ selectedImage: null }));
 
@@ -112,8 +117,8 @@ test('preset menu supports deterministic keyboard navigation and focus restorati
 });
 
 test('whole-tool reset restores all canonical defaults in one operation', async () => {
-  const initialAdjustments: Adjustments = {
-    ...INITIAL_ADJUSTMENTS,
+  const initialAdjustments: ColorPanelAdjustmentView = {
+    ...defaultColorView(),
     colorGrading: {
       balance: 18,
       blending: 62,
@@ -138,8 +143,8 @@ function ColorGradingHarness({
   initialAdjustments,
   onAdjustmentsChange,
 }: {
-  initialAdjustments: Adjustments;
-  onAdjustmentsChange: (adjustments: Adjustments) => void;
+  initialAdjustments: ColorPanelAdjustmentView;
+  onAdjustmentsChange: (adjustments: ColorPanelAdjustmentView) => void;
 }) {
   const [adjustments, setAdjustmentsState] = useState(initialAdjustments);
 
@@ -157,9 +162,9 @@ function ColorGradingHarness({
 }
 
 async function renderColorGrading({
-  initialAdjustments = INITIAL_ADJUSTMENTS,
+  initialAdjustments = defaultColorView(),
 }: {
-  initialAdjustments?: Adjustments;
+  initialAdjustments?: ColorPanelAdjustmentView;
 } = {}) {
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({

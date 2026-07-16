@@ -1,8 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 
 import { ExportColorProfile, ExportRenderingIntent } from '../../../src/components/ui/ExportImportProperties';
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 import {
   buildSoftProofProfileCompareProof,
   buildSoftProofProfileCompareRequests,
@@ -23,7 +22,7 @@ const metadata = {
 };
 
 describe('export soft-proof profile compare', () => {
-  const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(INITIAL_ADJUSTMENTS);
+  const editDocumentV2 = createDefaultEditDocumentV2();
   test('builds paired sRGB and Display P3 requests for the same adjustment payload', () => {
     const requests = buildSoftProofProfileCompareRequests({
       blackPointCompensation: true,

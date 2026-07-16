@@ -1,10 +1,11 @@
-import type { Adjustments } from './adjustments';
+import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import { resolveCropForGeometryTransaction } from './cropUtils';
+import { selectEditDocumentGeometry } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 
 export interface StraightenEditTransactionState {
   adjustmentRevision: number;
-  adjustmentSnapshot: { readonly value: Adjustments };
+  readonly editDocumentV2: EditDocumentV2;
   imageSession: { id: string } | null;
   operationGeneration: number;
   selectedImage: { height: number; path: string; width: number } | null;
@@ -45,7 +46,7 @@ export const buildStraightenEditTransaction = (
     );
   }
 
-  const previous = state.adjustmentSnapshot.value;
+  const previous = selectEditDocumentGeometry(state.editDocumentV2);
   const rotation = (previous.rotation || 0) + correctionDegrees;
   const selectedImage = state.selectedImage;
   const crop =

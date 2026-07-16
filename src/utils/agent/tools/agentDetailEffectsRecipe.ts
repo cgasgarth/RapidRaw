@@ -1,36 +1,8 @@
-import type { Adjustments } from '../../adjustments';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 
-export const buildAgentDetailEffectsRecipeHashInput = (adjustments: Adjustments) => ({
-  chromaticAberrationBlueYellow: adjustments.chromaticAberrationBlueYellow,
-  chromaticAberrationRedCyan: adjustments.chromaticAberrationRedCyan,
-  clarity: adjustments.clarity,
-  colorNoiseReduction: adjustments.colorNoiseReduction,
-  deblurEnabled: adjustments.deblurEnabled,
-  deblurSigmaPx: adjustments.deblurSigmaPx,
-  deblurStrength: adjustments.deblurStrength,
-  denoiseContrastProtection: adjustments.denoiseContrastProtection,
-  denoiseDetail: adjustments.denoiseDetail,
-  denoiseNaturalGrain: adjustments.denoiseNaturalGrain,
-  denoiseShadowBias: adjustments.denoiseShadowBias,
-  dehaze: adjustments.dehaze,
-  dustSpotMinRadiusPx: adjustments.dustSpotMinRadiusPx,
-  dustSpotOverlayEnabled: adjustments.dustSpotOverlayEnabled,
-  dustSpotSensitivity: adjustments.dustSpotSensitivity,
-  flareAmount: adjustments.flareAmount,
-  glowAmount: adjustments.glowAmount,
-  grainAmount: adjustments.grainAmount,
-  grainRoughness: adjustments.grainRoughness,
-  grainSize: adjustments.grainSize,
-  halationAmount: adjustments.halationAmount,
-  localContrastHaloGuard: adjustments.localContrastHaloGuard,
-  localContrastMidtoneMask: adjustments.localContrastMidtoneMask,
-  localContrastRadiusPx: adjustments.localContrastRadiusPx,
-  lumaNoiseReduction: adjustments.lumaNoiseReduction,
-  sharpness: adjustments.sharpness,
-  sharpnessThreshold: adjustments.sharpnessThreshold,
-  structure: adjustments.structure,
-  vignetteAmount: adjustments.vignetteAmount,
-  vignetteFeather: adjustments.vignetteFeather,
-  vignetteMidpoint: adjustments.vignetteMidpoint,
-  vignetteRoundness: adjustments.vignetteRoundness,
+export const buildAgentDetailEffectsRecipeHashInput = (document: EditDocumentV2) => ({
+  ...selectEditDocumentNode(document, 'detail_denoise_dehaze').params,
+  ...selectEditDocumentNode(document, 'display_creative').params,
+  ...selectEditDocumentNode(document, 'lens_correction').params,
 });

@@ -1,5 +1,6 @@
+import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerPickerCommitResult } from '../components/panel/editor/viewerPickerInteractionControllers';
-import type { Adjustments } from './adjustments';
+import { selectEditDocumentNode } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 import { buildPointColorEditTransaction } from './pointColorEditTransaction';
 import { buildToneEqualizerEditTransaction } from './toneEqualizerEditTransaction';
@@ -7,7 +8,7 @@ import { applyToneEqualizerPickerSelection, applyToneEqualizerTargetedDelta } fr
 
 export interface ViewerPickerEditTransactionState {
   readonly adjustmentRevision: number;
-  readonly adjustmentSnapshot: { readonly value: Adjustments };
+  readonly editDocumentV2: EditDocumentV2;
   readonly geometryEpoch: number;
   readonly imageSession: { id: string } | null;
   readonly imageSessionId: number;
@@ -48,7 +49,7 @@ const assertCurrent = (state: ViewerPickerEditTransactionState, command: ViewerP
 const buildPointColorPickerPoint = (
   command: Extract<ViewerPickerCommitResult, { kind: 'point-color' }>,
   createId: () => string,
-): Adjustments['pointColor']['points'][number] => ({
+): EditDocumentNodeParamsV2<'point_color'>['pointColor']['points'][number] => ({
   chromaRadius: 0.08,
   chromaShift: 0,
   enabled: true,
@@ -92,7 +93,10 @@ export const buildViewerPickerEditTransaction = (
   };
 
   if (command.kind === 'point-color') {
-    if (command.ordinal !== state.adjustmentSnapshot.value.pointColor.points.length + 1)
+    if (
+      command.ordinal !==
+      selectEditDocumentNode(state.editDocumentV2, 'point_color').params['pointColor'].points.length + 1
+    )
       rejectPicker('stale_point_ordinal');
     const point = buildPointColorPickerPoint(command, createId);
     return {
@@ -101,7 +105,7 @@ export const buildViewerPickerEditTransaction = (
         identity,
         {
           enabled: true,
-          points: [...state.adjustmentSnapshot.value.pointColor.points, point],
+          points: [...selectEditDocumentNode(state.editDocumentV2, 'point_color').params['pointColor'].points, point],
           selectedPointId: point.id,
         },
         transactionId,
@@ -110,15 +114,17 @@ export const buildViewerPickerEditTransaction = (
     };
   }
 
-  if (JSON.stringify(command.baseline.toneEqualizer) !== JSON.stringify(state.adjustmentSnapshot.value.toneEqualizer)) {
+  const currentToneEqualizer = selectEditDocumentNode(state.editDocumentV2, 'tone_equalizer').params['toneEqualizer'];
+  const baselineToneEqualizer = selectEditDocumentNode(command.baseline, 'tone_equalizer').params['toneEqualizer'];
+  if (JSON.stringify(baselineToneEqualizer) !== JSON.stringify(currentToneEqualizer)) {
     rejectPicker('stale_tone_baseline');
   }
-  const nextAdjustments =
+  const nextToneEqualizer =
     Math.abs(command.deltaEv) < 0.01
-      ? applyToneEqualizerPickerSelection(command.baseline, command.result)
-      : applyToneEqualizerTargetedDelta(command.baseline, command.result, command.deltaEv);
+      ? applyToneEqualizerPickerSelection(baselineToneEqualizer, command.result)
+      : applyToneEqualizerTargetedDelta(baselineToneEqualizer, command.result, command.deltaEv);
   return {
-    ...buildToneEqualizerEditTransaction(state, identity, nextAdjustments.toneEqualizer, transactionId),
+    ...buildToneEqualizerEditTransaction(state, identity, nextToneEqualizer, transactionId),
     source: 'picker',
   };
 };

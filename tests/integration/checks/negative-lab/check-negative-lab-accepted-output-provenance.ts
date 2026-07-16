@@ -82,7 +82,7 @@ for (const [label, fingerprint] of [
       outputFormat: 'tiff16',
       params: {
         ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
-        exposure: DEFAULT_NEGATIVE_LAB_UI_PRESET.params.exposure + 0.1,
+        exposure: DEFAULT_NEGATIVE_LAB_UI_PRESET.params['exposure'] + 0.1,
       },
       pathsToConvert: targetPaths,
       selectedProfileSnapshot: null,
@@ -150,7 +150,7 @@ const staleReasons = getNegativeLabAcceptedApplyPlanStaleReasons({
     outputFormat: 'jpeg_proof',
     params: {
       ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
-      exposure: DEFAULT_NEGATIVE_LAB_UI_PRESET.params.exposure + 0.1,
+      exposure: DEFAULT_NEGATIVE_LAB_UI_PRESET.params['exposure'] + 0.1,
     },
     pathsToConvert: [targetPaths[0] ?? ''],
     selectedProfileSnapshot: null,

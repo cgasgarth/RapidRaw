@@ -18,6 +18,7 @@ import {
   buildBasicToneCommandEnvelope,
   buildBasicToneImageCommandContext,
 } from '../../basicToneCommandBridge';
+import { selectEditDocumentNode } from '../../editDocumentSelectors';
 import {
   buildSelectiveColorCommandEnvelope,
   buildSelectiveColorImageCommandContext,
@@ -434,7 +435,21 @@ export const buildAgentToneColorDryRunExpertEdit = async ({
   const selectedImage = editor.selectedImage;
   if (selectedImage === null) throw new Error('Cannot dry-run tone/color expert edit without a selected image.');
   const graphRevisionBefore = snapshot.graphRevision;
-  const basicPayload = buildBasicTonePayload(editor.adjustmentSnapshot.value, intents);
+  const globalTone = selectEditDocumentNode(editor.editDocumentV2, 'scene_global_color_tone').params;
+  const basicPayload = buildBasicTonePayload(
+    {
+      blacks: globalTone.blacks,
+      brightness: globalTone.brightness,
+      clarity: selectEditDocumentNode(editor.editDocumentV2, 'detail_denoise_dehaze').params['clarity'],
+      contrast: globalTone.contrast,
+      exposure: globalTone.exposure,
+      highlights: globalTone.highlights,
+      saturation: selectEditDocumentNode(editor.editDocumentV2, 'color_presence').params['saturation'],
+      shadows: globalTone.shadows,
+      whites: globalTone.whites,
+    },
+    intents,
+  );
   const selectivePayload = buildSelectiveColorPayload(intents);
   const basicToneCommand = buildBasicToneCommandEnvelope(
     basicPayload,

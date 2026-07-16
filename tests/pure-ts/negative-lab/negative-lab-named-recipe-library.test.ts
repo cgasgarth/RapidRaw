@@ -47,7 +47,7 @@ describe('negative lab named recipe library', () => {
           ...input({ name: ' PORTRA daylight ' }),
           params: {
             ...DEFAULT_NEGATIVE_LAB_UI_PRESET.params,
-            exposure: DEFAULT_NEGATIVE_LAB_UI_PRESET.params.exposure + 0.1,
+            exposure: DEFAULT_NEGATIVE_LAB_UI_PRESET.params['exposure'] + 0.1,
           },
         }),
       ),

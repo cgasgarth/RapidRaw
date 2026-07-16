@@ -17,7 +17,7 @@ import {
   COLOR_OUTPUT_FOCUS_EVENT,
   COLOR_WORKSPACE_TAB_SESSION_KEY,
 } from '../../../../src/utils/colorWorkspaceNavigation';
-import { legacyAdjustmentsToEditDocumentV2 } from '../../../../src/utils/editDocumentV2';
+import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2';
 
 type RenderedPanel = {
   container: HTMLDivElement;
@@ -141,7 +141,7 @@ console.log('color inspector compact workflow coverage ok');
 async function renderColorPanel(isForMask = false): Promise<RenderedPanel> {
   await act(async () => {
     const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
-    const editDocumentV2 = legacyAdjustmentsToEditDocumentV2(adjustments);
+    const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
       adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),

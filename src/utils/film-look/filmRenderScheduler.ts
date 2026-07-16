@@ -1,9 +1,10 @@
+import type { EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import {
   type FilmRenderQualityV1,
   type FilmRenderResultIdentityV1,
   filmRenderResultIdentityV1Schema,
 } from '../../../packages/rawengine-schema/src/index.js';
-import type { Adjustments } from '../adjustments';
+import { selectEditDocumentGeometry, selectEditDocumentNode } from '../editDocumentSelectors';
 import { filmEmulationCanonicalHash } from './filmEmulationOperation';
 
 export type FilmCacheKeySet = {
@@ -15,7 +16,7 @@ export type FilmCacheKeySet = {
 
 export interface FilmPreviewRenderIdentityInput {
   adjustmentRevision: number;
-  adjustments: Readonly<Adjustments>;
+  editDocumentV2: Readonly<EditDocumentV2>;
   backend: 'cpu' | 'wgpu';
   displayGeneration: number;
   imageSessionId: number;
@@ -40,21 +41,22 @@ interface OwnedFilmRenderLease extends FilmRenderLease {
   readonly lane: string;
 }
 
-const upstreamAdjustments = (adjustments: Readonly<Adjustments>): Record<string, unknown> =>
-  Object.fromEntries(Object.entries(adjustments).filter(([key]) => key !== 'filmEmulation'));
-
 export const buildFilmPreviewRenderIdentity = (
   input: FilmPreviewRenderIdentityInput,
 ): FilmRenderResultIdentityV1 | null => {
-  const node = input.adjustments.filmEmulation;
+  const node = selectEditDocumentNode(input.editDocumentV2, 'film_emulation').params['filmEmulation'];
   if (node === null || !node.enabled) return null;
+  const geometry = selectEditDocumentGeometry(input.editDocumentV2);
 
   const sourceContentSha256 = filmEmulationCanonicalHash({
     imageSessionId: input.imageSessionId,
     sourceImagePath: input.sourceImagePath,
     sourceRevision: input.sourceRevision,
   });
-  const upstreamGraphSha256 = filmEmulationCanonicalHash(upstreamAdjustments(input.adjustments));
+  const upstreamGraphSha256 = filmEmulationCanonicalHash({
+    ...input.editDocumentV2,
+    nodes: { ...input.editDocumentV2.nodes, film_emulation: undefined },
+  });
   const filmNodeSha256 = filmEmulationCanonicalHash(node);
   const executionPlanSha256 = filmEmulationCanonicalHash({
     approximationContract:
@@ -64,18 +66,18 @@ export const buildFilmPreviewRenderIdentity = (
     profileContentSha256: node.profileRef.contentSha256,
   });
   const orientationAndGeometrySha256 = filmEmulationCanonicalHash({
-    crop: input.adjustments.crop,
-    flipHorizontal: input.adjustments.flipHorizontal,
-    flipVertical: input.adjustments.flipVertical,
-    orientationSteps: input.adjustments.orientationSteps,
-    rotation: input.adjustments.rotation,
+    crop: geometry.crop,
+    flipHorizontal: geometry.flipHorizontal,
+    flipVertical: geometry.flipVertical,
+    orientationSteps: geometry.orientationSteps,
+    rotation: geometry.rotation,
   });
   const viewOutputSha256 = filmEmulationCanonicalHash({
     displayGeneration: input.displayGeneration,
     proofIdentity: input.proofIdentity,
   });
   const cropAndDimensionsSha256 = filmEmulationCanonicalHash({
-    crop: input.adjustments.crop,
+    crop: geometry.crop,
     roi: input.roi,
     targetResolution: input.targetResolution,
     viewportRevision: input.viewportRevision,

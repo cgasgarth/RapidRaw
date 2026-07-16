@@ -1,8 +1,13 @@
 import { z } from 'zod';
+import type { EditDocumentGeometryV2, EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../store/useEditorStore';
-import type { Adjustments } from '../../adjustments';
 import { ActiveChannel } from '../../adjustments';
 import { BASIC_TONE_ADJUSTMENT_KEYS } from '../../basicToneCommandBridge';
+import {
+  selectEditDocumentControlValue,
+  selectEditDocumentGeometry,
+  selectEditDocumentLayers,
+} from '../../editDocumentSelectors';
 import { buildAgentColorRecipeHashInput } from '../tools/agentColorRecipe';
 import { buildAgentCurveLevelsRecipeHashInput } from '../tools/agentCurveLevelsRecipe';
 import { buildAgentDetailEffectsRecipeHashInput } from '../tools/agentDetailEffectsRecipe';
@@ -61,11 +66,13 @@ const agentImageContextSnapshotSchema = z
 
 export type AgentImageContextSnapshot = z.infer<typeof agentImageContextSnapshotSchema>;
 
-const summarizeAdjustment = (adjustments: Adjustments): AgentImageContextSnapshot['adjustmentSummary'] =>
-  BASIC_TONE_ADJUSTMENT_KEYS.map((key) => ({ key, value: adjustments[key] })).slice(0, MAX_ADJUSTMENT_ENTRIES);
+const summarizeAdjustment = (document: EditDocumentV2): AgentImageContextSnapshot['adjustmentSummary'] =>
+  BASIC_TONE_ADJUSTMENT_KEYS.map((key) => ({ key, value: selectEditDocumentControlValue(document, key) })).slice(
+    0,
+    MAX_ADJUSTMENT_ENTRIES,
+  );
 
-const normalizePreviewCrop = (crop: Adjustments['crop']): AgentPreviewEnvelope['crop'] =>
-  crop === null ? null : { ...crop, unit: crop.unit ?? '%' };
+const normalizePreviewCrop = (crop: EditDocumentGeometryV2['crop']): AgentPreviewEnvelope['crop'] => crop;
 
 const summarizeMetadata = (exif: Record<string, unknown> | undefined): AgentImageContextSnapshot['metadataSummary'] =>
   Object.entries(exif ?? {})
@@ -143,17 +150,17 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
       editor.selectedImage.originalUrl,
     ].find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0) ??
     editor.selectedImage.path;
-  const crop = normalizePreviewCrop(editor.adjustmentSnapshot.value.crop);
+  const crop = normalizePreviewCrop(selectEditDocumentGeometry(editor.editDocumentV2).crop);
   const recipeHash = `recipe:${stableAgentPreviewHash(
     JSON.stringify({
-      adjustments: summarizeAdjustment(editor.adjustmentSnapshot.value),
-      color: buildAgentColorRecipeHashInput(editor.adjustmentSnapshot.value),
-      curveLevels: buildAgentCurveLevelsRecipeHashInput(editor.adjustmentSnapshot.value),
-      detailEffects: buildAgentDetailEffectsRecipeHashInput(editor.adjustmentSnapshot.value),
-      geometry: buildAgentGeometryRecipeHashInput(editor.adjustmentSnapshot.value),
+      adjustments: summarizeAdjustment(editor.editDocumentV2),
+      color: buildAgentColorRecipeHashInput(editor.editDocumentV2),
+      curveLevels: buildAgentCurveLevelsRecipeHashInput(editor.editDocumentV2),
+      detailEffects: buildAgentDetailEffectsRecipeHashInput(editor.editDocumentV2),
+      geometry: buildAgentGeometryRecipeHashInput(editor.editDocumentV2),
       graphRevision,
-      lensProfile: buildAgentLensProfileRecipeHashInput(editor.adjustmentSnapshot.value),
-      masks: editor.adjustmentSnapshot.value.masks.map((mask) => ({
+      lensProfile: buildAgentLensProfileRecipeHashInput(editor.editDocumentV2),
+      masks: selectEditDocumentLayers(editor.editDocumentV2).masks.map((mask) => ({
         id: mask.id,
         name: mask.name,
         visible: mask.visible,
@@ -185,11 +192,11 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
 
   return agentImageContextSnapshotSchema.parse({
     activeImagePath: editor.selectedImage.path,
-    adjustmentSummary: summarizeAdjustment(editor.adjustmentSnapshot.value),
+    adjustmentSummary: summarizeAdjustment(editor.editDocumentV2),
     clipping: summarizeClipping(histogramSummary),
     cropHint: {
-      active: editor.adjustmentSnapshot.value.crop !== null,
-      aspectRatio: editor.adjustmentSnapshot.value.aspectRatio,
+      active: selectEditDocumentGeometry(editor.editDocumentV2).crop !== null,
+      aspectRatio: selectEditDocumentGeometry(editor.editDocumentV2).aspectRatio,
     },
     graphRevision,
     histogramSummary,
@@ -198,7 +205,7 @@ export const buildAgentImageContextSnapshot = (): AgentImageContextSnapshot => {
     previewIdentity: previewRef,
     subjectHint: {
       hasActiveMask: editor.activeMaskContainerId !== null,
-      maskCount: editor.adjustmentSnapshot.value.masks.length,
+      maskCount: selectEditDocumentLayers(editor.editDocumentV2).masks.length,
     },
   });
 };
