@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
 import { technicalWhiteBalanceV1Schema } from '../../../packages/rawengine-schema/src/color/whiteBalanceSchemas.ts';
-import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../../../src/utils/adjustments.ts';
+import {
+  type Adjustments,
+  INITIAL_ADJUSTMENTS,
+  INITIAL_MASK_ADJUSTMENTS,
+  normalizeLoadedAdjustments,
+} from '../../../src/utils/adjustments.ts';
 import { applyColorParityTechnicalWhiteBalance } from '../../../src/utils/color/runtime/colorCpuGpuParity.ts';
 import {
   buildTechnicalWhiteBalance,
@@ -47,17 +52,21 @@ describe('illuminant-based white balance', () => {
     expect(output[2]).toBeCloseTo(direct[2]!, 7);
   });
 
-  test('migrates legacy temperature and tint into the creative node without changing values', () => {
-    const loaded = normalizeLoadedAdjustments({ temperature: 18, tint: -9 });
-    expect(loaded.whiteBalanceTechnical.mode).toBe('as_shot');
-    expect(loaded.creativeTemperature).toBe(18);
-    expect(loaded.creativeTint).toBe(-9);
-    expect(loaded.whiteBalanceMigration).toBe('legacy_creative_temperature_tint_v1');
-    expect(loaded.temperature).toBe(18);
-    expect(loaded.tint).toBe(-9);
+  test('requires current technical WB and rejects old flat global WB state', () => {
+    expect(() => normalizeLoadedAdjustments({ exposure: 0.25 })).toThrow('adjustments.missing_white_balance_technical');
+    expect(() => normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, temperature: 18, tint: -9 })).toThrow(
+      'adjustments.obsolete_white_balance_representation',
+    );
+    expect(() => normalizeLoadedAdjustments({ creativeTemperature: 18 } as Partial<Adjustments>)).toThrow(
+      'adjustments.obsolete_white_balance_representation',
+    );
+    expect(INITIAL_MASK_ADJUSTMENTS).toMatchObject({ temperature: 0, tint: 0 });
+  });
 
-    const current = normalizeLoadedAdjustments(INITIAL_ADJUSTMENTS);
-    expect(current.whiteBalanceMigration).toBe('native_v1');
+  test('accepts Lightroom kelvin/tint import provenance without claiming a named preset', () => {
+    const imported = buildTechnicalWhiteBalance('kelvin_tint', 4_850, 0.006, 'preset');
+    expect(imported.presetId).toBeNull();
+    expect(technicalWhiteBalanceV1Schema.parse(imported)).toEqual(imported);
   });
 
   test('neutral picker reports physical coordinates and rejects clipped confidence', () => {

@@ -3,6 +3,7 @@ use serde_json::{Map, Value, json};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use crate::color::white_balance::{WHITE_BALANCE_CONTRACT, cct_duv_to_coordinates};
 use crate::presets::Preset;
 
 #[derive(Copy, Clone, Debug)]
@@ -165,23 +166,32 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         );
     }
 
-    if let Some(adjusted_k) = get_attr_as_f64(&attrs, "Temperature") {
-        const AS_SHOT_DEFAULT: f64 = 5500.0;
-        const MAX_MIRED_SHIFT: f64 = 150.0;
-        let as_shot_k = get_attr_as_f64(&attrs, "AsShotTemperature").unwrap_or(AS_SHOT_DEFAULT);
-        let mired_adjusted = 1_000_000.0 / adjusted_k;
-        let mired_as_shot = 1_000_000.0 / as_shot_k;
-        let mired_delta = mired_adjusted - mired_as_shot;
-        let temp_value = (-mired_delta / MAX_MIRED_SHIFT) * 100.0;
+    if attrs.contains_key("Temperature") || attrs.contains_key("Tint") {
+        let kelvin = get_attr_as_f64(&attrs, "Temperature")
+            .or_else(|| get_attr_as_f64(&attrs, "AsShotTemperature"))
+            .unwrap_or(5500.0)
+            .clamp(1667.0, 25_000.0);
+        let duv = (get_attr_as_f64(&attrs, "Tint").unwrap_or(0.0) / 3000.0).clamp(-0.05, 0.05);
+        let coordinates = cct_duv_to_coordinates(kelvin, duv)
+            .map_err(|error| format!("Invalid Lightroom/XMP white balance: {error}"))?;
         adjustments.insert(
-            "temperature".to_string(),
-            json!(temp_value.clamp(-100.0, 100.0)),
+            "whiteBalanceTechnical".to_string(),
+            json!({
+                "adaptation": "cat16_v1",
+                "confidence": null,
+                "contract": WHITE_BALANCE_CONTRACT,
+                "duv": coordinates.duv,
+                "inputSemantics": "raw_scene_linear",
+                "kelvin": coordinates.cct_kelvin,
+                "mode": "kelvin_tint",
+                "presetId": null,
+                "sampleCount": null,
+                "source": "preset",
+                "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
+                "x": coordinates.xy[0],
+                "y": coordinates.xy[1]
+            }),
         );
-    }
-
-    if let Some(tint_val) = get_attr_as_f64(&attrs, "Tint") {
-        let scaled_tint = (tint_val / 150.0) * 100.0;
-        adjustments.insert("tint".to_string(), json!(scaled_tint.clamp(-100.0, 100.0)));
     }
 
     let colors = [
@@ -350,4 +360,40 @@ pub fn convert_xmp_to_preset(xmp_content: &str) -> Result<Preset, String> {
         include_crop_transform: Some(false),
         preset_type: Some("style".to_string()),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::convert_xmp_to_preset;
+
+    #[test]
+    fn lightroom_white_balance_compiles_directly_to_current_technical_contract() {
+        let preset =
+            convert_xmp_to_preset(r#"<rdf:Description crs:Temperature="6500" crs:Tint="30" />"#)
+                .expect("Lightroom/XMP preset converts");
+        let adjustments = preset.adjustments.as_object().expect("adjustment object");
+        assert!(!adjustments.contains_key("temperature"));
+        assert!(!adjustments.contains_key("tint"));
+        let white_balance = adjustments["whiteBalanceTechnical"]
+            .as_object()
+            .expect("technical white balance");
+        assert_eq!(white_balance["contract"], "rapidraw.white_balance.v1");
+        assert_eq!(white_balance["mode"], "kelvin_tint");
+        assert_eq!(white_balance["source"], "preset");
+        assert_eq!(white_balance["kelvin"], 6500.0);
+        assert_eq!(white_balance["duv"], 0.01);
+        assert!(white_balance["x"].as_f64().is_some_and(f64::is_finite));
+        assert!(white_balance["y"].as_f64().is_some_and(f64::is_finite));
+    }
+
+    #[test]
+    fn lightroom_tint_without_temperature_uses_explicit_as_shot_kelvin() {
+        let preset = convert_xmp_to_preset(
+            r#"<rdf:Description crs:AsShotTemperature="5200" crs:Tint="-15" />"#,
+        )
+        .expect("Lightroom/XMP preset converts");
+        let white_balance = &preset.adjustments["whiteBalanceTechnical"];
+        assert_eq!(white_balance["kelvin"], 5200.0);
+        assert_eq!(white_balance["duv"], -0.005);
+    }
 }

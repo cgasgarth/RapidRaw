@@ -817,8 +817,15 @@ fn validate_adjustments(
         "outputTransform",
         "cameraToWorkingMatrix",
         "cameraWhiteBalance",
+        "temperature",
+        "tint",
+        "creativeTemperature",
+        "creativeTint",
         "legacyWhiteBalance",
         "inputTransform",
+        "whiteBalanceMigration",
+        "whiteBalanceTemperature",
+        "whiteBalanceTint",
     ];
     const KNOWN: &[&str] = &[
         "aiPatches",
@@ -838,8 +845,6 @@ fn validate_adjustments(
         "colorGrading",
         "colorNoiseReduction",
         "contrast",
-        "creativeTemperature",
-        "creativeTint",
         "crop",
         "curves",
         "pointCurves",
@@ -910,8 +915,6 @@ fn validate_adjustments(
         "showClipping",
         "skinToneUniformity",
         "structure",
-        "temperature",
-        "tint",
         "toneMapper",
         "toneEqualizer",
         "viewTransform",
@@ -937,7 +940,6 @@ fn validate_adjustments(
         "panorama",
         "hdrMerge",
         "viewTransform",
-        "whiteBalanceMigration",
         "whiteBalanceTechnical",
     ];
     for field in FORBIDDEN {
@@ -946,11 +948,7 @@ fn validate_adjustments(
             disabled.push(format!("adjustments.{field}"));
         }
     }
-    for (legacy, canonical) in [
-        ("whiteBalanceTemperature", "temperature"),
-        ("whiteBalanceTint", "tint"),
-        ("rotate", "rotation"),
-    ] {
+    for (legacy, canonical) in [("rotate", "rotation")] {
         if let Some(value) = object.remove(legacy) {
             object.entry(canonical.to_string()).or_insert(value);
             disabled.push(format!("adjustments.{legacy}->adjustments.{canonical}"));
@@ -1189,8 +1187,8 @@ fn valid_reference_match_application_receipt(value: &JsonValue) -> bool {
                                     key,
                                     "exposure"
                                         | "contrast"
-                                        | "creativeTemperature"
-                                        | "creativeTint"
+                                        | "whiteBalanceKelvin"
+                                        | "whiteBalanceDuv"
                                         | "saturation"
                                         | "vibrance"
                                 )
@@ -3074,8 +3072,6 @@ mod tests {
         let metadata = ImageMetadata {
             adjustments: serde_json::json!({
                 "cameraProfileAmount": 100,
-                "creativeTemperature": 0,
-                "creativeTint": 0,
                 "perspectiveCorrection": {
                     "amount": 62.5,
                     "cropPolicy": "auto_crop",
@@ -3101,8 +3097,21 @@ mod tests {
                     "sourceWhiteEv": 6.5,
                     "toe": 0.35
                 },
-                "whiteBalanceMigration": "native_v1",
-                "whiteBalanceTechnical": { "mode": "as_shot" }
+                "whiteBalanceTechnical": {
+                    "adaptation": "cat16_v1",
+                    "confidence": null,
+                    "contract": "rapidraw.white_balance.v1",
+                    "duv": 0,
+                    "inputSemantics": "raw_scene_linear",
+                    "kelvin": 6504,
+                    "mode": "as_shot",
+                    "presetId": null,
+                    "sampleCount": null,
+                    "source": "as_shot",
+                    "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
+                    "x": 0.32168,
+                    "y": 0.33767
+                }
             }),
             ..Default::default()
         };
@@ -3121,6 +3130,71 @@ mod tests {
             reloaded.adjustments["perceptualGradingV1"],
             perceptual_grading_fixture()
         );
+    }
+
+    #[test]
+    fn obsolete_flat_white_balance_state_is_quarantined_at_load_boundary() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let sidecar_path = temp_dir.path().join("legacy.arw.rrdata");
+        let legacy = serde_json::json!({
+            "version": 2,
+            "rating": 4,
+            "adjustments": {
+                "exposure": 0.25,
+                "temperature": 18,
+                "tint": -9,
+                "creativeTemperature": 7,
+                "creativeTint": 3,
+                "whiteBalanceMigration": { "state": "legacy" },
+                "whiteBalanceTechnical": {
+                    "adaptation": "cat16_v1",
+                    "confidence": null,
+                    "contract": "rapidraw.white_balance.v1",
+                    "duv": 0,
+                    "inputSemantics": "raw_scene_linear",
+                    "kelvin": 6504,
+                    "mode": "as_shot",
+                    "presetId": null,
+                    "sampleCount": null,
+                    "source": "as_shot",
+                    "synchronization": { "mode": "per_image", "referenceSourceIdentity": null },
+                    "x": 0.32168,
+                    "y": 0.33767
+                }
+            }
+        });
+        fs::write(&sidecar_path, serde_json::to_vec_pretty(&legacy).unwrap()).unwrap();
+
+        let recovered =
+            load_sidecar_recovering(&sidecar_path, None).expect("recover obsolete WB state");
+        assert_eq!(recovered.outcome, PersistedStateOutcome::Recovered);
+        assert_eq!(recovered.metadata.rating, 4);
+        assert_eq!(recovered.metadata.adjustments["exposure"], 0.25);
+        for field in [
+            "temperature",
+            "tint",
+            "creativeTemperature",
+            "creativeTint",
+            "whiteBalanceMigration",
+        ] {
+            assert!(recovered.metadata.adjustments.get(field).is_none());
+        }
+        let state = recovered.metadata.persisted_render_state.as_ref().unwrap();
+        let receipt = state.recovery_receipts.last().unwrap();
+        for field in [
+            "temperature",
+            "tint",
+            "creativeTemperature",
+            "creativeTint",
+            "whiteBalanceMigration",
+        ] {
+            assert!(state.quarantined_extensions.contains_key(field));
+            assert!(
+                receipt
+                    .disabled_fields
+                    .contains(&format!("adjustments.{field}"))
+            );
+        }
     }
 
     #[test]

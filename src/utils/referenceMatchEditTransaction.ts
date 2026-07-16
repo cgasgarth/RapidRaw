@@ -6,6 +6,7 @@ import {
   createReferenceMatchAdjustmentLayer,
   createReferenceMatchAppliedDiffs,
   fingerprintReferenceMatchValue,
+  getReferenceMatchAdjustmentValue,
   type ReferenceMatchGroup,
   type ReferenceMatchProposal,
 } from './referenceMatch';
@@ -103,6 +104,14 @@ export const buildReferenceMatchGlobalEditTransaction = ({
     proposal,
   });
   if (appliedDiffs.length === 0) return null;
+  const appliesWhiteBalance = appliedDiffs.some(
+    (diff) => diff.key === 'whiteBalanceKelvin' || diff.key === 'whiteBalanceDuv',
+  );
+  const scalarPatch = Object.fromEntries(
+    appliedDiffs
+      .filter((diff) => diff.key !== 'whiteBalanceKelvin' && diff.key !== 'whiteBalanceDuv')
+      .map((diff) => [diff.key, diff.after]),
+  );
   const receipt = matchLookApplicationReceiptV1Schema.parse({
     appliedDiffs,
     appliedAt,
@@ -114,7 +123,7 @@ export const buildReferenceMatchGlobalEditTransaction = ({
     impact,
     proposalFingerprint: proposal.proposalFingerprint,
     resultingGraphFingerprint: fingerprintReferenceMatchValue(
-      JSON.stringify(proposal.diffs.map((diff) => [diff.key, applied[diff.key]])),
+      JSON.stringify(proposal.diffs.map((diff) => [diff.key, getReferenceMatchAdjustmentValue(applied, diff.key)])),
     ),
     schemaVersion: 1,
     targetAnalysisFingerprint: proposal.targetAnalysisFingerprint,
@@ -128,7 +137,8 @@ export const buildReferenceMatchGlobalEditTransaction = ({
       operations: [
         {
           patch: {
-            ...Object.fromEntries(appliedDiffs.map((diff) => [diff.key, diff.after])),
+            ...scalarPatch,
+            ...(appliesWhiteBalance ? { whiteBalanceTechnical: structuredClone(applied.whiteBalanceTechnical) } : {}),
             referenceMatchApplicationReceipt: receipt,
           },
           type: 'patch-adjustments',

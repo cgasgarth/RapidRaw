@@ -32,7 +32,6 @@ const autoAdjustments = {
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,
-  whiteBalanceMigration: 'native_v1',
   whiteBalanceTechnical: {
     ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
     confidence: 0.8,

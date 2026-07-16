@@ -36,7 +36,7 @@ describe('adjustment section state', () => {
   });
 
   test('keeps color adjustment data compatible after color moves to its own panel', () => {
-    expect(ADJUSTMENT_SECTIONS.color).toContain('temperature');
+    expect(ADJUSTMENT_SECTIONS.color).toContain('whiteBalanceTechnical');
     expect(hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS.color, INITIAL_ADJUSTMENTS)).toBe(false);
   });
 

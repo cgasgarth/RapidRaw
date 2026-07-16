@@ -3,14 +3,7 @@ import type { EditTransactionRequest } from './editTransaction';
 
 export type CameraInputParameters = Pick<
   Adjustments,
-  | 'cameraProfile'
-  | 'cameraProfileAmount'
-  | 'creativeTemperature'
-  | 'creativeTint'
-  | 'temperature'
-  | 'tint'
-  | 'whiteBalanceMigration'
-  | 'whiteBalanceTechnical'
+  'cameraProfile' | 'cameraProfileAmount' | 'whiteBalanceTechnical'
 >;
 export type CameraInputPatch = Partial<CameraInputParameters>;
 

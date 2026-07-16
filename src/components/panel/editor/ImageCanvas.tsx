@@ -122,7 +122,6 @@ const canvasOverlayShadowProps = {
 } as const;
 export interface ViewerWhiteBalanceRuntimeDescriptor {
   readonly active: boolean;
-  readonly baseWhiteBalance: { readonly temperature: number; readonly tint: number };
   readonly commands: {
     readonly cancelPreview?: () => void;
     readonly commit?: (command: WhiteBalancePickerAdjustmentCommand) => void;
@@ -1066,10 +1065,6 @@ export const ImageCanvas = memo(
       },
       whiteBalance: {
         active: isWbPickerActive,
-        baseWhiteBalance: whiteBalanceRuntime?.baseWhiteBalance ?? {
-          temperature: adjustments.temperature,
-          tint: adjustments.tint,
-        },
         geometry: overlayGeometry,
         imageSessionId: pickerImageSessionId,
         ...(whiteBalanceRuntime?.commands.commit === undefined
@@ -1264,11 +1259,11 @@ export const ImageCanvas = memo(
         data-wb-picker-pending-intent={whiteBalanceController.pendingIntent ?? ''}
         data-wb-picker-pending-pointer-id={whiteBalanceController.pendingPointerId ?? ''}
         data-wb-picker-preview-identity={lastWhiteBalancePickerReceipt?.previewIdentity ?? undefined}
-        data-wb-picker-result-temperature={
-          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.resultingTemperature) : undefined
+        data-wb-picker-result-kelvin={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.resultingKelvin) : undefined
         }
-        data-wb-picker-result-tint={
-          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.resultingTint) : undefined
+        data-wb-picker-result-duv={
+          lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.resultingDuv) : undefined
         }
         data-wb-picker-sample-blue={
           lastWhiteBalancePickerReceipt ? String(lastWhiteBalancePickerReceipt.averageRgb.blue) : undefined

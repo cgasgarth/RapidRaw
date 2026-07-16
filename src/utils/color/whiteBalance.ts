@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
 const WHITE_BALANCE_CONTRACT = 'rapidraw.white_balance.v1' as const;
-const WHITE_BALANCE_ALGORITHM = 'cat16_ap1_illuminant_v1' as const;
-
 const whiteBalanceModeSchema = z.enum(['as_shot', 'auto', 'kelvin_tint', 'chromaticity', 'preset']);
 export type WhiteBalanceMode = z.infer<typeof whiteBalanceModeSchema>;
 const whiteBalancePresetIdSchema = z.enum(['tungsten', 'daylight', 'flash', 'cloudy', 'shade']);
@@ -24,25 +22,45 @@ export const technicalWhiteBalanceSchema = z
   .object({
     contract: z.literal(WHITE_BALANCE_CONTRACT),
     mode: whiteBalanceModeSchema,
-    kelvin: z.number().min(1667).max(25000),
-    duv: z.number().min(-0.05).max(0.05),
-    x: z.number().gt(0).lt(1),
-    y: z.number().gt(0).lt(1),
+    kelvin: z.number().finite().min(1667).max(25000),
+    duv: z.number().finite().min(-0.05).max(0.05),
+    x: z.number().finite().gt(0).lt(1),
+    y: z.number().finite().gt(0).lt(1),
     adaptation: z.literal('cat16_v1'),
     source: z.enum(['as_shot', 'auto', 'picker', 'preset', 'user']),
-    confidence: z.number().min(0).max(1).nullable(),
+    confidence: z.number().finite().min(0).max(1).nullable(),
     sampleCount: z.number().int().nonnegative().nullable(),
-    inputSemantics: z.enum(['raw_scene_linear', 'rendered_scene_linear_approximation']).default('raw_scene_linear'),
-    presetId: whiteBalancePresetIdSchema.nullable().default(null),
+    inputSemantics: z.enum(['raw_scene_linear', 'rendered_scene_linear_approximation']),
+    presetId: whiteBalancePresetIdSchema.nullable(),
     synchronization: z
       .object({
         mode: z.enum(['per_image', 'locked_reference']),
         referenceSourceIdentity: z.string().trim().min(1).nullable(),
       })
-      .strict()
-      .default({ mode: 'per_image', referenceSourceIdentity: null }),
+      .strict(),
   })
   .strict()
+  .superRefine((settings, context) => {
+    const sourceMatchesMode =
+      (settings.mode === 'as_shot' && settings.source === 'as_shot') ||
+      (settings.mode === 'auto' && settings.source === 'auto') ||
+      (settings.mode === 'preset' && settings.source === 'preset') ||
+      (settings.mode === 'chromaticity' && (settings.source === 'picker' || settings.source === 'user')) ||
+      (settings.mode === 'kelvin_tint' && (settings.source === 'preset' || settings.source === 'user'));
+    if (!sourceMatchesMode)
+      context.addIssue({ code: 'custom', message: 'White balance mode and source are incompatible.' });
+    if ((settings.mode === 'preset') !== (settings.presetId !== null)) {
+      context.addIssue({ code: 'custom', message: 'Only preset mode requires a preset identity.', path: ['presetId'] });
+    }
+    const hasReference = settings.synchronization.referenceSourceIdentity !== null;
+    if ((settings.synchronization.mode === 'locked_reference') !== hasReference) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Locked-reference synchronization requires exactly one reference identity.',
+        path: ['synchronization'],
+      });
+    }
+  })
   .refine(({ x, y }) => x + y < 1, { message: 'Chromaticity x+y must be below one' });
 
 export type TechnicalWhiteBalance = z.infer<typeof technicalWhiteBalanceSchema>;

@@ -572,28 +572,8 @@ fn get_global_adjustments_from_json(
             SCALES.saturation,
             None,
         ),
-        temperature: scaled_section_value(
-            js_adjustments,
-            "color",
-            if js_adjustments.get("whiteBalanceTechnical").is_some() {
-                "creativeTemperature"
-            } else {
-                "temperature"
-            },
-            SCALES.temperature,
-            None,
-        ),
-        tint: scaled_section_value(
-            js_adjustments,
-            "color",
-            if js_adjustments.get("whiteBalanceTechnical").is_some() {
-                "creativeTint"
-            } else {
-                "tint"
-            },
-            SCALES.tint,
-            None,
-        ),
+        temperature: 0.0,
+        tint: 0.0,
         vibrance: scaled_section_value(js_adjustments, "color", "vibrance", SCALES.vibrance, None),
         hue: scaled_section_value(js_adjustments, "color", "hue", 1.0, None),
         edit_graph_version: 0.0,
@@ -1131,10 +1111,8 @@ mod tests {
     }
 
     #[test]
-    fn parses_technical_white_balance_separately_from_creative_offsets() {
-        let native = json!({
-            "creativeTemperature": 25.0,
-            "creativeTint": -10.0,
+    fn parses_only_technical_white_balance_for_global_color() {
+        let current = json!({
             "temperature": 99.0,
             "tint": 99.0,
             "whiteBalanceTechnical": {
@@ -1143,23 +1121,23 @@ mod tests {
                 "duv": 0.008
             }
         });
-        let parsed = get_all_adjustments_from_json(&native, true, None);
-        assert_eq!(parsed.global.temperature, 1.0);
-        assert_eq!(parsed.global.tint, -0.1);
+        let parsed = get_all_adjustments_from_json(&current, true, None);
+        assert_eq!(parsed.global.temperature, 0.0);
+        assert_eq!(parsed.global.tint, 0.0);
         assert_ne!(
             parsed.global.technical_white_balance.col0,
             [1.0, 0.0, 0.0, 0.0]
         );
 
-        let legacy = get_all_adjustments_from_json(
+        let obsolete_scalars = get_all_adjustments_from_json(
             &json!({ "temperature": 25.0, "tint": -10.0 }),
             true,
             None,
         );
-        assert_eq!(legacy.global.temperature, 1.0);
-        assert_eq!(legacy.global.tint, -0.1);
+        assert_eq!(obsolete_scalars.global.temperature, 0.0);
+        assert_eq!(obsolete_scalars.global.tint, 0.0);
         assert_eq!(
-            legacy.global.technical_white_balance.col0,
+            obsolete_scalars.global.technical_white_balance.col0,
             [1.0, 0.0, 0.0, 0.0]
         );
     }

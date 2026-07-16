@@ -26,7 +26,7 @@ describe('tone equalizer settings lifecycle', () => {
   });
 
   test('keeps legacy process output selected until an explicit upgrade', () => {
-    const loaded = normalizeLoadedAdjustments({ exposure: 1.25, rawEngineEditGraphVersion: 1 });
+    const loaded = normalizeLoadedAdjustments({ ...INITIAL_ADJUSTMENTS, exposure: 1.25, rawEngineEditGraphVersion: 1 });
     expect(loaded.rawEngineEditGraphVersion).toBe(1);
     expect(loaded.toneEqualizer).toEqual(INITIAL_TONE_EQUALIZER);
   });
@@ -34,6 +34,7 @@ describe('tone equalizer settings lifecycle', () => {
   test('round-trips valid settings and quarantines malformed sidecar state', () => {
     const validBandEv = [0, 0, -0.5, 0.25, 1, 0, 0, 0, 0] as const;
     const loaded = normalizeLoadedAdjustments({
+      ...INITIAL_ADJUSTMENTS,
       rawEngineEditGraphVersion: 2,
       toneEqualizer: { ...INITIAL_TONE_EQUALIZER, bandEv: [...validBandEv], enabled: true, selectedBand: 4 },
     });

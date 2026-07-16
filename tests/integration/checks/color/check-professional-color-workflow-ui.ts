@@ -744,18 +744,33 @@ function installDom() {
         assert.equal(command, 'calculate_auto_adjustments');
         autoWhiteBalanceInvokeCount += 1;
         return {
+          blacks: 0,
+          brightness: 0,
+          centré: 0,
+          clarity: 0,
+          contrast: 0,
+          dehaze: 0,
+          exposure: 0,
+          highlights: 0,
+          shadows: 0,
+          vibrance: 0,
+          vignetteAmount: 0,
           whiteBalanceTechnical: {
             adaptation: 'cat16_v1',
             confidence: 0.78,
             contract: 'rapidraw.white_balance.v1',
             duv: 0.008,
+            inputSemantics: 'raw_scene_linear',
             kelvin: 4380,
             mode: 'auto',
+            presetId: null,
             sampleCount: 412,
             source: 'auto',
+            synchronization: { mode: 'per_image', referenceSourceIdentity: null },
             x: 0.36,
             y: 0.35,
           },
+          whites: 0,
         };
       },
     },

@@ -8,6 +8,7 @@ import {
   buildBasicToneImageCommandContext,
   type LegacyBasicToneAdjustmentPayload,
 } from '../../basicToneCommandBridge';
+import { technicalWhiteBalanceSchema } from '../../color/whiteBalance';
 import { buildAgentImageContextSnapshot } from '../context/agentImageContextSnapshot';
 import { applyBasicToneToLiveEditor } from '../session/agentLiveBasicTone';
 import { createLiveEditorAppServerBridge } from '../session/agentLiveEditorCoreState';
@@ -29,8 +30,7 @@ const agentGlobalAdjustmentPatchSchema = z
     highlights: z.number().min(-100).max(100).optional(),
     saturation: z.number().min(-100).max(100).optional(),
     shadows: z.number().min(-100).max(100).optional(),
-    temperature: z.number().min(-100).max(100).optional(),
-    tint: z.number().min(-100).max(100).optional(),
+    whiteBalanceTechnical: technicalWhiteBalanceSchema.optional(),
     vibrance: z.number().min(-100).max(100).optional(),
     whites: z.number().min(-100).max(100).optional(),
   })
@@ -152,7 +152,7 @@ export type AgentAdjustmentsDryRunRequest = z.infer<typeof agentAdjustmentsDryRu
 export type AgentAdjustmentsDryRunResponse = z.infer<typeof agentAdjustmentsDryRunResponseSchema>;
 export type AgentAdjustmentsApplyApproval = z.infer<typeof agentAdjustmentsApplyApprovalSchema>;
 
-const EXTRA_ADJUSTMENT_KEYS = ['temperature', 'tint', 'vibrance'] as const satisfies ReadonlyArray<keyof Adjustments>;
+const EXTRA_ADJUSTMENT_KEYS = ['whiteBalanceTechnical', 'vibrance'] as const satisfies ReadonlyArray<keyof Adjustments>;
 
 const buildRequestedBasicTone = (
   base: Adjustments,
@@ -417,11 +417,12 @@ export const applyAgentGlobalAdjustments = async (
 
   const initialState = useEditorStore.getState();
   const undoGraphRevision = parsedRequest.expectedGraphRevision;
-  const additionalAdjustmentPatch: Partial<Adjustments> = {};
-  for (const key of EXTRA_ADJUSTMENT_KEYS) {
-    const value = parsedRequest.adjustments[key];
-    if (value !== undefined) additionalAdjustmentPatch[key] = value;
-  }
+  const additionalAdjustmentPatch: Partial<Adjustments> = {
+    ...(parsedRequest.adjustments.vibrance === undefined ? {} : { vibrance: parsedRequest.adjustments.vibrance }),
+    ...(parsedRequest.adjustments.whiteBalanceTechnical === undefined
+      ? {}
+      : { whiteBalanceTechnical: structuredClone(parsedRequest.adjustments.whiteBalanceTechnical) }),
+  };
   const basicToneResult = await applyBasicToneToLiveEditor({
     acceptedPlanHash: acceptedReceipt.basicTonePlanHash,
     acceptedPlanId: acceptedReceipt.basicTonePlanId,

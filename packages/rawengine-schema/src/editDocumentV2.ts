@@ -907,11 +907,6 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
     defaultParams: {
       cameraProfile: 'camera_standard',
       cameraProfileAmount: 100,
-      creativeTemperature: 0,
-      creativeTint: 0,
-      temperature: 0,
-      tint: 0,
-      whiteBalanceMigration: 'native_v1',
       whiteBalanceTechnical: {
         adaptation: 'cat16_v1',
         confidence: null,
@@ -929,17 +924,7 @@ export const EDIT_DOCUMENT_NODE_DESCRIPTORS = [
       },
     },
     editorSection: 'color',
-    legacyFields: [
-      'cameraProfile',
-      'cameraProfileAmount',
-      'creativeTemperature',
-      'creativeTint',
-      'temperature',
-      'tint',
-      'whiteBalance',
-      'whiteBalanceMigration',
-      'whiteBalanceTechnical',
-    ],
+    legacyFields: ['cameraProfile', 'cameraProfileAmount', 'whiteBalanceTechnical'],
     nodeType: 'camera_input',
     process: 'scene_referred_v2',
     renderStage: 'camera_input',
@@ -1193,12 +1178,6 @@ export const editDocumentCameraInputV2Schema = z
       z.string().regex(/^dcp:[a-f0-9]{64}$/u),
     ]),
     cameraProfileAmount: z.number().finite().min(0).max(100),
-    creativeTemperature: z.number().finite().min(-100).max(100),
-    creativeTint: z.number().finite().min(-100).max(100),
-    temperature: z.number().finite().min(-100).max(100),
-    tint: z.number().finite().min(-100).max(100),
-    whiteBalance: editDocumentJsonValueSchema.optional(),
-    whiteBalanceMigration: z.enum(['native_v1', 'legacy_creative_temperature_tint_v1']),
     whiteBalanceTechnical: editDocumentTechnicalWhiteBalanceV2Schema,
   })
   .strict();

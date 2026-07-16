@@ -8,7 +8,11 @@ import {
   renderFilmProfileThumbnail,
 } from '../../tauri/filmThumbnails';
 import type { Adjustments } from '../../utils/adjustments';
-import { buildFilmLookAppliedAdjustmentPatch, type FilmLookBrowserItem } from '../../utils/film-look/filmLookBrowser';
+import {
+  buildFilmLookAppliedAdjustmentPatch,
+  type FilmLookBrowserItem,
+  lowerFilmLookAdjustmentPatchToCurrent,
+} from '../../utils/film-look/filmLookBrowser';
 
 type ThumbnailState =
   | { status: 'idle' | 'queued' | 'rendering'; dataUrl: null; reason: null }
@@ -101,7 +105,10 @@ export function FilmLookNativeThumbnail({
 
     const adjustments: Adjustments = {
       ...baseAdjustments,
-      ...buildFilmLookAppliedAdjustmentPatch(look, strength),
+      ...lowerFilmLookAdjustmentPatchToCurrent(
+        buildFilmLookAppliedAdjustmentPatch(look, strength),
+        baseAdjustments.whiteBalanceTechnical.inputSemantics,
+      ),
       filmEmulation: null,
       filmLookId: look.id,
       filmLookStrength: strength,

@@ -21,7 +21,6 @@ const autoPatch = {
   shadows: 12,
   vibrance: 16,
   vignetteAmount: -3,
-  whiteBalanceMigration: 'native_v1',
   whiteBalanceTechnical: {
     ...structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical),
     confidence: 0.8,
@@ -36,7 +35,7 @@ const invoke = mock(async (command: string) => {
   if (command === 'reset_adjustments_for_paths') {
     return [
       {
-        adjustments: {},
+        adjustments: { whiteBalanceTechnical: structuredClone(INITIAL_ADJUSTMENTS.whiteBalanceTechnical) },
         path: sourcePath,
         renderGeneration: 12,
         revision: `sha256:${'b'.repeat(64)}`,

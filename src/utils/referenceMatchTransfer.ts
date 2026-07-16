@@ -2,11 +2,10 @@ import type { Adjustments } from './adjustments';
 
 const REFERENCE_MATCH_NODE_KEYS = [
   'contrast',
-  'creativeTemperature',
-  'creativeTint',
   'exposure',
   'saturation',
   'vibrance',
+  'whiteBalanceTechnical',
 ] as const satisfies ReadonlyArray<keyof Adjustments>;
 
 export type ReferenceMatchTransferMode = 'batch-sync' | 'copy-paste';
@@ -59,7 +58,13 @@ export const reconcileReferenceMatchReceiptsAfterEdit = (previous: Adjustments, 
   if (
     globalReceipt !== null &&
     receiptsMatch(next.referenceMatchApplicationReceipt, globalReceipt) &&
-    globalReceipt.appliedDiffs.some((diff) => previous[diff.key] !== next[diff.key])
+    globalReceipt.appliedDiffs.some((diff) =>
+      diff.key === 'whiteBalanceKelvin'
+        ? previous.whiteBalanceTechnical.kelvin !== next.whiteBalanceTechnical.kelvin
+        : diff.key === 'whiteBalanceDuv'
+          ? previous.whiteBalanceTechnical.duv !== next.whiteBalanceTechnical.duv
+          : previous[diff.key] !== next[diff.key],
+    )
   ) {
     reconciled = { ...reconciled, referenceMatchApplicationReceipt: null };
   }
@@ -73,7 +78,12 @@ export const reconcileReferenceMatchReceiptsAfterEdit = (previous: Adjustments, 
     if (receipt === undefined || !receiptsMatch(layer.referenceMatchApplicationReceipt, receipt)) continue;
     const changed =
       previousLayer.opacity !== layer.opacity ||
-      receipt.appliedDiffs.some((diff) => previousLayer.adjustments[diff.key] !== layer.adjustments[diff.key]);
+      receipt.appliedDiffs.some(
+        (diff) =>
+          diff.key !== 'whiteBalanceKelvin' &&
+          diff.key !== 'whiteBalanceDuv' &&
+          previousLayer.adjustments[diff.key] !== layer.adjustments[diff.key],
+      );
     if (!changed) continue;
     if (reconciledMasks === reconciled.masks) reconciledMasks = [...reconciled.masks];
     const { referenceMatchApplicationReceipt: _staleReceipt, ...layerWithoutReceipt } = layer;

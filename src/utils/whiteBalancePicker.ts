@@ -1,16 +1,8 @@
 import { z } from 'zod';
 import type { Adjustments } from './adjustments';
-import {
-  buildTechnicalWhiteBalance,
-  cctToXy,
-  type TechnicalWhiteBalance,
-  technicalWhiteBalanceSchema,
-} from './color/whiteBalance';
+import { cctToXy, type TechnicalWhiteBalance, technicalWhiteBalanceSchema } from './color/whiteBalance';
 import { buildAdjustmentMutationOperations, type EditTransactionRequest } from './editTransaction';
 import { reconcileReferenceMatchReceiptsAfterEdit } from './referenceMatchTransfer';
-
-const sliderMinimum = -100;
-const sliderMaximum = 100;
 
 const whiteBalancePickerSampleSchema = z
   .object({
@@ -19,23 +11,6 @@ const whiteBalancePickerSampleSchema = z
     blue: z.number().min(0).max(255),
   })
   .strict();
-
-export const whiteBalancePickerInputSchema = z
-  .object({
-    currentTemperature: z.number().min(sliderMinimum).max(sliderMaximum),
-    currentTint: z.number().min(sliderMinimum).max(sliderMaximum),
-    sample: whiteBalancePickerSampleSchema,
-  })
-  .strict();
-
-export type WhiteBalancePickerInput = z.infer<typeof whiteBalancePickerInputSchema>;
-
-export interface WhiteBalancePickerResult {
-  deltaTemperature: number;
-  deltaTint: number;
-  temperature: number;
-  tint: number;
-}
 
 export interface WhiteBalancePickerSampleCoordinates {
   imageX: number;
@@ -57,17 +32,13 @@ export interface WhiteBalancePickerRuntimeReceipt {
   rejectedClippedPixels: number;
   spatialVariance: number;
   previewIdentity: string;
-  resultingTemperature: number;
-  resultingTint: number;
+  resultingDuv: number;
+  resultingKelvin: number;
   selectedImagePath: string;
 }
 
 export interface WhiteBalancePickerAdjustmentCommand {
-  adjustment: WhiteBalancePickerResult;
   patch: {
-    temperature: number;
-    tint: number;
-    whiteBalanceMigration: 'native_v1';
     whiteBalanceTechnical: TechnicalWhiteBalance;
   };
   receipt: WhiteBalancePickerRuntimeReceipt;
@@ -76,8 +47,6 @@ export interface WhiteBalancePickerAdjustmentCommand {
 export interface WhiteBalancePickerAdjustmentCommandInput {
   averageRgb: z.infer<typeof whiteBalancePickerSampleSchema>;
   coordinates: WhiteBalancePickerSampleCoordinates;
-  currentTemperature: number;
-  currentTint: number;
   previewIdentity: string;
   currentPreviewIdentity?: string;
   patchPixelCount?: number;
@@ -174,21 +143,6 @@ export const cancelWhiteBalancePickerPreview = (
   return structuredClone(session.baseAdjustments);
 };
 
-export interface RgbPixel {
-  blue: number;
-  green: number;
-  red: number;
-}
-
-export interface WhiteBalanceRgbResult {
-  outputRgb: RgbPixel;
-  temperatureMultiplier: RgbPixel;
-  tintMultiplier: RgbPixel;
-}
-
-const clampSlider = (value: number): number => Math.max(sliderMinimum, Math.min(sliderMaximum, value));
-const clamp01 = (value: number): number => Math.max(0, Math.min(1, value));
-
 const srgbToLinear = (value: number): number => {
   const normalized = value / 255;
   return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
@@ -234,27 +188,6 @@ export const estimateNeutralSampleIlluminant = (sample: z.infer<typeof whiteBala
     duv: Math.min(0.05, Math.max(-0.05, Math.sign(uv[1] - nearestUv[1]) * nearestDistance)),
     clippedChannelCount,
     confidence: Math.max(0, Math.min(1, (1 - clippedChannelCount / 3) * (1 - chroma / 255))),
-  };
-};
-
-export const calculateWhiteBalancePickerAdjustment = (input: WhiteBalancePickerInput): WhiteBalancePickerResult => {
-  const parsed = whiteBalancePickerInputSchema.parse(input);
-  const linR = srgbToLinear(parsed.sample.red);
-  const linG = srgbToLinear(parsed.sample.green);
-  const linB = srgbToLinear(parsed.sample.blue);
-
-  const sumRB = linR + linB;
-  const deltaTemperature = sumRB > 0.0001 ? ((linB - linR) / sumRB) * 125.0 : 0;
-
-  const linM = sumRB / 2.0;
-  const sumGM = linG + linM;
-  const deltaTint = sumGM > 0.0001 ? ((linG - linM) / sumGM) * 400.0 : 0;
-
-  return {
-    deltaTemperature,
-    deltaTint,
-    temperature: clampSlider(parsed.currentTemperature + deltaTemperature),
-    tint: clampSlider(parsed.currentTint + deltaTint),
   };
 };
 
@@ -310,8 +243,6 @@ export const analyzeWhiteBalancePickerRgbaSample = (
 export const buildWhiteBalancePickerAdjustmentCommand = ({
   averageRgb,
   coordinates,
-  currentTemperature,
-  currentTint,
   patchPixelCount = 1,
   previewIdentity,
   currentPreviewIdentity = previewIdentity,
@@ -323,28 +254,26 @@ export const buildWhiteBalancePickerAdjustmentCommand = ({
   if (patchPixelCount <= 0 || rejectedClippedPixels / patchPixelCount > 0.1)
     throw new WhiteBalancePickerSampleError('clipped_patch');
   if (spatialVariance > 0.025) throw new WhiteBalancePickerSampleError('non_uniform_patch');
-  const adjustment = calculateWhiteBalancePickerAdjustment({
-    currentTemperature,
-    currentTint,
-    sample: averageRgb,
-  });
   const estimate = estimateNeutralSampleIlluminant(averageRgb);
-  const technical = buildTechnicalWhiteBalance('chromaticity', estimate.kelvin, estimate.duv, 'picker');
   const patch = {
-    temperature: adjustment.temperature,
-    tint: adjustment.tint,
     whiteBalanceTechnical: technicalWhiteBalanceSchema.parse({
-      ...technical,
+      adaptation: 'cat16_v1',
+      confidence: estimate.confidence,
+      contract: 'rapidraw.white_balance.v1',
+      duv: estimate.duv,
+      inputSemantics: 'raw_scene_linear',
+      kelvin: estimate.kelvin,
+      mode: 'chromaticity',
+      presetId: null,
+      sampleCount: patchPixelCount - rejectedClippedPixels,
+      source: 'picker',
+      synchronization: { mode: 'per_image', referenceSourceIdentity: null },
       x: estimate.xy[0],
       y: estimate.xy[1],
-      confidence: estimate.confidence,
-      sampleCount: patchPixelCount - rejectedClippedPixels,
     }),
-    whiteBalanceMigration: 'native_v1' as const,
   };
 
   return {
-    adjustment,
     patch,
     receipt: {
       averageRgb: whiteBalancePickerSampleSchema.parse(averageRgb),
@@ -358,8 +287,8 @@ export const buildWhiteBalancePickerAdjustmentCommand = ({
       patchPixelCount,
       previewIdentity,
       rejectedClippedPixels,
-      resultingTemperature: adjustment.temperature,
-      resultingTint: adjustment.tint,
+      resultingDuv: estimate.duv,
+      resultingKelvin: estimate.kelvin,
       selectedImagePath,
       spatialVariance,
     },
@@ -371,36 +300,5 @@ export const applyWhiteBalancePickerAdjustmentCommand = (
   command: WhiteBalancePickerAdjustmentCommand,
 ): Adjustments => ({
   ...baseAdjustments,
-  // Retain legacy mirrors for command/audit compatibility; render authority
-  // is the typed technical illuminant below.
   ...command.patch,
 });
-
-export const applyWhiteBalanceToRgbPixel = (
-  pixel: RgbPixel,
-  temperature: number,
-  tint: number,
-): WhiteBalanceRgbResult => {
-  const normalizedTemperature = clampSlider(temperature) / 100;
-  const normalizedTint = clampSlider(tint) / 100;
-  const temperatureMultiplier = {
-    blue: 1 - normalizedTemperature * 0.2,
-    green: 1 + normalizedTemperature * 0.05,
-    red: 1 + normalizedTemperature * 0.2,
-  };
-  const tintMultiplier = {
-    blue: 1 + normalizedTint * 0.25,
-    green: 1 - normalizedTint * 0.25,
-    red: 1 + normalizedTint * 0.25,
-  };
-
-  return {
-    outputRgb: {
-      blue: clamp01(pixel.blue * temperatureMultiplier.blue * tintMultiplier.blue),
-      green: clamp01(pixel.green * temperatureMultiplier.green * tintMultiplier.green),
-      red: clamp01(pixel.red * temperatureMultiplier.red * tintMultiplier.red),
-    },
-    temperatureMultiplier,
-    tintMultiplier,
-  };
-};

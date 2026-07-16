@@ -71,7 +71,7 @@ export const useAutoWhiteBalanceEditCommit = (
       buildCameraInputEditTransaction(
         currentState,
         identity,
-        { whiteBalanceMigration: 'native_v1', whiteBalanceTechnical: technical },
+        { whiteBalanceTechnical: technical },
         crypto.randomUUID(),
       ),
     );

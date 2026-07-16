@@ -12,6 +12,7 @@ import {
 import {
   buildFilmLookAppliedAdjustmentPatch,
   type FilmLookBrowserItem,
+  lowerFilmLookAdjustmentPatchToCurrent,
   resetFilmLookControlledAdjustments,
 } from '../../utils/film-look/filmLookBrowser';
 import { getFilmLookBrowserGroups } from '../../utils/film-look/filmLookRegistry';
@@ -116,9 +117,12 @@ export function FilmEmulationWorkspace() {
   const applyProfile = (look: FilmLookBrowserItem) => {
     const current = useEditorStore.getState().adjustments;
     commitFilmPatch({
-      ...buildFilmLookAppliedAdjustmentPatch(
-        look,
-        current.filmLookId === look.id ? current.filmLookStrength : look.strengthDefault,
+      ...lowerFilmLookAdjustmentPatchToCurrent(
+        buildFilmLookAppliedAdjustmentPatch(
+          look,
+          current.filmLookId === look.id ? current.filmLookStrength : look.strengthDefault,
+        ),
+        current.whiteBalanceTechnical.inputSemantics,
       ),
       filmEmulation: null,
       filmLookId: look.id,
@@ -127,7 +131,10 @@ export function FilmEmulationWorkspace() {
   };
   const resetFilm = () => {
     commitFilmPatch({
-      ...resetFilmLookControlledAdjustments(),
+      ...lowerFilmLookAdjustmentPatchToCurrent(
+        resetFilmLookControlledAdjustments(),
+        useEditorStore.getState().adjustments.whiteBalanceTechnical.inputSemantics,
+      ),
       filmEmulation: null,
       filmLookId: null,
       filmLookStrength: INITIAL_ADJUSTMENTS.filmLookStrength,

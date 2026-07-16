@@ -772,7 +772,6 @@ fn compile_adjustments(
                 let after = item.proposed_parameters.clone();
                 if before != after {
                     object.insert(key.clone(), after.clone());
-                    object.insert("whiteBalanceMigration".into(), json!("native_v1"));
                     diffs.push(AutoParameterDiffV1 {
                         key,
                         before,

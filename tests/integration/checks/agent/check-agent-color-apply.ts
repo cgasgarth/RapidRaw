@@ -15,6 +15,7 @@ import {
   agentColorApplyRequestSchema,
   applyAgentColor,
 } from '../../../../src/utils/agent/tools/agentColorApplyTool.ts';
+import { buildTechnicalWhiteBalance } from '../../../../src/utils/color/whiteBalance.ts';
 import { TONE_CURVE_PARAMETRIC_PRESETS } from '../../../../src/utils/profileTonePresets.ts';
 import {
   buildRawEngineAppServerRouteCatalog,
@@ -265,6 +266,7 @@ if (
   throw new Error('agent color typed HSL dry-run mutated live editor state.');
 }
 
+const agentWhiteBalance = buildTechnicalWhiteBalance('kelvin_tint', 5900, -0.003);
 const result = await applyAgentColor({
   color: {
     blackWhiteMixer: {
@@ -321,8 +323,7 @@ const result = await applyAgentColor({
       targetLuminance: 0.58,
       targetSaturation: 0.42,
     },
-    temperature: 8,
-    tint: -3,
+    whiteBalanceTechnical: agentWhiteBalance,
     toneCurve: 'soft_contrast',
     vibrance: 14,
   },
@@ -336,8 +337,7 @@ const state = useEditorStore.getState();
 const afterSnapshot = buildAgentImageContextSnapshot();
 
 if (
-  state.adjustments.temperature !== 8 ||
-  state.adjustments.tint !== -3 ||
+  JSON.stringify(state.adjustments.whiteBalanceTechnical) !== JSON.stringify(agentWhiteBalance) ||
   state.adjustments.vibrance !== 14 ||
   state.adjustments.hsl.oranges.saturation !== 12 ||
   state.adjustments.colorGrading.highlights.saturation !== 7 ||
@@ -368,7 +368,8 @@ if (
 }
 if (
   state.editDocumentV2.nodes.camera_input?.params.cameraProfile !== 'camera_portrait' ||
-  state.editDocumentV2.nodes.camera_input.params.temperature !== 8 ||
+  state.editDocumentV2.nodes.camera_input.params.whiteBalanceTechnical.kelvin !== agentWhiteBalance.kelvin ||
+  state.editDocumentV2.nodes.camera_input.params.whiteBalanceTechnical.duv !== agentWhiteBalance.duv ||
   state.editDocumentV2.nodes.perceptual_grading?.params.colorGrading.highlights.saturation !== 7 ||
   state.editDocumentV2.nodes.color_presence?.params.saturation !== 5
 ) {
@@ -405,8 +406,7 @@ for (const field of [
   'saturation',
   'selectiveColorRangeControls',
   'skinToneUniformity',
-  'temperature',
-  'tint',
+  'whiteBalanceTechnical',
   'toneCurve',
   'vibrance',
 ]) {

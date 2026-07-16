@@ -118,6 +118,7 @@ import {
   type MaskContainer,
 } from '../../utils/adjustments';
 import { agentChatTranscriptFixture } from '../../utils/agent/session/agentChatTranscriptFixture';
+import { buildTechnicalWhiteBalance } from '../../utils/color/whiteBalance';
 import { getComputationalMergeAppServerRoutePairSummary } from '../../utils/computational-merge/computationalMergeAppServerRoutePairs';
 import { DETAIL_OUTPUT_COMPARISON_VISUAL_PROOF } from '../../utils/detail/detailOutputComparisonProof';
 import { copyEditDocumentV2Nodes, legacyAdjustmentsToEditDocumentV2 } from '../../utils/editDocumentV2';
@@ -2456,7 +2457,7 @@ const createBrushMaskCanvasSubMask = (): SubMask => ({
 });
 
 const createBrushMaskCanvasContainer = (subMask: SubMask): MaskContainer => ({
-  adjustments: INITIAL_ADJUSTMENTS,
+  adjustments: INITIAL_MASK_ADJUSTMENTS,
   blendMode: 'normal',
   editNodes: createDefaultMaskEditNodes(),
   editNodeSchemaVersion: 1,
@@ -2821,7 +2822,7 @@ const professionalCanvasRetouchMask: SubMask = {
 };
 
 const professionalCanvasRetouchContainer: MaskContainer = {
-  adjustments: INITIAL_ADJUSTMENTS,
+  adjustments: INITIAL_MASK_ADJUSTMENTS,
   blendMode: 'normal',
   editNodes: createDefaultMaskEditNodes(),
   editNodeSchemaVersion: 1,
@@ -5419,7 +5420,6 @@ const filmSmokeMetricLabels = {
   contrast: 'Contrast',
   grain: 'Grain',
   highlights: 'Highlights',
-  temperature: 'Temp',
 } as const;
 const formatSmokeMetric = (label: string, value: number | string) => `${label} ${value}`;
 const commandPaletteWorkflowSourcePath = '/Users/example/Pictures/CommandPalette/DSC_7853.ARW';
@@ -8117,10 +8117,9 @@ function FilmLookVisualSmoke() {
               <div className="h-full w-full bg-[radial-gradient(circle_at_42%_35%,rgba(255,244,215,0.45),transparent_22%),linear-gradient(170deg,transparent_42%,rgba(12,31,37,0.72)_43%)]" />
             </div>
             <div
-              className="grid grid-cols-5 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
+              className="grid grid-cols-3 gap-2 rounded-md border border-white/10 bg-black/45 p-3 text-sm"
               data-testid="film-look-adjustment-proof"
             >
-              <span>{formatSmokeMetric(filmSmokeMetricLabels.temperature, adjustments.temperature)}</span>
               <span>{formatSmokeMetric(filmSmokeMetricLabels.contrast, adjustments.contrast)}</span>
               <span>{formatSmokeMetric(filmSmokeMetricLabels.highlights, adjustments.highlights)}</span>
               <span>{formatSmokeMetric(filmSmokeMetricLabels.grain, adjustments.grainAmount)}</span>
@@ -8343,9 +8342,8 @@ function ColorWorkflowVisualSmoke() {
   const [adjustments, setAdjustments] = useState<Adjustments>(() => ({
     ...structuredClone(INITIAL_ADJUSTMENTS),
     saturation: -6,
-    temperature: 18,
-    tint: -9,
     vibrance: 14,
+    whiteBalanceTechnical: buildTechnicalWhiteBalance('kelvin_tint', 4_800, -0.006),
   }));
   const [isWbPickerActive, setIsWbPickerActive] = useState(false);
   const isCompactViewport = typeof window !== 'undefined' && window.innerWidth < 700;

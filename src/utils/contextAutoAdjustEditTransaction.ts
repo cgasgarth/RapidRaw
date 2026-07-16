@@ -20,7 +20,6 @@ export const contextAutoAdjustPatchSchema = z
     shadows: percentAdjustmentSchema,
     vibrance: percentAdjustmentSchema,
     vignetteAmount: percentAdjustmentSchema,
-    whiteBalanceMigration: z.literal('native_v1'),
     whiteBalanceTechnical: technicalWhiteBalanceSchema,
     whites: percentAdjustmentSchema,
     centré: percentAdjustmentSchema,
