@@ -514,6 +514,7 @@ export const ImageCanvas = memo(
       currentFrameHealth: rendererHandoff.committedBackend === 'wgpu' ? 'fresh' : null,
       hasRenderedFirstFrame,
       hasViewportTransform:
+        presentationDescriptor.semanticZoom.mode.kind !== 'fit' ||
         Math.abs(transformState.positionX) > 0.01 ||
         Math.abs(transformState.positionY) > 0.01 ||
         Math.abs(transformState.scale - 1) > 0.01,
