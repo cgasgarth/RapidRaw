@@ -7,6 +7,13 @@
     "types": ["bun"]
   },
   "include": [
+    "../../../scripts/native-feedback/runtime.ts",
+    "../../../scripts/native-feedback/workflow-selection.ts",
+    "../../../scripts/perf/bisect.ts",
+    "../../../scripts/perf/identity.ts",
+    "../../../scripts/perf/scenarios.ts",
+    "../../../scripts/qa/daemon-client.ts",
+    "../../../scripts/validation/scopedAutofix.ts",
     "./*.test.ts",
     "../qa-watch-plan.test.ts",
     "../validation-dag.test.ts",

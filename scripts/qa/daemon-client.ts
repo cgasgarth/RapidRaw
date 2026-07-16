@@ -74,6 +74,8 @@ async function ensureQaDaemonLease(worktree: string): Promise<QaDaemonLease> {
         stdout: 'pipe',
         stderr: 'pipe',
       });
+      if (!(child.stdout instanceof ReadableStream) || !(child.stderr instanceof ReadableStream))
+        throw new Error('QA daemon pipes were not attached.');
       childStdout = new Response(child.stdout).text();
       childStderr = new Response(child.stderr).text();
       child.unref();

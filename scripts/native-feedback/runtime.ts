@@ -3,6 +3,7 @@ import { readFile, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import type { NativeFeedbackExecutor } from './benchmark';
 import { cargoArtifactBytes, parseCargoTimingReport, peakRssBytes } from './cargo-timing';
+import type { NativeFeedbackSample } from './model';
 import { createNativeFeedbackRunGuard } from './run-guard';
 
 export function selectNativeFeedbackCargoArguments(options: {
@@ -25,6 +26,7 @@ export async function createCargoNativeFeedbackExecutor(options: {
   corePath: string;
   cargoArguments: readonly string[];
   cleanCargoArguments?: readonly string[];
+  cleanPreparationCargoArguments?: readonly string[];
   focusedCargoArguments?: readonly string[];
   signal?: AbortSignal;
 }): Promise<{
@@ -50,8 +52,10 @@ export async function createCargoNativeFeedbackExecutor(options: {
         const cargoArguments = selectNativeFeedbackCargoArguments({
           scenario,
           cargoArguments: options.cargoArguments,
-          cleanCargoArguments: options.cleanCargoArguments,
-          focusedCargoArguments: options.focusedCargoArguments,
+          ...(options.cleanCargoArguments === undefined ? {} : { cleanCargoArguments: options.cleanCargoArguments }),
+          ...(options.focusedCargoArguments === undefined
+            ? {}
+            : { focusedCargoArguments: options.focusedCargoArguments }),
         });
         const runCargo = async (arguments_: readonly string[]) => {
           const command = [
@@ -73,7 +77,7 @@ export async function createCargoNativeFeedbackExecutor(options: {
               ...Bun.env,
               RUSTFLAGS: profile.rustFlags.join(' '),
             },
-            signal: options.signal,
+            ...(options.signal === undefined ? {} : { signal: options.signal }),
             stderr: 'pipe',
             stdout: 'pipe',
           });
@@ -104,7 +108,7 @@ export async function createCargoNativeFeedbackExecutor(options: {
         const timingReportDigest = createHash('sha256')
           .update(runs.map(({ timing }) => timing.timingReportDigest).join(':'))
           .digest('hex');
-        const sample = {
+        const sample: NativeFeedbackSample = {
           scenario,
           iteration,
           wallMs,
