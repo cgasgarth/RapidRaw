@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test';
-
-import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
+import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
+import { createDefaultMaskEditNodes, INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 import {
   loadMaskOverlaySettingsPreference,
   nextMaskOverlayHotkeySettings,
@@ -11,6 +11,7 @@ import {
   buildMaskOverlayRequestIdentity,
   buildMaskOverlayTriggerHash,
   isMaskOverlayResponseCurrent,
+  type MaskPreviewDefinition,
 } from '../../../src/utils/mask/maskOverlayRequest';
 
 const originalLocalStorageDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
@@ -91,8 +92,10 @@ test('mask overlay hotkey cycles persisted review modes without changing opacity
 });
 
 test('mask overlay invoke payload carries normalized overlay settings and refinement parameters', () => {
-  const maskDef = {
+  const maskDef: MaskPreviewDefinition = {
     adjustments: {},
+    editNodes: createDefaultMaskEditNodes(),
+    editNodeSchemaVersion: 1,
     id: 'layer-1',
     invert: false,
     name: 'Layer 1',
@@ -101,7 +104,7 @@ test('mask overlay invoke payload carries normalized overlay settings and refine
       {
         id: 'mask-1',
         invert: false,
-        mode: 'additive',
+        mode: SubMaskMode.Additive,
         opacity: 100,
         parameters: {
           density: 0.55,
@@ -111,23 +114,25 @@ test('mask overlay invoke payload carries normalized overlay settings and refine
           maskDataBase64: 'already-sent-mask-payload',
           smoothness: 0.2,
         },
-        type: 'ai-subject',
+        type: Mask.AiSubject,
         visible: true,
       },
     ],
     visible: true,
-  } as const;
+  };
 
   const payload = buildMaskOverlayInvokePayload({
     jsAdjustments: INITIAL_ADJUSTMENTS,
     maskDef,
     maskOverlaySettings: { edgeThreshold: 0.65, mode: 'white', opacity: 0.4 },
     patchesSentToBackend: new Set(['mask-1']),
-    renderSize: { height: 240, scale: 0.5, width: 320 },
+    renderSize: { height: 240, offsetX: 0, offsetY: 0, scale: 0.5, width: 320 },
   });
 
   expect(payload?.overlaySettings).toEqual({ edgeThreshold: 0.65, mode: 'white', opacity: 0.4 });
-  expect(payload?.maskDef.subMasks[0].parameters).toMatchObject({
+  if (payload === null) throw new Error('Expected mask overlay invoke payload.');
+  if (!('subMasks' in payload.maskDef)) throw new Error('Expected mask-container overlay payload.');
+  expect(payload.maskDef.subMasks[0]?.parameters).toMatchObject({
     density: 0.55,
     edgeContrast: 0.4,
     edgeShiftPx: -3,
