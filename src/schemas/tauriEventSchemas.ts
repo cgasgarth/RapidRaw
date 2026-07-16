@@ -375,6 +375,24 @@ export const exportReceiptPayloadSchema = z
           colorProfile: z.string().trim().min(1).optional().nullable(),
           effectiveColorProfile: z.string().trim().min(1).optional().nullable(),
           format: z.string().trim().min(1),
+          hdrOutput: z
+            .object({
+              bitDepth: z.number().int().positive(),
+              byteSize: z.number().int().nonnegative(),
+              colorPrimaries: z.string().trim().min(1),
+              colorPolicyFingerprint: z.string().trim().min(1),
+              fileFormat: z.string().trim().min(1),
+              implementationVersion: z.number().int().positive(),
+              planFingerprint: z.string().trim().min(1),
+              rendition: z.string().trim().min(1),
+              sceneEditFingerprint: z.string().trim().min(1),
+              target: z.enum(['sdr_companion_tiff16', 'hdr_pq10', 'hdr_hlg10']),
+              transfer: z.string().trim().min(1),
+              viewFingerprint: z.string().trim().min(1),
+            })
+            .strict()
+            .optional()
+            .nullable(),
           iccEmbedded: z.boolean().optional().nullable(),
           outputPath: z.string().trim().min(1),
           outputDigest: z

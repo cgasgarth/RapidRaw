@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import {
+  currentRenderEditDocumentV2Schema,
   EDIT_DOCUMENT_COLOR_PRESENCE_FIELDS,
   EDIT_DOCUMENT_FILM_EMULATION_FIELDS,
   EDIT_DOCUMENT_LOCAL_CONTRAST_FIELDS,
@@ -431,15 +432,24 @@ export const prepareEditDocumentV2ForRender = (
   }
   // Explicit domains travel with their authoritative nodes; publishing only the
   // envelope would create an ambiguous render document rejected by native code.
+  const quarantinedNodes = authoritativeDocument.extensions['quarantinedNodes'];
   const next: EditDocumentV2 = {
-    ...prepared,
+    extensions:
+      quarantinedNodes !== undefined
+        ? {
+            quarantinedNodes,
+          }
+        : {},
     geometry,
+    graphProcess: prepared.graphProcess,
     layers,
     nodes,
+    provenance: prepared.provenance,
+    schemaVersion: prepared.schemaVersion,
     sourceDecode,
     sourceArtifacts,
   };
-  editDocumentV2Schema.parse(next);
+  currentRenderEditDocumentV2Schema.parse(next);
   return next;
 };
 

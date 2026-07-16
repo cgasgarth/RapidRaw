@@ -51,6 +51,47 @@ test('export receipt remains compatible with outputs without image metadata', ()
   expect(receipt.outputs[0]?.renderingIntent).toBeUndefined();
 });
 
+test('export receipt retains the exact native HDR output contract and accepts explicit SDR null', () => {
+  const hdrOutput = {
+    bitDepth: 16,
+    byteSize: 4096,
+    colorPrimaries: 'bt2020',
+    colorPolicyFingerprint: 'sha256:color-policy',
+    fileFormat: 'tiff',
+    implementationVersion: 1,
+    planFingerprint: '0000000000001234',
+    rendition: 'sdr_companion',
+    sceneEditFingerprint: '0000000000005412',
+    target: 'sdr_companion_tiff16' as const,
+    transfer: 'linear',
+    viewFingerprint: '0000000000009876',
+  };
+  const receipt = parseExportReceiptPayload({
+    completedAt: '2026-07-16T16:05:21.024Z',
+    outputs: [
+      {
+        byteSize: 4096,
+        format: 'tiff',
+        hdrOutput,
+        outputPath: '/tmp/hdr-companion.tiff',
+        sourcePath: '/tmp/source.arw',
+      },
+      {
+        byteSize: 1024,
+        format: 'jpg',
+        hdrOutput: null,
+        outputPath: '/tmp/sdr.jpg',
+        sourcePath: '/tmp/source.arw',
+      },
+    ],
+    terminalStatus: 'completed',
+    total: 2,
+  });
+
+  expect(receipt.outputs[0]?.hdrOutput).toEqual(hdrOutput);
+  expect(receipt.outputs[1]?.hdrOutput).toBeNull();
+});
+
 test('export receipt accepts exact final-byte digest evidence', () => {
   const digest = `sha256:${'a'.repeat(64)}`;
   const receipt = parseExportReceiptPayload({

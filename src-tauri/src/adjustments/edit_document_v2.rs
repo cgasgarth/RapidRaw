@@ -5197,6 +5197,28 @@ mod tests {
     }
 
     #[test]
+    fn current_render_document_accepts_only_current_quarantine_extensions() {
+        let mut document = current_document();
+        document["extensions"] = json!({
+            "quarantinedNodes": {
+                "future_node": { "implementationVersion": 3 }
+            }
+        });
+        let parsed = serde_json::from_value::<EditDocumentV2>(document)
+            .expect("current quarantine extension must deserialize");
+        let serialized = serde_json::to_value(parsed).expect("current render document serializes");
+        assert_eq!(
+            serialized["extensions"],
+            json!({
+                "quarantinedNodes": {
+                    "future_node": { "implementationVersion": 3 }
+                }
+            })
+        );
+        assert!(serialized.get("migration").is_none());
+    }
+
+    #[test]
     fn compiles_node_keyed_document_to_render_parity_adjustments() {
         let document: EditDocumentV2 =
             serde_json::from_value(current_document()).expect("valid document");

@@ -1843,6 +1843,23 @@ export const editDocumentV2Schema = z.preprocess((value) => {
   return document;
 }, editDocumentV2ObjectSchema);
 
+export const currentRenderEditDocumentV2Schema = editDocumentV2Schema.superRefine((document, context) => {
+  if (document.migration !== undefined) {
+    context.addIssue({ code: 'custom', message: 'Current render documents must not carry migration metadata.' });
+  }
+  const extensionKeys = Object.keys(document.extensions);
+  if (extensionKeys.some((key) => key !== 'quarantinedNodes')) {
+    context.addIssue({ code: 'custom', message: 'Current render documents may only carry quarantinedNodes.' });
+  }
+  const quarantinedNodes = document.extensions['quarantinedNodes'];
+  if (
+    quarantinedNodes !== undefined &&
+    (quarantinedNodes === null || Array.isArray(quarantinedNodes) || typeof quarantinedNodes !== 'object')
+  ) {
+    context.addIssue({ code: 'custom', message: 'quarantinedNodes must be an object when present.' });
+  }
+});
+
 export type EditDocumentNodeTypeV2 = z.infer<typeof editDocumentNodeTypeV2Schema>;
 export type EditDocumentNodeEnvelopeV2 = z.infer<typeof editDocumentNodeEnvelopeV2Schema>;
 export type EditDocumentV2CopyPayload = z.infer<typeof editDocumentV2CopyPayloadSchema>;
