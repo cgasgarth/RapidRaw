@@ -4252,6 +4252,12 @@ async function verifyViewportInteractionController(page: Page): Promise<void> {
   await page.waitForFunction(() => document.querySelector('[data-viewer-active-tool="crop"]') !== null, undefined, {
     timeout: 10_000,
   });
+  const cropCommitBaseline = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+  );
   const bounds = await previewPanel.boundingBox();
   if (!bounds) throw new Error('Viewport controller proof could not resolve the preview bounds.');
   const center = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
@@ -4290,6 +4296,10 @@ async function verifyViewportInteractionController(page: Page): Promise<void> {
   await page.waitForFunction(() => document.querySelector('[data-viewer-temporary-hand="true"]') !== null, undefined, {
     timeout: 10_000,
   });
+  await page.waitForFunction(() => {
+    const surface = document.querySelector<HTMLElement>('[data-testid="crop-overlay-surface"]');
+    return surface?.dataset.cropInputSuspended === 'true' && getComputedStyle(surface).pointerEvents === 'none';
+  });
   await page.mouse.move(center.x, center.y);
   await page.mouse.down();
   await page.mouse.move(center.x + 72, center.y + 24, { steps: 4 });
@@ -4300,6 +4310,20 @@ async function verifyViewportInteractionController(page: Page): Promise<void> {
     undefined,
     { timeout: 10_000 },
   );
+  const cropCommitCountAfterPan = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+  );
+  if (cropCommitCountAfterPan !== cropCommitBaseline) {
+    throw new Error('Temporary-hand pan committed crop state before returning viewport ownership.');
+  }
+  const zoomModeAfterPan = await previewPanel.getAttribute('data-editor-zoom-mode');
+  if (zoomModeAfterPan !== 'ratio') {
+    throw new Error(`Temporary-hand pan changed semantic ratio zoom mode to ${String(zoomModeAfterPan)}.`);
+  }
+  await assertRenderedImageGeometry(page, { height: 1536, label: 'viewport-controller-after-pan', width: 2048 });
   const positionAfter = Number(await previewPanel.getAttribute('data-editor-transform-position-x'));
   if (!Number.isFinite(positionBefore) || !Number.isFinite(positionAfter) || positionAfter <= positionBefore + 20) {
     throw new Error(
@@ -4331,9 +4355,26 @@ async function verifyViewportInteractionController(page: Page): Promise<void> {
   });
   await page.keyboard.up('Space');
 
-  await page.keyboard.press('r');
-  await zoomSelector.selectOption('2');
-  await assertRenderedImageGeometry(page, { height: 1536, label: 'viewport-controller-before-resize', width: 2048 });
+  await page.keyboard.press('Meta+-');
+  await assertRenderedImageGeometry(page, { height: 1152, label: 'viewport-controller-crop-zoom-out', width: 1536 });
+  await page.keyboard.press('Meta+=');
+  await assertRenderedImageGeometry(page, { height: 1536, label: 'viewport-controller-crop-zoom-in', width: 2048 });
+  await page.getByTestId('right-panel-switcher-button-adjustments').click();
+  await page.waitForFunction(() => document.querySelector('[data-viewer-active-tool="none"]') !== null, undefined, {
+    timeout: 10_000,
+  });
+  const cropCommitCount = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+  );
+  if (cropCommitCount !== cropCommitBaseline) {
+    throw new Error(
+      `Temporary-hand viewport gestures leaked ${String(cropCommitCount - cropCommitBaseline)} crop commit(s).`,
+    );
+  }
+  await assertRenderedImageGeometry(page, { height: 1536, label: 'viewport-controller-after-crop-exit', width: 2048 });
   const layoutEpochBefore = Number(await previewPanel.getAttribute('data-editor-layout-epoch'));
   await page.setViewportSize({ height: 760, width: 1200 });
   await page.waitForFunction(

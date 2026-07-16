@@ -20,6 +20,7 @@ interface CropOverlaySurfaceProps {
   isMaxZoom: boolean | undefined;
   isRotationActive: boolean | undefined;
   isStraightenActive: boolean;
+  isTemporaryHand: boolean;
   overlayMode: OverlayMode | undefined;
   overlayRotation: number | undefined;
   setCrop: (crop: Crop, percentCrop: PercentCrop) => void;
@@ -43,6 +44,7 @@ export function CropOverlaySurface({
   isMaxZoom,
   isRotationActive,
   isStraightenActive,
+  isTemporaryHand,
   overlayMode,
   overlayRotation,
   setCrop,
@@ -73,10 +75,14 @@ export function CropOverlaySurface({
       data-controller-source-revision={descriptor?.sessionKey.sourceRevision}
       data-controller-tool={descriptor?.tool}
       data-crop-view-visible={String(isCropViewVisible)}
+      data-crop-input-suspended={String(isTemporaryHand)}
       data-overlay-geometry-epoch={descriptor?.geometryEpoch}
       data-overlay-geometry-space="oriented-pixels"
       data-testid="crop-overlay-surface"
-      style={{ opacity: isCropViewVisible ? 1 : 0, pointerEvents: isCropViewVisible ? 'auto' : 'none' }}
+      style={{
+        opacity: isCropViewVisible ? 1 : 0,
+        pointerEvents: isCropViewVisible && !isTemporaryHand ? 'auto' : 'none',
+      }}
     >
       {isCropping && (
         <div

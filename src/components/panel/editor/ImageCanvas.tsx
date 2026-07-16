@@ -1736,6 +1736,7 @@ export const ImageCanvas = memo(
           isMaxZoom={isMaxZoom}
           isRotationActive={isRotationActive}
           isStraightenActive={isStraightenActive}
+          isTemporaryHand={viewerInputState?.isTemporaryHand ?? false}
           overlayMode={overlayMode}
           overlayRotation={overlayRotation}
           setCrop={cropStraightenController.handleCropChange}
