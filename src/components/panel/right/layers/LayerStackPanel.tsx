@@ -17,13 +17,17 @@ import {
 } from 'lucide-react';
 import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { readLayerStackSidecarsFromSidecar } from '../../../../../packages/rawengine-schema/src';
+import {
+  editDocumentDetailDenoiseDehazeV2Schema,
+  readLayerStackSidecarsFromSidecar,
+} from '../../../../../packages/rawengine-schema/src';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import {
   createDefaultMaskEditNodes,
   DEFAULT_LAYER_BLEND_MODE,
+  DetailsAdjustment,
   INITIAL_MASK_ADJUSTMENTS,
   type LayerBlendMode,
   type MaskContainer,
@@ -31,6 +35,7 @@ import {
   type RetouchCloneSource,
   type RetouchRemoveSource,
 } from '../../../../utils/adjustments';
+import { buildDetailEditTransaction } from '../../../../utils/detailEditTransaction';
 import { selectEditDocumentGeometry, selectEditDocumentMasks } from '../../../../utils/editDocumentSelectors';
 import {
   applyBrushLocalAdjustmentLayerFlow,
@@ -484,6 +489,11 @@ export function LayerStackPanel({
 }: LayerStackPanelProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
+  const detailNodeParamsRaw = useEditorStore((state) => state.editDocumentV2.nodes['detail_denoise_dehaze']?.params);
+  const detailNodeParams = useMemo(
+    () => editDocumentDetailDenoiseDehazeV2Schema.safeParse(detailNodeParamsRaw).data ?? null,
+    [detailNodeParamsRaw],
+  );
   const setEditor = useEditorStore((state) => state.setEditor);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
   const orientationSteps = useEditorStore((state) => selectEditDocumentGeometry(state.editDocumentV2).orientationSteps);
@@ -1080,6 +1090,47 @@ export function LayerStackPanel({
   };
   const toggleRetouchSpots = () => {
     setRetouchRemoveWorkflow((state) => reduceRetouchRemoveWorkflow(state, { type: 'toggle-spots' }));
+    const state = useEditorStore.getState();
+    const image = state.selectedImage;
+    const detailNode = state.editDocumentV2.nodes['detail_denoise_dehaze'];
+    if (image === null || detailNode === undefined) return;
+    const detailParams = editDocumentDetailDenoiseDehazeV2Schema.parse(detailNode.params);
+    applyEditTransaction(
+      buildDetailEditTransaction(
+        state,
+        {
+          adjustmentRevision: state.adjustmentRevision,
+          imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+          sourceIdentity: image.path,
+        },
+        DetailsAdjustment.DustSpotOverlayEnabled,
+        !detailParams.dustSpotOverlayEnabled,
+        crypto.randomUUID(),
+      ),
+    );
+  };
+  const updateDustSpotNumber = (
+    key: DetailsAdjustment.DustSpotSensitivity | DetailsAdjustment.DustSpotMinRadiusPx,
+    value: number,
+  ) => {
+    const state = useEditorStore.getState();
+    const image = state.selectedImage;
+    if (image === null || state.editDocumentV2.nodes['detail_denoise_dehaze'] === undefined) return;
+    applyEditTransaction(
+      buildDetailEditTransaction(
+        state,
+        {
+          adjustmentRevision: state.adjustmentRevision,
+          imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+          sourceIdentity: image.path,
+        },
+        key,
+        key === DetailsAdjustment.DustSpotMinRadiusPx
+          ? Math.round(Math.max(1, Math.min(12, value)))
+          : Math.round(Math.max(0, Math.min(100, value))),
+        crypto.randomUUID(),
+      ),
+    );
   };
   const moveActiveLayer = (direction: 'down' | 'up') => {
     if (!activeRow || activeRow.isBase) return;
@@ -1324,6 +1375,9 @@ export function LayerStackPanel({
 
       <RetouchWorkflowToolbar
         activeTool={retouchRemoveWorkflow.activeTool}
+        dustOverlayEnabled={detailNodeParams?.dustSpotOverlayEnabled ?? false}
+        dustSpotMinRadiusPx={detailNodeParams?.dustSpotMinRadiusPx ?? 2}
+        dustSpotSensitivity={detailNodeParams?.dustSpotSensitivity ?? 50}
         sessionActive={retouchRemoveWorkflow.sessionActive}
         spotsVisible={retouchRemoveWorkflow.spotsVisible}
         onCancel={() => {
@@ -1336,6 +1390,7 @@ export function LayerStackPanel({
         }}
         onSelectTool={activateRetouchTool}
         onToggleSpots={toggleRetouchSpots}
+        onUpdateDustSpotNumber={updateDustSpotNumber}
       />
 
       <div className="space-y-1 px-2 py-2">
@@ -2222,22 +2277,33 @@ export function LayerStackPanel({
 
 interface RetouchWorkflowToolbarProps {
   readonly activeTool: RetouchRemoveTool | null;
+  readonly dustOverlayEnabled: boolean;
+  readonly dustSpotMinRadiusPx: number;
+  readonly dustSpotSensitivity: number;
   readonly sessionActive: boolean;
   readonly spotsVisible: boolean;
   readonly onCancel: () => void;
   readonly onComplete: () => void;
   readonly onSelectTool: (tool: RetouchRemoveTool) => void;
   readonly onToggleSpots: () => void;
+  readonly onUpdateDustSpotNumber: (
+    key: DetailsAdjustment.DustSpotSensitivity | DetailsAdjustment.DustSpotMinRadiusPx,
+    value: number,
+  ) => void;
 }
 
 function RetouchWorkflowToolbar({
   activeTool,
+  dustOverlayEnabled,
+  dustSpotMinRadiusPx,
+  dustSpotSensitivity,
   sessionActive,
   spotsVisible,
   onCancel,
   onComplete,
   onSelectTool,
   onToggleSpots,
+  onUpdateDustSpotNumber,
 }: RetouchWorkflowToolbarProps) {
   const { t } = useTranslation();
   const tools: readonly { readonly id: RetouchRemoveTool; readonly label: string }[] = [
@@ -2312,6 +2378,42 @@ function RetouchWorkflowToolbar({
         >
           {t('editor.layers.removeWorkflow.complete')}
         </button>
+      </div>
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5" data-testid="remove-workflow-dust-controls">
+        <label className="min-w-0">
+          <UiText variant={TextVariants.small} className="block truncate text-[10px] text-text-tertiary">
+            {t('adjustments.details.sensitivity')}
+          </UiText>
+          <input
+            className={`mt-1 w-full ${layerNumericInputClassName}`}
+            data-testid="remove-workflow-dust-sensitivity"
+            disabled={!dustOverlayEnabled}
+            max={100}
+            min={0}
+            onChange={(event) => {
+              onUpdateDustSpotNumber(DetailsAdjustment.DustSpotSensitivity, Number(event.currentTarget.value));
+            }}
+            type="number"
+            value={dustSpotSensitivity}
+          />
+        </label>
+        <label className="min-w-0">
+          <UiText variant={TextVariants.small} className="block truncate text-[10px] text-text-tertiary">
+            {t('adjustments.details.minSpotRadius')}
+          </UiText>
+          <input
+            className={`mt-1 w-full ${layerNumericInputClassName}`}
+            data-testid="remove-workflow-dust-radius"
+            disabled={!dustOverlayEnabled}
+            max={12}
+            min={1}
+            onChange={(event) => {
+              onUpdateDustSpotNumber(DetailsAdjustment.DustSpotMinRadiusPx, Number(event.currentTarget.value));
+            }}
+            type="number"
+            value={dustSpotMinRadiusPx}
+          />
+        </label>
       </div>
     </section>
   );

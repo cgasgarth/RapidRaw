@@ -178,6 +178,11 @@ if (missingOperationReadinessKeys.length > 0) {
 
 const source = readFileSync('src/components/panel/right/layers/LayerStackPanel.tsx', 'utf8');
 const maskPanelSource = readFileSync('src/components/panel/right/layers/MasksPanel.tsx', 'utf8');
+const detailsSource = readFileSync('src/components/adjustments/Details.tsx', 'utf8');
+if (detailsSource.includes('dustSpotVisualization') || detailsSource.includes('showDustOverlay')) {
+  console.error('Dust/spot visualization must be owned by the canvas-first Remove workflow, not Details.tsx.');
+  process.exit(1);
+}
 for (const marker of [
   'data-testid="layer-stack-composition-summary"',
   'data-testid="layer-stack-count-summary"',
@@ -233,6 +238,10 @@ for (const marker of [
   'data-testid="remove-workflow-toggle-spots"',
   'data-testid="remove-workflow-cancel"',
   'data-testid="remove-workflow-complete"',
+  'data-testid="remove-workflow-dust-controls"',
+  'data-testid="remove-workflow-dust-sensitivity"',
+  'data-testid="remove-workflow-dust-radius"',
+  'updateDustSpotNumber',
   'reduceRetouchRemoveWorkflow',
   'const targetMaskId = `${layerId}_clone_target`',
   'const targetMaskId = `${layerId}_heal_target`',
