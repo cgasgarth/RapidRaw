@@ -16,7 +16,7 @@ pub use crate::gpu_processing::{
     process_and_get_dynamic_image_with_analytics, process_and_get_unclamped_dynamic_image,
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RawEngineArtifacts {
     pub schema_version: u32,

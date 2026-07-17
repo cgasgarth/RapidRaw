@@ -19,6 +19,7 @@ use crate::geometry::perspective::{
     PERSPECTIVE_IMPLEMENTATION_VERSION_V1, PerspectiveCorrectionSettingsV1,
 };
 use crate::image_processing::calculate_agx_matrices;
+use crate::render::image_processing::RawEngineArtifacts;
 use crate::tone::curves::{CurveChannelMode, CurvePoint, compile_scene_curve};
 use crate::tone::output_curves::{OutputCurvePoint, OutputCurveTargetV1, compile_output_curve};
 
@@ -2981,6 +2982,8 @@ struct EditDocumentProvenanceV2 {
 struct EditDocumentExtensionsV2 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     quarantined_nodes: Option<BTreeMap<String, Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    raw_engine_artifacts: Option<RawEngineArtifacts>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -5589,11 +5592,15 @@ mod tests {
     }
 
     #[test]
-    fn current_render_document_accepts_only_current_quarantine_extensions() {
+    fn current_render_document_accepts_typed_persistence_extensions() {
         let mut document = current_document();
         document["extensions"] = json!({
             "quarantinedNodes": {
                 "future_node": { "implementationVersion": 3 }
+            },
+            "rawEngineArtifacts": {
+                "schemaVersion": 1,
+                "layerStackSidecars": [{ "layerId": "brush-layer-1" }]
             }
         });
         let parsed = serde_json::from_value::<EditDocumentV2>(document)
@@ -5604,10 +5611,24 @@ mod tests {
             json!({
                 "quarantinedNodes": {
                     "future_node": { "implementationVersion": 3 }
+                },
+                "rawEngineArtifacts": {
+                    "schemaVersion": 1,
+                    "layerStackSidecars": [{ "layerId": "brush-layer-1" }]
                 }
             })
         );
         assert!(serialized.get("migration").is_none());
+    }
+
+    #[test]
+    fn current_render_document_rejects_unknown_persistence_extensions() {
+        let mut document = current_document();
+        document["extensions"] =
+            json!({ "rawEngineArtifacts": { "schemaVersion": 1 }, "unknown": true });
+        let error = serde_json::from_value::<EditDocumentV2>(document)
+            .expect_err("unknown persistence extension must fail at the native boundary");
+        assert!(error.to_string().contains("unknown field `unknown`"));
     }
 
     #[test]
