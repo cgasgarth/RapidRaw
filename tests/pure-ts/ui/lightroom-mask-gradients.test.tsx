@@ -3,6 +3,10 @@ import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Ma
 import { createDefaultMaskEditNodes } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
+  buildEditorPersistenceRequest,
+  editorPersistenceRequestSchema,
+} from '../../../src/utils/editorPersistenceEffectRunner';
+import {
   buildGradientMaskEditTransaction,
   createGradientMaskWorkflow,
   type GradientMaskWorkflowIdentity,
@@ -146,6 +150,19 @@ describe('gradient mask workflow', () => {
       gradientKind: 'radial',
       radiusX: 0.15,
       radiusY: 0.15,
+    });
+  });
+
+  test('keeps the validated artifact envelope at the gradient save boundary', () => {
+    const documentWithArtifacts = structuredClone(editDocumentV2);
+    documentWithArtifacts.extensions['rawEngineArtifacts'] = { layerStackSidecars: [], schemaVersion: 1 };
+    const request = buildEditorPersistenceRequest({
+      editDocumentV2: documentWithArtifacts,
+      path: sourcePath,
+    });
+    const serializedRequest = JSON.parse(JSON.stringify(request)) as unknown;
+    expect(editorPersistenceRequestSchema.parse(serializedRequest).editDocumentV2.extensions).toEqual({
+      rawEngineArtifacts: { layerStackSidecars: [], schemaVersion: 1 },
     });
   });
 });
