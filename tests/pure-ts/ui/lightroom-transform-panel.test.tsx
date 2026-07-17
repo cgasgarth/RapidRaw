@@ -7,7 +7,8 @@ import TransformLens from '../../../src/components/adjustments/TransformLens';
 import en from '../../../src/i18n/locales/en.json';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
 
-mock.module('@tauri-apps/api/core', () => ({ invoke: async () => [] }));
+const tauriInvoke = mock(async (_command: string, _args?: unknown) => []);
+mock.module('@tauri-apps/api/core', () => ({ invoke: tauriInvoke }));
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
@@ -32,6 +33,7 @@ const selectedImage = {
 
 test('Transform and Lens Corrections render as isolated Develop surfaces', () => {
   const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  tauriInvoke.mockClear();
   const transform = render(
     createElement(
       I18nextProvider,
@@ -49,6 +51,7 @@ test('Transform and Lens Corrections render as isolated Develop surfaces', () =>
   expect(transform.container.querySelector('[data-testid="transform-controls"]')).not.toBeNull();
   expect(transform.container.querySelector('[data-testid="lens-correction-controls"]')).toBeNull();
   expect(transform.container.querySelector('#switch-profile-distortion')).toBeNull();
+  expect(tauriInvoke.mock.calls.some(([command]) => command === 'get_lensfun_makers')).toBe(false);
 
   transform.unmount();
   const lens = render(

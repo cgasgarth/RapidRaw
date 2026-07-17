@@ -190,8 +190,11 @@ export default function TransformLens({
     [adjustments.lensDistortionParams],
   );
   const hasSupportedLensProfile = hasSupportedLensCorrections(availability);
+  const showTransform = mode === 'all' || mode === 'transform';
+  const showLens = mode === 'all' || mode === 'lens';
 
   useEffect(() => {
+    if (!showLens) return;
     let isMounted = true;
     void invokeWithSchema(Invokes.GetLensfunMakers, {}, lensfunNameListSchema)
       .then((nextMakers) => {
@@ -203,9 +206,10 @@ export default function TransformLens({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [showLens]);
 
   useEffect(() => {
+    if (!showLens) return;
     if (!adjustments.lensMaker) {
       setLenses([]);
       return;
@@ -222,7 +226,7 @@ export default function TransformLens({
     return () => {
       isMounted = false;
     };
-  }, [adjustments.lensMaker]);
+  }, [adjustments.lensMaker, showLens]);
 
   const updateAdjustment = <Key extends keyof TransformLensAdjustmentView>(
     key: Key,
@@ -536,9 +540,6 @@ export default function TransformLens({
           : detectionStatus === 'error'
             ? copy.profileError
             : copy.profileIdle;
-  const showTransform = mode === 'all' || mode === 'transform';
-  const showLens = mode === 'all' || mode === 'lens';
-
   return (
     <div
       className="space-y-2"
