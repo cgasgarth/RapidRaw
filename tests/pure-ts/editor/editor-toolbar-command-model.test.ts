@@ -12,6 +12,7 @@ const labels: EditorToolbarCommandLabels = {
   compareOrientation: 'Use horizontal compare',
   compareSideBySide: 'Compare side by side',
   compareSplitWipe: 'Compare split wipe',
+  referenceView: 'Reference View',
   fullscreen: 'Toggle preview mode',
   lightsOut: 'Lights out: Off',
   negativeLab: 'Convert Negative',
@@ -29,6 +30,7 @@ const state: EditorToolbarCommandState = {
   canUndo: true,
   compareMode: 'split-wipe',
   compareOrientation: 'vertical',
+  referenceViewActive: false,
   isFullScreen: true,
   isSoftProofEnabled: true,
   lightsOutLevel: 'dim',
@@ -44,6 +46,7 @@ function createActions(calls: string[]): EditorToolbarCommandActions {
     redo: () => calls.push('redo'),
     toggleCompareSideBySide: () => calls.push('compare-side-by-side'),
     toggleCompareSplitWipe: () => calls.push('compare-split-wipe'),
+    toggleReferenceView: () => calls.push('reference-view'),
     toggleFullScreen: () => calls.push('fullscreen'),
     toggleLightsOut: () => calls.push('lights-out'),
     toggleShowOriginal: () => calls.push('show-original'),
@@ -56,7 +59,7 @@ describe('editor toolbar command model', () => {
   test('publishes enabled, pressed, shortcut, and disabled-reason state', () => {
     const commands = buildEditorToolbarCommands(state, labels, createActions([]));
 
-    expect(commands.map((command) => command.priority)).toEqual([0, 10, 20, 30, 40, 50, 100, 110, 120, 200, 210]);
+    expect(commands.map((command) => command.priority)).toEqual([0, 10, 20, 30, 40, 50, 100, 110, 115, 120, 200, 210]);
     expect(commands.find((command) => command.id === 'undo')).toMatchObject({
       enabled: true,
       shortcutHint: 'Cmd+Z',
@@ -91,6 +94,7 @@ describe('editor toolbar command model', () => {
       'lights-out',
       'compare-split-wipe',
       'compare-side-by-side',
+      'reference-view',
       'compare-orientation',
       'negative-lab',
       'soft-proof',

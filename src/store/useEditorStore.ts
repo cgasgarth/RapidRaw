@@ -45,6 +45,12 @@ import {
   reduceEditorCompare,
 } from '../utils/editorCompare';
 import {
+  DEFAULT_EDITOR_REFERENCE_VIEW_STATE,
+  type EditorReferenceViewCommand,
+  type EditorReferenceViewState,
+  reduceEditorReferenceView,
+} from '../utils/editorReferenceView';
+import {
   type EditorNamedSnapshot,
   hasDuplicateSnapshotLabel,
   normalizeSnapshotLabel,
@@ -207,6 +213,7 @@ interface EditorState {
   interactivePatch: InteractivePatch | null;
   previewQualityStatus: PreviewQualityStatus | null;
   compare: EditorCompareState;
+  referenceView: EditorReferenceViewState;
   referenceMatchReferences: ReferenceMatchReference[];
   lastReferenceMatchApplicationReceipt: MatchLookApplicationReceiptV1 | null;
   referenceMatchPreview: ReferenceMatchPreview | null;
@@ -293,6 +300,7 @@ interface EditorState {
   applyEditorTeardownTransaction: (request: EditorTeardownTransactionRequest) => EditorTeardownTransactionResult;
   applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
+  dispatchReferenceView: (command: EditorReferenceViewCommand) => void;
   setReferenceMatchReferences: (
     updater: ReferenceMatchReference[] | ((references: ReferenceMatchReference[]) => ReferenceMatchReference[]),
   ) => void;
@@ -351,6 +359,9 @@ const normalizeCompareStateUpdate = (state: EditorState, update: Partial<EditorS
       };
     }
     if (!('transformedOriginalUrl' in update)) update.transformedOriginalUrl = null;
+    if (state.referenceView.reference?.path === update.selectedImage?.path) {
+      update.referenceView = { ...DEFAULT_EDITOR_REFERENCE_VIEW_STATE };
+    }
     update.previewQualityStatus = null;
     update.lastReferenceMatchApplicationReceipt = null;
     update.referenceMatchPreview = null;
@@ -631,6 +642,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   navigatorPreviewArtifact: null,
   uncroppedAdjustedPreviewUrl: null,
   compare: DEFAULT_EDITOR_COMPARE_STATE,
+  referenceView: DEFAULT_EDITOR_REFERENCE_VIEW_STATE,
   referenceMatchReferences: [],
   lastReferenceMatchApplicationReceipt: null,
   referenceMatchPreview: null,
@@ -1033,6 +1045,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   dispatchCompare: (command) => set((state) => ({ compare: reduceEditorCompare(state.compare, command) })),
+
+  dispatchReferenceView: (command) =>
+    set((state) => ({ referenceView: reduceEditorReferenceView(state.referenceView, command) })),
 
   setReferenceMatchReferences: (updater) =>
     set((state) => ({

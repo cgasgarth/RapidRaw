@@ -2004,6 +2004,17 @@
     "provisionalCameraPreview": "相机预览 — 正在处理 RAW",
     "provisionalCameraPreviewFailed": "相机预览 — RAW 处理失败",
     "provisionalLibraryPreview": "图库预览 — 正在处理 RAW",
+    "referenceView": {
+      "active": "",
+      "ariaLabel": "",
+      "chooseHint": "",
+      "chooseReference": "",
+      "clear": "",
+      "independent": "",
+      "readOnly": "",
+      "replace": "",
+      "sync": ""
+    },
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -2137,6 +2148,7 @@
         "updateCheckpoint": "Edit checkpoint"
       },
       "historyDepth": "",
+      "referenceView": "",
       "tooltips": {
         "aperture": "光圈",
         "backToLibrary": "返回图库",

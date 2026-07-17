@@ -54,6 +54,7 @@ interface EditorToolbarProps {
   onShowOriginalChange?: (showOriginal: boolean) => void;
   onToggleFullScreen: () => void;
   onToggleShowOriginal: () => void;
+  onToggleReferenceView?: () => void;
   onUndo: () => void;
   selectedImage: SelectedImage;
   compareMode?: EditorCompareMode;
@@ -61,12 +62,14 @@ interface EditorToolbarProps {
   lightsOutLevel?: EditorWorkspaceLightsOutLevel;
   osPlatform?: string;
   showOriginal: boolean;
+  referenceViewActive?: boolean;
 }
 
 const commandIcons: Record<EditorToolbarCommandId, LucideIcon> = {
   'back-to-library': ArrowLeft,
   'compare-orientation': SquareSplitHorizontal,
   'compare-side-by-side': Columns2,
+  'reference-view': Columns2,
   'compare-split-wipe': SquareSplitVertical,
   fullscreen: Maximize,
   'lights-out': MoonStar,
@@ -97,10 +100,12 @@ const EditorToolbar = memo(
     onShowOriginalChange = () => undefined,
     onToggleFullScreen,
     onToggleShowOriginal,
+    onToggleReferenceView = () => undefined,
     onUndo,
     osPlatform,
     selectedImage,
     showOriginal,
+    referenceViewActive = false,
   }: EditorToolbarProps) => {
     const { t } = useTranslation();
     const compactViewport = useCompactCommandBar();
@@ -149,6 +154,7 @@ const EditorToolbar = memo(
         canUndo,
         compareMode,
         compareOrientation,
+        referenceViewActive,
         isFullScreen,
         isSoftProofEnabled: resolvedSoftProofRecipe.enabled,
         lightsOutLevel,
@@ -163,6 +169,7 @@ const EditorToolbar = memo(
             : t('editor.toolbar.compare.useVertical'),
         compareSideBySide: t('editor.toolbar.compare.sideBySide'),
         compareSplitWipe: t('editor.toolbar.compare.splitWipe'),
+        referenceView: t('editor.toolbar.referenceView', { defaultValue: 'Reference View' }),
         fullscreen: fullscreenLabel,
         lightsOut: lightsOutLabel,
         negativeLab: t('contextMenus.editor.convertNegative'),
@@ -186,6 +193,7 @@ const EditorToolbar = memo(
         toggleCompareSplitWipe: () => {
           onCompareModeChange(compareMode === 'split-wipe' ? 'off' : 'split-wipe');
         },
+        toggleReferenceView: onToggleReferenceView,
         toggleFullScreen: onToggleFullScreen,
         toggleLightsOut: onCycleLightsOut,
         toggleShowOriginal: onToggleShowOriginal,

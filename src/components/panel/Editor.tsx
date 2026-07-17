@@ -276,11 +276,14 @@ export default function Editor({
       : null,
   });
   const compare = useEditorStore((s) => s.compare);
+  const referenceView = useEditorStore((s) => s.referenceView);
   const referenceMatchReferences = useEditorStore((s) => s.referenceMatchReferences);
   const referenceCompareSource =
     compare.source.kind === 'reference'
       ? (referenceMatchReferences.find((reference) => reference.id === compare.source.identity) ?? null)
       : null;
+  const referenceViewActive = referenceView.mode === 'side-by-side';
+  const effectiveCompareMode = referenceViewActive ? 'side-by-side' : compare.mode;
   const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
   const isSliderDragging = useEditorStore((s) => s.isSliderDragging);
   const zoom = useEditorStore((s) => s.zoom);
@@ -643,15 +646,15 @@ export default function Editor({
     }
     return resolveComparePaneLayout({
       imageDimensions: croppedDimensions,
-      mode: compare.mode,
+      mode: effectiveCompareMode,
       orientation: compare.orientation,
       viewport: {
         height: singleImageRenderSize.height + singleImageRenderSize.offsetY * 2,
         width: singleImageRenderSize.width + singleImageRenderSize.offsetX * 2,
       },
     });
-  }, [compare.mode, compare.orientation, croppedDimensions, singleImageRenderSize]);
-  const imageRenderSize = compare.mode === 'side-by-side' ? comparePaneLayout.edited : singleImageRenderSize;
+  }, [compare.orientation, croppedDimensions, effectiveCompareMode, singleImageRenderSize]);
+  const imageRenderSize = effectiveCompareMode === 'side-by-side' ? comparePaneLayout.edited : singleImageRenderSize;
   const [devicePixelRatio, setDevicePixelRatio] = useState(() =>
     getEditorZoomDpr(typeof window === 'undefined' ? 1 : window.devicePixelRatio),
   );
@@ -2293,9 +2296,14 @@ export default function Editor({
             dispatchCompare({ held: nextShowOriginal, type: 'set-original-held' });
           }}
           onToggleShowOriginal={toggleShowOriginal}
+          onToggleReferenceView={() => {
+            useEditorStore.getState().dispatchReferenceView({
+              type: referenceViewActive ? 'exit' : 'enter',
+            });
+          }}
           onUndo={undo}
           selectedImage={selectedImage}
-          compareMode={compare.mode}
+          compareMode={effectiveCompareMode}
           compareOrientation={compare.orientation}
           onCompareModeChange={(mode) => {
             dispatchCompare({ mode, type: 'set-mode' });
@@ -2305,6 +2313,7 @@ export default function Editor({
             dispatchCompare({ orientation, type: 'set-orientation' });
           }}
           showOriginal={compare.isOriginalHeld || compare.mode === 'hold-original'}
+          referenceViewActive={referenceViewActive}
         />
         {selectedImage.isOfflineSmartPreview === true && (
           <div
@@ -2367,6 +2376,9 @@ export default function Editor({
           data-viewer-viewport-controller={isViewportInteractionControllerReady ? 'ready' : 'loading'}
           data-viewer-frame-edge={String(framePresentation.edgeVisible)}
           data-viewer-frame-shadow={String(framePresentation.shadowVisible)}
+          data-reference-view-mode={referenceView.mode}
+          data-reference-view-active-pane={referenceView.activePane}
+          data-reference-view-reference-id={referenceView.reference?.id ?? ''}
           data-testid="editor-image-preview-panel"
         >
           <div
@@ -2397,8 +2409,16 @@ export default function Editor({
                 maskOverlay={maskOverlayBinding.descriptor}
                 selectedImage={selectedImage}
                 showOriginal={compare.isOriginalHeld}
-                transformedOriginalUrl={referenceCompareSource?.renderUrl ?? transformedOriginalUrl}
-                comparisonLabel={referenceCompareSource?.label ?? null}
+                transformedOriginalUrl={
+                  referenceViewActive
+                    ? (referenceView.reference?.renderUrl ?? null)
+                    : (referenceCompareSource?.renderUrl ?? transformedOriginalUrl)
+                }
+                comparisonLabel={
+                  referenceViewActive
+                    ? (referenceView.reference?.label ?? null)
+                    : (referenceCompareSource?.label ?? null)
+                }
                 uncroppedAdjustedPreviewUrl={uncroppedAdjustedPreviewUrl}
                 toolRuntime={{
                   activeAiPatchContainerId,
@@ -2432,7 +2452,7 @@ export default function Editor({
                   compare: {
                     dividerPosition: compare.dividerPosition,
                     labelsVisible: compare.labelsVisible,
-                    mode: compare.mode,
+                    mode: effectiveCompareMode,
                     onDividerPositionChange: (position) => {
                       dispatchCompare({ position, type: 'set-divider' });
                     },
@@ -2479,6 +2499,15 @@ export default function Editor({
                 wgpuFrameSerial={wgpuFrameSerial}
                 wgpuFailureSerial={wgpuFailureSerial}
                 viewerSampleGraphRevision={viewerSampleGraphRevision}
+                referenceView={referenceView}
+                onReferenceViewCommand={(command) => {
+                  const dispatch = useEditorStore.getState().dispatchReferenceView;
+                  if (command === 'choose') dispatch({ type: 'open-chooser' });
+                  else if (command === 'clear') dispatch({ type: 'clear-reference' });
+                  else if (command === 'focus-active') dispatch({ pane: 'active', type: 'set-active-pane' });
+                  else if (command === 'focus-reference') dispatch({ pane: 'reference', type: 'set-active-pane' });
+                  else dispatch({ type: 'toggle-synchronized-transform' });
+                }}
               />
             </Suspense>
             {provisionalPreviewFrame !== null && !selectedImage.isReady && (

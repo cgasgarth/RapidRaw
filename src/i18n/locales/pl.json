@@ -2122,6 +2122,17 @@
     "provisionalCameraPreview": "Podgląd aparatu — wywoływanie RAW",
     "provisionalCameraPreviewFailed": "Podgląd aparatu — wywoływanie RAW nie powiodło się",
     "provisionalLibraryPreview": "Podgląd biblioteki — wywoływanie RAW",
+    "referenceView": {
+      "active": "",
+      "ariaLabel": "",
+      "chooseHint": "",
+      "chooseReference": "",
+      "clear": "",
+      "independent": "",
+      "readOnly": "",
+      "replace": "",
+      "sync": ""
+    },
     "switcher": {
       "search": {
         "close": "Close panel search",
@@ -2261,6 +2272,7 @@
         "updateCheckpoint": "Edit checkpoint"
       },
       "historyDepth": "",
+      "referenceView": "",
       "tooltips": {
         "aperture": "Przysłona",
         "backToLibrary": "Wróć do biblioteki",
