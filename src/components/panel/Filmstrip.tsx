@@ -91,6 +91,34 @@ export const truncateFilmstripFilename = (filename: string, maxLength = 40): str
   return `${filename.slice(0, headLength)}...${filename.slice(-tailLength)}`;
 };
 
+export interface FilmstripEdgeHeaderModel {
+  activeFilename: string;
+  displayCount: number;
+  shownIndex: number;
+  selectedCount: number;
+}
+
+export const buildFilmstripEdgeHeaderModel = ({
+  activeIndex,
+  activePath,
+  imageCount,
+  noActiveLabel,
+  selectedCount,
+  totalImages,
+}: {
+  activeIndex: number;
+  activePath: string | undefined;
+  imageCount: number;
+  noActiveLabel: string;
+  selectedCount: number;
+  totalImages: number | undefined;
+}): FilmstripEdgeHeaderModel => ({
+  activeFilename: truncateFilmstripFilename(activePath ? getFilmstripFilename(activePath) : noActiveLabel, 64),
+  displayCount: totalImages ?? imageCount,
+  selectedCount,
+  shownIndex: activeIndex >= 0 ? activeIndex + 1 : 0,
+});
+
 const getFilmstripColorLabel = (tags: ImageFile['tags']) => {
   const colorTag = tags?.find((tag: string) => tag.startsWith('color:'))?.substring(6);
   return COLOR_LABELS.find((color: Color) => color.name === colorTag);
@@ -993,24 +1021,26 @@ const FilmstripEdgeHeader = memo(function FilmstripEdgeHeader({
 }: FilmstripEdgeHeaderProps) {
   const { t } = useTranslation();
   const activePath = selectedImage?.path ?? multiSelectedPaths[0];
-  const fullActiveFilename = activePath
-    ? getFilmstripFilename(activePath)
-    : t('ui.filmstrip.selectionSummary.noActive');
-  const activeFilename = truncateFilmstripFilename(fullActiveFilename, 64);
-  const selectedCount = multiSelectedPaths.length;
-  const displayCount = totalImages ?? imageCount;
-  const shownIndex = activeIndex >= 0 ? activeIndex + 1 : 0;
+  const model = buildFilmstripEdgeHeaderModel({
+    activeIndex,
+    activePath,
+    imageCount,
+    noActiveLabel: t('ui.filmstrip.selectionSummary.noActive'),
+    selectedCount: multiSelectedPaths.length,
+    totalImages,
+  });
+  const fullActiveFilename = activePath ? getFilmstripFilename(activePath) : model.activeFilename;
 
   return (
     <div
       aria-label={t('ui.filmstrip.selectionSummary.activePrefix')}
       className="pointer-events-none absolute inset-x-1 top-1 z-30 flex h-5 min-w-0 items-center gap-1.5 overflow-hidden rounded-sm border border-editor-border/80 bg-editor-panel/90 px-1.5 text-[10px] shadow-sm backdrop-blur-sm"
-      data-active-filename={activeFilename}
-      data-filmstrip-active-index={shownIndex}
+      data-active-filename={model.activeFilename}
+      data-filmstrip-active-index={model.shownIndex}
       data-filmstrip-filtered={hasActiveFilters ? 'true' : 'false'}
-      data-filmstrip-image-count={displayCount}
+      data-filmstrip-image-count={model.displayCount}
       data-filmstrip-loading={isLoading ? 'true' : 'false'}
-      data-filmstrip-selected-count={selectedCount}
+      data-filmstrip-selected-count={model.selectedCount}
       data-testid="filmstrip-edge-header"
       onClick={(event) => {
         event.stopPropagation();
@@ -1023,18 +1053,18 @@ const FilmstripEdgeHeader = memo(function FilmstripEdgeHeader({
         className="shrink-0 rounded-sm border border-editor-border bg-editor-selected-quiet px-1 py-0.5 font-semibold tabular-nums text-text-primary"
         data-testid="filmstrip-edge-count"
       >
-        {shownIndex} / {displayCount}
+        {model.shownIndex} / {model.displayCount}
       </span>
       <span
         className="min-w-0 flex-1 truncate text-text-primary"
         data-testid="filmstrip-edge-active-filename"
         title={fullActiveFilename}
       >
-        {activeFilename}
+        {model.activeFilename}
       </span>
       <span className="shrink-0 text-text-secondary" data-testid="filmstrip-edge-source-count">
-        {selectedCount > 1
-          ? t('ui.filmstrip.selectionSummary.selectedCount', { count: selectedCount })
+        {model.selectedCount > 1
+          ? t('ui.filmstrip.selectionSummary.selectedCount', { count: model.selectedCount })
           : imageList.length}
       </span>
       {hasActiveFilters ? (
@@ -1050,7 +1080,7 @@ const FilmstripEdgeHeader = memo(function FilmstripEdgeHeader({
           …
         </span>
       ) : null}
-      {selectedCount > 0 ? (
+      {model.selectedCount > 0 ? (
         <button
           aria-label={t('ui.filmstrip.selectionSummary.clearSelection')}
           className="pointer-events-auto flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
