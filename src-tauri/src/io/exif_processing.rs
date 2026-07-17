@@ -258,8 +258,11 @@ fn quarantine_invalid_layer_masks(document: &mut JsonValue) -> Vec<JsonValue> {
     let mut quarantined = Vec::new();
     for layer in masks {
         let invalid = layer.as_object().is_some_and(|layer| {
-            layer.get("layerGroupId").is_some_and(JsonValue::is_null)
-                || layer.get("layerGroupName").is_some_and(JsonValue::is_null)
+            let group_id_is_null = layer.get("layerGroupId").is_some_and(JsonValue::is_null);
+            let group_name_is_null = layer.get("layerGroupName").is_some_and(JsonValue::is_null);
+            // An ungrouped mask legitimately has neither optional group field. Only
+            // quarantine a partially-null group authority, not the null/null pair.
+            group_id_is_null != group_name_is_null
         });
         if invalid {
             quarantined.push(layer);
@@ -1958,7 +1961,7 @@ mod tests {
         let valid = valid_brush_layer();
         let mut malformed = valid.clone();
         malformed["layerGroupId"] = JsonValue::Null;
-        malformed["layerGroupName"] = JsonValue::Null;
+        malformed["layerGroupName"] = JsonValue::from("Partial group");
         let mut metadata = metadata_for(&source);
         let document = metadata.edit_document_v2.as_mut().unwrap();
         document["layers"]["masks"] = serde_json::json!([valid]);
@@ -2006,6 +2009,45 @@ mod tests {
         assert_eq!(
             reopened.metadata.edit_document_v2.unwrap()["layers"]["masks"][0]["subMasks"][0]["type"],
             "brush"
+        );
+    }
+
+    #[test]
+    fn ungrouped_layer_masks_with_null_group_fields_reopen_without_quarantine() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("ungrouped-mask.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let valid = valid_brush_layer();
+        let mut metadata = metadata_for(&source);
+        let document = metadata.edit_document_v2.as_mut().unwrap();
+        document["layers"]["masks"] = serde_json::json!([valid]);
+        document["nodes"]["layers"]["params"]["masks"] = document["layers"]["masks"].clone();
+        save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
+
+        let mut tampered: JsonValue = serde_json::from_slice(&fs::read(&sidecar).unwrap()).unwrap();
+        for path in [
+            "/editDocumentV2/layers/masks/0",
+            "/editDocumentV2/nodes/layers/params/masks/0",
+        ] {
+            let layer = tampered.pointer_mut(path).unwrap();
+            layer["layerGroupId"] = JsonValue::Null;
+            layer["layerGroupName"] = JsonValue::Null;
+        }
+        tampered["editRevision"] =
+            JsonValue::from(render_state_revision(&tampered["editDocumentV2"], None).unwrap());
+        fs::write(&sidecar, serde_json::to_vec_pretty(&tampered).unwrap()).unwrap();
+
+        let reopened = load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref()))
+            .expect("ungrouped mask with null optional groups is valid");
+        assert_eq!(reopened.outcome, PersistedStateOutcome::Current);
+        assert!(reopened.reason_codes.is_empty());
+        assert!(reopened.backup_path.is_none());
+        assert_eq!(
+            reopened.metadata.edit_document_v2.unwrap()["layers"]["masks"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
         );
     }
 

@@ -96,7 +96,10 @@ import {
   type LayerMaskProvenanceInvalidationReason,
   type LayerMaskProvenanceView,
 } from '../../../../utils/layers/layerMaskProvenance';
-import { updateLayerStackSidecarToneColorFromMasks } from '../../../../utils/layers/layerStackCommandBridge';
+import {
+  buildLayerStackSidecarFromMasks,
+  updateLayerStackSidecarToneColorFromMasks,
+} from '../../../../utils/layers/layerStackCommandBridge';
 import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../../utils/layers/layerStackSidecarAdjustments';
 import {
   cloneMaskContainerForPaste,
@@ -170,8 +173,8 @@ import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
 import { BrushMaskControls, type BrushSettingsUpdater } from '../../editor/BrushMaskControls';
 import Waveform from '../../editor/Waveform';
-import { type MaskLocalAdjustmentSection, MaskLocalAdjustmentStack } from './MaskLocalAdjustmentStack';
 import { LightroomAiSceneMaskChooser } from './LightroomAiSceneMaskChooser';
+import { type MaskLocalAdjustmentSection, MaskLocalAdjustmentStack } from './MaskLocalAdjustmentStack';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
 import {
   formatMaskTypeName,
@@ -1817,7 +1820,7 @@ export function MasksPanel() {
               (sidecar) => sidecar.sourceImagePath === state.selectedImage?.path,
             );
       const transaction =
-        persistedSidecar === undefined
+        state.selectedImage === null
           ? {
               transactionId,
               imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
@@ -1833,15 +1836,28 @@ export function MasksPanel() {
               history: 'single-entry' as const,
               persistence: 'commit' as const,
             }
-          : buildLayerEditTransactionRequest(
-              state,
-              persistLayerStackSidecarInEditDocumentCandidate(
-                state.editDocumentV2,
-                committed.masks,
-                updateLayerStackSidecarToneColorFromMasks(persistedSidecar, committed.masks),
-              ),
-              transactionId,
-            );
+          : (() => {
+              const sessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+              const layerStackSidecar =
+                persistedSidecar ??
+                buildLayerStackSidecarFromMasks(committed.masks, {
+                  graphRevision: `history_${String(state.historyIndex)}`,
+                  imagePath: state.selectedImage.path,
+                  operationId: transactionId,
+                  sessionId,
+                });
+              return buildLayerEditTransactionRequest(
+                state,
+                persistLayerStackSidecarInEditDocumentCandidate(
+                  state.editDocumentV2,
+                  committed.masks,
+                  persistedSidecar === undefined
+                    ? layerStackSidecar
+                    : updateLayerStackSidecarToneColorFromMasks(layerStackSidecar, committed.masks),
+                ),
+                transactionId,
+              );
+            })();
       applyEditTransaction(transaction);
       setEditor({
         activeMaskContainerId: committed.selection.containerId,
