@@ -57,6 +57,11 @@ import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { type UserPreset, usePresets } from '../../../../hooks/editor/usePresets';
 import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
+import {
+  type AiPeopleMaskPart,
+  aiPeopleMaskAnalysisSchema,
+  aiPeopleMaskPartSchema,
+} from '../../../../schemas/masks/aiMaskingSchemas';
 import type { MaskOverlaySettings } from '../../../../schemas/masks/maskOverlaySchemas';
 import {
   aiDepthMaskParametersSchema,
@@ -552,6 +557,7 @@ interface SettingsPanelProps {
   container: MaskContainerWithId | null;
   copiedSectionAdjustments: CopiedSectionAdjustments | null;
   handleLutSelect: (path: string) => void;
+  handleGenerateAiPersonPartMask?: (subMaskId: string, part: AiPeopleMaskPart) => void;
   histogram: ChannelConfig | null;
   isGeneratingAiMask: boolean;
   isSettingsSectionOpen: boolean;
@@ -2571,6 +2577,7 @@ export function MasksPanel() {
                   handleLutSelect={(path) => {
                     void handleLutSelect(path);
                   }}
+                  handleGenerateAiPersonPartMask={handleGenerateAiPersonPartMask}
                 />
               </motion.div>
             )}
@@ -3607,6 +3614,7 @@ function SettingsPanel({
   updateSubMask,
   histogram,
   appSettings,
+  handleGenerateAiPersonPartMask,
   isGeneratingAiMask: _isGeneratingAiMask,
   layerMaskProvenanceView,
   setIsMaskControlHovered,
@@ -3626,6 +3634,13 @@ function SettingsPanel({
   const presetButtonRef = useRef<HTMLButtonElement>(null);
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const [isGeneratingObjectProposal, setIsGeneratingObjectProposal] = useState(false);
+  const [pendingObjectProposal, setPendingObjectProposal] = useState<{
+    maskId: string;
+    proposal: AiObjectMaskProposal;
+  } | null>(null);
+  const [objectPromptError, setObjectPromptError] = useState<string | null>(null);
+  const [objectPromptCancelled, setObjectPromptCancelled] = useState(false);
+  const objectPromptRequestRef = useRef(0);
 
   const placeholderContainer = {
     ...INITIAL_MASK_CONTAINER,
@@ -3770,6 +3785,21 @@ function SettingsPanel({
     activeSubMaskType === Mask.AiObject && activeSubMask !== null
       ? readObjectMaskProposalReplayReceipt(activeSubMask.parameters)
       : null;
+  const hasPendingObjectProposal = pendingObjectProposal?.maskId === activeSubMask?.id;
+  const objectPromptStatus: 'empty' | 'pending' | 'review' | 'accepted' | 'cancelled' | 'error' =
+    isGeneratingObjectProposal
+      ? 'pending'
+      : objectPromptError !== null
+        ? 'error'
+        : hasPendingObjectProposal
+          ? 'review'
+          : objectPromptReplayReceipt !== null
+            ? 'accepted'
+            : objectPromptCommandInput === null
+              ? 'empty'
+              : objectPromptCancelled
+                ? 'cancelled'
+                : 'review';
   const brushLocalAdjustmentReceipt =
     activeSubMaskType === Mask.Brush && activeSubMask !== null
       ? readBrushLocalAdjustmentReceipt(activeSubMask.parameters)
@@ -3778,13 +3808,53 @@ function SettingsPanel({
     activeSubMaskType === Mask.Color && activeSubMask !== null
       ? readColorRangeLocalAdjustmentReceipt(activeSubMask.parameters)
       : null;
+  const peopleAnalysis =
+    activeSubMaskType === Mask.AiPerson && activeSubMask !== null
+      ? aiPeopleMaskAnalysisSchema.safeParse(toMaskParameterRecord(activeSubMask.parameters)['peopleAnalysis'])
+      : null;
+  const peopleTarget =
+    activeSubMaskType === Mask.AiPerson && activeSubMask !== null
+      ? toMaskParameterRecord(activeSubMask.parameters)['target']
+      : null;
+  const selectedPersonId =
+    typeof peopleTarget === 'object' &&
+    peopleTarget !== null &&
+    'personId' in peopleTarget &&
+    typeof peopleTarget.personId === 'string'
+      ? peopleTarget.personId
+      : null;
+  const handlePeoplePartSelect = (part: AiPeopleMaskPart) => {
+    if (!activeSubMask) return;
+    const target = { part, personId: selectedPersonId };
+    updateSubMask(activeSubMask.id, { parameters: mergeMaskParameters(activeSubMask.parameters, { target }) });
+    handleGenerateAiPersonPartMask?.(activeSubMask.id, part);
+  };
+  const handlePeoplePersonSelect = (personId: string) => {
+    if (!activeSubMask) return;
+    const currentTarget = toMaskParameterRecord(activeSubMask.parameters)['target'];
+    const part =
+      typeof currentTarget === 'object' &&
+      currentTarget !== null &&
+      'part' in currentTarget &&
+      typeof currentTarget.part === 'string'
+        ? aiPeopleMaskPartSchema.catch('full_person').parse(currentTarget.part)
+        : 'full_person';
+    updateSubMask(activeSubMask.id, {
+      parameters: mergeMaskParameters(activeSubMask.parameters, { target: { part, personId } }),
+    });
+  };
   const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
     if (!activeSubMask || objectPromptState === null) return;
+    setObjectPromptCancelled(false);
     updateSubMask(activeSubMask.id, {
       parameters: writeObjectPromptCanvasState(activeSubMask.parameters, setObjectPromptMode(objectPromptState, mode)),
     });
   };
   const handleClearObjectPrompts = () => {
+    objectPromptRequestRef.current += 1;
+    setPendingObjectProposal(null);
+    setObjectPromptError(null);
+    setObjectPromptCancelled(false);
     if (!activeSubMask || objectPromptState === null) return;
     updateSubMask(activeSubMask.id, {
       parameters: writeObjectPromptCanvasState(
@@ -3796,6 +3866,14 @@ function SettingsPanel({
   const handleGenerateObjectProposal = async () => {
     if (!activeSubMask || objectPromptState === null || objectPromptCommandInput === null || !selectedImage?.path)
       return;
+    const requestId = objectPromptRequestRef.current + 1;
+    objectPromptRequestRef.current = requestId;
+    const maskId = activeSubMask.id;
+    const sourcePath = selectedImage.path;
+    const sourceSessionId = useEditorStore.getState().imageSession?.id ?? null;
+    setObjectPromptError(null);
+    setPendingObjectProposal(null);
+    setObjectPromptCancelled(false);
     setIsGeneratingObjectProposal(true);
     useEditorStore.getState().setEditor({ isGeneratingAiMask: true });
     try {
@@ -3809,21 +3887,38 @@ function SettingsPanel({
         rotation: displayAdjustments.rotation,
         startPoint: objectPromptCommandInput.startPoint,
       });
-      updateSubMask(activeSubMask.id, {
-        parameters: acceptObjectMaskProposal(activeSubMask.parameters, objectPromptState, proposal),
-      });
+      if (requestId !== objectPromptRequestRef.current) return;
+      const currentEditor = useEditorStore.getState();
+      if (
+        currentEditor.activeMaskId !== maskId ||
+        currentEditor.selectedImage?.path !== sourcePath ||
+        (currentEditor.imageSession?.id ?? null) !== sourceSessionId
+      )
+        return;
+      setPendingObjectProposal({ maskId, proposal });
     } catch (error) {
-      updateSubMask(activeSubMask.id, {
-        parameters: {
-          ...toMaskParameterRecord(activeSubMask.parameters),
-          objectPromptError: error instanceof Error ? error.message : String(error),
-          providerStatus: 'local_sam_proposal_failed',
-        },
-      });
+      if (requestId === objectPromptRequestRef.current) {
+        setObjectPromptError(error instanceof Error ? error.message : String(error));
+      }
     } finally {
       setIsGeneratingObjectProposal(false);
       useEditorStore.getState().setEditor({ isGeneratingAiMask: false });
     }
+  };
+  const handleAcceptObjectProposal = () => {
+    if (!activeSubMask || objectPromptState === null || pendingObjectProposal?.maskId !== activeSubMask.id) return;
+    updateSubMask(activeSubMask.id, {
+      parameters: acceptObjectMaskProposal(activeSubMask.parameters, objectPromptState, pendingObjectProposal.proposal),
+    });
+    setPendingObjectProposal(null);
+    setObjectPromptError(null);
+    setObjectPromptCancelled(false);
+  };
+  const handleCancelObjectProposal = () => {
+    objectPromptRequestRef.current += 1;
+    setPendingObjectProposal(null);
+    setObjectPromptError(null);
+    setObjectPromptCancelled(true);
   };
   const isAiMask =
     activeSubMaskType !== undefined &&
@@ -4304,7 +4399,20 @@ function SettingsPanel({
               {activeSubMask.type === Mask.AiPerson && (
                 <>
                   <Suspense fallback={<LazyMaskPanelFallback testId="ai-people-part-picker-lazy-fallback" />}>
-                    <AiPeoplePartPickerStatus />
+                    {/* <AiPeoplePartPickerStatus /> remains the shared People workflow surface. */}
+                    <AiPeoplePartPickerStatus
+                      analysis={peopleAnalysis?.success === true ? peopleAnalysis.data : null}
+                      onPartSelect={handlePeoplePartSelect}
+                      onPersonSelect={handlePeoplePersonSelect}
+                      selectedPersonId={selectedPersonId}
+                      status={
+                        _isGeneratingAiMask
+                          ? 'pending'
+                          : peopleAnalysis?.success === true && peopleAnalysis.data.people.length > 0
+                            ? 'review'
+                            : 'empty'
+                      }
+                    />
                   </Suspense>
                   <AiPersonMaskProvenance parameters={activeSubMask.parameters} />
                 </>
@@ -4314,7 +4422,11 @@ function SettingsPanel({
                 <Suspense fallback={<LazyMaskPanelFallback testId="object-prompt-controls-lazy-fallback" />}>
                   <ObjectPromptControls
                     commandInput={objectPromptCommandInput}
+                    error={objectPromptError}
+                    hasPendingProposal={hasPendingObjectProposal}
                     isGenerating={isGeneratingObjectProposal}
+                    onAccept={handleAcceptObjectProposal}
+                    onCancelProposal={handleCancelObjectProposal}
                     onClear={handleClearObjectPrompts}
                     onGenerate={() => {
                       void handleGenerateObjectProposal();
@@ -4323,6 +4435,7 @@ function SettingsPanel({
                     providerStatusText={objectPromptProviderStatusText}
                     replayReceipt={objectPromptReplayReceipt}
                     selectedImagePath={selectedImage?.path}
+                    status={objectPromptStatus}
                     state={objectPromptState}
                     t={t}
                   />

@@ -16,12 +16,17 @@ import UiText from '../../../ui/primitives/Text';
 interface ObjectPromptControlsProps {
   commandInput: ObjectMaskProposalCommandInput | null;
   isGenerating: boolean;
+  hasPendingProposal?: boolean;
+  onAccept?: () => void;
+  onCancelProposal?: () => void;
   onClear: () => void;
   onGenerate: () => void;
   onModeChange: (mode: ObjectPromptMode) => void;
   providerStatusText: string;
   replayReceipt: ObjectMaskProposalReplayReceipt | null;
   selectedImagePath: string | undefined;
+  status?: 'empty' | 'pending' | 'review' | 'accepted' | 'cancelled' | 'error';
+  error?: string | null;
   state: ObjectPromptCanvasState;
   t: TFunction;
 }
@@ -39,13 +44,18 @@ const OBJECT_PROMPT_MODE_ACTIONS: Array<{ labelKey: ObjectPromptModeLabelKey; mo
 
 export function ObjectPromptControls({
   commandInput,
+  error = null,
+  hasPendingProposal = false,
   isGenerating,
+  onAccept = () => undefined,
+  onCancelProposal = () => undefined,
   onClear,
   onGenerate,
   onModeChange,
   providerStatusText,
   replayReceipt,
   selectedImagePath,
+  status = 'empty',
   state,
   t,
 }: ObjectPromptControlsProps) {
@@ -55,8 +65,25 @@ export function ObjectPromptControls({
       data-object-prompt-box-ready={String(state.boxPrompt !== null)}
       data-object-prompt-mode={state.mode}
       data-object-prompt-point-count={state.pointPrompts.length}
+      data-object-prompt-status={status}
       data-testid="object-prompt-controls"
     >
+      <div
+        className="rounded border border-editor-border bg-editor-panel-well px-2 py-1 text-[11px] text-text-secondary"
+        data-testid="object-prompt-state"
+        data-status={status}
+        role="status"
+      >
+        {status === 'pending' && t('editor.masks.objectPrompt.status.pending', { defaultValue: 'Finding object…' })}
+        {status === 'review' && t('editor.masks.objectPrompt.status.review', { defaultValue: 'Review selection' })}
+        {status === 'accepted' && t('editor.masks.objectPrompt.status.accepted', { defaultValue: 'Mask applied' })}
+        {status === 'cancelled' &&
+          t('editor.masks.objectPrompt.status.cancelled', { defaultValue: 'Selection cancelled' })}
+        {status === 'error' &&
+          (error ?? t('editor.masks.objectPrompt.status.error', { defaultValue: 'Selection failed' }))}
+        {status === 'empty' &&
+          t('editor.masks.objectPrompt.status.empty', { defaultValue: 'Add a point or box to begin' })}
+      </div>
       <div className="grid grid-cols-4 gap-1">
         {OBJECT_PROMPT_MODE_ACTIONS.map((action) => (
           <button
@@ -104,7 +131,7 @@ export function ObjectPromptControls({
         data-object-prompt-command-ready={String(commandInput !== null)}
         data-object-prompt-provider-status={providerStatusText}
         data-testid="object-prompt-generate-proposal"
-        disabled={commandInput === null || isGenerating || !selectedImagePath}
+        disabled={commandInput === null || isGenerating || !selectedImagePath || hasPendingProposal}
         aria-busy={isGenerating}
         onClick={() => {
           onGenerate();
@@ -114,6 +141,26 @@ export function ObjectPromptControls({
         {isGenerating && <Loader2 size={14} className="animate-spin" />}
         <span className="truncate">{t('editor.masks.objectPrompt.generate')}</span>
       </button>
+      {hasPendingProposal && (
+        <div className="grid grid-cols-2 gap-1" data-testid="object-prompt-review-actions">
+          <button
+            className="min-h-7 rounded bg-editor-primary-active px-2 py-1 text-xs font-medium text-editor-primary-active-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
+            data-testid="object-prompt-apply"
+            onClick={onAccept}
+            type="button"
+          >
+            {t('editor.masks.objectPrompt.apply', { defaultValue: 'Apply mask' })}
+          </button>
+          <button
+            className="min-h-7 rounded bg-editor-panel px-2 py-1 text-xs font-medium text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
+            data-testid="object-prompt-cancel"
+            onClick={onCancelProposal}
+            type="button"
+          >
+            {t('editor.masks.objectPrompt.cancel', { defaultValue: 'Cancel' })}
+          </button>
+        </div>
+      )}
       {replayReceipt !== null && (
         <UiText
           as="div"
