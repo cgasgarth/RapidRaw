@@ -3,7 +3,11 @@ import { act, render } from '@testing-library/react';
 
 import { EditorSnapshotsSection } from '../../../src/components/panel/editor/EditorHistorySections';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  prepareEditDocumentV2ForPersistence,
+} from '../../../src/utils/editDocumentV2';
 import { readNamedSnapshots, snapshotDocumentEquals } from '../../../src/utils/editorNamedSnapshots';
 
 const imagePath = '/private/Alaska/DSC0001.ARW';
@@ -54,6 +58,8 @@ test('named snapshots capture typed documents, reject duplicate/empty labels, an
   )[0];
   expect(snapshot).toBeDefined();
   expect(Object.hasOwn(snapshot?.editDocumentV2.extensions ?? {}, 'rawengineNamedSnapshots')).toBe(false);
+  const persisted = prepareEditDocumentV2ForPersistence(useEditorStore.getState().editDocumentV2);
+  expect(readNamedSnapshots(persisted, imagePath, `editor-image-source:${imagePath}`)).toHaveLength(1);
 
   const beforeRestore = patchEditDocumentV2Node(useEditorStore.getState().editDocumentV2, 'scene_global_color_tone', {
     exposure: -1,

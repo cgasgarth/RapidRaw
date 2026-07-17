@@ -235,6 +235,7 @@ export const setEditDocumentV2NodeEnabled = (
 export const prepareEditDocumentV2ForPersistence = (document: EditDocumentV2): EditDocumentV2 => {
   const quarantinedNodes = document.extensions['quarantinedNodes'];
   const rawEngineArtifacts = document.extensions['rawEngineArtifacts'];
+  const namedSnapshots = document.extensions['rawengineNamedSnapshots'];
   const layers = projectLayersForPersistence(document.layers);
   const current = currentRenderEditDocumentV2Schema.parse({
     ...document,
@@ -249,6 +250,7 @@ export const prepareEditDocumentV2ForPersistence = (document: EditDocumentV2): E
     extensions: {
       ...(quarantinedNodes === undefined ? {} : { quarantinedNodes }),
       ...(rawEngineArtifacts === undefined ? {} : { rawEngineArtifacts }),
+      ...(namedSnapshots === undefined ? {} : { rawengineNamedSnapshots: namedSnapshots }),
     },
   });
   const jsonSafe: unknown = JSON.parse(JSON.stringify(current));

@@ -2981,11 +2981,37 @@ struct EditDocumentProvenanceV2 {
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct NamedSnapshotMetadataV1 {
+    created_at: String,
+    edit_document_v2: Value,
+    id: String,
+    label: String,
+    source_image_path: String,
+    source_session_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+struct NamedSnapshotsEnvelopeV1 {
+    snapshots: Vec<NamedSnapshotMetadataV1>,
+    version: u8,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct EditDocumentExtensionsV2 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     quarantined_nodes: Option<BTreeMap<String, Value>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     raw_engine_artifacts: Option<RawEngineArtifacts>,
+    /// Source-owned named snapshots are validated by the frontend schema and
+    /// persisted as sidecar metadata without entering the render projection.
+    #[serde(
+        default,
+        rename = "rawengineNamedSnapshots",
+        skip_serializing_if = "Option::is_none"
+    )]
+    raw_engine_named_snapshots: Option<NamedSnapshotsEnvelopeV1>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -5596,6 +5622,7 @@ mod tests {
     #[test]
     fn current_render_document_accepts_typed_persistence_extensions() {
         let mut document = current_document();
+        let snapshot_document = document.clone();
         document["extensions"] = json!({
             "quarantinedNodes": {
                 "future_node": { "implementationVersion": 3 }
@@ -5603,6 +5630,17 @@ mod tests {
             "rawEngineArtifacts": {
                 "schemaVersion": 1,
                 "layerStackSidecars": [{ "layerId": "brush-layer-1" }]
+            },
+            "rawengineNamedSnapshots": {
+                "version": 1,
+                "snapshots": [{
+                    "createdAt": "2026-07-17T12:00:00.000Z",
+                    "editDocumentV2": snapshot_document,
+                    "id": "snapshot-1",
+                    "label": "Saved look",
+                    "sourceImagePath": "/private/Alaska/DSC0001.ARW",
+                    "sourceSessionId": "editor-image-source:/private/Alaska/DSC0001.ARW"
+                }]
             }
         });
         let parsed = serde_json::from_value::<EditDocumentV2>(document)
@@ -5617,6 +5655,17 @@ mod tests {
                 "rawEngineArtifacts": {
                     "schemaVersion": 1,
                     "layerStackSidecars": [{ "layerId": "brush-layer-1" }]
+                },
+                "rawengineNamedSnapshots": {
+                    "version": 1,
+                    "snapshots": [{
+                        "createdAt": "2026-07-17T12:00:00.000Z",
+                        "editDocumentV2": snapshot_document,
+                        "id": "snapshot-1",
+                        "label": "Saved look",
+                        "sourceImagePath": "/private/Alaska/DSC0001.ARW",
+                        "sourceSessionId": "editor-image-source:/private/Alaska/DSC0001.ARW"
+                    }]
                 }
             })
         );
