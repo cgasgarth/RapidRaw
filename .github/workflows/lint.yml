@@ -240,7 +240,7 @@ jobs:
         run: >-
           cargo check --quiet --locked --lib
           --no-default-features --features required-ci,validation-harness
-          --profile rapid-dev-fast
+          --profile rapid-ci-check
 
   fast-workflow:
     name: 'pr fast: workflow contracts'
