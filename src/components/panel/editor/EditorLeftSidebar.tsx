@@ -9,12 +9,12 @@ import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import Resizer from '../../ui/Resizer';
 
 export const EDITOR_LEFT_SECTION_IDS = [
-  'collections',
   'navigator',
-  'focusSources',
   'presets',
   'snapshots',
   'history',
+  'collections',
+  'focusSources',
 ] as const;
 export type EditorLeftSectionId = (typeof EDITOR_LEFT_SECTION_IDS)[number];
 type EditorLeftSidebarSlots = Partial<Record<EditorLeftSectionId, ReactNode>>;
@@ -48,6 +48,8 @@ export default function EditorLeftSidebar({
   const sidebarRef = useRef<HTMLElement | null>(null);
   const expandButtonRef = useRef<HTMLButtonElement | null>(null);
   const shouldRestoreFocusRef = useRef(false);
+  const previousFullScreenRef = useRef(isFullScreen);
+  const fullScreenRestoreFocusRef = useRef<HTMLElement | null>(null);
   const labels: Record<EditorLeftSectionId, string> = {
     collections: 'Collections',
     focusSources: 'Focus Stack Sources',
@@ -64,6 +66,24 @@ export default function EditorLeftSidebar({
     }
   }, [isVisible]);
 
+  useEffect(() => {
+    const wasFullScreen = previousFullScreenRef.current;
+    previousFullScreenRef.current = isFullScreen;
+    if (wasFullScreen === isFullScreen) return;
+
+    if (!isFullScreen) {
+      const restoreTarget = fullScreenRestoreFocusRef.current;
+      fullScreenRestoreFocusRef.current = null;
+      requestAnimationFrame(() => restoreTarget?.focus({ preventScroll: true }));
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    if (!(activeElement instanceof HTMLElement) || !sidebarRef.current?.contains(activeElement)) return;
+    fullScreenRestoreFocusRef.current = activeElement;
+    activeElement.blur();
+  }, [isFullScreen]);
+
   const handleCollapse = () => {
     shouldRestoreFocusRef.current = sidebarRef.current?.contains(document.activeElement) ?? false;
     onVisibleChange(false);
@@ -78,6 +98,7 @@ export default function EditorLeftSidebar({
       data-editor-region="left"
       data-editor-surrounding-chrome="true"
       data-testid="editor-left-region"
+      data-editor-left-fullscreen={isFullScreen ? 'true' : 'false'}
       style={{
         opacity: isFullScreen ? 0 : 1,
         width: isFullScreen
@@ -88,23 +109,23 @@ export default function EditorLeftSidebar({
       {/* i18next-instrument-ignore */}
       <aside
         aria-label="Develop workflow"
+        aria-hidden={isFullScreen || undefined}
         className="flex h-full min-h-0 shrink-0 flex-col overflow-hidden bg-editor-panel"
         data-editor-left-state={isVisible ? 'expanded' : 'collapsed'}
         ref={sidebarRef}
-        style={{ width: `${isVisible ? width : hasMacWindowOverlay ? 80 : 32}px` }}
+        style={{ position: 'relative', width: `${isVisible ? width : hasMacWindowOverlay ? 80 : 32}px` }}
       >
         {isVisible ? (
           <>
             <header
               className={cx(
                 professionalInspectorDensityTokens.frame.header,
+                'pointer-events-none absolute inset-x-0 top-0 z-10 h-0 items-start overflow-visible border-0 bg-transparent p-0 pt-1',
                 '!min-h-9',
                 hasMacWindowOverlay && 'pl-20',
               )}
               data-tauri-drag-region={hasMacWindowOverlay ? 'true' : undefined}
             >
-              {/* i18next-instrument-ignore */}
-              <h2 className={professionalInspectorDensityTokens.frame.title}>Develop</h2>
               {/* i18next-instrument-ignore */}
               <button
                 aria-label="Collapse Develop workflow"
@@ -112,6 +133,8 @@ export default function EditorLeftSidebar({
                   editorChromeTokens.button.base,
                   editorChromeTokens.button.iconCompact,
                   editorChromeTokens.button.quiet,
+                  'pointer-events-auto',
+                  'ml-auto',
                 )}
                 data-testid="editor-left-collapse"
                 data-tooltip="Collapse Develop workflow"
@@ -125,10 +148,11 @@ export default function EditorLeftSidebar({
             <div
               aria-label="Develop workflow sections"
               className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+              data-editor-left-navigation="true"
               data-testid="editor-left-scroll-root"
               role="group"
             >
-              {EDITOR_LEFT_SECTION_IDS.map((sectionId) => {
+              {EDITOR_LEFT_SECTION_IDS.map((sectionId, index) => {
                 const isOpen = expandedSections.includes(sectionId);
                 return (
                   <CollapsibleSection
@@ -143,8 +167,9 @@ export default function EditorLeftSidebar({
                   >
                     <div
                       aria-label={`${labels[sectionId]} slot`}
-                      className={cx('w-full bg-editor-panel-well', sectionId === 'navigator' ? 'min-h-28' : 'min-h-10')}
+                      className={cx('w-full', sectionId === 'navigator' && 'min-h-28 bg-editor-panel-well')}
                       data-editor-left-slot={sectionId}
+                      data-editor-left-primary={index === 0 ? 'true' : undefined}
                       role="group"
                     >
                       {isOpen ? slots[sectionId] : null}
