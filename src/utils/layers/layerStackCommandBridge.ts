@@ -227,6 +227,35 @@ export function buildLayerStackSidecarFromMasks(
   };
 }
 
+/**
+ * Keep an existing native layer sidecar aligned with the typed layer authority
+ * without re-serializing brush payloads that may only exist in the sidecar.
+ * Local mask controls can update tone values while the native mask remains
+ * authoritative for rendering and reopen.
+ */
+export function updateLayerStackSidecarToneColorFromMasks(
+  sidecar: LayerStackSidecarV1,
+  masks: ReadonlyArray<MaskContainer>,
+): LayerStackSidecarV1 {
+  const masksById = new Map(masks.map((mask) => [mask.id, mask]));
+  return layerStackSidecarV1Schema.parse({
+    ...sidecar,
+    layers: sidecar.layers.flatMap((layer) => {
+      const mask = masksById.get(layer.id);
+      if (mask === undefined) return [];
+      return [
+        {
+          ...layer,
+          adjustments: {
+            ...(layer.adjustments ?? {}),
+            toneColor: toLayerScopedToneAdjustment(mask.adjustments),
+          },
+        },
+      ];
+    }),
+  });
+}
+
 export function applyLayerStackCommandBridgeOperation(
   masks: ReadonlyArray<MaskContainer>,
   operation: LayerStackCommandBridgeOperation,
