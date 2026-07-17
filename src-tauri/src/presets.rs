@@ -255,18 +255,46 @@ fn validate_preset_items(presets: &[PresetItem]) -> Result<(), String> {
     Ok(())
 }
 
+fn candidate_claims_rapidraw_format(candidate: &Value) -> bool {
+    fn claims_format(value: &Value) -> bool {
+        value.get("format").and_then(Value::as_str) == Some(RAPIDRAW_PRESET_FORMAT)
+    }
+
+    claims_format(candidate)
+        || candidate.get("preset").is_some_and(claims_format)
+        || candidate
+            .get("folder")
+            .and_then(|folder| folder.get("children"))
+            .and_then(Value::as_array)
+            .is_some_and(|children| children.iter().any(claims_format))
+}
+
 fn decode_presets(content: &str) -> Result<Vec<PresetItem>, String> {
     let candidates: Vec<Value> =
         serde_json::from_str(content).map_err(|error| error.to_string())?;
-    Ok(candidates
-        .into_iter()
-        .filter_map(|candidate| {
-            let item = serde_json::from_value::<PresetItem>(candidate).ok()?;
-            validate_preset_items(std::slice::from_ref(&item))
-                .ok()
-                .map(|()| item)
-        })
-        .collect())
+    let mut presets = Vec::new();
+    for (index, candidate) in candidates.into_iter().enumerate() {
+        let claims_current_format = candidate_claims_rapidraw_format(&candidate);
+        let item = match serde_json::from_value::<PresetItem>(candidate) {
+            Ok(item) => item,
+            Err(error) if claims_current_format => {
+                return Err(format!(
+                    "RapidRaw preset entry {index} claims format {RAPIDRAW_PRESET_FORMAT} but does not match the current schema: {error}"
+                ));
+            }
+            Err(_) => continue,
+        };
+        match validate_preset_items(std::slice::from_ref(&item)) {
+            Ok(()) => presets.push(item),
+            Err(error) if claims_current_format => {
+                return Err(format!(
+                    "RapidRaw preset entry {index} failed current validation: {error}"
+                ));
+            }
+            Err(_) => {}
+        }
+    }
+    Ok(presets)
 }
 
 fn encode_presets(presets: &[PresetItem]) -> Result<String, String> {
@@ -439,8 +467,26 @@ mod tests {
         PresetItem, extract_external_xmp, read_preset_values_from_path, read_presets_from_path,
         write_presets_to_path,
     };
-    use serde_json::json;
+    use serde_json::{Value, json};
     use std::fs;
+
+    fn current_preset_value(id: &str) -> Value {
+        let mut preset = crate::preset_converter::convert_xmp_to_preset(&format!(
+            r#"<rdf:Description crs:Name="{id}" crs:Exposure2012="0.5" />"#
+        ))
+        .expect("current preset")
+        .preset;
+        preset.id = id.to_string();
+        serde_json::to_value(PresetItem::Preset(preset)).expect("serialize current preset")
+    }
+
+    fn write_library(path: &std::path::Path, values: Vec<Value>) {
+        fs::write(
+            path,
+            serde_json::to_vec_pretty(&values).expect("preset JSON"),
+        )
+        .expect("write preset library");
+    }
 
     #[test]
     fn preset_edit_document_v2_survives_native_save_and_reload() {
@@ -465,6 +511,25 @@ mod tests {
         assert_eq!(reopened.edit_document_v2, edit_document_v2);
         assert_eq!(reopened.format, "rapidraw.preset");
         assert_eq!(reopened.schema_version, 1);
+
+        let target: crate::adjustments::edit_document_v2::EditDocumentV2 =
+            serde_json::from_value(crate::exif_processing::neutral_current_edit_document())
+                .expect("neutral current target");
+        let payload: crate::adjustments::edit_document_v2::EditDocumentV2CopyPayload =
+            serde_json::from_value(reopened.edit_document_v2.clone())
+                .expect("reopened preset copy payload");
+        let applied = target
+            .merge_copy_payload(payload)
+            .expect("reopened preset applies to the current document");
+        let applied_value = serde_json::to_value(&applied).expect("serialize applied document");
+        assert_eq!(
+            applied_value["nodes"]["scene_global_color_tone"]["params"]["exposure"].as_f64(),
+            Some(1.25),
+            "reopened exposure must reach the applied current document"
+        );
+        applied
+            .compile()
+            .expect("applied preset document remains renderable");
 
         fs::write(
             &path,
@@ -540,6 +605,84 @@ mod tests {
         };
         assert_eq!(loaded.id, "current");
         assert_eq!(fs::read(&path).expect("source bytes remain"), source);
+    }
+
+    #[test]
+    fn current_format_preset_documents_never_fail_open() {
+        let directory = tempfile::tempdir().expect("temporary preset directory");
+        let path = directory.path().join("presets.json");
+        let valid = current_preset_value("strict-current");
+
+        let mut absent = valid.clone();
+        absent["preset"]
+            .as_object_mut()
+            .expect("preset object")
+            .remove("editDocumentV2");
+        let mut null = valid.clone();
+        null["preset"]["editDocumentV2"] = Value::Null;
+        let mut scalar = valid.clone();
+        scalar["preset"]["editDocumentV2"] = json!(7);
+        let mut malformed = valid.clone();
+        malformed["preset"]["editDocumentV2"] = json!({
+            "nodes": [],
+            "schemaVersion": 2
+        });
+        let mut future = valid.clone();
+        future["preset"]["editDocumentV2"]["schemaVersion"] = json!(3);
+        let mut invalid_current_node = valid.clone();
+        invalid_current_node["preset"]["editDocumentV2"]["nodes"]["film_emulation"]["params"] = json!({
+            "filmEmulation": { "stageParams": null }
+        });
+        let mut future_preset = valid;
+        future_preset["preset"]["schemaVersion"] = json!(2);
+
+        for (case, candidate) in [
+            ("absent", absent),
+            ("null", null),
+            ("scalar", scalar),
+            ("malformed", malformed),
+            ("future-document", future),
+            ("invalid-current-node", invalid_current_node),
+            ("future-preset", future_preset),
+        ] {
+            write_library(&path, vec![candidate]);
+            let error = read_presets_from_path(&path)
+                .expect_err("current-format invalid authority must not be silently filtered");
+            assert!(
+                error.contains("RapidRaw preset entry 0"),
+                "{case} lacked actionable entry context: {error}"
+            );
+            assert!(
+                error.contains("current schema") || error.contains("current validation"),
+                "{case} lacked current-contract context: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn mixed_obsolete_and_invalid_current_preset_rejects_current_authority() {
+        let directory = tempfile::tempdir().expect("temporary preset directory");
+        let path = directory.path().join("presets.json");
+        let obsolete = json!({
+            "preset": {
+                "adjustments": { "exposure": 0.75 },
+                "id": "obsolete",
+                "name": "Obsolete"
+            }
+        });
+        let mut invalid_current = current_preset_value("invalid-current");
+        invalid_current["preset"]["editDocumentV2"] = Value::Null;
+        write_library(&path, vec![obsolete, invalid_current]);
+        let source = fs::read(&path).expect("invalid mixed source bytes");
+
+        let error = read_presets_from_path(&path)
+            .expect_err("obsolete entries cannot hide an invalid current preset");
+        assert!(error.contains("RapidRaw preset entry 1"), "{error}");
+        assert_eq!(
+            fs::read(&path).expect("source bytes after rejection"),
+            source,
+            "strict reads must not rewrite invalid current preset authority"
+        );
     }
 
     #[test]
