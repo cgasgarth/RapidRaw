@@ -221,6 +221,8 @@ jobs:
     if: needs.plan.outputs.rust == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 4
+    env:
+      CARGO_BUILD_JOBS: '8'
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
       - uses: ./.github/actions/install-tauri-linux-deps
