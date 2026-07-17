@@ -59,7 +59,11 @@ const BasicTreatment = ({ enabled, onChange }: BasicTreatmentProps) => {
   const { t } = useTranslation();
   const treatmentLabel = t('adjustments.basic.treatment', { defaultValue: 'Treatment' });
   return (
-    <section className="border-b border-editor-border pb-1.5" data-testid="basic-treatment" data-treatment={enabled ? 'black_and_white' : 'color'}>
+    <section
+      className="border-b border-editor-border pb-1.5"
+      data-testid="basic-treatment"
+      data-treatment={enabled ? 'black_and_white' : 'color'}
+    >
       <div className="grid grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-0.5 py-0.5">
         <span className="truncate text-[10px] leading-4 text-text-secondary">{treatmentLabel}</span>
         <InspectorSegmentedControl
