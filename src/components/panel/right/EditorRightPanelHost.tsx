@@ -1,8 +1,9 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Component, type ReactNode, Suspense, useCallback, useLayoutEffect, useRef } from 'react';
 import { useUIStore } from '../../../store/useUIStore';
-import type { AppSettings, Panel, SelectedImage } from '../../ui/AppProperties';
+import { type AppSettings, Panel, type SelectedImage } from '../../ui/AppProperties';
 import type { ExportState } from '../../ui/ExportImportProperties';
+import InspectorAnalyticsHeader from './inspector/InspectorAnalyticsHeader';
 import { getRightPanelHostDescriptor, RIGHT_PANEL_ENTRIES, type RightPanelHostDescriptor } from './rightPanelRegistry';
 import { getRightPanelRenderer } from './rightPanelRenderers';
 
@@ -112,6 +113,13 @@ export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
   };
 
   const predecessorPanel = renderedRightPanel;
+  const analyticsTestId =
+    activeRightPanel === Panel.Adjustments
+      ? 'adjustments-analytics-header'
+      : activeRightPanel === Panel.Color
+        ? 'color-analytics-header'
+        : 'editor-analytics-header';
+  const renderHostAnalyticsHeader = activeRightPanel !== Panel.Adjustments && activeRightPanel !== Panel.Color;
   const renderLoadingFallback = () => {
     if (predecessorPanel === null || predecessorPanel === activeRightPanel) return <EditorRightPanelSkeleton />;
     return <Suspense fallback={<EditorRightPanelSkeleton />}>{renderPanel(predecessorPanel)}</Suspense>;
@@ -134,44 +142,47 @@ export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
       onScrollCapture={onScrollCapture}
       ref={hostRef}
     >
-      <div className="h-full min-h-0 w-full" data-right-panel-focus-entry="true" tabIndex={-1}>
-        {RIGHT_PANEL_ENTRIES.filter((entry) => entry.host.keepAlive === 'session').map(({ id }) => {
-          const isActive = activeRightPanel === id;
-          const hasMounted = mountedKeepAlivePanels.has(id);
-          if (!isActive && !hasMounted) return null;
+      <div className="flex h-full min-h-0 w-full flex-col" data-right-panel-focus-entry="true" tabIndex={-1}>
+        {renderHostAnalyticsHeader && <InspectorAnalyticsHeader includeDevelopToolStrip testId={analyticsTestId} />}
+        <div className="min-h-0 min-w-0 flex-1">
+          {RIGHT_PANEL_ENTRIES.filter((entry) => entry.host.keepAlive === 'session').map(({ id }) => {
+            const isActive = activeRightPanel === id;
+            const hasMounted = mountedKeepAlivePanels.has(id);
+            if (!isActive && !hasMounted) return null;
 
-          return (
-            <Suspense fallback={isActive ? renderLoadingFallback() : null} key={id}>
-              <div
-                aria-hidden={!isActive}
-                className="h-full w-full overflow-hidden"
-                data-testid={`editor-right-panel-keep-alive-${id}`}
-                hidden={!isActive}
-                inert={isActive ? undefined : true}
-              >
-                {renderPanel(id)}
-              </div>
-            </Suspense>
-          );
-        })}
+            return (
+              <Suspense fallback={isActive ? renderLoadingFallback() : null} key={id}>
+                <div
+                  aria-hidden={!isActive}
+                  className="h-full w-full overflow-hidden"
+                  data-testid={`editor-right-panel-keep-alive-${id}`}
+                  hidden={!isActive}
+                  inert={isActive ? undefined : true}
+                >
+                  {renderPanel(id)}
+                </div>
+              </Suspense>
+            );
+          })}
 
-        {activeRightPanel !== null && activeDescriptor !== null && activeDescriptor.keepAlive !== 'session' ? (
-          <Suspense
-            fallback={
-              activeDescriptor.loading.retainPredecessor ? renderLoadingFallback() : <EditorRightPanelSkeleton />
-            }
-          >
-            <motion.div
-              animate={{ opacity: 1 }}
-              className="h-full w-full overflow-hidden"
-              initial={prefersReducedMotion ? false : { opacity: 0.96 }}
-              key={activeRightPanel}
-              transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.12, ease: 'easeOut' }}
+          {activeRightPanel !== null && activeDescriptor !== null && activeDescriptor.keepAlive !== 'session' ? (
+            <Suspense
+              fallback={
+                activeDescriptor.loading.retainPredecessor ? renderLoadingFallback() : <EditorRightPanelSkeleton />
+              }
             >
-              {renderPanel(activeRightPanel)}
-            </motion.div>
-          </Suspense>
-        ) : null}
+              <motion.div
+                animate={{ opacity: 1 }}
+                className="h-full w-full overflow-hidden"
+                initial={prefersReducedMotion ? false : { opacity: 0.96 }}
+                key={activeRightPanel}
+                transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.12, ease: 'easeOut' }}
+              >
+                {renderPanel(activeRightPanel)}
+              </motion.div>
+            </Suspense>
+          ) : null}
+        </div>
       </div>
     </section>
   );

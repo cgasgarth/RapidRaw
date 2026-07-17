@@ -1,8 +1,10 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "B&W",
       "blacks": "Blacks",
       "brightness": "Brightness",
+      "color": "Color",
       "contrast": "Contrast",
       "evShift": "EV Shift",
       "exposure": "Exposure",
@@ -42,6 +44,7 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "Tone Mapper",
+      "treatment": "Treatment",
       "viewContrast": "View contrast",
       "whites": "Whites"
     },
@@ -1364,6 +1367,12 @@
         "switchToPortrait": "Switch to portrait",
         "transform": "Perspective and keystone correction"
       }
+    },
+    "developTools": {
+      "crop": "Crop",
+      "label": "Develop tools",
+      "masking": "Masking",
+      "remove": "Remove"
     },
     "layers": {
       "actions": {

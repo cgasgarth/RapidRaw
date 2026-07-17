@@ -1,8 +1,10 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "Schwarz",
       "brightness": "Helligkeit",
+      "color": "",
       "contrast": "Kontrast",
       "evShift": "EV-Korrektur",
       "exposure": "Belichtung",
@@ -41,6 +43,7 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "Tonemapper",
+      "treatment": "",
       "viewContrast": "Ansichtskontrast",
       "whites": "Weiß"
     },
@@ -1329,6 +1332,9 @@
         "switchToPortrait": "Zum Hochformat wechseln",
         "transform": "Perspektiv- und Trapezkorrektur"
       }
+    },
+    "developTools": {
+      "label": ""
     },
     "layers": {
       "actions": {

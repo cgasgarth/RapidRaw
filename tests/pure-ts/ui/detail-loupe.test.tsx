@@ -16,6 +16,32 @@ const identity = { imageSessionId: 'session-1', renderRevision: 4, sourceIdentit
 const target = createDetailLoupeTarget(identity, { x: 0.2, y: 0.8 });
 
 describe('detail loupe', () => {
+  test('is opt-in and hidden by default so it cannot cover viewer controls', async () => {
+    const i18n = i18next.createInstance();
+    await i18n.use(initReactI18next).init({
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: en } },
+    });
+    const view = render(
+      createElement(
+        I18nextProvider,
+        { i18n },
+        createElement(DetailLoupe, {
+          currentIdentity: identity,
+          devicePixelRatio: 1,
+          imageRect: { height: 400, width: 600, x: 0, y: 0 },
+          orientationSteps: 0,
+          previewUrl: 'data:image/png;base64,AAAA',
+          resolutionState: 'ready',
+          sourceSize: { height: 4000, width: 6000 },
+          target,
+        }),
+      ),
+    );
+    expect(view.container.querySelector('[data-testid="detail-loupe"]')).toBeNull();
+  });
+
   test('clamps crosshair targets and rejects stale source or render identity', () => {
     expect(createDetailLoupeTarget(identity, { x: -1, y: 2 })).toMatchObject({ x: 0, y: 1, ...identity });
     expect(
@@ -81,6 +107,7 @@ describe('detail loupe', () => {
           resolutionState: 'ready',
           sourceSize: { height: 4000, width: 6000 },
           target,
+          visible: true,
         }),
       ),
     );
@@ -102,6 +129,7 @@ describe('detail loupe', () => {
           resolutionState: 'ready',
           sourceSize: { height: 4000, width: 6000 },
           target,
+          visible: true,
         }),
       ),
     );

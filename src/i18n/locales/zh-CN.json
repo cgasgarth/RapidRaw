@@ -1,8 +1,10 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "黑色",
       "brightness": "亮度",
+      "color": "",
       "contrast": "对比度",
       "evShift": "EV 偏移",
       "exposure": "曝光",
@@ -41,6 +43,7 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "色调映射",
+      "treatment": "",
       "viewContrast": "视图对比度",
       "whites": "白色"
     },
@@ -1322,6 +1325,9 @@
         "switchToPortrait": "切换为纵向",
         "transform": "透视和梯形校正"
       }
+    },
+    "developTools": {
+      "label": ""
     },
     "layers": {
       "actions": {

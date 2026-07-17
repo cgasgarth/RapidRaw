@@ -1,8 +1,10 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "Czernie",
       "brightness": "Jasność",
+      "color": "",
       "contrast": "Kontrast",
       "evShift": "Przesunięcie EV",
       "exposure": "Ekspozycja",
@@ -41,6 +43,7 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "Mapowanie tonów",
+      "treatment": "",
       "viewContrast": "Kontrast widoku",
       "whites": "Biele"
     },
@@ -1383,6 +1386,9 @@
         "switchToPortrait": "Zmień na portret",
         "transform": "Korekcja perspektywy i keystone"
       }
+    },
+    "developTools": {
+      "label": ""
     },
     "layers": {
       "actions": {

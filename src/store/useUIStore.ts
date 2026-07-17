@@ -108,6 +108,8 @@ export interface PointColorPickerUiReceipt {
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
 
+export type DevelopToolId = 'crop' | 'masking' | 'remove';
+
 const LAZY_COMPUTATIONAL_MODAL_IDS = ['panorama', 'hdr', 'superResolution', 'focusStack', 'negativeLab'] as const;
 export type LazyComputationalModalId = (typeof LAZY_COMPUTATIONAL_MODAL_IDS)[number];
 
@@ -445,6 +447,8 @@ export interface UIState {
   // Right Panel
   activeRightPanel: Panel | null;
   renderedRightPanel: Panel | null;
+  activeDevelopTool: DevelopToolId | null;
+  activeDevelopToolRequestId: number;
   mountedKeepAlivePanels: ReadonlySet<Panel>;
   recentRightPanels: Panel[];
   slideDirection: number;
@@ -520,6 +524,7 @@ export interface UIState {
   recordRecentRightPanel: (panel: Panel) => void;
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
+  setActiveDevelopTool: (tool: DevelopToolId | null) => void;
   upsertDerivedOutputReceipt: (receipt: DerivedOutputReceipt) => void;
   customEscapeHandler: (() => void) | null;
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
@@ -578,6 +583,8 @@ export const useUIStore = create<UIState>((set, get) => {
 
     activeRightPanel: initialRightPanel,
     renderedRightPanel: initialRightPanel,
+    activeDevelopTool: initialRightPanel === Panel.Crop ? 'crop' : initialRightPanel === Panel.Masks ? 'masking' : null,
+    activeDevelopToolRequestId: 0,
     mountedKeepAlivePanels:
       getRightPanelHostDescriptor(initialRightPanel).keepAlive === 'session' ? new Set([initialRightPanel]) : new Set(),
     recentRightPanels: [initialRightPanel],
@@ -716,6 +723,8 @@ export const useUIStore = create<UIState>((set, get) => {
       set({
         ...applyWorkspacePreferences(preferences),
         activeRightPanel,
+        activeDevelopTool:
+          activeRightPanel === Panel.Crop ? 'crop' : activeRightPanel === Panel.Masks ? 'masking' : null,
         collapsibleSectionsState: createCollapsibleSectionsState(preferences),
         developPanelPinnedControlIds: preferences.rightInspector.pinnedControlIds,
         recentRightPanels: preferences.rightInspector.recentPanels,
@@ -801,7 +810,16 @@ export const useUIStore = create<UIState>((set, get) => {
         return {
           ...applyWorkspacePreferences(preferences, state.editorWorkspaceViewport),
           ...(region === 'rightInspector'
-            ? { activeRightPanel: visible ? preferences.rightInspector.activePanel : null }
+            ? {
+                activeRightPanel: visible ? preferences.rightInspector.activePanel : null,
+                activeDevelopTool: visible
+                  ? preferences.rightInspector.activePanel === Panel.Crop
+                    ? 'crop'
+                    : preferences.rightInspector.activePanel === Panel.Masks
+                      ? 'masking'
+                      : null
+                  : null,
+              }
             : {}),
         };
       });
@@ -972,6 +990,7 @@ export const useUIStore = create<UIState>((set, get) => {
             slideDirection: newIndex === currentIndex ? 0 : newIndex > currentIndex ? 1 : -1,
             activeRightPanel: panelId,
             renderedRightPanel: previousPanel,
+            activeDevelopTool: panelId === Panel.Crop ? 'crop' : panelId === Panel.Masks ? 'masking' : null,
             mountedKeepAlivePanels:
               panelId !== null && getRightPanelHostDescriptor(panelId).keepAlive === 'session'
                 ? new Set([...state.mountedKeepAlivePanels, panelId])
@@ -983,6 +1002,13 @@ export const useUIStore = create<UIState>((set, get) => {
           };
         });
       }
+    },
+
+    setActiveDevelopTool: (tool) => {
+      set((state) => ({
+        activeDevelopTool: tool,
+        activeDevelopToolRequestId: state.activeDevelopToolRequestId + 1,
+      }));
     },
 
     upsertDerivedOutputReceipt: (receipt) => {

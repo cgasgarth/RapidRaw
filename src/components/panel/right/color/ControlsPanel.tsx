@@ -120,6 +120,7 @@ import InspectorPanelFrame, {
   type InspectorPanelNotice,
   type InspectorPanelStatus,
 } from '../inspector/InspectorPanelFrame';
+import { selectColorPanelAdjustmentView } from './ColorWorkspacePanel';
 
 const ADJUSTMENT_SECTION_NAMES = [
   'basic',
@@ -280,7 +281,11 @@ const toHeaderAction = (option: Option, testId: string): CollapsibleSectionHeade
   };
 };
 
-export default function Controls() {
+interface ControlsProps {
+  embeddedHeader?: boolean;
+}
+
+export default function Controls({ embeddedHeader = false }: ControlsProps = {}) {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
@@ -327,6 +332,7 @@ export default function Controls() {
     histogram,
     selectedImage,
     selectedImageSessionId,
+    isWbPickerActive,
     setEditor,
   } = useEditorStore(
     useShallow((state) => ({
@@ -337,6 +343,7 @@ export default function Controls() {
       histogram: state.histogram,
       selectedImage: state.selectedImage,
       selectedImageSessionId: currentAutoEditImageSessionId(state),
+      isWbPickerActive: state.isWbPickerActive,
       setEditor: state.setEditor,
     })),
   );
@@ -1677,7 +1684,19 @@ export default function Controls() {
               }}
               setAdjustments={setBasicAdjustments}
               appSettings={appSettings}
+              cameraInputAdjustments={selectColorPanelAdjustmentView(adjustments)}
+              isWbPickerActive={isWbPickerActive}
               onDragStateChange={onDragStateChange}
+              toggleWbPicker={() => {
+                setEditor({ isWbPickerActive: !isWbPickerActive });
+              }}
+              onAutoAdjust={() => {
+                void beginAutoEdit();
+              }}
+              autoAdjustDisabled={!selectedImage?.isReady || isAutoEditAnalyzing || isAutoEditApplying}
+              autoAdjustStatus={
+                isAutoEditAnalyzing || isAutoEditApplying ? 'busy' : autoEditError !== null ? 'error' : 'idle'
+              }
             />
           </>
         );
@@ -1839,8 +1858,7 @@ export default function Controls() {
       status={panelStatus}
       testId="adjustments-inspector"
     >
-      <InspectorAnalyticsHeader testId="adjustments-analytics-header" />
-
+      {!embeddedHeader && <InspectorAnalyticsHeader includeDevelopToolStrip testId="adjustments-analytics-header" />}
       <ReferenceMatchPanel />
 
       <div
