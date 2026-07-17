@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'bun:test';
-import { act } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 
+import { EditorSnapshotsSection } from '../../../src/components/panel/editor/EditorHistorySections';
 import { useEditorStore } from '../../../src/store/useEditorStore';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { readNamedSnapshots, snapshotDocumentEquals } from '../../../src/utils/editorNamedSnapshots';
@@ -108,4 +109,31 @@ test('rename and delete operate on the source-image snapshot authority', () => {
   expect(
     readNamedSnapshots(useEditorStore.getState().editDocumentV2, imagePath, `editor-image-source:${imagePath}`),
   ).toHaveLength(0);
+});
+
+test('named snapshot rail reads snapshots from the source-image authority during an active session', () => {
+  act(() => {
+    useEditorStore.getState().setEditor({
+      imageSession: { generation: 3, id: 'session-3', path: imagePath, source: 'cache', status: 'ready' },
+      selectedImage: {
+        exif: null,
+        height: 100,
+        isRaw: true,
+        isReady: true,
+        originalUrl: null,
+        path: imagePath,
+        thumbnailUrl: '',
+        width: 100,
+      },
+    });
+    const document = createDefaultEditDocumentV2();
+    useEditorStore
+      .getState()
+      .hydrateEditorRenderAuthority({ editDocumentV2: document, history: [document], historyIndex: 0 });
+  });
+
+  expect(useEditorStore.getState().createNamedSnapshot('Saved look')).toBe(true);
+  const container = render(<EditorSnapshotsSection />).container;
+  expect(container.querySelector('[role="option"]')?.textContent).toBe('Saved look');
+  expect(container.querySelector('[data-testid="editor-sidebar-snapshot-active-row"]')).not.toBeNull();
 });
