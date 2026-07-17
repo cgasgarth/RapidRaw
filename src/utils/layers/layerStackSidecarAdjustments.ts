@@ -58,7 +58,13 @@ export function hydrateLayerStackMasksInEditDocument(
   );
   if (layerStackSidecar === undefined) return document;
 
-  const masks = materializeMasksFromLayerStackSidecar(layerStackSidecar, selectEditDocumentMasks(document));
+  const previousMasks = selectEditDocumentMasks(document);
+  const materializedMasks = materializeMasksFromLayerStackSidecar(layerStackSidecar, previousMasks);
+  const materializedIds = new Set(materializedMasks.map((mask) => mask.id));
+  // Native current-document masks are the authoritative reopen source. Keep
+  // any typed layers absent from an older/incomplete sidecar artifact instead
+  // of silently dropping newly introduced AI scene masks during hydration.
+  const masks = [...materializedMasks, ...previousMasks.filter((mask) => !materializedIds.has(mask.id))];
   const layers = editDocumentLayersV2Schema.parse({ masks: structuredClone(masks) });
   return updateEditDocumentV2Node(document, 'layers', () => layers);
 }
