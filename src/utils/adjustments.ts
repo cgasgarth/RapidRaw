@@ -728,6 +728,8 @@ export interface Sections {
   color: Array<string>;
   details: Array<string>;
   effects: Array<string>;
+  lensCorrection: Array<string>;
+  transform: Array<string>;
   transformLens: Array<string>;
 }
 
@@ -1577,6 +1579,28 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     Effect.VignetteFeather,
     Effect.VignetteMidpoint,
     Effect.VignetteRoundness,
+  ],
+  transform: [
+    TransformAdjustment.TransformDistortion,
+    TransformAdjustment.TransformVertical,
+    TransformAdjustment.TransformHorizontal,
+    TransformAdjustment.TransformRotate,
+    TransformAdjustment.TransformAspect,
+    TransformAdjustment.TransformScale,
+    TransformAdjustment.TransformXOffset,
+    TransformAdjustment.TransformYOffset,
+  ],
+  lensCorrection: [
+    LensAdjustment.LensCorrectionMode,
+    LensAdjustment.LensMaker,
+    LensAdjustment.LensModel,
+    LensAdjustment.LensDistortionAmount,
+    LensAdjustment.LensVignetteAmount,
+    LensAdjustment.LensTcaAmount,
+    LensAdjustment.LensDistortionParams,
+    LensAdjustment.LensDistortionEnabled,
+    LensAdjustment.LensTcaEnabled,
+    LensAdjustment.LensVignetteEnabled,
   ],
   transformLens: [
     TransformAdjustment.TransformDistortion,
