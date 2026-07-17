@@ -281,7 +281,11 @@ const toHeaderAction = (option: Option, testId: string): CollapsibleSectionHeade
   };
 };
 
-export default function Controls() {
+interface ControlsProps {
+  embeddedHeader?: boolean;
+}
+
+export default function Controls({ embeddedHeader = false }: ControlsProps = {}) {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
@@ -1854,8 +1858,7 @@ export default function Controls() {
       status={panelStatus}
       testId="adjustments-inspector"
     >
-      <InspectorAnalyticsHeader testId="adjustments-analytics-header" />
-
+      {!embeddedHeader && <InspectorAnalyticsHeader includeDevelopToolStrip testId="adjustments-analytics-header" />}
       <ReferenceMatchPanel />
 
       <div

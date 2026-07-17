@@ -1387,6 +1387,9 @@
         "transform": "Korekcja perspektywy i keystone"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "Collapse group",

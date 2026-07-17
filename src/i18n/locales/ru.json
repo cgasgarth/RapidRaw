@@ -1347,6 +1347,9 @@
         "transform": "Коррекция перспективы и искажений"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "",
