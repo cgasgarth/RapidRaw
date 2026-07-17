@@ -21,7 +21,19 @@ describe('Develop inspector stack', () => {
       'effects',
       'calibration',
     ]);
-    expect(DEVELOP_INSPECTOR_STACK_ORDER.slice(0, 2)).toEqual(['histogram', 'toolStrip']);
+    expect(DEVELOP_INSPECTOR_STACK_ORDER).toEqual([
+      'histogram',
+      'toolStrip',
+      'basic',
+      'curves',
+      'colorMixer',
+      'colorGrading',
+      'details',
+      'lensCorrection',
+      'transform',
+      'effects',
+      'calibration',
+    ]);
   });
 
   test('normalizes persisted IDs without allowing unknowns or duplicates', () => {
