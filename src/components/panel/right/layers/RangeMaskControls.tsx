@@ -23,13 +23,19 @@ type RangeDraft = TypedRangeDraft & { smoothness: number };
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 const finite = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+const normalizedFraction = (value: unknown, fallback: number): number => {
+  const numeric = finite(value, fallback);
+  // Picker-era masks stored feather as a percentage (for example, 35), while
+  // range-mask and refinement contracts use a normalized 0..1 fraction.
+  return numeric > 1 ? numeric / 100 : numeric;
+};
 
 function defaultsFor(kind: RangeMaskKind, parameters: unknown): RangeDraft {
   const current = toMaskParameterRecord(parameters);
   if (kind === 'luminance') {
     const minLuma = clamp(finite(current['minLuma'], 0.08), 0, 0.98);
     const maxLuma = clamp(finite(current['maxLuma'], 0.92), minLuma + 0.01, 1);
-    const feather = clamp(finite(current['feather'], finite(current['softness'], 0.18)), 0, 1);
+    const feather = clamp(normalizedFraction(current['feather'], normalizedFraction(current['softness'], 0.18)), 0, 1);
     return {
       feather,
       maxLuma,
@@ -44,7 +50,7 @@ function defaultsFor(kind: RangeMaskKind, parameters: unknown): RangeDraft {
   const maxSaturation = clamp(finite(current['maxSaturation'], 1), minSaturation + 0.01, 1);
   return {
     centerHueDegrees: clamp(finite(current['centerHueDegrees'], 180), 0, 359.999),
-    feather: clamp(finite(current['feather'], 0.35), 0, 1),
+    feather: clamp(normalizedFraction(current['feather'], 0.35), 0, 1),
     hueToleranceDegrees: clamp(finite(current['hueToleranceDegrees'], 36), 1, 180),
     maxLuma,
     maxSaturation,

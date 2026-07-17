@@ -3678,7 +3678,10 @@ function SettingsPanel({
 
   const handleRangeMaskParametersChange = (parameters: Record<string, unknown>) => {
     if (!isActive || !activeSubMask) return;
-    updateSubMask(activeSubMask.id, { parameters });
+    // Keep picker/overlay and runtime provenance fields while replacing only
+    // the range-selection values. A preview or apply gesture must not erase
+    // the sampled target (or an existing local-adjustment receipt).
+    updateSubMask(activeSubMask.id, { parameters: mergeMaskParameters(activeSubMask.parameters, parameters) });
   };
 
   const handleMaskRefinementParametersChange = (changes: NumericMaskParameterPatch<MaskRefinementParameterKey>) => {

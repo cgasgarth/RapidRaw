@@ -3,6 +3,7 @@ import { fireEvent, render } from '@testing-library/react';
 import i18next from 'i18next';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { RangeMaskControls } from '../../../src/components/panel/right/layers/RangeMaskControls';
+import { mergeMaskParameters } from '../../../src/utils/mask/maskParameterAccess';
 
 mock.module('@clerk/react', () => ({
   useAuth: () => ({ getToken: async () => null }),
@@ -69,5 +70,32 @@ describe('Lightroom range mask controls', () => {
     const restored = callbacks.preview.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(restored['feather']).toBe(0.2);
     expect(restored['smoothness']).toBe(0.3);
+  });
+
+  test('normalizes picker-era feather percentages without dropping sampled metadata', () => {
+    const callbacks = { apply: mock(), preview: mock() };
+    const view = render(
+      <I18nextProvider i18n={i18n}>
+        <RangeMaskControls
+          kind="luminance"
+          parameters={{
+            feather: 35,
+            isInitialDraw: false,
+            targetX: 812,
+            targetY: 426,
+            tolerance: 20,
+          }}
+          onApply={callbacks.apply}
+          onPreview={callbacks.preview}
+        />
+      </I18nextProvider>,
+    );
+
+    expect((view.getByLabelText('Range feather') as HTMLInputElement).value).toBe('35');
+    fireEvent.click(view.getByTestId('range-mask-apply-luminance'));
+    const selection = callbacks.apply.mock.calls[0]?.[0] as Record<string, unknown>;
+    const merged = mergeMaskParameters({ isInitialDraw: false, targetX: 812, targetY: 426, tolerance: 20 }, selection);
+    expect(merged).toMatchObject({ isInitialDraw: false, targetX: 812, targetY: 426, tolerance: 20 });
+    expect(merged['feather']).toBe(0.35);
   });
 });
