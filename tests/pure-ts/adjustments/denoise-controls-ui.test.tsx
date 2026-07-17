@@ -5,6 +5,7 @@ import { createElement, useMemo, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 
 import DetailsPanel, { type DetailAdjustmentView } from '../../../src/components/adjustments/Details.tsx';
+import LensCorrections from '../../../src/components/adjustments/LensCorrections.tsx';
 import en from '../../../src/i18n/locales/en.json';
 import { createEditorImageSession, useEditorStore } from '../../../src/store/useEditorStore.ts';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments.ts';
@@ -99,6 +100,7 @@ test('Alt sharpening diagnostics are transient and publish only during the slide
 
 function DenoiseControlsHarness() {
   const document = useEditorStore((state) => state.editDocumentV2);
+  const selectedImage = useEditorStore((state) => state.selectedImage);
   const adjustments = useMemo<DetailAdjustmentView>(
     () => ({
       ...selectEditDocumentNode(document, 'detail_denoise_dehaze').params,
@@ -114,6 +116,16 @@ function DenoiseControlsHarness() {
       appSettings: null,
       setAdjustments: () => {
         throw new Error('Global node-owned denoise control bypassed EditTransaction.');
+      },
+    }),
+    createElement(LensCorrections, {
+      adjustments: {
+        ...document.geometry,
+        ...selectEditDocumentNode(document, 'lens_correction').params,
+      },
+      selectedImage,
+      setAdjustments: () => {
+        throw new Error('Global lens control bypassed EditTransaction.');
       },
     }),
     createElement(

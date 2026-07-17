@@ -102,7 +102,7 @@ const copy = {
   profileIdle: 'Profile idle',
   profileNotFound: 'No profile',
   profileReady: 'Profile ready',
-  profileTca: 'Chromatic aberration',
+  profileTca: 'Remove Chromatic Aberration',
   profileVignette: 'Lens vignette',
   rotation: 'Rotation',
   scale: 'Scale',
@@ -546,6 +546,7 @@ export default function TransformLens({
       data-commit-adjustment-revision={lensCorrectionCommitIdentity?.adjustmentRevision}
       data-commit-image-session={lensCorrectionCommitIdentity?.imageSessionId}
       data-commit-source-identity={lensCorrectionCommitIdentity?.sourceIdentity}
+      data-lens-detection-status={detectionStatus}
       data-testid="transform-lens-inspector"
     >
       {showTransform && (
@@ -833,6 +834,7 @@ export default function TransformLens({
                   ? 'bg-editor-selected-quiet text-text-primary'
                   : 'bg-editor-panel text-text-secondary',
               )}
+              data-testid="lens-profile-status"
             >
               {detectionStatus === 'detecting' ? <Loader className="animate-spin" size={11} /> : <Aperture size={11} />}
               {detectionLabel}
@@ -924,6 +926,7 @@ export default function TransformLens({
                 checked={adjustments.lensTcaEnabled && availability.tca}
                 chrome="editor"
                 disabled={!availability.tca}
+                id="switch-remove-chromatic-aberration"
                 label={copy.profileTca}
                 onChange={(checked) => {
                   commitLensCorrectionAdjustment('lensTcaEnabled', checked);

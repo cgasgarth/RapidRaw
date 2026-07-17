@@ -11,10 +11,6 @@ import {
   isDetailNumberNodeAdjustment,
 } from '../../utils/detailEditTransaction';
 import { type DetailModifierPreview, resolveDetailModifierPreview } from '../../utils/detailLoupe';
-import {
-  buildLensCorrectionEditTransaction,
-  isManualLensCorrectionAdjustment,
-} from '../../utils/lensCorrectionEditTransaction';
 import type { AppSettings } from '../ui/AppProperties';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import Switch from '../ui/primitives/Switch';
@@ -112,18 +108,6 @@ export default function DetailsPanel({
 
   const handleAdjustmentChange = (key: DetailsAdjustment, value: number) => {
     const nextValue = Math.trunc(value);
-    if (!isForMask && isManualLensCorrectionAdjustment(key)) {
-      const identity = detailCommitIdentityRef.current;
-      if (identity === null) return;
-      const result = applyEditTransaction(
-        buildLensCorrectionEditTransaction(useEditorStore.getState(), identity, key, nextValue, crypto.randomUUID()),
-      );
-      detailCommitIdentityRef.current = {
-        ...identity,
-        adjustmentRevision: result.nextAdjustmentRevision,
-      };
-      return;
-    }
     if (!isForMask && isDetailNumberNodeAdjustment(key)) {
       const identity = detailCommitIdentityRef.current;
       if (identity === null) return;
@@ -501,38 +485,6 @@ export default function DetailsPanel({
               {t('adjustments.details.altPreviewNoiseReduction')}
             </div>
           )}
-        </div>
-      )}
-
-      {!isForMask && adjustmentVisibility['chromaticAberration'] !== false && (
-        <div className={detailGroupClassName}>
-          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-            {t('adjustments.details.chromaticAberration')}
-          </UiText>
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.redCyan')}
-            max={100}
-            min={-100}
-            onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationRedCyan, value);
-            }}
-            step={1}
-            value={adjustments.chromaticAberrationRedCyan}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.blueYellow')}
-            max={100}
-            min={-100}
-            onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationBlueYellow, value);
-            }}
-            step={1}
-            value={adjustments.chromaticAberrationBlueYellow}
-            onDragStateChange={onDragStateChange}
-          />
         </div>
       )}
     </div>
