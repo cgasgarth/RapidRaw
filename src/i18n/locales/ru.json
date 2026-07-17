@@ -1338,6 +1338,7 @@
         "flipHoriz": "Отразить горизонтально",
         "flipVert": "Отразить вертикально",
         "lens": "Коррекция искажений объектива",
+        "lockAspect": "",
         "overlayDetails": "Сетка: {{name}}{{rotateHint}}",
         "resetFineRotation": "Сбросить точный поворот",
         "rotateHint": " (Shift+O для вращения сетки)",
@@ -1347,7 +1348,8 @@
         "switchOrientation": "Сменить ориентацию",
         "switchToLandscape": "Переключить на альбомную",
         "switchToPortrait": "Переключить на портретную",
-        "transform": "Коррекция перспективы и искажений"
+        "transform": "Коррекция перспективы и искажений",
+        "unlockAspect": ""
       }
     },
     "developTools": {
