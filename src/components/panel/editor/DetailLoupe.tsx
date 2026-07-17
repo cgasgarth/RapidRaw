@@ -25,6 +25,7 @@ interface DetailLoupeProps {
   sourceSize: { readonly height: number; readonly width: number };
   currentIdentity: DetailLoupeIdentity | null;
   target: DetailLoupeTarget | null;
+  visible?: boolean;
   onTargetChange?: (target: DetailLoupeTarget) => void;
 }
 
@@ -46,6 +47,7 @@ export default function DetailLoupe({
   resolutionState,
   sourceSize,
   target,
+  visible = false,
 }: DetailLoupeProps) {
   const { t } = useTranslation();
   const [dragging, setDragging] = useState(false);
@@ -108,6 +110,8 @@ export default function DetailLoupe({
     dragRef.current = false;
     setDragging(false);
   };
+
+  if (!visible) return null;
 
   return (
     <aside
