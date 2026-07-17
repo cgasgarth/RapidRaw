@@ -27,6 +27,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import {
   type EditDocumentNodeTypeV2,
+  type EditDocumentV2,
   type EditDocumentV2CopyPayload,
   getEditDocumentNodeTypesForEditorSection,
 } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
@@ -185,7 +186,7 @@ type NumericAdjustmentKey = keyof {
 const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> = {
   basic: 'Light',
   calibration: 'Calibration',
-  curves: 'Curve',
+  curves: 'Tone Curve',
   details: 'Detail',
   effects: 'Effects',
   transform: 'Transform',
@@ -208,6 +209,13 @@ const PINNED_CONTROLS_LIMIT = 8;
 const DEVELOP_PANEL_SEARCH_NORMALIZER = /\s+/g;
 const DEVELOP_PANEL_FOCUSABLE_SELECTOR =
   'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+interface CurveInteractionSession {
+  baseline: EditDocumentV2;
+  historyIndex: number;
+  imageSessionId: string;
+  transactionId: string;
+}
 
 const normalizeDevelopPanelSearchText = (value: string) =>
   value.trim().toLowerCase().replace(DEVELOP_PANEL_SEARCH_NORMALIZER, ' ');
@@ -242,7 +250,7 @@ const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionN
       );
     case 'curves':
       return String(
-        t('editor.adjustments.scopedSections.curves', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.curves }),
+        t('editor.adjustments.scopedSections.toneCurve', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.curves }),
       );
     case 'details':
       return String(
@@ -302,6 +310,7 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
   const autoEditPreviewKeyRef = useRef<string | null>(null);
   const autoEditBaseRef = useRef<AutoEditProposalBase | null>(null);
   const developPanelScrollRootRef = useRef<HTMLDivElement | null>(null);
+  const curveInteractionRef = useRef<CurveInteractionSession | null>(null);
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -378,16 +387,60 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
     [commitEditNodeOperations],
   );
 
-  const setCurveAdjustments = useCallback(
-    (update: CurveAdjustmentUpdater) => {
-      const current = selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_curve').params;
-      const next: CurveAdjustmentView = update(current);
-      if (hasViewChanged(current, next)) {
-        commitEditNodeOperations([{ nodeType: 'scene_curve', patch: next, type: 'patch-edit-document-node' }]);
-      }
-    },
-    [commitEditNodeOperations],
-  );
+  const beginCurveInteraction = useCallback(() => {
+    if (curveInteractionRef.current !== null) return;
+    const state = useEditorStore.getState();
+    curveInteractionRef.current = {
+      baseline: structuredClone(state.editDocumentV2),
+      historyIndex: state.historyIndex,
+      imageSessionId: currentAutoEditImageSessionId(state),
+      transactionId: crypto.randomUUID(),
+    };
+  }, []);
+
+  const commitCurveInteraction = useCallback(() => {
+    curveInteractionRef.current = null;
+  }, []);
+
+  const cancelCurveInteraction = useCallback(() => {
+    const interaction = curveInteractionRef.current;
+    curveInteractionRef.current = null;
+    if (interaction === null) return;
+    const state = useEditorStore.getState();
+    if (state.historyIndex === interaction.historyIndex) return;
+    try {
+      state.applyEditTransaction({
+        baseAdjustmentRevision: state.adjustmentRevision,
+        history: 'navigation',
+        historyTargetIndex: interaction.historyIndex,
+        imageSessionId: currentAutoEditImageSessionId(state),
+        operations: [{ editDocumentV2: interaction.baseline, type: 'replace-edit-document' }],
+        persistence: 'commit',
+        source: 'manual-control',
+        transactionId: crypto.randomUUID(),
+      });
+    } catch {
+      // A session/revision switch already invalidated the interaction. The
+      // current editor authority is safer than replaying a stale baseline.
+    }
+  }, []);
+
+  const setCurveAdjustments = useCallback((update: CurveAdjustmentUpdater) => {
+    const state = useEditorStore.getState();
+    const current = selectEditDocumentNode(state.editDocumentV2, 'scene_curve').params;
+    const next: CurveAdjustmentView = update(current);
+    if (!hasViewChanged(current, next)) return;
+    const interaction = curveInteractionRef.current;
+    state.applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: interaction === null ? 'single-entry' : 'coalesced-interaction',
+      imageSessionId: interaction?.imageSessionId ?? currentAutoEditImageSessionId(state),
+      operations: [{ nodeType: 'scene_curve', patch: next, type: 'patch-edit-document-node' }],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: interaction?.transactionId ?? crypto.randomUUID(),
+    });
+  }, []);
 
   const setTransformLensAdjustments = useCallback(
     (update: TransformLensAdjustmentUpdate) => {
@@ -1704,6 +1757,9 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
         return (
           <CurveGraph
             adjustments={selectEditDocumentNode(adjustments, 'scene_curve').params}
+            onInteractionCancel={cancelCurveInteraction}
+            onInteractionCommit={commitCurveInteraction}
+            onInteractionStart={beginCurveInteraction}
             setAdjustments={setCurveAdjustments}
             histogram={histogram}
             theme={theme}
