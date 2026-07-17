@@ -38,6 +38,7 @@ import {
   Settings2,
   SlidersHorizontal,
   SortAsc,
+  Star,
   Trash2,
   Users,
   Wrench,
@@ -66,6 +67,12 @@ import {
 } from '../../../../utils/color/style/colorStylePresetCatalog';
 import { buildPresetEditTransaction, resolveEditDocumentPresetPayload } from '../../../../utils/editDocumentPreset';
 import { areEditDocumentsEqual } from '../../../../utils/editTransaction';
+import {
+  type PresetBrowserMemory,
+  readPresetBrowserMemory,
+  recordPresetUse,
+  writePresetBrowserMemory,
+} from '../../../../utils/presetBrowserMemory';
 import { classifyPresetLibraryLoadState } from '../../../../utils/presetLibraryLoadState';
 import ConfigurePresetModal from '../../../modals/library/ConfigurePresetModal';
 import CreateFolderModal from '../../../modals/library/CreateFolderModal';
@@ -104,7 +111,7 @@ type PresetFolder = Omit<PresetFolderBase, 'children' | 'id' | 'name'> & {
 type PresetEntry = UserPreset & { folder?: undefined; preset: Preset };
 type FolderEntry = UserPreset & { folder: PresetFolder; preset?: undefined };
 type PresetContextItem = FolderEntry | PresetEntry;
-type DiscoveryFilter = 'all' | 'style' | 'tool';
+type DiscoveryFilter = 'all' | 'style' | 'tool' | 'favorites' | 'recent';
 type DiscoverySort = 'library' | 'name';
 type DiscoveryDensity = 'list' | 'grid';
 
@@ -156,6 +163,7 @@ interface PresetResultItemProps {
   appliedId: string | null;
   density: DiscoveryDensity;
   editedAfterApply: boolean;
+  isFavorite: boolean;
   isSelected: boolean;
   isPreviewed: boolean;
   onApply: (preset: Preset) => void;
@@ -163,6 +171,7 @@ interface PresetResultItemProps {
   onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>, preset: Preset) => void;
   onPreview: (preset: Preset | null) => void;
   onSelect: (preset: Preset) => void;
+  onToggleFavorite: (id: string) => void;
   preset: Preset;
   presetButtonRef: (node: HTMLButtonElement | null) => void;
   previewState: 'failed' | 'idle' | 'loading' | 'ready';
@@ -173,6 +182,7 @@ function PresetResultItem({
   appliedId,
   density,
   editedAfterApply,
+  isFavorite,
   isSelected,
   isPreviewed,
   onApply,
@@ -180,6 +190,7 @@ function PresetResultItem({
   onKeyDown,
   onPreview,
   onSelect,
+  onToggleFavorite,
   preset,
   presetButtonRef,
   previewState,
@@ -308,6 +319,23 @@ function PresetResultItem({
           <Check size={13} />
         </button>
         <button
+          aria-label={t(isFavorite ? 'editor.presets.discovery.unfavorite' : 'editor.presets.discovery.favorite', {
+            name: preset.name,
+          })}
+          aria-pressed={isFavorite}
+          className="flex h-6 w-6 items-center justify-center rounded text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+          data-tooltip={t(isFavorite ? 'editor.presets.discovery.unfavorite' : 'editor.presets.discovery.favorite', {
+            name: preset.name,
+          })}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleFavorite(preset.id);
+          }}
+          type="button"
+        >
+          <Star aria-hidden="true" className={isFavorite ? 'fill-current text-editor-warning' : undefined} size={13} />
+        </button>
+        <button
           aria-label={t('editor.presets.discovery.moveLabel', { name: preset.name })}
           className="flex h-6 w-5 cursor-grab items-center justify-center rounded text-text-tertiary hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring active:cursor-grabbing"
           data-tooltip={t('editor.presets.discovery.moveLabel', { name: preset.name })}
@@ -405,7 +433,6 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
   const imageSession = useEditorStore((state) => state.imageSession);
-  const adjustments = useEditorStore((state) => state.editDocumentV2);
   const editDocumentV2 = useEditorStore((state) => state.editDocumentV2);
   const appliedPreset = useEditorStore((state) => state.presetApplication);
   const setAppliedPreset = useEditorStore((state) => state.setPresetApplication);
@@ -435,8 +462,10 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const density = professionalInspectorDensityTokens;
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<DiscoveryFilter>('all');
+  const [category, setCategory] = useState('all');
   const [sort, setSort] = useState<DiscoverySort>('library');
   const [resultDensity, setResultDensity] = useState<DiscoveryDensity>('list');
+  const [browserMemory, setBrowserMemory] = useState<PresetBrowserMemory>(readPresetBrowserMemory);
   const [expandedFolders, setExpandedFolders] = useState(new Set<string>());
   const { clearPreviews, enqueuePreviews, installImageSession, isGeneratingPreviews, previews, previewStates } =
     usePresetPreviewQueue();
@@ -471,11 +500,23 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     return parents;
   }, [folders, rootPresets]);
   const queryText = query.trim().toLocaleLowerCase();
+  const categories = useMemo(
+    () =>
+      [...new Set(BUILT_IN_COLOR_STYLE_PRESETS.map((preset) => preset.category))].sort((a, b) => a.localeCompare(b)),
+    [],
+  );
+  const favoriteIds = useMemo(() => new Set(browserMemory.favorites), [browserMemory.favorites]);
+  const recentIds = useMemo(() => new Set(Object.keys(browserMemory.recent)), [browserMemory.recent]);
   const matchesPreset = useCallback(
     (preset: Preset) =>
-      (filter === 'all' || (preset.presetType ?? 'style') === filter) &&
+      (filter === 'all' ||
+        (filter === 'favorites'
+          ? favoriteIds.has(preset.id)
+          : filter === 'recent'
+            ? recentIds.has(preset.id)
+            : (preset.presetType ?? 'style') === filter)) &&
       (queryText.length === 0 || preset.name.toLocaleLowerCase().includes(queryText)),
-    [filter, queryText],
+    [favoriteIds, filter, queryText, recentIds],
   );
   const displayFolders = useMemo(() => {
     const matching = folders.flatMap((entry) => {
@@ -483,25 +524,42 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
       const children = entry.folder.children.filter((preset) => matchesPreset(preset) || folderMatches);
       return children.length > 0 || folderMatches ? [{ ...entry, folder: { ...entry.folder, children } }] : [];
     });
+    if (filter === 'recent') {
+      return [...matching].sort(
+        (first, second) =>
+          Math.max(...second.folder.children.map((preset) => browserMemory.recent[preset.id] ?? 0)) -
+          Math.max(...first.folder.children.map((preset) => browserMemory.recent[preset.id] ?? 0)),
+      );
+    }
     return sort === 'name'
       ? [...matching].sort((first, second) => compareNames(first.folder, second.folder))
       : matching;
-  }, [folders, matchesPreset, queryText, sort]);
+  }, [browserMemory.recent, filter, folders, matchesPreset, queryText, sort]);
   const displayRootPresets = useMemo(() => {
     const matching = rootPresets.filter((entry) => matchesPreset(entry.preset));
+    if (filter === 'recent') {
+      return [...matching].sort(
+        (first, second) => (browserMemory.recent[second.preset.id] ?? 0) - (browserMemory.recent[first.preset.id] ?? 0),
+      );
+    }
     return sort === 'name'
       ? [...matching].sort((first, second) => compareNames(first.preset, second.preset))
       : matching;
-  }, [matchesPreset, rootPresets, sort]);
+  }, [browserMemory.recent, filter, matchesPreset, rootPresets, sort]);
   const displayBuiltInStyles = useMemo(
     () =>
       BUILT_IN_COLOR_STYLE_PRESETS.filter(
         (preset) =>
           filter !== 'tool' &&
+          (filter === 'all' ||
+            filter === 'style' ||
+            (filter === 'favorites' && favoriteIds.has(preset.id)) ||
+            (filter === 'recent' && recentIds.has(preset.id))) &&
+          (category === 'all' || preset.category === category) &&
           (queryText.length === 0 ||
             `${preset.name} ${preset.category} ${preset.description}`.toLocaleLowerCase().includes(queryText)),
       ),
-    [filter, queryText],
+    [category, favoriteIds, filter, queryText, recentIds],
   );
   const visiblePresetIds = useMemo(
     () => [
@@ -521,6 +579,12 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
   const hasUserPresets = rootPresets.length > 0 || folders.some((entry) => entry.folder.children.length > 0);
   const hasDiscoveryResults =
     displayBuiltInStyles.length > 0 || displayFolders.length > 0 || displayRootPresets.length > 0;
+
+  // A thumbnail request is session-bound. Cancel the active indication when the
+  // source image changes so a preview can never appear to follow a new image.
+  useEffect(() => {
+    setPreviewedPresetId(null);
+  }, [imageSession?.generation, imageSession?.path, selectedImage?.path]);
 
   useEffect(() => {
     const nextImageSession =
@@ -577,6 +641,11 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         const request = buildPresetEditTransaction(state, payload, crypto.randomUUID());
         if (request === null) throw new Error('Preset has no applicable edit nodes.');
         const result = applyEditTransaction(request);
+        setBrowserMemory((current) => {
+          const next = recordPresetUse(current, preset.id);
+          writePresetBrowserMemory(next);
+          return next;
+        });
         setActionError(null);
         setSelectedPresetId(preset.id);
         if (result.noOp) return;
@@ -607,6 +676,11 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         const request = buildPresetEditTransaction(state, payload, crypto.randomUUID());
         if (request === null) throw new Error('Color style has no applicable edit nodes.');
         const result = applyEditTransaction(request);
+        setBrowserMemory((current) => {
+          const next = recordPresetUse(current, preset.id);
+          writePresetBrowserMemory(next);
+          return next;
+        });
         setActionError(null);
         if (result.noOp) return;
         setAppliedPreset({
@@ -623,6 +697,17 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
     },
     [applyEditTransaction, selectedImage?.path, setAppliedPreset, t],
   );
+
+  const toggleFavorite = useCallback((id: string) => {
+    setBrowserMemory((current) => {
+      const favorites = current.favorites.includes(id)
+        ? current.favorites.filter((candidate) => candidate !== id)
+        : [...current.favorites, id].slice(-256);
+      const next = { ...current, favorites };
+      writePresetBrowserMemory(next);
+      return next;
+    });
+  }, []);
 
   const revertAppliedPreset = useCallback(() => {
     if (!appliedPreset) return;
@@ -940,7 +1025,24 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
               <option value="all">{t('editor.presets.discovery.filters.all')}</option>
               <option value="style">{t('editor.presets.discovery.filters.styles')}</option>
               <option value="tool">{t('editor.presets.discovery.filters.tools')}</option>
+              <option value="favorites">{t('editor.presets.discovery.filters.favorites')}</option>
+              <option value="recent">{t('editor.presets.discovery.filters.recent')}</option>
             </select>
+            {categories.length > 1 ? (
+              <select
+                aria-label={t('editor.presets.discovery.categoryLabel')}
+                className="h-6 min-w-0 flex-1 rounded-sm border border-editor-border bg-editor-panel px-1 text-[10px] text-text-primary focus:outline-none focus:ring-1 focus:ring-editor-focus-ring"
+                onChange={(event) => setCategory(event.target.value)}
+                value={category}
+              >
+                <option value="all">{t('editor.presets.discovery.categories.all')}</option>
+                {categories.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            ) : null}
             <select
               aria-label={t('editor.presets.discovery.sortLabel')}
               className="h-6 min-w-0 flex-1 rounded-sm border border-editor-border bg-editor-panel px-1 text-[10px] text-text-primary focus:outline-none focus:ring-1 focus:ring-editor-focus-ring"
@@ -1087,37 +1189,56 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
                     {displayBuiltInStyles.map((preset) => {
                       const isApplied = appliedPreset?.id === preset.id;
                       return (
-                        <button
-                          aria-pressed={isApplied}
-                          className={cx(
-                            'min-w-0 rounded-sm border border-editor-border bg-editor-panel px-2 py-1.5 text-left hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
-                            isApplied && 'border-editor-focus-ring',
-                          )}
-                          data-tooltip={preset.description}
-                          key={preset.id}
-                          onClick={() => applyColorStyle(preset)}
-                          type="button"
-                        >
-                          <span className="flex min-w-0 items-center gap-1.5">
-                            <Palette size={12} />
-                            <span className="truncate text-[11px] font-medium text-text-primary">{preset.name}</span>
-                            {preset.id === COLOR_STYLE_PRESET_CATALOG.defaultPresetId ? (
-                              <span className="text-[10px] text-text-secondary">
-                                {t('editor.presets.colorStyles.defaultBadge')}
-                              </span>
-                            ) : null}
-                            {isApplied ? (
-                              <CheckCircle2
-                                aria-label={t('editor.presets.states.applied')}
-                                className="ml-auto shrink-0"
-                                size={12}
-                              />
-                            ) : null}
-                          </span>
-                          <span className="mt-0.5 block truncate text-[10px] leading-3 text-text-secondary">
-                            {preset.previewTags.join(' / ')}
-                          </span>
-                        </button>
+                        <div className="flex min-w-0 items-stretch gap-1" key={preset.id}>
+                          <button
+                            aria-pressed={isApplied}
+                            className={cx(
+                              'min-w-0 flex-1 rounded-sm border border-editor-border bg-editor-panel px-2 py-1.5 text-left hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+                              isApplied && 'border-editor-focus-ring',
+                            )}
+                            data-tooltip={preset.description}
+                            onClick={() => applyColorStyle(preset)}
+                            type="button"
+                          >
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <Palette size={12} />
+                              <span className="truncate text-[11px] font-medium text-text-primary">{preset.name}</span>
+                              {preset.id === COLOR_STYLE_PRESET_CATALOG.defaultPresetId ? (
+                                <span className="text-[10px] text-text-secondary">
+                                  {t('editor.presets.colorStyles.defaultBadge')}
+                                </span>
+                              ) : null}
+                              {isApplied ? (
+                                <CheckCircle2
+                                  aria-label={t('editor.presets.states.applied')}
+                                  className="ml-auto shrink-0"
+                                  size={12}
+                                />
+                              ) : null}
+                            </span>
+                            <span className="mt-0.5 block truncate text-[10px] leading-3 text-text-secondary">
+                              {preset.previewTags.join(' / ')}
+                            </span>
+                          </button>
+                          <button
+                            aria-label={t(
+                              favoriteIds.has(preset.id)
+                                ? 'editor.presets.discovery.unfavorite'
+                                : 'editor.presets.discovery.favorite',
+                              { name: preset.name },
+                            )}
+                            aria-pressed={favoriteIds.has(preset.id)}
+                            className="flex w-7 shrink-0 items-center justify-center rounded-sm border border-editor-border text-text-secondary hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                            onClick={() => toggleFavorite(preset.id)}
+                            type="button"
+                          >
+                            <Star
+                              aria-hidden="true"
+                              className={favoriteIds.has(preset.id) ? 'fill-current text-editor-warning' : undefined}
+                              size={13}
+                            />
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -1145,6 +1266,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
                           appliedId={appliedPreset?.id ?? null}
                           density={resultDensity}
                           editedAfterApply={isEditedAfterApply}
+                          isFavorite={favoriteIds.has(preset.id)}
                           isPreviewed={previewedPresetId === preset.id}
                           isSelected={selectedPresetId === preset.id}
                           key={preset.id}
@@ -1153,6 +1275,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
                           onKeyDown={handlePresetKeyDown}
                           onPreview={(nextPreset) => setPreviewedPresetId(nextPreset?.id ?? null)}
                           onSelect={(nextPreset) => setSelectedPresetId(nextPreset.id)}
+                          onToggleFavorite={toggleFavorite}
                           preset={preset}
                           presetButtonRef={(node) => {
                             if (node) presetButtonRefs.current.set(preset.id, node);
@@ -1172,6 +1295,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
                         appliedId={appliedPreset?.id ?? null}
                         density={resultDensity}
                         editedAfterApply={isEditedAfterApply}
+                        isFavorite={favoriteIds.has(entry.preset.id)}
                         isPreviewed={previewedPresetId === entry.preset.id}
                         isSelected={selectedPresetId === entry.preset.id}
                         key={entry.preset.id}
@@ -1180,6 +1304,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
                         onKeyDown={handlePresetKeyDown}
                         onPreview={(nextPreset) => setPreviewedPresetId(nextPreset?.id ?? null)}
                         onSelect={(nextPreset) => setSelectedPresetId(nextPreset.id)}
+                        onToggleFavorite={toggleFavorite}
                         preset={entry.preset}
                         presetButtonRef={(node) => {
                           if (node) presetButtonRefs.current.set(entry.preset.id, node);

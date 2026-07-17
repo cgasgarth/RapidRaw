@@ -1805,11 +1805,18 @@
         "rapidRawPreset": "RapidRAW 預設"
       },
       "discovery": {
+        "categories": {
+          "all": ""
+        },
+        "categoryLabel": "",
         "dismiss": "",
         "dismissError": "",
+        "favorite": "",
         "filterLabel": "",
         "filters": {
           "all": "",
+          "favorites": "",
+          "recent": "",
           "styles": "",
           "tools": ""
         },
@@ -1828,7 +1835,8 @@
           "name": ""
         },
         "sortLabel": "",
-        "toggleFolder": ""
+        "toggleFolder": "",
+        "unfavorite": ""
       },
       "errors": {
         "applyFailed": "",
