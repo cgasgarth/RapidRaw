@@ -1566,10 +1566,14 @@
       },
       "addNewMask": "Add New Mask",
       "aiPeopleParts": {
+        "candidate": "Person {{index}}",
         "classes": "Classes",
         "description": "Runtime-backed person parts are enabled; planned targets stay disabled until provider proof lands.",
+        "empty": "No people detected",
+        "error": "People detection failed",
         "model": "Model",
         "notAvailable": "n/a",
+        "pending": "Finding people…",
         "provenanceTitle": "Generated mask provenance",
         "provider": "Provider",
         "target": "Target",
@@ -1614,16 +1618,26 @@
       "maskingTitle": "Masking",
       "masksTitle": "Masks",
       "objectPrompt": {
+        "apply": "Apply mask",
         "background": "Background",
         "box": "Box",
         "boxReady": "1 box",
+        "cancel": "Cancel",
         "clear": "Clear",
         "foreground": "Foreground",
         "generate": "Generate SAM proposal",
         "points": "{{count}} points",
         "points_one": "{{count}} point",
         "points_other": "{{count}} points",
-        "receipt": "Replay receipt: {{provider}}, {{promptKind}}, {{latency}} ms"
+        "receipt": "Replay receipt: {{provider}}, {{promptKind}}, {{latency}} ms",
+        "status": {
+          "accepted": "Mask applied",
+          "cancelled": "Selection cancelled",
+          "empty": "Add a point or box to begin",
+          "error": "Selection failed",
+          "pending": "Finding object…",
+          "review": "Review selection"
+        }
       },
       "overlay": {
         "edgeThreshold": "Edge Threshold",

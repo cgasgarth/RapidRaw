@@ -1530,10 +1530,14 @@
       },
       "addNewMask": "Neue Maske hinzufügen",
       "aiPeopleParts": {
+        "candidate": "",
         "classes": "Classes",
         "description": "Runtime-backed person parts are enabled; planned targets stay disabled until provider proof lands.",
+        "empty": "",
+        "error": "",
         "model": "Model",
         "notAvailable": "n/a",
+        "pending": "",
         "provenanceTitle": "Generated mask provenance",
         "provider": "Provider",
         "target": "Target",
@@ -1578,16 +1582,26 @@
       "maskingTitle": "Maskieren",
       "masksTitle": "Masken",
       "objectPrompt": {
+        "apply": "",
         "background": "Background",
         "box": "Box",
         "boxReady": "1 box",
+        "cancel": "",
         "clear": "Clear",
         "foreground": "Foreground",
         "generate": "Generate SAM proposal",
         "points": "{{count}} points",
         "points_one": "{{count}} point",
         "points_other": "{{count}} points",
-        "receipt": "Replay-Beleg: {{provider}}, {{promptKind}}, {{latency}} ms"
+        "receipt": "Replay-Beleg: {{provider}}, {{promptKind}}, {{latency}} ms",
+        "status": {
+          "accepted": "",
+          "cancelled": "",
+          "empty": "",
+          "error": "",
+          "pending": "",
+          "review": ""
+        }
       },
       "overlay": {
         "edgeThreshold": "Kantenschwellenwert",

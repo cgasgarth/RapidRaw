@@ -1509,10 +1509,14 @@
       },
       "addNewMask": "Aggiungi Nuova Maschera",
       "aiPeopleParts": {
+        "candidate": "",
         "classes": "",
         "description": "Le parti con runtime sono attive; i target pianificati restano disattivati fino alla prova provider.",
+        "empty": "",
+        "error": "",
         "model": "",
         "notAvailable": "",
+        "pending": "",
         "provenanceTitle": "",
         "provider": "",
         "target": "",
@@ -1557,9 +1561,11 @@
       "maskingTitle": "Mascheratura",
       "masksTitle": "Maschere",
       "objectPrompt": {
+        "apply": "",
         "background": "Background",
         "box": "Box",
         "boxReady": "1 box",
+        "cancel": "",
         "clear": "Clear",
         "foreground": "Foreground",
         "generate": "Generate SAM proposal",
@@ -1567,7 +1573,15 @@
         "points_one": "{{count}} point",
         "points_many": "",
         "points_other": "{{count}} points",
-        "receipt": "Ricevuta replay: {{provider}}, {{promptKind}}, {{latency}} ms"
+        "receipt": "Ricevuta replay: {{provider}}, {{promptKind}}, {{latency}} ms",
+        "status": {
+          "accepted": "",
+          "cancelled": "",
+          "empty": "",
+          "error": "",
+          "pending": "",
+          "review": ""
+        }
       },
       "overlay": {
         "edgeThreshold": "",

@@ -1452,10 +1452,14 @@
       },
       "addNewMask": "新增新遮色片",
       "aiPeopleParts": {
+        "candidate": "",
         "classes": "",
         "description": "",
+        "empty": "",
+        "error": "",
         "model": "",
         "notAvailable": "",
+        "pending": "",
         "provenanceTitle": "",
         "provider": "",
         "target": "",
@@ -1500,14 +1504,24 @@
       "maskingTitle": "遮色片",
       "masksTitle": "遮色片",
       "objectPrompt": {
+        "apply": "",
         "background": "",
         "box": "",
         "boxReady": "",
+        "cancel": "",
         "clear": "",
         "foreground": "",
         "generate": "",
         "points_other": "",
-        "receipt": ""
+        "receipt": "",
+        "status": {
+          "accepted": "",
+          "cancelled": "",
+          "empty": "",
+          "error": "",
+          "pending": "",
+          "review": ""
+        }
       },
       "overlay": {
         "edgeThreshold": "",
