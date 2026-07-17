@@ -273,11 +273,13 @@ function LayerStackPanelFallback() {
 type NumericMaskParameterPatch<TKey extends string> = Partial<Record<TKey, number>>;
 type SubMaskControlParameterKey = 'feather' | 'flow' | 'grow' | 'tolerance';
 type LinearGradientControlParameterKey = 'endY' | 'imageHeight' | 'range' | 'startY';
+type RadialGradientControlParameterKey = 'feather' | 'radiusX' | 'radiusY' | 'rotation';
 type AiDepthControlParameterKey = 'maxDepth' | 'maxFade' | 'minDepth' | 'minFade';
 type MaskRefinementParameterKey = keyof MaskRefinementParameters;
 type PanelMaskParameterKey =
   | AiDepthControlParameterKey
   | LinearGradientControlParameterKey
+  | RadialGradientControlParameterKey
   | MaskRefinementParameterKey
   | SubMaskControlParameterKey;
 
@@ -582,9 +584,7 @@ interface DragData extends MaskLikeDragData {
 }
 
 const SUB_MASK_CONFIG: Record<Mask, SubMaskConfig> = {
-  [Mask.Radial]: {
-    parameters: [{ key: 'feather', min: 0, max: 100, step: 1, multiplier: 100, defaultValue: 50 }],
-  },
+  [Mask.Radial]: { parameters: [] },
   [Mask.Brush]: { showBrushTools: true },
   [Mask.Flow]: { showBrushTools: true, showFlowControl: true },
   [Mask.Linear]: { parameters: [] },
@@ -1559,6 +1559,7 @@ function LinearGradientMaskControls({
       className={`${maskPanelCardClassName} space-y-2`}
       data-end-y-percent={endYPercent}
       data-gradient-command-type="layerMask.createGradientMask"
+      data-gradient-tool="linear"
       data-range={range}
       data-start-y-percent={startYPercent}
       data-testid="linear-gradient-mask-controls"
@@ -1604,6 +1605,58 @@ function LinearGradientMaskControls({
         }}
         step={1}
         value={range}
+      />
+    </div>
+  );
+}
+
+function RadialGradientMaskControls({
+  parameters,
+  onChange,
+  onDragStateChange,
+}: {
+  onChange: (changes: NumericMaskParameterPatch<RadialGradientControlParameterKey>) => void;
+  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+  parameters: unknown;
+}) {
+  const feather = Math.round(getPanelMaskParameterNumber(parameters, 'feather', 0.5) * 100);
+  const rotation = Math.round(getPanelMaskParameterNumber(parameters, 'rotation', 0));
+  const radiusX = Math.round(getPanelMaskParameterNumber(parameters, 'radiusX', 0));
+  const radiusY = Math.round(getPanelMaskParameterNumber(parameters, 'radiusY', 0));
+
+  return (
+    <div
+      className={`${maskPanelCardClassName} space-y-2`}
+      data-feather-percent={feather}
+      data-gradient-command-type="layerMask.createGradientMask"
+      data-gradient-tool="radial"
+      data-radius-x={radiusX}
+      data-radius-y={radiusY}
+      data-rotation-degrees={rotation}
+      data-testid="radial-gradient-mask-controls"
+    >
+      <AdjustmentSlider
+        density="compact"
+        defaultValue={50}
+        fillOrigin="min"
+        label={parameterLabelFallback('feather')}
+        max={100}
+        min={0}
+        onDragStateChange={onDragStateChange}
+        onValueChange={(value) => onChange({ feather: value / 100 })}
+        step={1}
+        value={feather}
+      />
+      <AdjustmentSlider
+        density="compact"
+        defaultValue={0}
+        label={parameterLabelFallback('rotation')}
+        max={180}
+        min={-180}
+        onDragStateChange={onDragStateChange}
+        onValueChange={(value) => onChange({ rotation: value })}
+        step={1}
+        value={rotation}
       />
     </div>
   );
@@ -4555,6 +4608,14 @@ function SettingsPanel({
 
               {activeSubMask.type === Mask.Linear && (
                 <LinearGradientMaskControls
+                  parameters={toMaskParameterRecord(activeSubMask.parameters)}
+                  onChange={handleSubMaskParametersChange}
+                  onDragStateChange={onDragStateChange}
+                />
+              )}
+
+              {activeSubMask.type === Mask.Radial && (
+                <RadialGradientMaskControls
                   parameters={toMaskParameterRecord(activeSubMask.parameters)}
                   onChange={handleSubMaskParametersChange}
                   onDragStateChange={onDragStateChange}

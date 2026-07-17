@@ -45,6 +45,7 @@ export function buildLinearGradientMaskCommandFromParameters(
     startX: rawParameters['startX'],
     startY: rawParameters['startY'],
   });
+  const invert = rawParameters['invert'] === true;
   const parsedContext = linearGradientCommandContextSchema.parse(context);
   const feather = roundMetric(Math.min(1, parsedParameters.range / Math.max(1, parsedContext.imageSize.height)));
   const command = {
@@ -72,7 +73,7 @@ export function buildLinearGradientMaskCommandFromParameters(
         },
         feather,
         gradientKind: 'linear',
-        invert: false,
+        invert,
         start: {
           x: roundMetric(normalizeCoordinate(parsedParameters.startX, parsedContext.imageSize.width)),
           y: roundMetric(normalizeCoordinate(parsedParameters.startY, parsedContext.imageSize.height)),
