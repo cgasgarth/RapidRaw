@@ -62,6 +62,15 @@ describe('Lightroom Crop canvas-first draft workflow', () => {
     expect(useEditorStore.getState().cropDraft?.geometry.aspectRatio).toBeCloseTo(16 / 9);
     expect(useEditorStore.getState().history).toHaveLength(1);
 
+    const ratioLock = required<HTMLButtonElement>(container, '[data-testid="crop-panel-ratio-lock-toggle"]');
+    expect(ratioLock.getAttribute('aria-pressed')).toBe('true');
+    await user.click(ratioLock);
+    expect(ratioLock.getAttribute('aria-pressed')).toBe('false');
+    expect(useEditorStore.getState().cropDraft?.geometry.aspectRatio).toBeNull();
+    await user.click(ratioLock);
+    expect(ratioLock.getAttribute('aria-pressed')).toBe('true');
+    expect(useEditorStore.getState().cropDraft?.geometry.aspectRatio).toBeCloseTo(16 / 9);
+
     await user.click(buttonByText(container, 'Apply'));
     expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBeCloseTo(16 / 9);
     expect(useEditorStore.getState().history).toHaveLength(2);
