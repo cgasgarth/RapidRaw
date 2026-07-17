@@ -61,6 +61,8 @@ interface ColorPanelProps {
   isWbPickerActive?: boolean;
   toggleWbPicker?: () => void;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+  /** Render one canonical Develop subsection without the workspace tab chrome. */
+  workspaceTab?: ColorWorkspaceTabId;
 }
 
 const COLOR_WORKSPACE_TAB_IDS = ['foundation', 'mixer', 'grading', 'output'] as const;
@@ -142,6 +144,7 @@ export default function ColorPanel({
   isWbPickerActive = false,
   toggleWbPicker,
   onDragStateChange,
+  workspaceTab,
 }: ColorPanelProps) {
   const { t } = useTranslation();
   const tablistId = useId();
@@ -656,6 +659,14 @@ export default function ColorPanel({
       focusColorWorkspaceTab(nextTabId);
     }
   };
+
+  if (workspaceTab !== undefined) {
+    return (
+      <div className="space-y-1" data-color-inspector-density="compact" data-color-workspace-scope={workspaceTab}>
+        {workspaceTabs.find((tab) => tab.id === workspaceTab)?.panel ?? null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1" data-color-inspector-density="compact">

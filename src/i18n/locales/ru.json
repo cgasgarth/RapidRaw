@@ -799,6 +799,8 @@
       "scopedSections": {
         "basic": "Light",
         "calibration": "Калибровка",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
@@ -820,6 +822,10 @@
         "details": "Детали",
         "effects": "Эффекты"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
         "editedSections_one": "Изменён {{count}} раздел",
         "editedSections_few": "Изменено разделов: {{count}}",
@@ -832,6 +838,9 @@
         "autoAdjust": "Автонастройка изображения",
         "resetAdjustments": "Сбросить настройки",
         "toggleAnalytics": "Показать/скрыть панель гистограммы"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {

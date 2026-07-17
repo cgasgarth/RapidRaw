@@ -826,6 +826,8 @@
       "scopedSections": {
         "basic": "Light",
         "calibration": "Kalibracja",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
@@ -847,6 +849,10 @@
         "details": "Detale",
         "effects": "Efekty"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
         "editedSections_one": "",
         "editedSections_few": "",
@@ -859,6 +865,9 @@
         "autoAdjust": "Auto-korekta obrazu",
         "resetAdjustments": "Resetuj ustawienia",
         "toggleAnalytics": "Przełącz widok analityki"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {

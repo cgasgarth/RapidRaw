@@ -755,6 +755,8 @@
       "scopedSections": {
         "basic": "Light",
         "calibration": "キャリブレーション",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
@@ -776,6 +778,10 @@
         "details": "ディテール",
         "effects": "効果"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
         "editedSections_other": "{{count}} 個のセクションを編集済み",
         "loadingImage": "画像プレビューを読み込み中"
@@ -785,6 +791,9 @@
         "autoAdjust": "画像を自動補正",
         "resetAdjustments": "補正設定をリセット",
         "toggleAnalytics": "アナリティクス表示の切り替え"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {
