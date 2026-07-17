@@ -185,6 +185,7 @@ import {
   type MaskLikeDragData,
   useDelayedHover,
 } from './maskPanelRowHelpers';
+import { RangeMaskControls } from './RangeMaskControls';
 
 const AiPeoplePartPickerStatus = lazy(() =>
   import('../ai/AiPeoplePartPickerStatus.js').then((module) => ({ default: module.AiPeoplePartPickerStatus })),
@@ -1000,7 +1001,12 @@ function DepthRangePicker({
   const isDragging = activeHandle !== null;
 
   return (
-    <div className="space-y-2">
+    <div
+      className="space-y-2"
+      data-range-mask-kind="depth"
+      data-testid="range-mask-controls-depth"
+      data-visual-smoke-section="lightroom-range-mask-depth"
+    >
       <button
         type="button"
         className="grid w-fit cursor-pointer bg-transparent p-0 text-left"
@@ -3670,6 +3676,14 @@ function SettingsPanel({
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
+  const handleRangeMaskParametersChange = (parameters: Record<string, unknown>) => {
+    if (!isActive || !activeSubMask) return;
+    // Keep picker/overlay and runtime provenance fields while replacing only
+    // the range-selection values. A preview or apply gesture must not erase
+    // the sampled target (or an existing local-adjustment receipt).
+    updateSubMask(activeSubMask.id, { parameters: mergeMaskParameters(activeSubMask.parameters, parameters) });
+  };
+
   const handleMaskRefinementParametersChange = (changes: NumericMaskParameterPatch<MaskRefinementParameterKey>) => {
     if (!isActive || !activeSubMask) return;
     const command = createMaskRefinementCommand(activeSubMask.id, activeSubMask.parameters, changes);
@@ -4289,28 +4303,39 @@ function SettingsPanel({
                 />
               )}
 
-              {subMaskConfig.parameters?.map((param) => (
-                <AdjustmentSlider
-                  key={param.key}
-                  label={
-                    param.key === 'feather' && activeSubMask.type === Mask.AiDepth
-                      ? t('editor.masks.params.globalFeather')
-                      : t('editor.masks.params.' + param.key, { defaultValue: parameterLabelFallback(param.key) })
-                  }
-                  min={param.min}
-                  max={param.max}
-                  step={param.step}
-                  defaultValue={param.defaultValue}
-                  value={getPanelMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
-                  onValueChange={(value) => {
-                    handleSubMaskParametersChange({
-                      [param.key]: value / (param.multiplier || 1),
-                    });
-                  }}
-                  {...(param.key !== 'grow' && { fillOrigin: 'min' })}
-                  onDragStateChange={onDragStateChange}
+              {(activeSubMask.type === Mask.Color || activeSubMask.type === Mask.Luminance) && (
+                <RangeMaskControls
+                  kind={activeSubMask.type === Mask.Color ? 'color' : 'luminance'}
+                  parameters={activeSubMask.parameters}
+                  onApply={handleRangeMaskParametersChange}
+                  onPreview={handleRangeMaskParametersChange}
                 />
-              ))}
+              )}
+
+              {subMaskConfig.parameters
+                ?.filter((param) => activeSubMask.type !== Mask.Color && activeSubMask.type !== Mask.Luminance)
+                .map((param) => (
+                  <AdjustmentSlider
+                    key={param.key}
+                    label={
+                      param.key === 'feather' && activeSubMask.type === Mask.AiDepth
+                        ? t('editor.masks.params.globalFeather')
+                        : t('editor.masks.params.' + param.key, { defaultValue: parameterLabelFallback(param.key) })
+                    }
+                    min={param.min}
+                    max={param.max}
+                    step={param.step}
+                    defaultValue={param.defaultValue}
+                    value={getPanelMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
+                    onValueChange={(value) => {
+                      handleSubMaskParametersChange({
+                        [param.key]: value / (param.multiplier || 1),
+                      });
+                    }}
+                    {...(param.key !== 'grow' && { fillOrigin: 'min' })}
+                    onDragStateChange={onDragStateChange}
+                  />
+                ))}
 
               <MaskRefinementControls
                 parameters={toMaskParameterRecord(activeSubMask.parameters)}

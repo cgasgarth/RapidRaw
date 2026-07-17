@@ -1584,6 +1584,19 @@
       "quickAddComplete": "Ready",
       "quickAddGradient": "Add gradient",
       "quickAddRange": "Add color range",
+      "rangeMask": {
+        "apply": "",
+        "cancel": "",
+        "feather": "",
+        "hueCenter": "",
+        "hueTolerance": "",
+        "preview": "",
+        "previewHint": "",
+        "refine": "",
+        "saturation": "",
+        "smooth": "",
+        "title": ""
+      },
       "refinement": {
         "density": "Density",
         "edgeContrast": "Edge Contrast",
