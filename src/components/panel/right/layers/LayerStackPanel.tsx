@@ -500,11 +500,19 @@ export function LayerStackPanel({
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
   const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
-  const [retouchRemoveWorkflow, setRetouchRemoveWorkflow] = useState(createRetouchRemoveWorkflowState);
+  const [retouchRemoveWorkflow, setRetouchRemoveWorkflow] = useState(() => ({
+    ...createRetouchRemoveWorkflowState(),
+    spotsVisible: detailNodeParams?.dustSpotOverlayEnabled ?? true,
+  }));
   const [layerGraphRevision, setLayerGraphRevision] = useState('layer_stack_panel_initial');
   const [lastCommandType, setLastCommandType] = useState('none');
   const [lastChangedLayerCount, setLastChangedLayerCount] = useState(0);
   const [lastBrushLocalReceiptId, setLastBrushLocalReceiptId] = useState('');
+  useEffect(() => {
+    const spotsVisible = detailNodeParams?.dustSpotOverlayEnabled;
+    if (spotsVisible === undefined) return;
+    setRetouchRemoveWorkflow((state) => (state.spotsVisible === spotsVisible ? state : { ...state, spotsVisible }));
+  }, [detailNodeParams?.dustSpotOverlayEnabled]);
   const layerMaskProvenanceReceipts = useUIStore((state) => state.layerMaskProvenanceReceipts);
   const layerMaskSourceGraphRevision = useUIStore((state) => state.layerMaskSourceGraphRevision);
   const markLayerMaskProvenanceStale = useUIStore((state) => state.markLayerMaskProvenanceStale);
