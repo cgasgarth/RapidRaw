@@ -1519,6 +1519,23 @@
         "title": "Mascaras de partes de persona",
         "unknown": ""
       },
+      "aiScene": {
+        "analyzing": "",
+        "apply": "",
+        "ariaLabel": "",
+        "background": "",
+        "cancel": "",
+        "cancelled": "",
+        "failed": "",
+        "previewReady": "",
+        "refine": "",
+        "refinePlaceholder": "",
+        "retry": "",
+        "select": "",
+        "sky": "",
+        "subject": "",
+        "title": ""
+      },
       "brush": {
         "brush": "Pincel",
         "density": "",

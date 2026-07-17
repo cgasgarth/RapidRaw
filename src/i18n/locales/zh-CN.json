@@ -1529,6 +1529,23 @@
         "title": "Person part masks",
         "unknown": ""
       },
+      "aiScene": {
+        "analyzing": "",
+        "apply": "",
+        "ariaLabel": "",
+        "background": "",
+        "cancel": "",
+        "cancelled": "",
+        "failed": "",
+        "previewReady": "",
+        "refine": "",
+        "refinePlaceholder": "",
+        "retry": "",
+        "select": "",
+        "sky": "",
+        "subject": "",
+        "title": ""
+      },
       "brush": {
         "brush": "画笔",
         "density": "",

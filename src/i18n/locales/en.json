@@ -1576,6 +1576,23 @@
         "title": "Person part masks",
         "unknown": "Unknown"
       },
+      "aiScene": {
+        "analyzing": "Analyzing…",
+        "apply": "Apply mask",
+        "ariaLabel": "AI scene masks",
+        "background": "Background",
+        "cancel": "Cancel",
+        "cancelled": "Cancelled",
+        "failed": "Mask generation failed.",
+        "previewReady": "Preview ready · refine before applying",
+        "refine": "Refine",
+        "refinePlaceholder": "Feather or grow (optional)",
+        "retry": "Retry",
+        "select": "Select scene mask",
+        "sky": "Sky",
+        "subject": "Subject",
+        "title": "Scene masks"
+      },
       "brush": {
         "brush": "Brush",
         "density": "Density",

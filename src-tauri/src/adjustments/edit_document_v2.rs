@@ -2902,7 +2902,9 @@ struct LayerV2 {
     edit_node_schema_version: u8,
     id: String,
     invert: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     layer_group_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     layer_group_name: Option<String>,
     name: String,
     opacity: f64,
@@ -5917,6 +5919,26 @@ mod tests {
         assert_eq!(definitions[0].adjustments, Value::Null);
         assert_eq!(render.mask_count, 1);
         assert_eq!(render.mask_adjustments[0].exposure, 0.0);
+    }
+
+    #[test]
+    fn ungrouped_layer_groups_are_omitted_from_native_json() {
+        let mut value = current_document();
+        let mut current_layer = layer();
+        current_layer["layerGroupId"] = Value::Null;
+        current_layer["layerGroupName"] = Value::Null;
+        value["layers"] = json!({ "masks": [current_layer] });
+        value["nodes"]["layers"]["params"] = value["layers"].clone();
+
+        let document: EditDocumentV2 =
+            serde_json::from_value(value).expect("valid current document");
+        let serialized = serde_json::to_value(document).expect("serialize current document");
+        let layer = &serialized["layers"]["masks"][0];
+        let node_layer = &serialized["nodes"]["layers"]["params"]["masks"][0];
+        assert!(layer.get("layerGroupId").is_none());
+        assert!(layer.get("layerGroupName").is_none());
+        assert!(node_layer.get("layerGroupId").is_none());
+        assert!(node_layer.get("layerGroupName").is_none());
     }
 
     #[test]
