@@ -349,6 +349,7 @@
       "resetAllPoint": "Resetuj wszystkie krzywe punktowe",
       "resetParametric": "Resetuj krzywą parametryczną ({{channel}})",
       "resetPoint": "Resetuj krzywą punktową ({{channel}})",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",

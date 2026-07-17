@@ -30,6 +30,7 @@ const viewerTargetTool = (target: EventTarget | null): ViewerActiveTool | undefi
     value === 'point-color' ||
     value === 'retouch' ||
     value === 'straighten' ||
+    value === 'tone-curve' ||
     value === 'tone-equalizer' ||
     value === 'white-balance'
   )

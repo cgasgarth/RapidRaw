@@ -54,7 +54,7 @@ import {
   readNegativeLabWorkspaceLayout,
   saveNegativeLabWorkspaceLayout,
 } from '../schemas/negative-lab/negativeLabWorkspaceLayout';
-import type { MaskContainer } from '../utils/adjustments';
+import { ActiveChannel, type MaskContainer } from '../utils/adjustments';
 import {
   DEFAULT_DEVELOP_PANEL_ORDER,
   type DevelopPanelId,
@@ -116,7 +116,7 @@ export interface PointColorPickerUiReceipt {
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
 
-export type DevelopToolId = 'crop' | 'masking' | 'remove';
+export type DevelopToolId = 'crop' | 'masking' | 'remove' | 'tone-curve';
 
 const LAZY_COMPUTATIONAL_MODAL_IDS = ['panorama', 'hdr', 'superResolution', 'focusStack', 'negativeLab'] as const;
 export type LazyComputationalModalId = (typeof LAZY_COMPUTATIONAL_MODAL_IDS)[number];
@@ -471,6 +471,9 @@ export interface UIState {
   toneEqualizerPickerReceipt: ToneEqualizerPickerUiReceipt | null;
   pointColorPickerActive: boolean;
   pointColorPickerReceipt: PointColorPickerUiReceipt | null;
+  toneCurveTargetChannel: ActiveChannel;
+  toneCurveTargetMode: 'point' | 'parametric';
+  toneCurveTargetPointIndex: number | null;
 
   // Modals & Dialogs
   isCreateFolderModalOpen: boolean;
@@ -613,6 +616,9 @@ export const useUIStore = create<UIState>((set, get) => {
     toneEqualizerPickerReceipt: null,
     pointColorPickerActive: false,
     pointColorPickerReceipt: null,
+    toneCurveTargetChannel: ActiveChannel.Luma,
+    toneCurveTargetMode: 'point',
+    toneCurveTargetPointIndex: null,
 
     isCreateFolderModalOpen: false,
     isRenameFolderModalOpen: false,

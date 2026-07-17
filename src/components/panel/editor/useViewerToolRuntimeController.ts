@@ -11,6 +11,7 @@ import { useViewerParametricMaskTargetController } from './useViewerParametricMa
 import { useViewerPickerControllers } from './useViewerPickerControllers';
 import { useViewerRetouchHandlesController } from './useViewerRetouchHandlesController';
 import { useViewerSamplerController } from './useViewerSamplerController';
+import { useViewerToneCurveTargetController } from './useViewerToneCurveTargetController';
 import { useViewerWhiteBalanceController } from './useViewerWhiteBalanceController';
 import type { ViewerActiveTool } from './viewerInputResolver';
 import { type ViewerInteractionContext, viewerInteractionToolId } from './viewerInteractionCoordinator';
@@ -48,6 +49,7 @@ export interface ViewerToolControllerSnapshot {
   readonly pickerActiveTool: ViewerActiveTool | null;
   readonly retouchActive: boolean;
   readonly whiteBalanceActive: boolean;
+  readonly toneCurveTargetActive?: boolean;
 }
 
 export const resolveViewerSamplerSuppression = (
@@ -78,6 +80,7 @@ export const resolveViewerInteractionRuntime = (
       (snapshot.whiteBalanceActive ? 'white-balance' : null) ??
       (snapshot.focusRetouchActive ? 'focus-retouch' : null) ??
       (snapshot.retouchActive ? 'retouch' : null) ??
+      (snapshot.toneCurveTargetActive === true ? 'tone-curve' : null) ??
       policy.requestedActiveTool ??
       'none');
   return {
@@ -127,6 +130,7 @@ export interface ViewerToolRuntimeControllerInput {
   readonly sampler: Omit<ControllerInput<typeof useViewerSamplerController>, 'suppressed'>;
   readonly suppression: ViewerToolSuppressionPolicy;
   readonly whiteBalance: ControllerInput<typeof useViewerWhiteBalanceController>;
+  readonly toneCurveTarget: ControllerInput<typeof useViewerToneCurveTargetController>;
 }
 
 /**
@@ -138,6 +142,7 @@ export const useViewerToolRuntimeController = (input: ViewerToolRuntimeControlle
   const picker = useViewerPickerControllers(input.picker);
   const focusRetouch = useViewerFocusRetouchController(input.focusRetouch);
   const whiteBalance = useViewerWhiteBalanceController(input.whiteBalance);
+  const toneCurveTarget = useViewerToneCurveTargetController(input.toneCurveTarget);
   const brush = useViewerBrushController(input.brush);
   const aiMaskBox = useViewerAiMaskBoxController(input.aiMaskBox);
   const parametricMaskTarget = useViewerParametricMaskTargetController(input.parametricMaskTarget);
@@ -172,6 +177,7 @@ export const useViewerToolRuntimeController = (input: ViewerToolRuntimeControlle
     pickerActiveTool: picker.activeTool,
     retouchActive: retouchHandles.activeMode !== null,
     whiteBalanceActive: whiteBalance.active,
+    toneCurveTargetActive: toneCurveTarget.active,
   });
   const interaction = useViewerInteractionController({
     context: interactionContext,
@@ -186,6 +192,7 @@ export const useViewerToolRuntimeController = (input: ViewerToolRuntimeControlle
         retouch: retouchHandles.handleInputEvent,
         straighten: cropStraighten.handleInputEvent,
         'tone-equalizer': picker.handleInputEvent,
+        'tone-curve': toneCurveTarget.handleInputEvent,
         'white-balance': whiteBalance.handleInputEvent,
       },
     },
@@ -207,6 +214,7 @@ export const useViewerToolRuntimeController = (input: ViewerToolRuntimeControlle
     picker,
     retouchHandles,
     sampler,
+    toneCurveTarget,
     whiteBalance,
   };
 };

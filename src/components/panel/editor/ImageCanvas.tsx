@@ -9,6 +9,7 @@ import type { RenderSize } from '../../../hooks/viewport/useImageRenderSize';
 import type { GamutWarningOverlayPayload } from '../../../schemas/tauriEventSchemas';
 import type { EditorCompareMode, ExportSoftProofTransformState, InteractivePatch } from '../../../store/useEditorStore';
 import type { AiPatch, MaskContainer } from '../../../utils/adjustments';
+import { ActiveChannel } from '../../../utils/adjustments';
 import {
   getRenderedPreviewWarningStatus,
   isCurrentExportSoftProofGamutWarningOverlay,
@@ -40,6 +41,7 @@ import {
 } from '../../../utils/interactivePreviewPatch';
 import { PreviewUrlReleaseAuthority } from '../../../utils/previewUrlReleaseAuthority';
 import type { SubMaskInteractionIdentity } from '../../../utils/subMaskInteractionEditTransaction';
+import type { ToneCurveTargetMode } from '../../../utils/toneCurveTarget';
 import { resolveWgpuPreviewVisibility } from '../../../utils/wgpuPreviewHealth';
 import type {
   WhiteBalancePickerAdjustmentCommand,
@@ -63,6 +65,7 @@ import { type CanvasOverlayStatus, canvasOverlayTokens } from './overlays/canvas
 import { PreviewSurface } from './PreviewSurface';
 import { ReferenceViewOverlay } from './ReferenceViewOverlay';
 import { SvgPreviewHandoff } from './SvgPreviewHandoff';
+import type { ToneCurveTargetCommitResult } from './toneCurveTargetInteractionController';
 import { useViewerToolRuntimeController } from './useViewerToolRuntimeController';
 import { ViewerFocusRetouchOverlay } from './ViewerFocusRetouchOverlay';
 import { ViewerPickerOverlay } from './ViewerPickerOverlay';
@@ -70,6 +73,7 @@ import { ViewerRetouchHandlesOverlay } from './ViewerRetouchHandlesOverlay';
 import type { ViewerSamplerState } from './ViewerSamplerHud';
 import { ViewerSamplerOverlay } from './ViewerSamplerOverlay';
 import { ViewerSurface } from './ViewerSurface';
+import { ViewerToneCurveTargetOverlay } from './ViewerToneCurveTargetOverlay';
 import type { ViewerAiMaskBoxCommand, ViewerAiMaskBoxCurrentContext } from './viewerAiMaskBoxInteractionController';
 import type { ViewerBrushCommitResult, ViewerBrushParameters } from './viewerBrushCommandAdapter';
 import type { ViewerBrushCurrentContext, ViewerBrushLine } from './viewerBrushInteractionController';
@@ -155,6 +159,7 @@ export interface ViewerToolRuntimeDescriptor {
     readonly commitInitialMaskDraw: (command: ViewerInitialMaskDrawCommand) => void;
     readonly commitParametricMaskTarget: (command: ViewerParametricMaskTargetCommand) => void;
     readonly commitPicker?: (command: ViewerPickerCommitResult) => void;
+    readonly commitToneCurveTarget?: (command: ToneCurveTargetCommitResult) => void;
     readonly commitRetouch: (command: ViewerRetouchCommand) => void;
     readonly commitStraighten: (value: number, identity: CropStraightenSessionIdentity) => void;
     readonly liveMaskPreview?: (previewMaskDef: MaskContainer | AiPatch) => void;
@@ -194,6 +199,12 @@ export interface ViewerToolRuntimeDescriptor {
   readonly isRotationActive: boolean;
   readonly onSamplerStateChange?: (state: ViewerSamplerState) => void;
   readonly whiteBalance?: ViewerWhiteBalanceRuntimeDescriptor;
+  readonly toneCurveTarget?: {
+    readonly active: boolean;
+    readonly channel: ActiveChannel;
+    readonly mode: ToneCurveTargetMode;
+    readonly selectedPointIndex: number | null;
+  };
 }
 
 interface ImageCanvasProps {
@@ -235,6 +246,7 @@ interface ImageCanvasProps {
 }
 
 const ignoreViewerPickerCommit = (): void => undefined;
+const ignoreToneCurveTargetCommit = (): void => undefined;
 
 export const ImageCanvas = memo(
   ({
@@ -275,6 +287,12 @@ export const ImageCanvas = memo(
     onReferenceViewCommand,
   }: ImageCanvasProps) => {
     const { t } = useTranslation();
+    const toneCurveTargetRuntime = toolRuntime.toneCurveTarget ?? {
+      active: false,
+      channel: ActiveChannel.Luma,
+      mode: 'point' as const,
+      selectedPointIndex: null,
+    };
     const {
       activeAiPatchContainerId,
       activeAiSubMaskId,
@@ -1062,6 +1080,23 @@ export const ImageCanvas = memo(
         onCommit: onPickerCommit,
         presentation: presentationDescriptor,
       },
+      toneCurveTarget: {
+        active: toneCurveTargetRuntime.active,
+        adjustmentRevision,
+        channel: toneCurveTargetRuntime.channel,
+        compareDividerPosition,
+        compareMode,
+        compareOrientation,
+        editDocumentV2,
+        geometry: overlayGeometry,
+        imageSessionId: pickerImageSessionId,
+        mode: toneCurveTargetRuntime.mode,
+        onCommit: commands.commitToneCurveTarget ?? ignoreToneCurveTargetCommit,
+        presentation: presentationDescriptor,
+        proofEnabled: isExportSoftProofEnabled,
+        sourceImageSize: { height: selectedImage.height, width: selectedImage.width },
+        selectedPointIndex: toneCurveTargetRuntime.selectedPointIndex,
+      },
       retouchHandles: {
         activeCloneLayer: activeRetouchLayer,
         activeRemoveLayer,
@@ -1132,6 +1167,7 @@ export const ImageCanvas = memo(
       overlayVisibility,
       parametricMaskTarget: viewerParametricMaskTargetBinding,
       picker: pickerControllers,
+      toneCurveTarget: toneCurveTargetBinding,
       retouchHandles: retouchHandlesController,
       sampler: viewerSamplerController,
       whiteBalance: whiteBalanceController,
@@ -1176,6 +1212,7 @@ export const ImageCanvas = memo(
     const effectiveCursor = useMemo(() => {
       if (viewerInputState?.isTemporaryHand) return cursorStyle;
       if (isWbPickerActive) return 'crosshair';
+      if (toneCurveTargetBinding.active) return 'crosshair';
       if (isParametricActive) return 'crosshair';
       if (isInitialDrawing) return 'crosshair';
       if (isBrushActive) return 'none';
@@ -1183,6 +1220,7 @@ export const ImageCanvas = memo(
       return cursorStyle;
     }, [
       isWbPickerActive,
+      toneCurveTargetBinding.active,
       isInitialDrawing,
       isBrushActive,
       isAiSubjectActive,
@@ -1197,23 +1235,25 @@ export const ImageCanvas = memo(
         : 'crop'
       : pickerControllers.activeTool
         ? pickerControllers.activeTool
-        : isWbPickerActive
-          ? 'white-balance'
-          : focusRetouchController.active
-            ? 'focus-retouch'
-            : retouchHandlesController.activeMode
-              ? retouchHandlesController.activeMode
-              : isBrushActive
-                ? 'brush'
-                : isAiSubjectActive
-                  ? 'object-prompt'
-                  : isParametricActive
-                    ? 'parametric-mask'
-                    : isMasking || isAiEditing
-                      ? 'mask'
-                      : showGamutWarningOverlay
-                        ? 'soft-proof'
-                        : 'pan-zoom';
+        : toneCurveTargetBinding.active
+          ? 'tone-curve'
+          : isWbPickerActive
+            ? 'white-balance'
+            : focusRetouchController.active
+              ? 'focus-retouch'
+              : retouchHandlesController.activeMode
+                ? retouchHandlesController.activeMode
+                : isBrushActive
+                  ? 'brush'
+                  : isAiSubjectActive
+                    ? 'object-prompt'
+                    : isParametricActive
+                      ? 'parametric-mask'
+                      : isMasking || isAiEditing
+                        ? 'mask'
+                        : showGamutWarningOverlay
+                          ? 'soft-proof'
+                          : 'pan-zoom';
     const activeCanvasOverlayStatus: CanvasOverlayStatus =
       isShowingOriginal || compareOverlayDisabled
         ? 'disabled'
@@ -1230,7 +1270,11 @@ export const ImageCanvas = memo(
                 : activeRemoveSource.status === 'stale' || activeRemoveSource.status === 'fallback_unchanged'
                   ? 'stale'
                   : 'warning'
-              : pickerControllers.activeTool !== null || isToolActive || isCropping || showGamutWarningOverlay
+              : pickerControllers.activeTool !== null ||
+                  toneCurveTargetBinding.active ||
+                  isToolActive ||
+                  isCropping ||
+                  showGamutWarningOverlay
                 ? 'active'
                 : 'ready';
     const canvasPointerOwner = resolveImageCanvasPointerOwner({
@@ -1288,7 +1332,10 @@ export const ImageCanvas = memo(
         data-renderer-generation={String(rendererHandoff.generation)}
         data-renderer-handoff-status={rendererHandoff.status}
         data-viewer-active-tool={
-          pickerControllers.activeTool ?? viewerInputState?.activeTool ?? activeCanvasOverlayTool
+          pickerControllers.activeTool ??
+          (toneCurveTargetBinding.active ? 'tone-curve' : null) ??
+          viewerInputState?.activeTool ??
+          activeCanvasOverlayTool
         }
         data-viewer-temporary-hand={String(viewerInputState?.isTemporaryHand ?? false)}
         data-wb-picker-image-path={lastWhiteBalancePickerReceipt?.selectedImagePath ?? undefined}
@@ -1351,6 +1398,8 @@ export const ImageCanvas = memo(
         data-viewer-sampler-status={viewerSamplerController.state.result?.status ?? 'idle'}
         data-viewer-sampler-suppressed={String(viewerSamplerController.state.suppressed)}
         data-viewer-sampler-target={viewerSamplerController.state.target}
+        data-tone-curve-target-active={String(toneCurveTargetBinding.active)}
+        data-tone-curve-target-overlay-count={String(toneCurveTargetBinding.overlays.length)}
         data-testid="image-canvas"
         onInputEvent={referenceView?.activePane === 'reference' ? () => undefined : viewerInteraction.handleInputEvent}
         onPointerLeave={() => {
@@ -1361,7 +1410,7 @@ export const ImageCanvas = memo(
           if (viewerInteraction.shouldCapturePointer(event.pointerId) && event.nativeEvent.isTrusted) {
             event.currentTarget.setPointerCapture(event.pointerId);
           }
-          if (pickerControllers.activeTool !== null || whiteBalanceController.active) {
+          if (pickerControllers.activeTool !== null || toneCurveTargetBinding.active || whiteBalanceController.active) {
             event.preventDefault();
             return;
           }
@@ -1373,7 +1422,8 @@ export const ImageCanvas = memo(
         style={{
           width: '100%',
           height: '100%',
-          cursor: pickerControllers.activeTool !== null ? 'crosshair' : effectiveCursor,
+          cursor:
+            pickerControllers.activeTool !== null || toneCurveTargetBinding.active ? 'crosshair' : effectiveCursor,
           pointerEvents: 'auto',
         }}
       >
@@ -1435,6 +1485,7 @@ export const ImageCanvas = memo(
               />
             )}
             <ViewerPickerOverlay descriptors={pickerControllers.overlays} />
+            <ViewerToneCurveTargetOverlay descriptors={toneCurveTargetBinding.overlays} />
             <ViewerSamplerOverlay descriptor={viewerSamplerController.overlay} />
             <ViewerFocusRetouchOverlay descriptors={focusRetouchController.overlays} geometry={overlayGeometry} />
             {displayedMaskUrl && (

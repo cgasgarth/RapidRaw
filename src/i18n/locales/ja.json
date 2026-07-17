@@ -328,6 +328,7 @@
       "resetAllPoint": "すべてのポイントカーブをリセット",
       "resetParametric": "{{channel}} パラメトリックカーブをリセット",
       "resetPoint": "{{channel}} ポイントカーブをリセット",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
