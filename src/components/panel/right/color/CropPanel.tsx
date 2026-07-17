@@ -7,12 +7,14 @@ import {
   FlipHorizontal,
   FlipVertical,
   Grid3x3,
+  Lock,
   RectangleHorizontal,
   RectangleVertical,
   RotateCcw,
   RotateCw,
   Ruler,
   Scan,
+  Unlock,
   X,
 } from 'lucide-react';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -239,6 +241,8 @@ function CropEditSession() {
   ]);
   const [customDraft, setCustomDraft] = useState<{ height: string; width: string } | null>(null);
   const [isRotationActive, setIsRotationActive] = useState(false);
+  const [isRatioLocked, setIsRatioLocked] = useState(() => adjustments.aspectRatio !== null);
+  const lastLockedAspectRatioRef = useRef(adjustments.aspectRatio ?? BASE_RATIO);
   const [preferredPresetOrientation, setPreferredPresetOrientation] = useState<Orientation>(() =>
     adjustments.aspectRatio !== null && adjustments.aspectRatio < 1 ? Orientation.Vertical : Orientation.Horizontal,
   );
@@ -460,6 +464,23 @@ function CropEditSession() {
     return getOrientedOriginalRatio(selectedImage?.width, selectedImage?.height, orientationSteps);
   }, [selectedImage, orientationSteps]);
 
+  const handleRatioLockToggle = () => {
+    const nextLocked = !isRatioLocked;
+    setIsRatioLocked(nextLocked);
+    if (nextLocked) {
+      setGeometryAdjustments((previous) => ({
+        ...previous,
+        aspectRatio: previous.aspectRatio ?? lastLockedAspectRatioRef.current,
+      }));
+    } else {
+      setGeometryAdjustments((previous) => ({ ...previous, aspectRatio: null }));
+    }
+  };
+
+  useEffect(() => {
+    if (adjustments.aspectRatio !== null) lastLockedAspectRatioRef.current = adjustments.aspectRatio;
+  }, [adjustments.aspectRatio]);
+
   const activePreset = useMemo(() => {
     if (aspectRatio === null) {
       return PRESETS.find((p: CropPreset) => p.value === null);
@@ -562,6 +583,7 @@ function CropEditSession() {
   };
 
   const handlePresetClick = (preset: CropPreset) => {
+    setIsRatioLocked(preset.value !== null);
     if (preset.value === ORIGINAL_RATIO) {
       setGeometryAdjustments((prev) => ({
         ...prev,
@@ -602,6 +624,7 @@ function CropEditSession() {
       selectedImage?.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
 
     setPreferredPresetOrientation(Orientation.Horizontal);
+    setIsRatioLocked(true);
     setIsEditingCustom(false);
     setCustomDraft(null);
     setCustomRatioError(false);
@@ -874,6 +897,25 @@ function CropEditSession() {
                 <div className="flex shrink-0 items-center gap-1">
                   <span className={utilityLabelClassName}>{orientationLabel}</span>
                   <button
+                    aria-label={t(
+                      isRatioLocked ? 'editor.crop.tooltips.unlockAspect' : 'editor.crop.tooltips.lockAspect',
+                      {
+                        defaultValue: isRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio',
+                      },
+                    )}
+                    aria-pressed={isRatioLocked}
+                    className={cx(iconButtonClassName, isRatioLocked && selectedControlClassName)}
+                    data-testid="crop-panel-ratio-lock-toggle"
+                    data-tooltip={t(
+                      isRatioLocked ? 'editor.crop.tooltips.unlockAspect' : 'editor.crop.tooltips.lockAspect',
+                      { defaultValue: isRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio' },
+                    )}
+                    onClick={handleRatioLockToggle}
+                    type="button"
+                  >
+                    {isRatioLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                  </button>
+                  <button
                     aria-label={getOrientationTooltip()}
                     className={iconButtonClassName}
                     disabled={isOrientationToggleDisabled}
@@ -918,6 +960,7 @@ function CropEditSession() {
                     isCustomActive ? selectedControlClassName : quietControlClassName,
                   )}
                   onClick={() => {
+                    setIsRatioLocked(true);
                     let newAspectRatio = BASE_RATIO;
                     if (preferredPresetOrientation === Orientation.Vertical) {
                       newAspectRatio = 1 / BASE_RATIO;

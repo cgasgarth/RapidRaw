@@ -1387,6 +1387,7 @@
         "flipHoriz": "Przerzuć obraz w poziomie",
         "flipVert": "Przerzuć obraz w pionie",
         "lens": "Korekcja zniekształceń obiektywu",
+        "lockAspect": "",
         "overlayDetails": "Nakładka: {{name}}{{rotateHint}}",
         "resetFineRotation": "Resetuj precyzyjny obrót",
         "rotateHint": " (Shift+O aby obrócić)",
@@ -1396,7 +1397,8 @@
         "switchOrientation": "Zmień orientację",
         "switchToLandscape": "Zmień na krajobraz",
         "switchToPortrait": "Zmień na portret",
-        "transform": "Korekcja perspektywy i keystone"
+        "transform": "Korekcja perspektywy i keystone",
+        "unlockAspect": ""
       }
     },
     "developTools": {

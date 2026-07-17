@@ -1287,6 +1287,7 @@
         "flipHoriz": "画像を水平方向に反転",
         "flipVert": "画像を垂直方向に反転",
         "lens": "レンズ歪み補正",
+        "lockAspect": "",
         "overlayDetails": "ガイド: {{name}}{{rotateHint}}",
         "resetFineRotation": "微調整回転をリセット",
         "rotateHint": " (Shift+O で回転)",
@@ -1296,7 +1297,8 @@
         "switchOrientation": "縦横比の向きを切り替え",
         "switchToLandscape": "横向きに切り替え",
         "switchToPortrait": "縦向きに切り替え",
-        "transform": "遠近歪みとあおり補正"
+        "transform": "遠近歪みとあおり補正",
+        "unlockAspect": ""
       }
     },
     "developTools": {

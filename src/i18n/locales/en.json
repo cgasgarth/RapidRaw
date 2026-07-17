@@ -1368,6 +1368,7 @@
         "flipHoriz": "Flip image horizontally",
         "flipVert": "Flip image vertically",
         "lens": "Lens distortion correction",
+        "lockAspect": "editor.crop.tooltips.lockAspect",
         "overlayDetails": "Overlay: {{name}}{{rotateHint}}",
         "resetFineRotation": "Reset Fine Rotation",
         "rotateHint": " (Shift+O to rotate)",
@@ -1377,7 +1378,8 @@
         "switchOrientation": "Switch orientation",
         "switchToLandscape": "Switch to landscape",
         "switchToPortrait": "Switch to portrait",
-        "transform": "Perspective and keystone correction"
+        "transform": "Perspective and keystone correction",
+        "unlockAspect": "editor.crop.tooltips.unlockAspect"
       }
     },
     "developTools": {

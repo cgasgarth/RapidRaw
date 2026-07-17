@@ -1321,6 +1321,7 @@
         "flipHoriz": "Rifletti immagine orizzontalmente",
         "flipVert": "Rifletti immagine verticalmente",
         "lens": "Correzione distorsione obiettivo",
+        "lockAspect": "",
         "overlayDetails": "Sovrapposizione: {{name}}{{rotateHint}}",
         "resetFineRotation": "Ripristina Rotazione Fine",
         "rotateHint": " (Shift+O per ruotare)",
@@ -1330,7 +1331,8 @@
         "switchOrientation": "Cambia orientamento",
         "switchToLandscape": "Passa a paesaggio",
         "switchToPortrait": "Passa a ritratto",
-        "transform": "Correzione prospettiva e distorsione trapezoidale"
+        "transform": "Correzione prospettiva e distorsione trapezoidale",
+        "unlockAspect": ""
       }
     },
     "developTools": {

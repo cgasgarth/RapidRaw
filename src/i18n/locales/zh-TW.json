@@ -1287,6 +1287,7 @@
         "flipHoriz": "水平翻轉影像",
         "flipVert": "垂直翻轉影像",
         "lens": "鏡頭畸變校正",
+        "lockAspect": "",
         "overlayDetails": "疊加：{{name}}{{rotateHint}}",
         "resetFineRotation": "重置精細旋轉",
         "rotateHint": "（Shift+O 旋轉）",
@@ -1296,7 +1297,8 @@
         "switchOrientation": "切換方向",
         "switchToLandscape": "切換為橫向",
         "switchToPortrait": "切換為縱向",
-        "transform": "透視和梯形校正"
+        "transform": "透視和梯形校正",
+        "unlockAspect": ""
       }
     },
     "developTools": {

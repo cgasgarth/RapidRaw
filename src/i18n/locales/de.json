@@ -1333,6 +1333,7 @@
         "flipHoriz": "Bild horizontal spiegeln",
         "flipVert": "Bild vertikal spiegeln",
         "lens": "Objektivverzerrung korrigieren",
+        "lockAspect": "",
         "overlayDetails": "Überlagerung: {{name}}{{rotateHint}}",
         "resetFineRotation": "Feinrotation zurücksetzen",
         "rotateHint": " (Shift+O zum Drehen)",
@@ -1342,7 +1343,8 @@
         "switchOrientation": "Ausrichtung wechseln",
         "switchToLandscape": "Zum Querformat wechseln",
         "switchToPortrait": "Zum Hochformat wechseln",
-        "transform": "Perspektiv- und Trapezkorrektur"
+        "transform": "Perspektiv- und Trapezkorrektur",
+        "unlockAspect": ""
       }
     },
     "developTools": {
