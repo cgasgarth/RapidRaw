@@ -319,6 +319,8 @@ export default function Editor({
   const activeAiPatchContainerId = useEditorStore((s) => s.activeAiPatchContainerId);
   const activeAiSubMaskId = useEditorStore((s) => s.activeAiSubMaskId);
   const isMaskControlHovered = useEditorStore((s) => s.isMaskControlHovered);
+  const maskSelectedPinVisible = useEditorStore((s) => s.maskSelectedPinVisible);
+  const maskHandlesVisible = useEditorStore((s) => s.maskHandlesVisible);
   const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
   const wgpuFrameSerial = useEditorStore((s) => s.wgpuFrameSerial);
   const wgpuFailureSerial = useEditorStore((s) => s.wgpuFailureSerial);
@@ -2562,6 +2564,8 @@ export default function Editor({
                   input: { activeTool: activeViewerTool, isTemporaryHand },
                   isAiEditing,
                   isMaskControlHovered,
+                  maskHandlesVisible,
+                  maskSelectedPinVisible,
                   isMasking,
                   isRotationActive: Boolean(isRotationActive),
                   onSamplerStateChange: setViewerSamplerState,
