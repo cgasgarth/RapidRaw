@@ -233,7 +233,7 @@ jobs:
           workspaces: src-tauri
           # `shared-key` replaces both the automatic job identity and `key`.
           # Reproduce main's generated rust-test cache identity byte-for-byte.
-          shared-key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-main-long-rust-test
+          shared-key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-main-long
           cache-on-failure: false
       - name: Compile the optimized app validation feature surface
         working-directory: src-tauri
