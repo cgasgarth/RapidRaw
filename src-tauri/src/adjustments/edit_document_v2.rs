@@ -19,6 +19,7 @@ use crate::geometry::perspective::{
     PERSPECTIVE_IMPLEMENTATION_VERSION_V1, PerspectiveCorrectionSettingsV1,
 };
 use crate::image_processing::calculate_agx_matrices;
+use crate::render::image_processing::RawEngineArtifacts;
 use crate::tone::curves::{CurveChannelMode, CurvePoint, compile_scene_curve};
 use crate::tone::output_curves::{OutputCurvePoint, OutputCurveTargetV1, compile_output_curve};
 
@@ -2901,7 +2902,9 @@ struct LayerV2 {
     edit_node_schema_version: u8,
     id: String,
     invert: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     layer_group_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     layer_group_name: Option<String>,
     name: String,
     opacity: f64,
@@ -2981,6 +2984,8 @@ struct EditDocumentProvenanceV2 {
 struct EditDocumentExtensionsV2 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     quarantined_nodes: Option<BTreeMap<String, Value>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    raw_engine_artifacts: Option<RawEngineArtifacts>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -5589,11 +5594,15 @@ mod tests {
     }
 
     #[test]
-    fn current_render_document_accepts_only_current_quarantine_extensions() {
+    fn current_render_document_accepts_typed_persistence_extensions() {
         let mut document = current_document();
         document["extensions"] = json!({
             "quarantinedNodes": {
                 "future_node": { "implementationVersion": 3 }
+            },
+            "rawEngineArtifacts": {
+                "schemaVersion": 1,
+                "layerStackSidecars": [{ "layerId": "brush-layer-1" }]
             }
         });
         let parsed = serde_json::from_value::<EditDocumentV2>(document)
@@ -5604,10 +5613,24 @@ mod tests {
             json!({
                 "quarantinedNodes": {
                     "future_node": { "implementationVersion": 3 }
+                },
+                "rawEngineArtifacts": {
+                    "schemaVersion": 1,
+                    "layerStackSidecars": [{ "layerId": "brush-layer-1" }]
                 }
             })
         );
         assert!(serialized.get("migration").is_none());
+    }
+
+    #[test]
+    fn current_render_document_rejects_unknown_persistence_extensions() {
+        let mut document = current_document();
+        document["extensions"] =
+            json!({ "rawEngineArtifacts": { "schemaVersion": 1 }, "unknown": true });
+        let error = serde_json::from_value::<EditDocumentV2>(document)
+            .expect_err("unknown persistence extension must fail at the native boundary");
+        assert!(error.to_string().contains("unknown field `unknown`"));
     }
 
     #[test]
@@ -5896,6 +5919,26 @@ mod tests {
         assert_eq!(definitions[0].adjustments, Value::Null);
         assert_eq!(render.mask_count, 1);
         assert_eq!(render.mask_adjustments[0].exposure, 0.0);
+    }
+
+    #[test]
+    fn ungrouped_layer_groups_are_omitted_from_native_json() {
+        let mut value = current_document();
+        let mut current_layer = layer();
+        current_layer["layerGroupId"] = Value::Null;
+        current_layer["layerGroupName"] = Value::Null;
+        value["layers"] = json!({ "masks": [current_layer] });
+        value["nodes"]["layers"]["params"] = value["layers"].clone();
+
+        let document: EditDocumentV2 =
+            serde_json::from_value(value).expect("valid current document");
+        let serialized = serde_json::to_value(document).expect("serialize current document");
+        let layer = &serialized["layers"]["masks"][0];
+        let node_layer = &serialized["nodes"]["layers"]["params"]["masks"][0];
+        assert!(layer.get("layerGroupId").is_none());
+        assert!(layer.get("layerGroupName").is_none());
+        assert!(node_layer.get("layerGroupId").is_none());
+        assert!(node_layer.get("layerGroupName").is_none());
     }
 
     #[test]

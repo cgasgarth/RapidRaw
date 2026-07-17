@@ -107,11 +107,11 @@ export class PreviewPresentationAdapter {
         },
       };
     } else if (value.kind === 'wgpu') {
-      this.options.acceptWgpuPresentation({
-        identity: context.identity,
-        previewQualityStatus: readyStatus,
-        ...(context.identity.kind === 'settled' ? { renderedPreviewResolution: targetResolution } : {}),
-      });
+      // The WGPU worker response only acknowledges GPU work submission. It is
+      // not a visibility receipt: native presentation health is joined later
+      // by the wgpu-frame-ready event. Keeping the existing CPU layer visible
+      // here prevents a black/stale GPU texture from replacing the current
+      // preview during zoom, resize, or surface recovery.
       this.recordTiming(result, context, commitStartedAt);
       return true;
     } else if (value.kind === 'patch') {

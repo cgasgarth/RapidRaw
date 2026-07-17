@@ -12,6 +12,8 @@ export const DETAIL_NUMBER_NODE_ADJUSTMENTS = [
   DetailsAdjustment.DenoiseNaturalGrain,
   DetailsAdjustment.DenoiseShadowBias,
   DetailsAdjustment.LumaNoiseReduction,
+  DetailsAdjustment.DustSpotSensitivity,
+  DetailsAdjustment.DustSpotMinRadiusPx,
   DetailsAdjustment.LocalContrastHaloGuard,
   DetailsAdjustment.LocalContrastMidtoneMask,
   DetailsAdjustment.LocalContrastRadiusPx,
@@ -21,7 +23,10 @@ export const DETAIL_NUMBER_NODE_ADJUSTMENTS = [
   DetailsAdjustment.Centré,
 ] as const;
 
-export const DETAIL_BOOLEAN_NODE_ADJUSTMENTS = [DetailsAdjustment.DeblurEnabled] as const;
+export const DETAIL_BOOLEAN_NODE_ADJUSTMENTS = [
+  DetailsAdjustment.DeblurEnabled,
+  DetailsAdjustment.DustSpotOverlayEnabled,
+] as const;
 
 export const DETAIL_NODE_ADJUSTMENTS = [...DETAIL_NUMBER_NODE_ADJUSTMENTS, ...DETAIL_BOOLEAN_NODE_ADJUSTMENTS] as const;
 

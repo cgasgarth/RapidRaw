@@ -2155,7 +2155,7 @@ function ProfessionalEditorShellFixture({ state }: { state: 'collapsed' | 'defau
         <section
           className="grid min-h-0 min-w-0"
           data-visual-smoke-section="professional-editor-center"
-          style={{ gridTemplateRows: collapsed ? '36px minmax(0,1fr) 40px' : '36px minmax(0,1fr) 152px' }}
+          style={{ gridTemplateRows: collapsed ? '36px minmax(0,1fr) 76px' : '36px minmax(0,1fr) 188px' }}
         >
           <div
             className="flex h-9 shrink-0 items-center justify-between border-b border-editor-divider bg-editor-panel px-2"
@@ -2176,6 +2176,28 @@ function ProfessionalEditorShellFixture({ state }: { state: 'collapsed' | 'defau
             data-visual-smoke-section="professional-editor-bottom-bar"
             data-testid="professional-editor-shell-bottom-bar"
           >
+            <div
+              data-testid="professional-editor-viewer-toolbar"
+              data-visual-smoke-section="professional-editor-viewer-toolbar"
+            >
+              <ViewerFooter
+                activeTool="none"
+                isFullScreen={false}
+                isRendering={false}
+                resolvedZoom={{
+                  cssPercent: 100,
+                  devicePixelsPerImagePixel: 1,
+                  displayPercent: 100,
+                  imagePixelsPerCssPixel: 1,
+                  imagePixelsPerDevicePixel: 1,
+                  mode: { devicePixelsPerImagePixel: 1, kind: 'ratio' },
+                  requiredPreviewResolution: 4096,
+                  transformScale: 1,
+                }}
+                samplerState={null}
+                zoomResolutionState="ready"
+              />
+            </div>
             {collapsed ? (
               <div className="flex h-10 items-center justify-between bg-editor-panel px-2 text-[11px] text-text-secondary">
                 <span>{copy.professionalEditorSelectionCount}</span>
@@ -2867,6 +2889,8 @@ function BrushMaskCanvasVisualSmoke() {
             data-mask-id={brushMaskCanvasSubMaskId}
             data-point-counts={pointCounts}
             data-refine-brush-feather={brushSettings.feather}
+            data-refine-brush-flow={brushSettings.flow ?? 100}
+            data-refine-brush-density={brushSettings.density ?? 100}
             data-refine-brush-size={brushSettings.size}
             data-stroke-count={lines.length}
             data-testid="brush-mask-canvas-ui-proof"
@@ -2885,6 +2909,24 @@ function BrushMaskCanvasVisualSmoke() {
               type="button"
             >
               {copy.brushSize96}
+            </button>
+            <button
+              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
+              onClick={() => {
+                setBrushSettings((current) => ({ ...current, flow: 64 }));
+              }}
+              type="button"
+            >
+              {copy.brushFlow64}
+            </button>
+            <button
+              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
+              onClick={() => {
+                setBrushSettings((current) => ({ ...current, density: 72 }));
+              }}
+              type="button"
+            >
+              {copy.brushDensity72}
             </button>
             <button
               className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
@@ -4137,6 +4179,8 @@ const copy = {
   activeLayerCount: '3 active',
   brushMaskCanvasUi: 'Brush mask canvas UI',
   brushFeather64: 'Feather 64',
+  brushFlow64: 'Flow 64',
+  brushDensity72: 'Density 72',
   brushSize96: 'Size 96',
   pointCounts: 'Point counts',
   runtimeProof: 'Runtime proof',

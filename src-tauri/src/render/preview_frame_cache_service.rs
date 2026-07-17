@@ -63,6 +63,17 @@ impl PreviewFrameCacheService {
         if state.epoch != request.0 {
             return false;
         }
+        if state.cached.as_ref().is_some_and(|current| {
+            current
+                .identity
+                .same_content_different_resolution(&preview.identity)
+                && preview.preview_dim < current.preview_dim
+        }) {
+            // A duplicate low-tier request must never downgrade the reusable
+            // base. The request can still complete for the caller, but the
+            // sharp cache remains authoritative for the next render.
+            return false;
+        }
         state.cached = Some(preview);
         true
     }
@@ -135,5 +146,16 @@ mod tests {
         assert_eq!(snapshot.image.shared_image().width(), 5);
         service.clear();
         assert!(service.snapshot().is_none());
+    }
+
+    #[test]
+    fn lower_resolution_duplicate_does_not_replace_sharp_cache() {
+        let service = PreviewFrameCacheService::default();
+        let request = service.begin_request();
+        assert!(service.publish_if_current(request, cached("same.raw", 1, 4096)));
+        assert!(!service.publish_if_current(request, cached("same.raw", 1, 1920)));
+        let snapshot = service.snapshot().expect("sharp cache remains");
+        assert_eq!(snapshot.preview_dim, 4096);
+        assert_eq!(snapshot.image.shared_image().width(), 4096);
     }
 }

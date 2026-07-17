@@ -228,8 +228,19 @@ describe('preview presentation adapter', () => {
     expect(adapter.present({ value: { kind: 'wgpu' } }, context(firstA))).toBe(false);
     expect(adapter.present({ value: { kind: 'wgpu' } }, context(b))).toBe(false);
     expect(adapter.present({ value: { kind: 'wgpu' } }, context(successorA))).toBe(true);
-    expect(updates).toHaveLength(1);
-    expect(updates[0]?.previewQualityStatus.requestId).toBe(successorA.operationId);
+    expect(updates).toHaveLength(0);
+  });
+
+  test('keeps the current CPU layer visible until zoom WGPU work has a visible frame receipt', () => {
+    const { adapter, coordinator, updates } = harness();
+    const fit = start(coordinator, session({ viewportRevision: 1 }));
+    complete(coordinator, fit);
+    expect(adapter.present({ value: { kind: 'wgpu' } }, context(fit))).toBe(true);
+
+    const zoom = start(coordinator, session({ graphRevision: 'graph-zoom', viewportRevision: 2 }));
+    complete(coordinator, zoom);
+    expect(adapter.present({ value: { kind: 'wgpu' } }, context(zoom))).toBe(true);
+    expect(updates).toHaveLength(0);
   });
 
   test('empty and limited output publish bounded degraded status only while current', () => {

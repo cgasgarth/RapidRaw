@@ -80,10 +80,13 @@ import { useEditorStore } from './useEditorStore';
 
 export interface CollapsibleSectionsState {
   basic: boolean;
+  calibration: boolean;
   color: boolean;
   curves: boolean;
   details: boolean;
   effects: boolean;
+  lensCorrection?: boolean;
+  transform?: boolean;
   transformLens: boolean;
 }
 
@@ -142,6 +145,7 @@ export const createRecentRightPanels = (selectedPanel: Panel, currentPanels: rea
 
 export const DEFAULT_COLLAPSIBLE_SECTIONS_STATE: CollapsibleSectionsState = {
   basic: true,
+  calibration: false,
   color: false,
   curves: true,
   details: false,
@@ -151,10 +155,14 @@ export const DEFAULT_COLLAPSIBLE_SECTIONS_STATE: CollapsibleSectionsState = {
 
 const createCollapsibleSectionsState = (preferences: EditorWorkspacePreferences): CollapsibleSectionsState => ({
   basic: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('basic') ?? false,
+  calibration: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('calibration') ?? false,
   color: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('color') ?? false,
   curves: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('curves') ?? false,
   details: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('details') ?? false,
   effects: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('effects') ?? false,
+  lensCorrection:
+    preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('lensCorrection') ?? false,
+  transform: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('transform') ?? false,
   transformLens:
     preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('transformLens') ?? false,
 });

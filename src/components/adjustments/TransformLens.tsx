@@ -57,6 +57,7 @@ type PerspectiveStatus = 'idle' | 'analyzing' | 'ready' | 'abstained' | 'error';
 
 interface TransformLensProps {
   adjustments: TransformLensAdjustmentView;
+  mode?: 'all' | 'lens' | 'transform';
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   selectedImage: SelectedImage | null;
   setAdjustments: (adjustments: AdjustmentUpdate) => void;
@@ -139,6 +140,7 @@ const toOptions = (values: unknown): Array<OptionItem<string>> =>
 
 export default function TransformLens({
   adjustments,
+  mode = 'all',
   onDragStateChange,
   selectedImage,
   setAdjustments,
@@ -188,8 +190,11 @@ export default function TransformLens({
     [adjustments.lensDistortionParams],
   );
   const hasSupportedLensProfile = hasSupportedLensCorrections(availability);
+  const showTransform = mode === 'all' || mode === 'transform';
+  const showLens = mode === 'all' || mode === 'lens';
 
   useEffect(() => {
+    if (!showLens) return;
     let isMounted = true;
     void invokeWithSchema(Invokes.GetLensfunMakers, {}, lensfunNameListSchema)
       .then((nextMakers) => {
@@ -201,9 +206,10 @@ export default function TransformLens({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [showLens]);
 
   useEffect(() => {
+    if (!showLens) return;
     if (!adjustments.lensMaker) {
       setLenses([]);
       return;
@@ -220,7 +226,7 @@ export default function TransformLens({
     return () => {
       isMounted = false;
     };
-  }, [adjustments.lensMaker]);
+  }, [adjustments.lensMaker, showLens]);
 
   const updateAdjustment = <Key extends keyof TransformLensAdjustmentView>(
     key: Key,
@@ -534,7 +540,6 @@ export default function TransformLens({
           : detectionStatus === 'error'
             ? copy.profileError
             : copy.profileIdle;
-
   return (
     <div
       className="space-y-2"
@@ -543,426 +548,440 @@ export default function TransformLens({
       data-commit-source-identity={lensCorrectionCommitIdentity?.sourceIdentity}
       data-testid="transform-lens-inspector"
     >
-      <section className="space-y-1.5" data-testid="perspective-correction-controls">
-        <div className="flex items-center justify-between gap-2">
-          <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
-            {t('adjustments.perspective.heading')}
-          </UiText>
-          <span className={cx(statusChipClassName, 'bg-editor-panel text-text-secondary')}>
-            {perspectiveStatus === 'analyzing' ? <Loader className="animate-spin" size={11} /> : <Grid3X3 size={11} />}
-            {perspectiveStatus}
-          </span>
-        </div>
-        <div className="space-y-1.5 rounded border border-editor-border bg-editor-panel-well p-1.5">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <Dropdown
-              chrome="editor"
-              onChange={(mode) => {
-                updatePerspective({ mode, resolvedPlan: null });
-                setPerspectiveStatus('idle');
-                setPerspectiveMessage(null);
-              }}
-              options={perspectiveModeOptions}
-              value={adjustments.perspectiveCorrection.mode}
-            />
-            <button
-              aria-label={t('adjustments.perspective.analyze')}
-              className="inline-flex h-7 w-8 items-center justify-center rounded border border-editor-border text-text-secondary hover:bg-editor-selected-quiet disabled:opacity-45"
-              disabled={
-                perspectiveStatus === 'analyzing' || !adjustments.perspectiveCorrection.mode.startsWith('auto_')
-              }
-              onClick={() => void analyzePerspective()}
-              data-testid="perspective-analyze-button"
-              type="button"
-            >
-              {perspectiveStatus === 'analyzing' ? <Loader className="animate-spin" size={14} /> : <Wand2 size={14} />}
-            </button>
+      {showTransform && (
+        <section className="space-y-1.5" data-testid="perspective-correction-controls">
+          <div className="flex items-center justify-between gap-2">
+            <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
+              {t('adjustments.perspective.heading')}
+            </UiText>
+            <span className={cx(statusChipClassName, 'bg-editor-panel text-text-secondary')}>
+              {perspectiveStatus === 'analyzing' ? (
+                <Loader className="animate-spin" size={11} />
+              ) : (
+                <Grid3X3 size={11} />
+              )}
+              {perspectiveStatus}
+            </span>
           </div>
-          {adjustments.perspectiveCorrection.mode !== 'off' &&
-            adjustments.perspectiveCorrection.mode !== 'manual_legacy' && (
-              <>
-                <AdjustmentSlider
-                  density="compact"
-                  fillOrigin="min"
-                  label={t('adjustments.perspective.amount')}
-                  max={100}
-                  min={0}
-                  onDragStateChange={onDragStateChange}
-                  onValueChange={(amount) => updatePerspective({ amount })}
-                  step={1}
-                  suffix="%"
-                  value={adjustments.perspectiveCorrection.amount}
+          <div className="space-y-1.5 rounded border border-editor-border bg-editor-panel-well p-1.5">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <Dropdown
+                chrome="editor"
+                onChange={(mode) => {
+                  updatePerspective({ mode, resolvedPlan: null });
+                  setPerspectiveStatus('idle');
+                  setPerspectiveMessage(null);
+                }}
+                options={perspectiveModeOptions}
+                value={adjustments.perspectiveCorrection.mode}
+              />
+              <button
+                aria-label={t('adjustments.perspective.analyze')}
+                className="inline-flex h-7 w-8 items-center justify-center rounded border border-editor-border text-text-secondary hover:bg-editor-selected-quiet disabled:opacity-45"
+                disabled={
+                  perspectiveStatus === 'analyzing' || !adjustments.perspectiveCorrection.mode.startsWith('auto_')
+                }
+                onClick={() => void analyzePerspective()}
+                data-testid="perspective-analyze-button"
+                type="button"
+              >
+                {perspectiveStatus === 'analyzing' ? (
+                  <Loader className="animate-spin" size={14} />
+                ) : (
+                  <Wand2 size={14} />
+                )}
+              </button>
+            </div>
+            {adjustments.perspectiveCorrection.mode !== 'off' &&
+              adjustments.perspectiveCorrection.mode !== 'manual_legacy' && (
+                <>
+                  <AdjustmentSlider
+                    density="compact"
+                    fillOrigin="min"
+                    label={t('adjustments.perspective.amount')}
+                    max={100}
+                    min={0}
+                    onDragStateChange={onDragStateChange}
+                    onValueChange={(amount) => updatePerspective({ amount })}
+                    step={1}
+                    suffix="%"
+                    value={adjustments.perspectiveCorrection.amount}
+                  />
+                  <Dropdown
+                    chrome="editor"
+                    onChange={(cropPolicy) => updatePerspective({ cropPolicy })}
+                    options={perspectiveCropOptions}
+                    value={adjustments.perspectiveCorrection.cropPolicy}
+                  />
+                </>
+              )}
+            {adjustments.perspectiveCorrection.resolvedPlan && (
+              <div
+                className="grid grid-cols-2 gap-1 text-[10px] text-text-secondary"
+                data-testid="perspective-evidence-summary"
+              >
+                <span>
+                  {t('adjustments.perspective.confidence')}:{' '}
+                  {Math.round(adjustments.perspectiveCorrection.resolvedPlan.confidence * 100)}%
+                </span>
+                <span>
+                  {t('adjustments.perspective.retainedArea')}:{' '}
+                  {Math.round(adjustments.perspectiveCorrection.resolvedPlan.retainedArea * 100)}%
+                </span>
+              </div>
+            )}
+            {perspectiveMessage && (
+              <div
+                className="rounded border border-editor-warning bg-editor-warning-surface px-1.5 py-1 text-[10px] text-text-secondary"
+                role="status"
+              >
+                {perspectiveMessage}
+              </div>
+            )}
+            {adjustments.perspectiveCorrection.resolvedPlan && (
+              <button
+                className="w-full rounded border border-editor-border px-1.5 py-1 text-[10px] text-text-secondary hover:bg-editor-selected-quiet"
+                onClick={() => {
+                  updatePerspective({ resolvedPlan: null });
+                  setPerspectiveStatus('idle');
+                  setPerspectiveMessage(null);
+                }}
+                type="button"
+              >
+                {t('adjustments.perspective.resetSolved')}
+              </button>
+            )}
+            {adjustments.perspectiveCorrection.mode === 'guided' && (
+              <div className="space-y-1" data-testid="perspective-guide-list">
+                <div className="grid grid-cols-2 gap-1">
+                  <button
+                    className="inline-flex items-center justify-center gap-1 rounded border border-editor-border p-1 text-[10px]"
+                    onClick={() => addGuide('horizontal')}
+                    type="button"
+                  >
+                    <Plus size={10} />
+                    {t('adjustments.perspective.addHorizontalGuide')}
+                  </button>
+                  <button
+                    className="inline-flex items-center justify-center gap-1 rounded border border-editor-border p-1 text-[10px]"
+                    onClick={() => addGuide('vertical')}
+                    type="button"
+                  >
+                    <Plus size={10} />
+                    {t('adjustments.perspective.addVerticalGuide')}
+                  </button>
+                </div>
+                {adjustments.perspectiveCorrection.guides.map((guide, index) => (
+                  <div className="space-y-1 rounded border border-editor-border px-1.5 py-1 text-[10px]" key={guide.id}>
+                    <div className="flex items-center justify-between">
+                      <span>
+                        {guide.class} {index + 1}
+                      </span>
+                      <button
+                        aria-label={`Delete ${guide.class} guide`}
+                        onClick={() =>
+                          updatePerspective({
+                            guides: adjustments.perspectiveCorrection.guides.filter(
+                              (candidate) => candidate.id !== guide.id,
+                            ),
+                            resolvedPlan: null,
+                          })
+                        }
+                        type="button"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1">
+                      {guide.endpointsSourceNormalized.flatMap((point, endpoint) =>
+                        point.map((coordinate, axis) => (
+                          <input
+                            aria-label={`${guide.class} guide ${index + 1} endpoint ${endpoint + 1} ${axis === 0 ? 'x' : 'y'}`}
+                            className="min-w-0 rounded border border-editor-border bg-editor-panel px-1 py-0.5"
+                            key={`${endpoint}-${axis}`}
+                            max={1}
+                            min={0}
+                            onChange={(event) =>
+                              updateGuideCoordinate(
+                                guide.id,
+                                endpoint as 0 | 1,
+                                axis as 0 | 1,
+                                event.currentTarget.valueAsNumber,
+                              )
+                            }
+                            step={0.001}
+                            type="number"
+                            value={coordinate}
+                          />
+                        )),
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+      {showTransform && (
+        <section className="space-y-1.5" data-testid="transform-controls">
+          <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
+            {copy.transformHeading}
+          </UiText>
+          <div className="space-y-px">
+            <AdjustmentSlider
+              density="compact"
+              label={copy.vertical}
+              max={100}
+              min={-100}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                updateAdjustment('transformVertical', Math.trunc(value));
+              }}
+              step={1}
+              value={adjustments.transformVertical}
+            />
+            <AdjustmentSlider
+              density="compact"
+              label={copy.horizontal}
+              max={100}
+              min={-100}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                updateAdjustment('transformHorizontal', Math.trunc(value));
+              }}
+              step={1}
+              value={adjustments.transformHorizontal}
+            />
+            <AdjustmentSlider
+              density="compact"
+              label={copy.rotation}
+              max={45}
+              min={-45}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                updateAdjustment('transformRotate', value);
+              }}
+              step={0.1}
+              suffix="°"
+              value={adjustments.transformRotate}
+            />
+            <AdjustmentSlider
+              density="compact"
+              fillOrigin="min"
+              label={copy.scale}
+              max={150}
+              min={50}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                updateAdjustment('transformScale', Math.trunc(value));
+              }}
+              step={1}
+              suffix="%"
+              value={adjustments.transformScale}
+            />
+            <AdjustmentSlider
+              density="compact"
+              label={copy.xOffset}
+              max={100}
+              min={-100}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                updateAdjustment('transformXOffset', Math.trunc(value));
+              }}
+              step={1}
+              value={adjustments.transformXOffset}
+            />
+            <AdjustmentSlider
+              density="compact"
+              label={copy.yOffset}
+              max={100}
+              min={-100}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                updateAdjustment('transformYOffset', Math.trunc(value));
+              }}
+              step={1}
+              value={adjustments.transformYOffset}
+            />
+            <AdjustmentSlider
+              density="compact"
+              label={copy.opticalDistortion}
+              max={100}
+              min={-100}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                updateAdjustment('transformDistortion', Math.trunc(value));
+              }}
+              step={1}
+              value={adjustments.transformDistortion}
+            />
+          </div>
+        </section>
+      )}
+
+      {showLens && (
+        <section className="space-y-2" data-testid="lens-correction-controls">
+          <div className="flex items-center justify-between gap-2">
+            <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
+              {copy.lensHeading}
+            </UiText>
+            <span
+              className={cx(
+                statusChipClassName,
+                hasSupportedLensProfile
+                  ? 'bg-editor-selected-quiet text-text-primary'
+                  : 'bg-editor-panel text-text-secondary',
+              )}
+            >
+              {detectionStatus === 'detecting' ? <Loader className="animate-spin" size={11} /> : <Aperture size={11} />}
+              {detectionLabel}
+            </span>
+          </div>
+
+          <div className="space-y-1.5 rounded border border-editor-border bg-editor-panel-well p-1.5">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <Dropdown
+                chrome="editor"
+                onChange={handleModeChange}
+                options={lensModeOptions}
+                value={adjustments.lensCorrectionMode}
+              />
+              <button
+                aria-label={copy.autoDetect}
+                className="inline-flex h-7 w-8 items-center justify-center rounded border border-editor-border text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45"
+                data-tooltip={copy.autoDetect}
+                disabled={detectionStatus === 'detecting' || !getExifValue(selectedExif, 'LensModel')}
+                onClick={() => {
+                  void handleAutoDetect();
+                }}
+                type="button"
+              >
+                {detectionStatus === 'detecting' ? <Loader className="animate-spin" size={14} /> : <Wand2 size={14} />}
+              </button>
+            </div>
+
+            {adjustments.lensCorrectionMode === 'manual' && (
+              <div className="grid grid-cols-1 gap-1.5">
+                <Dropdown
+                  chrome="editor"
+                  onChange={handleMakerChange}
+                  options={makerOptions}
+                  placeholder={copy.selectMaker}
+                  value={adjustments.lensMaker}
                 />
                 <Dropdown
                   chrome="editor"
-                  onChange={(cropPolicy) => updatePerspective({ cropPolicy })}
-                  options={perspectiveCropOptions}
-                  value={adjustments.perspectiveCorrection.cropPolicy}
+                  disabled={!adjustments.lensMaker}
+                  onChange={handleModelChange}
+                  options={lensOptions}
+                  placeholder={copy.selectLens}
+                  value={adjustments.lensModel}
                 />
-              </>
-            )}
-          {adjustments.perspectiveCorrection.resolvedPlan && (
-            <div
-              className="grid grid-cols-2 gap-1 text-[10px] text-text-secondary"
-              data-testid="perspective-evidence-summary"
-            >
-              <span>
-                {t('adjustments.perspective.confidence')}:{' '}
-                {Math.round(adjustments.perspectiveCorrection.resolvedPlan.confidence * 100)}%
-              </span>
-              <span>
-                {t('adjustments.perspective.retainedArea')}:{' '}
-                {Math.round(adjustments.perspectiveCorrection.resolvedPlan.retainedArea * 100)}%
-              </span>
-            </div>
-          )}
-          {perspectiveMessage && (
-            <div
-              className="rounded border border-editor-warning bg-editor-warning-surface px-1.5 py-1 text-[10px] text-text-secondary"
-              role="status"
-            >
-              {perspectiveMessage}
-            </div>
-          )}
-          {adjustments.perspectiveCorrection.resolvedPlan && (
-            <button
-              className="w-full rounded border border-editor-border px-1.5 py-1 text-[10px] text-text-secondary hover:bg-editor-selected-quiet"
-              onClick={() => {
-                updatePerspective({ resolvedPlan: null });
-                setPerspectiveStatus('idle');
-                setPerspectiveMessage(null);
-              }}
-              type="button"
-            >
-              {t('adjustments.perspective.resetSolved')}
-            </button>
-          )}
-          {adjustments.perspectiveCorrection.mode === 'guided' && (
-            <div className="space-y-1" data-testid="perspective-guide-list">
-              <div className="grid grid-cols-2 gap-1">
-                <button
-                  className="inline-flex items-center justify-center gap-1 rounded border border-editor-border p-1 text-[10px]"
-                  onClick={() => addGuide('horizontal')}
-                  type="button"
-                >
-                  <Plus size={10} />
-                  {t('adjustments.perspective.addHorizontalGuide')}
-                </button>
-                <button
-                  className="inline-flex items-center justify-center gap-1 rounded border border-editor-border p-1 text-[10px]"
-                  onClick={() => addGuide('vertical')}
-                  type="button"
-                >
-                  <Plus size={10} />
-                  {t('adjustments.perspective.addVerticalGuide')}
-                </button>
               </div>
-              {adjustments.perspectiveCorrection.guides.map((guide, index) => (
-                <div className="space-y-1 rounded border border-editor-border px-1.5 py-1 text-[10px]" key={guide.id}>
-                  <div className="flex items-center justify-between">
-                    <span>
-                      {guide.class} {index + 1}
-                    </span>
-                    <button
-                      aria-label={`Delete ${guide.class} guide`}
-                      onClick={() =>
-                        updatePerspective({
-                          guides: adjustments.perspectiveCorrection.guides.filter(
-                            (candidate) => candidate.id !== guide.id,
-                          ),
-                          resolvedPlan: null,
-                        })
-                      }
-                      type="button"
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-4 gap-1">
-                    {guide.endpointsSourceNormalized.flatMap((point, endpoint) =>
-                      point.map((coordinate, axis) => (
-                        <input
-                          aria-label={`${guide.class} guide ${index + 1} endpoint ${endpoint + 1} ${axis === 0 ? 'x' : 'y'}`}
-                          className="min-w-0 rounded border border-editor-border bg-editor-panel px-1 py-0.5"
-                          key={`${endpoint}-${axis}`}
-                          max={1}
-                          min={0}
-                          onChange={(event) =>
-                            updateGuideCoordinate(
-                              guide.id,
-                              endpoint as 0 | 1,
-                              axis as 0 | 1,
-                              event.currentTarget.valueAsNumber,
-                            )
-                          }
-                          step={0.001}
-                          type="number"
-                          value={coordinate}
-                        />
-                      )),
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
-      <section className="space-y-1.5">
-        <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
-          {copy.transformHeading}
-        </UiText>
-        <div className="space-y-px">
-          <AdjustmentSlider
-            density="compact"
-            label={copy.vertical}
-            max={100}
-            min={-100}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              updateAdjustment('transformVertical', Math.trunc(value));
-            }}
-            step={1}
-            value={adjustments.transformVertical}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={copy.horizontal}
-            max={100}
-            min={-100}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              updateAdjustment('transformHorizontal', Math.trunc(value));
-            }}
-            step={1}
-            value={adjustments.transformHorizontal}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={copy.rotation}
-            max={45}
-            min={-45}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              updateAdjustment('transformRotate', value);
-            }}
-            step={0.1}
-            suffix="°"
-            value={adjustments.transformRotate}
-          />
-          <AdjustmentSlider
-            density="compact"
-            fillOrigin="min"
-            label={copy.scale}
-            max={150}
-            min={50}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              updateAdjustment('transformScale', Math.trunc(value));
-            }}
-            step={1}
-            suffix="%"
-            value={adjustments.transformScale}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={copy.xOffset}
-            max={100}
-            min={-100}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              updateAdjustment('transformXOffset', Math.trunc(value));
-            }}
-            step={1}
-            value={adjustments.transformXOffset}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={copy.yOffset}
-            max={100}
-            min={-100}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              updateAdjustment('transformYOffset', Math.trunc(value));
-            }}
-            step={1}
-            value={adjustments.transformYOffset}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={copy.opticalDistortion}
-            max={100}
-            min={-100}
-            onDragStateChange={onDragStateChange}
-            onValueChange={(value) => {
-              updateAdjustment('transformDistortion', Math.trunc(value));
-            }}
-            step={1}
-            value={adjustments.transformDistortion}
-          />
-        </div>
-      </section>
-
-      <section className="space-y-2">
-        <div className="flex items-center justify-between gap-2">
-          <UiText variant={TextVariants.label} className="text-[11px] font-semibold uppercase text-text-secondary">
-            {copy.lensHeading}
-          </UiText>
-          <span
-            className={cx(
-              statusChipClassName,
-              hasSupportedLensProfile
-                ? 'bg-editor-selected-quiet text-text-primary'
-                : 'bg-editor-panel text-text-secondary',
             )}
-          >
-            {detectionStatus === 'detecting' ? <Loader className="animate-spin" size={11} /> : <Aperture size={11} />}
-            {detectionLabel}
-          </span>
-        </div>
 
-        <div className="space-y-1.5 rounded border border-editor-border bg-editor-panel-well p-1.5">
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-            <Dropdown
-              chrome="editor"
-              onChange={handleModeChange}
-              options={lensModeOptions}
-              value={adjustments.lensCorrectionMode}
-            />
-            <button
-              aria-label={copy.autoDetect}
-              className="inline-flex h-7 w-8 items-center justify-center rounded border border-editor-border text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-45"
-              data-tooltip={copy.autoDetect}
-              disabled={detectionStatus === 'detecting' || !getExifValue(selectedExif, 'LensModel')}
-              onClick={() => {
-                void handleAutoDetect();
-              }}
-              type="button"
-            >
-              {detectionStatus === 'detecting' ? <Loader className="animate-spin" size={14} /> : <Wand2 size={14} />}
-            </button>
-          </div>
+            {adjustments.lensCorrectionMode === 'auto' && adjustments.lensMaker && adjustments.lensModel && (
+              <UiText as="div" variant={TextVariants.small} className="truncate text-[11px] text-text-secondary">
+                {adjustments.lensMaker} - {adjustments.lensModel}
+              </UiText>
+            )}
 
-          {adjustments.lensCorrectionMode === 'manual' && (
-            <div className="grid grid-cols-1 gap-1.5">
-              <Dropdown
+            <div className="space-y-2">
+              <Switch
+                checked={adjustments.lensDistortionEnabled && availability.distortion}
                 chrome="editor"
-                onChange={handleMakerChange}
-                options={makerOptions}
-                placeholder={copy.selectMaker}
-                value={adjustments.lensMaker}
+                disabled={!availability.distortion}
+                label={copy.profileDistortion}
+                onChange={(checked) => {
+                  commitLensCorrectionAdjustment('lensDistortionEnabled', checked);
+                }}
+                {...(availability.distortion ? {} : { tooltip: unsupportedProfileFieldTooltip })}
               />
-              <Dropdown
+              <AdjustmentSlider
+                density="compact"
+                disabled={!availability.distortion || !adjustments.lensDistortionEnabled}
+                fillOrigin="min"
+                label={
+                  <span className="inline-flex items-center gap-1">
+                    <SquareDashed size={12} />
+                    {copy.distortionAmount}
+                  </span>
+                }
+                max={200}
+                min={0}
+                onDragStateChange={onDragStateChange}
+                onValueChange={(value) => {
+                  commitLensCorrectionAdjustment('lensDistortionAmount', Math.trunc(value));
+                }}
+                step={1}
+                suffix="%"
+                testId="lens-control-distortion-amount"
+                value={adjustments.lensDistortionAmount}
+              />
+
+              <Switch
+                checked={adjustments.lensTcaEnabled && availability.tca}
                 chrome="editor"
-                disabled={!adjustments.lensMaker}
-                onChange={handleModelChange}
-                options={lensOptions}
-                placeholder={copy.selectLens}
-                value={adjustments.lensModel}
+                disabled={!availability.tca}
+                label={copy.profileTca}
+                onChange={(checked) => {
+                  commitLensCorrectionAdjustment('lensTcaEnabled', checked);
+                }}
+                {...(availability.tca ? {} : { tooltip: unsupportedProfileFieldTooltip })}
+              />
+              <AdjustmentSlider
+                density="compact"
+                disabled={!availability.tca || !adjustments.lensTcaEnabled}
+                fillOrigin="min"
+                label={copy.correctionAmount}
+                max={200}
+                min={0}
+                onDragStateChange={onDragStateChange}
+                onValueChange={(value) => {
+                  commitLensCorrectionAdjustment('lensTcaAmount', Math.trunc(value));
+                }}
+                step={1}
+                suffix="%"
+                testId="lens-control-tca-amount"
+                value={adjustments.lensTcaAmount}
+              />
+
+              <Switch
+                checked={adjustments.lensVignetteEnabled && availability.vignetting}
+                chrome="editor"
+                disabled={!availability.vignetting}
+                label={copy.profileVignette}
+                onChange={(checked) => {
+                  commitLensCorrectionAdjustment('lensVignetteEnabled', checked);
+                }}
+                {...(availability.vignetting ? {} : { tooltip: unsupportedProfileFieldTooltip })}
+              />
+              <AdjustmentSlider
+                density="compact"
+                disabled={!availability.vignetting || !adjustments.lensVignetteEnabled}
+                fillOrigin="min"
+                label={
+                  <span className="inline-flex items-center gap-1">
+                    <CircleDashed size={12} />
+                    {copy.vignetteAmount}
+                  </span>
+                }
+                max={200}
+                min={0}
+                onDragStateChange={onDragStateChange}
+                onValueChange={(value) => {
+                  commitLensCorrectionAdjustment('lensVignetteAmount', Math.trunc(value));
+                }}
+                step={1}
+                suffix="%"
+                testId="lens-control-vignette-amount"
+                value={adjustments.lensVignetteAmount}
               />
             </div>
-          )}
-
-          {adjustments.lensCorrectionMode === 'auto' && adjustments.lensMaker && adjustments.lensModel && (
-            <UiText as="div" variant={TextVariants.small} className="truncate text-[11px] text-text-secondary">
-              {adjustments.lensMaker} - {adjustments.lensModel}
-            </UiText>
-          )}
-
-          <div className="space-y-2">
-            <Switch
-              checked={adjustments.lensDistortionEnabled && availability.distortion}
-              chrome="editor"
-              disabled={!availability.distortion}
-              label={copy.profileDistortion}
-              onChange={(checked) => {
-                commitLensCorrectionAdjustment('lensDistortionEnabled', checked);
-              }}
-              {...(availability.distortion ? {} : { tooltip: unsupportedProfileFieldTooltip })}
-            />
-            <AdjustmentSlider
-              density="compact"
-              disabled={!availability.distortion || !adjustments.lensDistortionEnabled}
-              fillOrigin="min"
-              label={
-                <span className="inline-flex items-center gap-1">
-                  <SquareDashed size={12} />
-                  {copy.distortionAmount}
-                </span>
-              }
-              max={200}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => {
-                commitLensCorrectionAdjustment('lensDistortionAmount', Math.trunc(value));
-              }}
-              step={1}
-              suffix="%"
-              testId="lens-control-distortion-amount"
-              value={adjustments.lensDistortionAmount}
-            />
-
-            <Switch
-              checked={adjustments.lensTcaEnabled && availability.tca}
-              chrome="editor"
-              disabled={!availability.tca}
-              label={copy.profileTca}
-              onChange={(checked) => {
-                commitLensCorrectionAdjustment('lensTcaEnabled', checked);
-              }}
-              {...(availability.tca ? {} : { tooltip: unsupportedProfileFieldTooltip })}
-            />
-            <AdjustmentSlider
-              density="compact"
-              disabled={!availability.tca || !adjustments.lensTcaEnabled}
-              fillOrigin="min"
-              label={copy.correctionAmount}
-              max={200}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => {
-                commitLensCorrectionAdjustment('lensTcaAmount', Math.trunc(value));
-              }}
-              step={1}
-              suffix="%"
-              testId="lens-control-tca-amount"
-              value={adjustments.lensTcaAmount}
-            />
-
-            <Switch
-              checked={adjustments.lensVignetteEnabled && availability.vignetting}
-              chrome="editor"
-              disabled={!availability.vignetting}
-              label={copy.profileVignette}
-              onChange={(checked) => {
-                commitLensCorrectionAdjustment('lensVignetteEnabled', checked);
-              }}
-              {...(availability.vignetting ? {} : { tooltip: unsupportedProfileFieldTooltip })}
-            />
-            <AdjustmentSlider
-              density="compact"
-              disabled={!availability.vignetting || !adjustments.lensVignetteEnabled}
-              fillOrigin="min"
-              label={
-                <span className="inline-flex items-center gap-1">
-                  <CircleDashed size={12} />
-                  {copy.vignetteAmount}
-                </span>
-              }
-              max={200}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => {
-                commitLensCorrectionAdjustment('lensVignetteAmount', Math.trunc(value));
-              }}
-              step={1}
-              suffix="%"
-              testId="lens-control-vignette-amount"
-              value={adjustments.lensVignetteAmount}
-            />
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

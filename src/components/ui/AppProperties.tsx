@@ -152,7 +152,12 @@ export interface AppSettings {
 }
 
 export interface BrushSettings {
+  /** Brush diameter in image pixels. */
   feather: number;
+  /** Edge softness as a percentage. */
+  flow?: number;
+  /** Stroke density/opacity as a percentage. */
+  density?: number;
   size: number;
   tool: ToolType;
 }

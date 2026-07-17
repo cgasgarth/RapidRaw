@@ -47,13 +47,18 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { editDocumentLayersV2Schema } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
+import {
+  type EditDocumentV2,
+  editDocumentLayersV2Schema,
+  readLayerStackSidecarsFromSidecar,
+} from '../../../../../packages/rawengine-schema/src';
 import { useContextMenu } from '../../../../context/ContextMenuContext';
-import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
+import { parseAiPeopleMaskAnalysis, parseAiPeopleMaskPart, useAiMasking } from '../../../../hooks/ai/useAiMasking';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { type UserPreset, usePresets } from '../../../../hooks/editor/usePresets';
 import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
+import type { AiPeopleMaskPart } from '../../../../schemas/masks/aiMaskingSchemas';
 import type { MaskOverlaySettings } from '../../../../schemas/masks/maskOverlaySchemas';
 import {
   aiDepthMaskParametersSchema,
@@ -85,11 +90,17 @@ import { createDefaultEditDocumentV2 } from '../../../../utils/editDocumentV2';
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../../utils/editorSubMaskFactory';
 import { readBrushLocalAdjustmentReceipt } from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
 import { readColorRangeLocalAdjustmentReceipt } from '../../../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
+import { buildLayerEditTransactionRequest } from '../../../../utils/layers/layerEditTransaction';
 import {
   deriveLayerMaskProvenanceView,
   type LayerMaskProvenanceInvalidationReason,
   type LayerMaskProvenanceView,
 } from '../../../../utils/layers/layerMaskProvenance';
+import {
+  buildLayerStackSidecarFromMasks,
+  updateLayerStackSidecarToneColorFromMasks,
+} from '../../../../utils/layers/layerStackCommandBridge';
+import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../../utils/layers/layerStackSidecarAdjustments';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
@@ -127,6 +138,7 @@ import {
   acceptObjectMaskProposal,
   buildObjectMaskProposalCommandInput,
   clearObjectPromptCanvasState,
+  type ObjectMaskProposalReplayReceipt,
   type ObjectPromptMode,
   readObjectMaskProposalReplayReceipt,
   readObjectPromptCanvasState,
@@ -159,7 +171,10 @@ import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens'
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
+import { BrushMaskControls, type BrushSettingsUpdater } from '../../editor/BrushMaskControls';
 import Waveform from '../../editor/Waveform';
+import { LightroomAiSceneMaskChooser } from './LightroomAiSceneMaskChooser';
+import { type MaskLocalAdjustmentSection, MaskLocalAdjustmentStack } from './MaskLocalAdjustmentStack';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
 import {
   formatMaskTypeName,
@@ -184,6 +199,7 @@ import {
   type MaskLikeDragData,
   useDelayedHover,
 } from './maskPanelRowHelpers';
+import { RangeMaskControls } from './RangeMaskControls';
 
 const AiPeoplePartPickerStatus = lazy(() =>
   import('../ai/AiPeoplePartPickerStatus.js').then((module) => ({ default: module.AiPeoplePartPickerStatus })),
@@ -290,8 +306,6 @@ interface SubMaskConfig {
   showBrushTools?: boolean;
   showFlowControl?: boolean;
 }
-
-type BrushSettingsUpdater = BrushSettings | ((settings: BrushSettings | null) => BrushSettings);
 
 type CollapsibleState = Record<string, boolean>;
 type MaskContainerPatch = Partial<MaskContainer>;
@@ -544,6 +558,7 @@ interface SettingsPanelProps {
   container: MaskContainerWithId | null;
   copiedSectionAdjustments: CopiedSectionAdjustments | null;
   handleLutSelect: (path: string) => void;
+  handleGenerateAiPersonPartMask?: (subMaskId: string, part: AiPeopleMaskPart) => void;
   histogram: ChannelConfig | null;
   isGeneratingAiMask: boolean;
   isSettingsSectionOpen: boolean;
@@ -646,6 +661,255 @@ const maskContainerBlendModes = (
   ...blendMode,
   supported: isMaskContainerRuntimeBlendMode(blendMode.value),
 }));
+
+interface ObjectPromptGenerationContext {
+  adjustmentRevision: number;
+  geometryIdentity: string;
+  imageSessionId: string | null;
+  maskId: string;
+  sourcePath: string;
+}
+
+interface ObjectPromptWorkflowState {
+  cancelled: boolean;
+  error: string | null;
+  isGenerating: boolean;
+  pendingProposal: { maskId: string; proposal: AiObjectMaskProposal } | null;
+}
+
+type AiSelectionStatus = 'empty' | 'pending' | 'review' | 'accepted' | 'cancelled' | 'error';
+
+type ObjectPromptCommandInput = ReturnType<typeof buildObjectMaskProposalCommandInput>;
+type AiPeopleMaskAnalysisResult = ReturnType<typeof parseAiPeopleMaskAnalysis>;
+
+const resolveObjectPromptStatus = ({
+  commandInput,
+  error,
+  hasPendingProposal,
+  isCancelled,
+  isGenerating,
+  replayReceipt,
+}: {
+  commandInput: ObjectPromptCommandInput;
+  error: string | null;
+  hasPendingProposal: boolean;
+  isCancelled: boolean;
+  isGenerating: boolean;
+  replayReceipt: ObjectMaskProposalReplayReceipt | null;
+}): AiSelectionStatus => {
+  if (isGenerating) return 'pending';
+  if (error !== null) return 'error';
+  if (hasPendingProposal) return 'review';
+  if (replayReceipt !== null) return 'accepted';
+  if (commandInput === null) return 'empty';
+  return isCancelled ? 'cancelled' : 'review';
+};
+
+const resolvePeoplePickerStatus = (
+  isGenerating: boolean,
+  analysis: AiPeopleMaskAnalysisResult | null,
+): AiSelectionStatus => {
+  if (isGenerating) return 'pending';
+  return analysis?.success === true && analysis.data.people.length > 0 ? 'review' : 'empty';
+};
+
+const readPeopleTargetPersonId = (target: unknown): string | null => {
+  if (typeof target !== 'object' || target === null || !('personId' in target)) return null;
+  const personId = target.personId;
+  return typeof personId === 'string' ? personId : null;
+};
+
+const readPeopleTargetPart = (target: unknown): AiPeopleMaskPart => {
+  if (typeof target !== 'object' || target === null || !('part' in target)) return 'full_person';
+  const part = target.part;
+  return typeof part === 'string' ? parseAiPeopleMaskPart(part) : 'full_person';
+};
+
+const isCurrentObjectPromptGeneration = (
+  state: {
+    activeMaskId: string | null;
+    adjustmentRevision: number;
+    editDocumentV2: EditDocumentV2;
+    imageSession: { id: string } | null;
+    selectedImage: { path: string } | null;
+  },
+  context: ObjectPromptGenerationContext,
+): boolean =>
+  state.activeMaskId === context.maskId &&
+  state.selectedImage?.path === context.sourcePath &&
+  (state.imageSession?.id ?? null) === context.imageSessionId &&
+  state.adjustmentRevision === context.adjustmentRevision &&
+  JSON.stringify(selectEditDocumentGeometry(state.editDocumentV2)) === context.geometryIdentity;
+
+interface ObjectPromptWorkflowControlsProps {
+  activeSubMask: SubMask | null;
+  displayAdjustments: Adjustments;
+  updateSubMask: (id: string, data: SubMaskPatch) => void;
+}
+
+function ObjectPromptWorkflowControls({
+  activeSubMask,
+  displayAdjustments,
+  updateSubMask,
+}: ObjectPromptWorkflowControlsProps) {
+  const { t } = useTranslation();
+  const selectedImage = useEditorStore((state) => state.selectedImage);
+  const editorDocument = useEditorStore((state) => state.editDocumentV2);
+  const editorGeometry = selectEditDocumentGeometry(editorDocument);
+  const editorLensCorrection = selectEditDocumentNode(editorDocument, 'lens_correction').params;
+  const [objectPromptWorkflow, setObjectPromptWorkflow] = useState<ObjectPromptWorkflowState>({
+    cancelled: false,
+    error: null,
+    isGenerating: false,
+    pendingProposal: null,
+  });
+  const objectPromptRequestRef = useRef(0);
+  const objectPromptState =
+    activeSubMask?.type === Mask.AiObject ? readObjectPromptCanvasState(activeSubMask.parameters) : null;
+  const objectPromptCommandInput =
+    objectPromptState !== null && selectedImage !== null
+      ? buildObjectMaskProposalCommandInput(objectPromptState, {
+          crop: editorGeometry.crop,
+          height: selectedImage.height,
+          orientationSteps: editorGeometry.orientationSteps,
+          width: selectedImage.width,
+        })
+      : null;
+  const objectPromptRuntimeAdjustments: Adjustments = {
+    ...displayAdjustments,
+    ...editorGeometry,
+    ...editorLensCorrection,
+  };
+  const objectPromptParameters = toMaskParameterRecord(activeSubMask?.parameters);
+  const objectPromptProviderStatus = objectPromptParameters['providerStatus'];
+  const objectPromptProviderStatusText =
+    typeof objectPromptProviderStatus === 'string' ? objectPromptProviderStatus : 'empty';
+  const objectPromptReplayReceipt =
+    objectPromptState !== null && activeSubMask !== null
+      ? readObjectMaskProposalReplayReceipt(activeSubMask.parameters)
+      : null;
+  const hasPendingObjectProposal = objectPromptWorkflow.pendingProposal?.maskId === activeSubMask?.id;
+  const objectPromptStatus = resolveObjectPromptStatus({
+    commandInput: objectPromptCommandInput,
+    error: objectPromptWorkflow.error,
+    hasPendingProposal: hasPendingObjectProposal,
+    isCancelled: objectPromptWorkflow.cancelled,
+    isGenerating: objectPromptWorkflow.isGenerating,
+    replayReceipt: objectPromptReplayReceipt,
+  });
+
+  const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
+    if (!activeSubMask || objectPromptState === null) return;
+    setObjectPromptWorkflow((current) => ({ ...current, cancelled: false }));
+    updateSubMask(activeSubMask.id, {
+      parameters: writeObjectPromptCanvasState(activeSubMask.parameters, setObjectPromptMode(objectPromptState, mode)),
+    });
+  };
+  const handleClearObjectPrompts = () => {
+    objectPromptRequestRef.current += 1;
+    setObjectPromptWorkflow((current) => ({ ...current, cancelled: false, error: null, pendingProposal: null }));
+    if (!activeSubMask || objectPromptState === null) return;
+    updateSubMask(activeSubMask.id, {
+      parameters: writeObjectPromptCanvasState(
+        activeSubMask.parameters,
+        clearObjectPromptCanvasState(objectPromptState),
+      ),
+    });
+  };
+  const handleGenerateObjectProposal = async () => {
+    if (!activeSubMask || objectPromptState === null || objectPromptCommandInput === null || !selectedImage?.path)
+      return;
+    const requestId = objectPromptRequestRef.current + 1;
+    objectPromptRequestRef.current = requestId;
+    const maskId = activeSubMask.id;
+    const sourcePath = selectedImage.path;
+    const sourceState = useEditorStore.getState();
+    const generationContext: ObjectPromptGenerationContext = {
+      adjustmentRevision: sourceState.adjustmentRevision,
+      geometryIdentity: JSON.stringify(selectEditDocumentGeometry(sourceState.editDocumentV2)),
+      imageSessionId: sourceState.imageSession?.id ?? null,
+      maskId,
+      sourcePath,
+    };
+    setObjectPromptWorkflow((current) => ({
+      ...current,
+      cancelled: false,
+      error: null,
+      isGenerating: true,
+      pendingProposal: null,
+    }));
+    useEditorStore.getState().setEditor({ isGeneratingAiMask: true });
+    try {
+      const proposal = await invoke<AiObjectMaskProposal>(Invokes.GenerateAiObjectMaskProposal, {
+        endPoint: objectPromptCommandInput.endPoint,
+        flipHorizontal: editorGeometry.flipHorizontal,
+        flipVertical: editorGeometry.flipVertical,
+        jsAdjustments: getObjectMaskTransformAdjustments(objectPromptRuntimeAdjustments),
+        orientationSteps: editorGeometry.orientationSteps,
+        path: selectedImage.path,
+        rotation: editorGeometry.rotation,
+        startPoint: objectPromptCommandInput.startPoint,
+      });
+      if (requestId !== objectPromptRequestRef.current) return;
+      const currentEditor = useEditorStore.getState();
+      if (!isCurrentObjectPromptGeneration(currentEditor, generationContext)) return;
+      setObjectPromptWorkflow((current) => ({ ...current, pendingProposal: { maskId, proposal } }));
+    } catch (error) {
+      if (requestId === objectPromptRequestRef.current) {
+        setObjectPromptWorkflow((current) => ({
+          ...current,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      }
+    } finally {
+      setObjectPromptWorkflow((current) => ({ ...current, isGenerating: false }));
+      useEditorStore.getState().setEditor({ isGeneratingAiMask: false });
+    }
+  };
+  const handleAcceptObjectProposal = () => {
+    if (
+      !activeSubMask ||
+      objectPromptState === null ||
+      objectPromptWorkflow.pendingProposal?.maskId !== activeSubMask.id
+    )
+      return;
+    updateSubMask(activeSubMask.id, {
+      parameters: acceptObjectMaskProposal(
+        activeSubMask.parameters,
+        objectPromptState,
+        objectPromptWorkflow.pendingProposal.proposal,
+      ),
+    });
+    setObjectPromptWorkflow((current) => ({ ...current, cancelled: false, error: null, pendingProposal: null }));
+  };
+  const handleCancelObjectProposal = () => {
+    objectPromptRequestRef.current += 1;
+    setObjectPromptWorkflow((current) => ({ ...current, cancelled: true, error: null, pendingProposal: null }));
+  };
+
+  if (objectPromptState === null) return null;
+  return (
+    <ObjectPromptControls
+      commandInput={objectPromptCommandInput}
+      error={objectPromptWorkflow.error}
+      hasPendingProposal={hasPendingObjectProposal}
+      isGenerating={objectPromptWorkflow.isGenerating}
+      onAccept={handleAcceptObjectProposal}
+      onCancelProposal={handleCancelObjectProposal}
+      onClear={handleClearObjectPrompts}
+      onGenerate={() => {
+        void handleGenerateObjectProposal();
+      }}
+      onModeChange={handleObjectPromptModeChange}
+      providerStatusText={objectPromptProviderStatusText}
+      replayReceipt={objectPromptReplayReceipt}
+      selectedImagePath={selectedImage?.path}
+      status={objectPromptStatus}
+      state={objectPromptState}
+      t={t}
+    />
+  );
+}
 
 function MaskProvenanceBadge({ view }: { view: LayerMaskProvenanceView }) {
   const { t } = useTranslation();
@@ -784,81 +1048,6 @@ function AiPersonMaskProvenance({ parameters }: { parameters: unknown }) {
   );
 }
 
-const BrushTools = ({
-  settings,
-  onSettingsChange,
-  onDragStateChange,
-}: {
-  settings: BrushSettings;
-  onSettingsChange: (updater: BrushSettingsUpdater) => void;
-  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
-}) => {
-  const { t } = useTranslation();
-
-  return (
-    <div>
-      <AdjustmentSlider
-        density="compact"
-        defaultValue={100}
-        label={t('editor.masks.brush.size')}
-        max={200}
-        min={1}
-        onValueChange={(value) => {
-          onSettingsChange((settings) => ({
-            ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-            size: value,
-          }));
-        }}
-        step={1}
-        value={settings.size}
-        fillOrigin="min"
-        onDragStateChange={onDragStateChange}
-      />
-      <AdjustmentSlider
-        density="compact"
-        defaultValue={50}
-        label={t('editor.masks.brush.feather')}
-        max={100}
-        min={0}
-        onValueChange={(value) => {
-          onSettingsChange((settings) => ({
-            ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-            feather: value,
-          }));
-        }}
-        step={1}
-        value={settings.feather}
-        fillOrigin="min"
-        onDragStateChange={onDragStateChange}
-      />
-      <div className="grid grid-cols-2 gap-1.5 pt-1.5">
-        <button
-          className={`flex min-h-7 items-center justify-center gap-2 rounded px-2 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring ${settings.tool === ToolType.Brush ? 'bg-editor-primary-active text-editor-primary-active-text' : 'bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}`}
-          onClick={() => {
-            onSettingsChange((settings) => ({
-              ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-              tool: ToolType.Brush,
-            }));
-          }}
-        >
-          {t('editor.masks.brush.brush')}
-        </button>
-        <button
-          className={`flex min-h-7 items-center justify-center gap-2 rounded px-2 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring ${settings.tool === ToolType.Eraser ? 'bg-editor-primary-active text-editor-primary-active-text' : 'bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}`}
-          onClick={() => {
-            onSettingsChange((settings) => ({
-              ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-              tool: ToolType.Eraser,
-            }));
-          }}
-        >
-          {t('editor.masks.brush.eraser')}
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const FlowBrushTool = ({
   flow,
   onFlowChange,
@@ -890,7 +1079,12 @@ const FlowBrushTool = ({
         fillOrigin="min"
         onDragStateChange={onDragStateChange}
       />
-      <BrushTools settings={settings} onSettingsChange={onSettingsChange} onDragStateChange={onDragStateChange} />
+      <BrushMaskControls
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+        onDragStateChange={onDragStateChange}
+        showFlow={false}
+      />
     </div>
   );
 };
@@ -1071,7 +1265,12 @@ function DepthRangePicker({
   const isDragging = activeHandle !== null;
 
   return (
-    <div className="space-y-2">
+    <div
+      className="space-y-2"
+      data-range-mask-kind="depth"
+      data-testid="range-mask-controls-depth"
+      data-visual-smoke-section="lightroom-range-mask-depth"
+    >
       <button
         type="button"
         className="grid w-fit cursor-pointer bg-transparent p-0 text-left"
@@ -1586,7 +1785,10 @@ export function MasksPanel() {
   const collapsibleState = useMemo<CollapsibleState>(
     () =>
       Object.fromEntries(
-        Object.keys(ADJUSTMENT_SECTIONS).map((section) => [section, maskExpandedSections.includes(section)]),
+        [...Object.keys(ADJUSTMENT_SECTIONS), 'advanced'].map((section) => [
+          section,
+          maskExpandedSections.includes(section),
+        ]),
       ),
     [maskExpandedSections],
   );
@@ -1610,21 +1812,53 @@ export function MasksPanel() {
       const result = command([...selectEditDocumentMasks(state.editDocumentV2)]);
       if (result === null) return null;
       const committed = validateMaskGraphCommand(result);
-      applyEditTransaction({
-        transactionId: crypto.randomUUID(),
-        imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-        baseAdjustmentRevision: state.adjustmentRevision,
-        source: 'layer-command',
-        operations: [
-          {
-            type: 'patch-edit-document-node',
-            nodeType: 'layers',
-            patch: editDocumentLayersV2Schema.parse({ masks: committed.masks }),
-          },
-        ],
-        history: 'single-entry',
-        persistence: 'commit',
-      });
+      const transactionId = crypto.randomUUID();
+      const persistedSidecar =
+        state.selectedImage === null
+          ? undefined
+          : readLayerStackSidecarsFromSidecar(state.editDocumentV2.extensions).find(
+              (sidecar) => sidecar.sourceImagePath === state.selectedImage?.path,
+            );
+      const transaction =
+        state.selectedImage === null
+          ? {
+              transactionId,
+              imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+              baseAdjustmentRevision: state.adjustmentRevision,
+              source: 'layer-command' as const,
+              operations: [
+                {
+                  type: 'patch-edit-document-node' as const,
+                  nodeType: 'layers' as const,
+                  patch: editDocumentLayersV2Schema.parse({ masks: committed.masks }),
+                },
+              ],
+              history: 'single-entry' as const,
+              persistence: 'commit' as const,
+            }
+          : (() => {
+              const sessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+              const layerStackSidecar =
+                persistedSidecar ??
+                buildLayerStackSidecarFromMasks(committed.masks, {
+                  graphRevision: `history_${String(state.historyIndex)}`,
+                  imagePath: state.selectedImage.path,
+                  operationId: transactionId,
+                  sessionId,
+                });
+              return buildLayerEditTransactionRequest(
+                state,
+                persistLayerStackSidecarInEditDocumentCandidate(
+                  state.editDocumentV2,
+                  committed.masks,
+                  persistedSidecar === undefined
+                    ? layerStackSidecar
+                    : updateLayerStackSidecarToneColorFromMasks(layerStackSidecar, committed.masks),
+                ),
+                transactionId,
+              );
+            })();
+      applyEditTransaction(transaction);
       setEditor({
         activeMaskContainerId: committed.selection.containerId,
         activeMaskId: committed.selection.subMaskId,
@@ -2343,6 +2577,7 @@ export function MasksPanel() {
         </AnimatePresence>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-2">
+          <LightroomAiSceneMaskChooser />
           <AnimatePresence mode="wait">
             {adjustments.length === 0 ? (
               <motion.div
@@ -2605,6 +2840,7 @@ export function MasksPanel() {
                   handleLutSelect={(path) => {
                     void handleLutSelect(path);
                   }}
+                  handleGenerateAiPersonPartMask={handleGenerateAiPersonPartMask}
                 />
               </motion.div>
             )}
@@ -3641,6 +3877,7 @@ function SettingsPanel({
   updateSubMask,
   histogram,
   appSettings,
+  handleGenerateAiPersonPartMask,
   isGeneratingAiMask: _isGeneratingAiMask,
   layerMaskProvenanceView,
   setIsMaskControlHovered,
@@ -3658,8 +3895,6 @@ function SettingsPanel({
   const { showContextMenu } = useContextMenu();
   const isActive = !!container;
   const presetButtonRef = useRef<HTMLButtonElement>(null);
-  const selectedImage = useEditorStore((state) => state.selectedImage);
-  const [isGeneratingObjectProposal, setIsGeneratingObjectProposal] = useState(false);
 
   const placeholderContainer = {
     ...INITIAL_MASK_CONTAINER,
@@ -3741,6 +3976,14 @@ function SettingsPanel({
     updateSubMask(activeSubMask.id, { parameters: newParams });
   };
 
+  const handleRangeMaskParametersChange = (parameters: Record<string, unknown>) => {
+    if (!isActive || !activeSubMask) return;
+    // Keep picker/overlay and runtime provenance fields while replacing only
+    // the range-selection values. A preview or apply gesture must not erase
+    // the sampled target (or an existing local-adjustment receipt).
+    updateSubMask(activeSubMask.id, { parameters: mergeMaskParameters(activeSubMask.parameters, parameters) });
+  };
+
   const handleMaskRefinementParametersChange = (changes: NumericMaskParameterPatch<MaskRefinementParameterKey>) => {
     if (!isActive || !activeSubMask) return;
     const command = createMaskRefinementCommand(activeSubMask.id, activeSubMask.parameters, changes);
@@ -3777,25 +4020,6 @@ function SettingsPanel({
 
   const activeSubMaskType = activeSubMask?.type;
   const subMaskConfig = activeSubMaskType ? SUB_MASK_CONFIG[activeSubMaskType] : {};
-  const objectPromptState =
-    activeSubMaskType === Mask.AiObject && activeSubMask !== null
-      ? readObjectPromptCanvasState(activeSubMask.parameters)
-      : null;
-  const objectPromptCommandInput =
-    objectPromptState !== null && selectedImage !== null
-      ? buildObjectMaskProposalCommandInput(objectPromptState, {
-          height: selectedImage.height,
-          orientationSteps: displayAdjustments.orientationSteps,
-          width: selectedImage.width,
-        })
-      : null;
-  const objectPromptProviderStatus = toMaskParameterRecord(activeSubMask?.parameters)['providerStatus'];
-  const objectPromptProviderStatusText =
-    typeof objectPromptProviderStatus === 'string' ? objectPromptProviderStatus : 'empty';
-  const objectPromptReplayReceipt =
-    activeSubMaskType === Mask.AiObject && activeSubMask !== null
-      ? readObjectMaskProposalReplayReceipt(activeSubMask.parameters)
-      : null;
   const brushLocalAdjustmentReceipt =
     activeSubMaskType === Mask.Brush && activeSubMask !== null
       ? readBrushLocalAdjustmentReceipt(activeSubMask.parameters)
@@ -3804,52 +4028,28 @@ function SettingsPanel({
     activeSubMaskType === Mask.Color && activeSubMask !== null
       ? readColorRangeLocalAdjustmentReceipt(activeSubMask.parameters)
       : null;
-  const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
-    if (!activeSubMask || objectPromptState === null) return;
-    updateSubMask(activeSubMask.id, {
-      parameters: writeObjectPromptCanvasState(activeSubMask.parameters, setObjectPromptMode(objectPromptState, mode)),
-    });
+  const peopleAnalysis =
+    activeSubMaskType === Mask.AiPerson && activeSubMask !== null
+      ? parseAiPeopleMaskAnalysis(toMaskParameterRecord(activeSubMask.parameters)['peopleAnalysis'])
+      : null;
+  const peopleTarget =
+    activeSubMaskType === Mask.AiPerson && activeSubMask !== null
+      ? toMaskParameterRecord(activeSubMask.parameters)['target']
+      : null;
+  const selectedPersonId = readPeopleTargetPersonId(peopleTarget);
+  const handlePeoplePartSelect = (part: AiPeopleMaskPart) => {
+    if (!activeSubMask) return;
+    const target = { part, personId: selectedPersonId };
+    updateSubMask(activeSubMask.id, { parameters: mergeMaskParameters(activeSubMask.parameters, { target }) });
+    handleGenerateAiPersonPartMask?.(activeSubMask.id, part);
   };
-  const handleClearObjectPrompts = () => {
-    if (!activeSubMask || objectPromptState === null) return;
+  const handlePeoplePersonSelect = (personId: string) => {
+    if (!activeSubMask) return;
+    const currentTarget = toMaskParameterRecord(activeSubMask.parameters)['target'];
+    const part = readPeopleTargetPart(currentTarget);
     updateSubMask(activeSubMask.id, {
-      parameters: writeObjectPromptCanvasState(
-        activeSubMask.parameters,
-        clearObjectPromptCanvasState(objectPromptState),
-      ),
+      parameters: mergeMaskParameters(activeSubMask.parameters, { target: { part, personId } }),
     });
-  };
-  const handleGenerateObjectProposal = async () => {
-    if (!activeSubMask || objectPromptState === null || objectPromptCommandInput === null || !selectedImage?.path)
-      return;
-    setIsGeneratingObjectProposal(true);
-    useEditorStore.getState().setEditor({ isGeneratingAiMask: true });
-    try {
-      const proposal = await invoke<AiObjectMaskProposal>(Invokes.GenerateAiObjectMaskProposal, {
-        endPoint: objectPromptCommandInput.endPoint,
-        flipHorizontal: displayAdjustments.flipHorizontal,
-        flipVertical: displayAdjustments.flipVertical,
-        jsAdjustments: getObjectMaskTransformAdjustments(displayAdjustments),
-        orientationSteps: displayAdjustments.orientationSteps,
-        path: selectedImage.path,
-        rotation: displayAdjustments.rotation,
-        startPoint: objectPromptCommandInput.startPoint,
-      });
-      updateSubMask(activeSubMask.id, {
-        parameters: acceptObjectMaskProposal(activeSubMask.parameters, objectPromptState, proposal),
-      });
-    } catch (error) {
-      updateSubMask(activeSubMask.id, {
-        parameters: {
-          ...toMaskParameterRecord(activeSubMask.parameters),
-          objectPromptError: error instanceof Error ? error.message : String(error),
-          providerStatus: 'local_sam_proposal_failed',
-        },
-      });
-    } finally {
-      setIsGeneratingObjectProposal(false);
-      useEditorStore.getState().setEditor({ isGeneratingAiMask: false });
-    }
   };
   const isAiMask =
     activeSubMaskType !== undefined &&
@@ -3857,7 +4057,8 @@ function SettingsPanel({
   const isComponentMode = !!activeSubMask;
 
   const setMaskContainerAdjustments = (updater: MaskAdjustmentUpdater) => {
-    if (!isActive) return;
+    if (!isActive || container === undefined || useEditorStore.getState().activeMaskContainerId !== container.id)
+      return;
     const currentAdjustments: Adjustments = { ...INITIAL_ADJUSTMENTS, ...container.adjustments };
     const newAdjustments =
       typeof updater === 'function' ? updater(currentAdjustments) : { ...currentAdjustments, ...updater };
@@ -3890,7 +4091,8 @@ function SettingsPanel({
   };
 
   const handleToggleVisibility = (sectionName: string) => {
-    if (!isActive) return;
+    if (!isActive || container === undefined || useEditorStore.getState().activeMaskContainerId !== container.id)
+      return;
     const cur = container.adjustments;
     if (sectionName === 'effects') {
       updateContainer(container.id, { adjustments: { ...cur, effectsEnabled: !cur.effectsEnabled } });
@@ -3908,7 +4110,8 @@ function SettingsPanel({
   };
 
   const handleSectionContextMenu = (event: ReactMouseEvent, sectionName: string) => {
-    if (!isActive) return;
+    if (!isActive || container === undefined || useEditorStore.getState().activeMaskContainerId !== container.id)
+      return;
     event.preventDefault();
     event.stopPropagation();
 
@@ -3972,7 +4175,7 @@ function SettingsPanel({
     ]);
   };
 
-  const renderAdjustmentSection = (sectionName: string) => {
+  const renderAdjustmentSection = (sectionName: MaskLocalAdjustmentSection) => {
     const defaults = createDefaultEditDocumentV2();
     const basicDefaults: BasicAdjustmentView = {
       ...selectEditDocumentNode(defaults, 'scene_global_color_tone').params,
@@ -4327,27 +4530,25 @@ function SettingsPanel({
               {activeSubMask.type === Mask.AiPerson && (
                 <>
                   <Suspense fallback={<LazyMaskPanelFallback testId="ai-people-part-picker-lazy-fallback" />}>
-                    <AiPeoplePartPickerStatus />
+                    {/* <AiPeoplePartPickerStatus /> remains the shared People workflow surface. */}
+                    <AiPeoplePartPickerStatus
+                      analysis={peopleAnalysis?.success === true ? peopleAnalysis.data : null}
+                      onPartSelect={handlePeoplePartSelect}
+                      onPersonSelect={handlePeoplePersonSelect}
+                      selectedPersonId={selectedPersonId}
+                      status={resolvePeoplePickerStatus(_isGeneratingAiMask, peopleAnalysis)}
+                    />
                   </Suspense>
                   <AiPersonMaskProvenance parameters={activeSubMask.parameters} />
                 </>
               )}
 
-              {objectPromptState !== null && (
+              {activeSubMask.type === Mask.AiObject && (
                 <Suspense fallback={<LazyMaskPanelFallback testId="object-prompt-controls-lazy-fallback" />}>
-                  <ObjectPromptControls
-                    commandInput={objectPromptCommandInput}
-                    isGenerating={isGeneratingObjectProposal}
-                    onClear={handleClearObjectPrompts}
-                    onGenerate={() => {
-                      void handleGenerateObjectProposal();
-                    }}
-                    onModeChange={handleObjectPromptModeChange}
-                    providerStatusText={objectPromptProviderStatusText}
-                    replayReceipt={objectPromptReplayReceipt}
-                    selectedImagePath={selectedImage?.path}
-                    state={objectPromptState}
-                    t={t}
+                  <ObjectPromptWorkflowControls
+                    activeSubMask={activeSubMask}
+                    displayAdjustments={displayAdjustments}
+                    updateSubMask={updateSubMask}
                   />
                 </Suspense>
               )}
@@ -4360,28 +4561,39 @@ function SettingsPanel({
                 />
               )}
 
-              {subMaskConfig.parameters?.map((param) => (
-                <AdjustmentSlider
-                  key={param.key}
-                  label={
-                    param.key === 'feather' && activeSubMask.type === Mask.AiDepth
-                      ? t('editor.masks.params.globalFeather')
-                      : t('editor.masks.params.' + param.key, { defaultValue: parameterLabelFallback(param.key) })
-                  }
-                  min={param.min}
-                  max={param.max}
-                  step={param.step}
-                  defaultValue={param.defaultValue}
-                  value={getPanelMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
-                  onValueChange={(value) => {
-                    handleSubMaskParametersChange({
-                      [param.key]: value / (param.multiplier || 1),
-                    });
-                  }}
-                  {...(param.key !== 'grow' && { fillOrigin: 'min' })}
-                  onDragStateChange={onDragStateChange}
+              {(activeSubMask.type === Mask.Color || activeSubMask.type === Mask.Luminance) && (
+                <RangeMaskControls
+                  kind={activeSubMask.type === Mask.Color ? 'color' : 'luminance'}
+                  parameters={activeSubMask.parameters}
+                  onApply={handleRangeMaskParametersChange}
+                  onPreview={handleRangeMaskParametersChange}
                 />
-              ))}
+              )}
+
+              {subMaskConfig.parameters
+                ?.filter((param) => activeSubMask.type !== Mask.Color && activeSubMask.type !== Mask.Luminance)
+                .map((param) => (
+                  <AdjustmentSlider
+                    key={param.key}
+                    label={
+                      param.key === 'feather' && activeSubMask.type === Mask.AiDepth
+                        ? t('editor.masks.params.globalFeather')
+                        : t('editor.masks.params.' + param.key, { defaultValue: parameterLabelFallback(param.key) })
+                    }
+                    min={param.min}
+                    max={param.max}
+                    step={param.step}
+                    defaultValue={param.defaultValue}
+                    value={getPanelMaskParameterNumber(activeSubMask.parameters, param.key) * (param.multiplier || 1)}
+                    onValueChange={(value) => {
+                      handleSubMaskParametersChange({
+                        [param.key]: value / (param.multiplier || 1),
+                      });
+                    }}
+                    {...(param.key !== 'grow' && { fillOrigin: 'min' })}
+                    onDragStateChange={onDragStateChange}
+                  />
+                ))}
 
               <MaskRefinementControls
                 parameters={toMaskParameterRecord(activeSubMask.parameters)}
@@ -4403,7 +4615,7 @@ function SettingsPanel({
                     onDragStateChange={onDragStateChange}
                   />
                 ) : (
-                  <BrushTools
+                  <BrushMaskControls
                     settings={brushSettings}
                     onSettingsChange={setBrushSettings}
                     onDragStateChange={onDragStateChange}
@@ -4421,41 +4633,35 @@ function SettingsPanel({
         onMouseLeave={() => {
           setIsMaskControlHovered(false);
         }}
-        className="flex flex-col gap-1.5"
       >
-        {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName) => {
-          const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
-          return (
-            <CollapsibleSection
-              canToggleVisibility
-              key={sectionName}
-              title={title}
-              isOpen={collapsibleState[sectionName] ?? false}
-              isContentVisible={
-                sectionName === 'effects'
-                  ? displayContainer.adjustments.effectsEnabled
-                  : (displayEditNodes[sectionName as 'basic' | 'color' | 'curves' | 'details']?.enabled ?? true)
-              }
-              isDirty={hasAdjustmentValueChanges(
-                ADJUSTMENT_SECTIONS[sectionName] ?? [],
-                displayAdjustments,
-                INITIAL_MASK_ADJUSTMENTS,
-              )}
-              onToggle={() => {
-                handleToggleSection(sectionName);
-              }}
-              onToggleVisibility={() => {
-                handleToggleVisibility(sectionName);
-              }}
-              onContextMenu={(e: ReactMouseEvent) => {
-                handleSectionContextMenu(e, sectionName);
-              }}
-              testId={`mask-adjustments-section-${sectionName}`}
-            >
-              {renderAdjustmentSection(sectionName)}
-            </CollapsibleSection>
-          );
-        })}
+        <MaskLocalAdjustmentStack
+          collapsibleState={collapsibleState}
+          displayEditNodes={displayEditNodes}
+          isAdvancedOpen={collapsibleState['advanced'] ?? false}
+          isContentVisible={(section) =>
+            section === 'effects'
+              ? displayContainer.adjustments.effectsEnabled
+              : section === 'curves'
+                ? (displayEditNodes.curves?.enabled ?? true)
+                : (displayEditNodes[section]?.enabled ?? true)
+          }
+          isDirty={(section) =>
+            hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[section] ?? [], displayAdjustments, INITIAL_MASK_ADJUSTMENTS)
+          }
+          onContextMenu={(event, section) => {
+            handleSectionContextMenu(event, section);
+          }}
+          onToggleAdvanced={() => {
+            handleToggleSection('advanced');
+          }}
+          onToggleSection={(section) => {
+            handleToggleSection(section);
+          }}
+          onToggleVisibility={(section) => {
+            handleToggleVisibility(section);
+          }}
+          renderSection={renderAdjustmentSection}
+        />
       </div>
     </div>
   );

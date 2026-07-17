@@ -260,6 +260,18 @@ export const wgpuFrameReadyPayloadSchema = z
     height: positiveIntegerSchema,
     imageSession: nonnegativeIntegerSchema,
     path: z.string().trim().min(1),
+    presentationHealth: z
+      .object({
+        contentFingerprint: z.string().regex(/^sha256:[a-f0-9]{64}$/u),
+        maxChroma: z.number().finite().nonnegative(),
+        maxLuminance: z.number().finite().nonnegative(),
+        sampleCount: positiveIntegerSchema,
+        visibleSampleCount: nonnegativeIntegerSchema,
+      })
+      .strict()
+      .refine((health) => health.visibleSampleCount <= health.sampleCount, {
+        message: 'visible sample count must not exceed sample count',
+      }),
     previewOperationIdentity: previewOperationIdentitySchema,
     submitLatencyMicros: nonnegativeIntegerSchema,
     width: positiveIntegerSchema,

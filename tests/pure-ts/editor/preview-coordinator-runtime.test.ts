@@ -116,6 +116,31 @@ describe('preview coordinator runtime', () => {
     expect(released).toEqual([]);
   });
 
+  test('does not replace a sharp settled frame with a lower-resolution duplicate render', () => {
+    const published: PreviewSurfaceUpdate[] = [];
+    const released: string[] = [];
+    const runtime = new PreviewCoordinatorRuntime({
+      publishSurface: (update) => published.push(update),
+      releaseUrl: (url) => released.push(url),
+    });
+    const complete = (values: Partial<PreviewSessionIdentity>, url: string): PreviewOperationIdentity => {
+      const queued = runtime.dispatch({ identity: session(values), kind: 'settled', type: 'render-inputs-changed' });
+      const operation = requiredIdentity(queued.state.settled.identity);
+      runtime.dispatch({ identity: operation, type: 'operation-started' });
+      runtime.dispatch({ artifact: artifact(operation, url), identity: operation, type: 'operation-completed' });
+      return operation;
+    };
+
+    const sharp = complete({ targetHeight: 4096, targetWidth: 4096 }, 'blob:sharp');
+    const lower = complete({ backend: 'wgpu', targetHeight: 1920, targetWidth: 1920 }, 'blob:lower');
+
+    expect(runtime.snapshot().visibleArtifact).toEqual(artifact(sharp, 'blob:sharp'));
+    expect(runtime.snapshot().settled).toMatchObject({ identity: lower, status: 'superseded' });
+    expect(published.map((update) => update.finalPreviewUrl)).toEqual(['blob:sharp']);
+    expect(released).toEqual(['blob:lower']);
+    expect(runtime.snapshot().lastTransition?.reason).toBe('lower-resolution-artifact-rejected');
+  });
+
   test('publishes an interactive successor when the settled artifact belongs to older exact render inputs', () => {
     const published: PreviewSurfaceUpdate[] = [];
     const released: string[] = [];

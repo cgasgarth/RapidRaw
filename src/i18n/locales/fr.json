@@ -339,6 +339,8 @@
       }
     },
     "details": {
+      "altPreviewNoiseReduction": "",
+      "altPreviewSharpening": "",
       "amount": "",
       "blueYellow": "Bleu/Jaune",
       "blurRadius": "",
@@ -357,9 +359,11 @@
       "haloGuard": "",
       "localContrastRadius": "",
       "localContrastStatus": "",
+      "loupe": "",
       "luminance": "Luminance",
       "midtoneMask": "",
       "minSpotRadius": "",
+      "moveLoupeTarget": "",
       "naturalGrain": "Grain naturel",
       "noiseReduction": "Réduction du bruit",
       "presence": "Présence",
@@ -769,9 +773,12 @@
       },
       "scopedSections": {
         "basic": "Light",
+        "calibration": "Étalonnage",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
+        "lensCorrection": "Lens Corrections",
+        "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
       "search": {
@@ -1437,6 +1444,15 @@
         "summary": "{{generator}} - {{status}}",
         "title": "Remove"
       },
+      "removeWorkflow": {
+        "cancel": "",
+        "canvasReady": "",
+        "complete": "",
+        "hideSpots": "",
+        "inProgress": "",
+        "showSpots": "",
+        "title": ""
+      },
       "retouchSource": {
         "feather": "",
         "modes": {
@@ -1493,18 +1509,40 @@
       },
       "addNewMask": "Ajouter un nouveau masque",
       "aiPeopleParts": {
+        "candidate": "",
         "classes": "",
         "description": "Les parties prises en charge sont actives; les cibles planifiees restent desactivees avant la preuve fournisseur.",
+        "empty": "",
+        "error": "",
         "model": "",
         "notAvailable": "",
+        "pending": "",
         "provenanceTitle": "",
         "provider": "",
         "target": "",
         "title": "Masques de parties de personne",
         "unknown": ""
       },
+      "aiScene": {
+        "analyzing": "",
+        "apply": "",
+        "ariaLabel": "",
+        "background": "",
+        "cancel": "",
+        "cancelled": "",
+        "failed": "",
+        "previewReady": "",
+        "refine": "",
+        "refinePlaceholder": "",
+        "retry": "",
+        "select": "",
+        "sky": "",
+        "subject": "",
+        "title": ""
+      },
       "brush": {
         "brush": "Pinceau",
+        "density": "",
         "eraser": "Gomme",
         "feather": "Contour progressif du pinceau",
         "flow": "Flux",
@@ -1523,9 +1561,11 @@
       "maskingTitle": "Masquage",
       "masksTitle": "Masques",
       "objectPrompt": {
+        "apply": "",
         "background": "Background",
         "box": "Box",
         "boxReady": "1 box",
+        "cancel": "",
         "clear": "Clear",
         "foreground": "Foreground",
         "generate": "Generate SAM proposal",
@@ -1533,7 +1573,15 @@
         "points_one": "{{count}} point",
         "points_many": "",
         "points_other": "{{count}} points",
-        "receipt": "Recu de relecture : {{provider}}, {{promptKind}}, {{latency}} ms"
+        "receipt": "Recu de relecture : {{provider}}, {{promptKind}}, {{latency}} ms",
+        "status": {
+          "accepted": "",
+          "cancelled": "",
+          "empty": "",
+          "error": "",
+          "pending": "",
+          "review": ""
+        }
       },
       "overlay": {
         "edgeThreshold": "",
@@ -1559,6 +1607,19 @@
       "quickAddComplete": "",
       "quickAddGradient": "",
       "quickAddRange": "",
+      "rangeMask": {
+        "apply": "",
+        "cancel": "",
+        "feather": "",
+        "hueCenter": "",
+        "hueTolerance": "",
+        "preview": "",
+        "previewHint": "",
+        "refine": "",
+        "saturation": "",
+        "smooth": "",
+        "title": ""
+      },
       "refinement": {
         "density": "Density",
         "edgeContrast": "Edge Contrast",
@@ -2106,6 +2167,19 @@
     "viewerFooter": {
       "accessibilityLabel": "",
       "moreStatus": "",
+      "toolbar": {
+        "beforeAfter": "",
+        "flipHorizontal": "",
+        "flipVertical": "",
+        "gamutWarning": "",
+        "loupe": "",
+        "noReference": "",
+        "original": "",
+        "reference": "",
+        "rotateLeft": "",
+        "rotateRight": "",
+        "softProof": ""
+      },
       "zoom": {
         "fill": "",
         "fit": "",

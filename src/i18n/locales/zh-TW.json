@@ -339,6 +339,8 @@
       }
     },
     "details": {
+      "altPreviewNoiseReduction": "",
+      "altPreviewSharpening": "",
       "amount": "",
       "blueYellow": "藍/黃",
       "blurRadius": "",
@@ -357,9 +359,11 @@
       "haloGuard": "",
       "localContrastRadius": "",
       "localContrastStatus": "",
+      "loupe": "",
       "luminance": "亮度",
       "midtoneMask": "",
       "minSpotRadius": "",
+      "moveLoupeTarget": "",
       "naturalGrain": "自然顆粒",
       "noiseReduction": "降噪",
       "presence": "質感",
@@ -745,9 +749,12 @@
       },
       "scopedSections": {
         "basic": "Light",
+        "calibration": "校準",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
+        "lensCorrection": "Lens Corrections",
+        "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
       "search": {
@@ -1382,6 +1389,15 @@
         "summary": "",
         "title": ""
       },
+      "removeWorkflow": {
+        "cancel": "",
+        "canvasReady": "",
+        "complete": "",
+        "hideSpots": "",
+        "inProgress": "",
+        "showSpots": "",
+        "title": ""
+      },
       "retouchSource": {
         "feather": "",
         "modes": {
@@ -1436,18 +1452,40 @@
       },
       "addNewMask": "新增新遮色片",
       "aiPeopleParts": {
+        "candidate": "",
         "classes": "",
         "description": "",
+        "empty": "",
+        "error": "",
         "model": "",
         "notAvailable": "",
+        "pending": "",
         "provenanceTitle": "",
         "provider": "",
         "target": "",
         "title": "",
         "unknown": ""
       },
+      "aiScene": {
+        "analyzing": "",
+        "apply": "",
+        "ariaLabel": "",
+        "background": "",
+        "cancel": "",
+        "cancelled": "",
+        "failed": "",
+        "previewReady": "",
+        "refine": "",
+        "refinePlaceholder": "",
+        "retry": "",
+        "select": "",
+        "sky": "",
+        "subject": "",
+        "title": ""
+      },
       "brush": {
         "brush": "畫筆",
+        "density": "",
         "eraser": "橡皮擦",
         "feather": "畫筆羽化",
         "flow": "流量",
@@ -1466,14 +1504,24 @@
       "maskingTitle": "遮色片",
       "masksTitle": "遮色片",
       "objectPrompt": {
+        "apply": "",
         "background": "",
         "box": "",
         "boxReady": "",
+        "cancel": "",
         "clear": "",
         "foreground": "",
         "generate": "",
         "points_other": "",
-        "receipt": ""
+        "receipt": "",
+        "status": {
+          "accepted": "",
+          "cancelled": "",
+          "empty": "",
+          "error": "",
+          "pending": "",
+          "review": ""
+        }
       },
       "overlay": {
         "edgeThreshold": "",
@@ -1498,6 +1546,19 @@
       "quickAddComplete": "",
       "quickAddGradient": "",
       "quickAddRange": "",
+      "rangeMask": {
+        "apply": "",
+        "cancel": "",
+        "feather": "",
+        "hueCenter": "",
+        "hueTolerance": "",
+        "preview": "",
+        "previewHint": "",
+        "refine": "",
+        "saturation": "",
+        "smooth": "",
+        "title": ""
+      },
       "refinement": {
         "replayReceipt": "",
         "reset": "",
@@ -2000,6 +2061,19 @@
     "viewerFooter": {
       "accessibilityLabel": "",
       "moreStatus": "",
+      "toolbar": {
+        "beforeAfter": "",
+        "flipHorizontal": "",
+        "flipVertical": "",
+        "gamutWarning": "",
+        "loupe": "",
+        "noReference": "",
+        "original": "",
+        "reference": "",
+        "rotateLeft": "",
+        "rotateRight": "",
+        "softProof": ""
+      },
       "zoom": {
         "fill": "",
         "fit": "",

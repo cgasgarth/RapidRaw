@@ -423,7 +423,7 @@ mod tests {
     use image::{DynamicImage, GrayImage, ImageBuffer, Luma, Rgba};
     use serde_json::json;
 
-    use super::apply_clone_retouch_layers;
+    use super::{CurrentRetouchRemoveSource, apply_clone_retouch_layers};
 
     #[test]
     fn clone_retouch_samples_source_into_target_region() {
@@ -546,5 +546,35 @@ mod tests {
         assert_eq!(removed[0], 0.7);
         assert_eq!(removed[1], 0.6);
         assert_eq!(removed[2], 0.5);
+    }
+
+    #[test]
+    fn current_remove_source_serde_accepts_only_the_native_render_projection() {
+        let current = serde_json::json!({
+            "featherRadiusPx": 24.0,
+            "radiusPx": 48.0,
+            "resolvedSourcePoint": { "x": 0.22, "y": 0.34 }
+        });
+        let parsed: CurrentRetouchRemoveSource =
+            serde_json::from_value(current).expect("native Remove projection should deserialize");
+        assert_eq!(parsed.radius_px, Some(48.0));
+        assert_eq!(parsed.feather_radius_px, Some(24.0));
+        assert_eq!(
+            parsed.resolved_source_point.map(|point| (point.x, point.y)),
+            Some((0.22, 0.34))
+        );
+
+        let workflow_payload = serde_json::json!({
+            "generator": "local_patch_fill_v1",
+            "generatorVersion": 1,
+            "targetMaskId": "mask:remove",
+            "searchRadiusMultiplier": 4,
+            "seed": 7,
+            "status": "ready",
+            "featherRadiusPx": 24.0,
+            "radiusPx": 48.0,
+            "resolvedSourcePoint": { "x": 0.22, "y": 0.34 }
+        });
+        assert!(serde_json::from_value::<CurrentRetouchRemoveSource>(workflow_payload).is_err());
     }
 }

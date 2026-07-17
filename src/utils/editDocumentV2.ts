@@ -1,6 +1,8 @@
+import { z } from 'zod';
 import {
   currentRenderEditDocumentV2Schema,
   EDIT_DOCUMENT_NODE_DESCRIPTORS,
+  type EditDocumentJsonValue,
   type EditDocumentNodeEnvelopeV2,
   type EditDocumentNodeParamsV2,
   type EditDocumentNodeTypeV2,
@@ -18,6 +20,109 @@ import {
 const descriptorFor = (nodeType: EditDocumentNodeTypeV2) => getEditDocumentNodeDescriptor(nodeType);
 const normalizeGeometryParams = (params: Readonly<Record<string, unknown>>) =>
   editDocumentGeometryV2Schema.parse(params);
+
+/**
+ * Native EditDocumentV2 only owns the current render projection of a Remove
+ * source.  Workflow/provenance fields are carried by the layer-stack sidecar;
+ * they must not cross the strict native serde boundary.
+ */
+const currentRetouchRemoveSourceV2Schema = z
+  .object({
+    featherRadiusPx: z.number().min(0).max(4096).optional(),
+    radiusPx: z.number().positive().max(4096).optional(),
+    resolvedSourcePoint: z.object({ x: z.number(), y: z.number() }).strict().optional(),
+  })
+  .strict();
+
+const retouchRemovePointProjectionSchema = z.object({ x: z.number(), y: z.number() }).passthrough();
+
+/**
+ * Layer adjustments are authored from the broader editor adjustment shape, but
+ * native EditDocumentV2 accepts only the current layer render projection.
+ * Keep this allowlist at the persistence boundary so source artifacts such as
+ * aiPatches never leak into the strict Rust LayerAdjustmentsV2 payload.
+ */
+const CURRENT_LAYER_ADJUSTMENT_KEYS = [
+  'blacks',
+  'brightness',
+  'clarity',
+  'colorGrading',
+  'perceptualGradingV1',
+  'colorNoiseReduction',
+  'contrast',
+  'curves',
+  'pointCurves',
+  'parametricCurve',
+  'curveMode',
+  'dehaze',
+  'effectsEnabled',
+  'exposure',
+  'flareAmount',
+  'glowAmount',
+  'halationAmount',
+  'highlights',
+  'hue',
+  'hsl',
+  'selectiveColorRangeControls',
+  'lumaNoiseReduction',
+  'saturation',
+  'shadows',
+  'sharpness',
+  'sharpnessThreshold',
+  'structure',
+  'temperature',
+  'tint',
+  'toneEqualizer',
+  'vibrance',
+  'whites',
+] as const;
+
+const projectLayerAdjustmentsForPersistence = (
+  adjustments: Record<string, EditDocumentJsonValue>,
+): Record<string, EditDocumentJsonValue> =>
+  Object.fromEntries(
+    CURRENT_LAYER_ADJUSTMENT_KEYS.flatMap((key) => {
+      const value = adjustments[key];
+      return value === undefined ? [] : [[key, structuredClone(value)]];
+    }),
+  );
+
+const projectRetouchRemoveSourceForPersistence = (
+  source: EditDocumentV2['layers']['masks'][number]['retouchRemoveSource'],
+): NonNullable<EditDocumentV2['layers']['masks'][number]['retouchRemoveSource']> => {
+  if (source === undefined) throw new Error('Cannot project an absent Remove source.');
+  const resolvedSourcePoint =
+    source['resolvedSourcePoint'] === undefined
+      ? undefined
+      : (() => {
+          const parsed = retouchRemovePointProjectionSchema.safeParse(source['resolvedSourcePoint']);
+          if (!parsed.success) {
+            throw new Error(`Invalid Remove resolvedSourcePoint: ${parsed.error.message}`);
+          }
+          return { x: parsed.data.x, y: parsed.data.y };
+        })();
+  const parsed = currentRetouchRemoveSourceV2Schema.parse({
+    ...(source['featherRadiusPx'] === undefined ? {} : { featherRadiusPx: source['featherRadiusPx'] }),
+    ...(source['radiusPx'] === undefined ? {} : { radiusPx: source['radiusPx'] }),
+    ...(resolvedSourcePoint === undefined ? {} : { resolvedSourcePoint }),
+  });
+  const projected: Record<string, EditDocumentJsonValue> = {};
+  if (parsed.featherRadiusPx !== undefined) projected['featherRadiusPx'] = parsed.featherRadiusPx;
+  if (parsed.radiusPx !== undefined) projected['radiusPx'] = parsed.radiusPx;
+  if (parsed.resolvedSourcePoint !== undefined) projected['resolvedSourcePoint'] = parsed.resolvedSourcePoint;
+  return projected;
+};
+
+const projectLayersForPersistence = (layers: EditDocumentV2['layers']): EditDocumentV2['layers'] =>
+  editDocumentLayersV2Schema.parse({
+    masks: layers.masks.map((layer) => ({
+      ...layer,
+      adjustments: projectLayerAdjustmentsForPersistence(layer.adjustments),
+      ...(layer.retouchRemoveSource === undefined
+        ? {}
+        : { retouchRemoveSource: projectRetouchRemoveSourceForPersistence(layer.retouchRemoveSource) }),
+    })),
+  });
 
 /** Build the editor's current document authority directly from node descriptors. */
 export const createDefaultEditDocumentV2 = (): EditDocumentV2 => {
@@ -130,8 +235,17 @@ export const setEditDocumentV2NodeEnabled = (
 export const prepareEditDocumentV2ForPersistence = (document: EditDocumentV2): EditDocumentV2 => {
   const quarantinedNodes = document.extensions['quarantinedNodes'];
   const rawEngineArtifacts = document.extensions['rawEngineArtifacts'];
+  const layers = projectLayersForPersistence(document.layers);
   const current = currentRenderEditDocumentV2Schema.parse({
     ...document,
+    layers,
+    nodes: {
+      ...document.nodes,
+      layers: {
+        ...document.nodes['layers'],
+        params: layers,
+      },
+    },
     extensions: {
       ...(quarantinedNodes === undefined ? {} : { quarantinedNodes }),
       ...(rawEngineArtifacts === undefined ? {} : { rawEngineArtifacts }),

@@ -185,7 +185,7 @@ const aiPeopleMaskAnalysisPersonSchema = z
     }
   });
 
-const aiPeopleMaskAnalysisSchema = z
+export const aiPeopleMaskAnalysisSchema = z
   .object({
     generatedAt: z.iso.datetime(),
     imageHash: z.string().trim().min(1),

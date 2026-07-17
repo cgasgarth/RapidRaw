@@ -27,6 +27,7 @@ const capturedBrushLineSchema = z.union([
   z
     .object({
       brushSize: z.number().positive().max(4096),
+      density: z.number().min(0).max(1).optional(),
       feather: z.number().min(0).max(1).optional(),
       flow: z.number().min(0).max(100).optional(),
       points: z.array(capturedBrushPointSchema).min(1).max(4096),
@@ -36,6 +37,7 @@ const capturedBrushLineSchema = z.union([
   z
     .object({
       feather: z.number().min(0).max(100),
+      density: z.number().min(0).max(1).optional(),
       points: z.array(capturedBrushPointSchema).min(1).max(4096),
       size: z.number().positive().max(1024),
       tool: z.enum(['brush', 'eraser']),
@@ -190,6 +192,7 @@ function lineToCommandStroke(
   const commandPoints = line.points.length === 1 ? [firstPoint, firstPoint] : line.points;
 
   return {
+    ...(line.density === undefined ? {} : { density: roundMetric(clamp(line.density, 0, 1)) }),
     flow: roundMetric(clamp(flowPercent / 100, 0, 1)),
     hardness: roundMetric(1 - featherNormalized),
     mode: line.tool === 'eraser' ? 'erase' : 'paint',

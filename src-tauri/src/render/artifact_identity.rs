@@ -122,6 +122,34 @@ impl RenderArtifactIdentity {
         }
     }
 
+    /// Returns true when two full-frame preview identities describe the same
+    /// rendered content and differ only in output dimensions. This is used by
+    /// the preview cache to retain a sharp base while a duplicate lower-tier
+    /// request is still settling.
+    pub fn same_content_different_resolution(&self, other: &Self) -> bool {
+        self.source == other.source
+            && self.image_session == other.image_session
+            && self.adjustment_revision == other.adjustment_revision
+            && self.plan_revision == other.plan_revision
+            && self.source_stage == other.source_stage
+            && self.geometry_stage == other.geometry_stage
+            && self.masks_stage == other.masks_stage
+            && self.retouch_stage == other.retouch_stage
+            && self.detail_stage == other.detail_stage
+            && self.color_stage == other.color_stage
+            && self.output_stage == other.output_stage
+            && self.color_domain == other.color_domain
+            && self.completed_stage == other.completed_stage
+            && self.scope == other.scope
+            && self.quality == other.quality
+            && self.resampling_version == other.resampling_version
+            && self.encoding_contract == other.encoding_contract
+            && self.display_snapshot == other.display_snapshot
+            && self.backend_generation == other.backend_generation
+            && self.implementation_version == other.implementation_version
+            && (self.width != other.width || self.height != other.height)
+    }
+
     #[cfg(test)]
     fn fingerprint(&self) -> u64 {
         stable_hash(self)

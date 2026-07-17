@@ -3,6 +3,7 @@ import { Eye, Maximize, Minimize2, MoonStar } from 'lucide-react';
 import {
   lazy,
   type MouseEvent,
+  type PointerEvent,
   type RefObject,
   Suspense,
   useCallback,
@@ -45,6 +46,7 @@ import {
   resolveNextCropForGeometryChange,
   updateCropDraft,
 } from '../../utils/cropUtils';
+import { createDetailLoupeTarget, type DetailLoupeTarget } from '../../utils/detailLoupe';
 import {
   selectEditDocumentGeometry,
   selectEditDocumentMasks,
@@ -80,6 +82,14 @@ import {
   getNegativeLabSourceReadiness,
 } from '../../utils/negative-lab/negativeLabSourceReadiness';
 import { buildObjectPromptEditTransaction } from '../../utils/objectPromptEditTransaction';
+import {
+  buildOrientationFlipEditTransaction,
+  type OrientationFlipAxis,
+} from '../../utils/orientationFlipEditTransaction';
+import {
+  buildOrientationRotateEditTransaction,
+  captureOrientationRotateCommitIdentity,
+} from '../../utils/orientationRotateEditTransaction';
 import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
 import { resolveReferenceMatchRenderDocument } from '../../utils/referenceMatch';
 import { buildRetouchHandleEditTransaction } from '../../utils/retouchHandleEditTransaction';
@@ -101,6 +111,7 @@ import {
 import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
 import type { CropStraightenSessionIdentity } from './editor/cropStraightenController';
+import DetailLoupe from './editor/DetailLoupe';
 import EditorToolbar from './editor/EditorToolbar';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
 import { useViewerMaskOverlayController } from './editor/useViewerMaskOverlayController';
@@ -317,6 +328,24 @@ export default function Editor({
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [viewerSamplerState, setViewerSamplerState] = useState<ViewerSamplerState | null>(null);
+  const detailModifierPreview = useEditorStore((s) => s.detailModifierPreview);
+  const detailLoupeIdentity = useMemo(
+    () =>
+      selectedImage === null
+        ? null
+        : {
+            imageSessionId: editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`,
+            renderRevision: committedAdjustmentRevision,
+            sourceIdentity: selectedImage.path,
+          },
+    [committedAdjustmentRevision, editorImageSession?.id, editorImageSessionGeneration, selectedImage],
+  );
+  const [detailLoupeTarget, setDetailLoupeTarget] = useState<DetailLoupeTarget | null>(null);
+  const detailLoupeIdentityRef = useRef(detailLoupeIdentity);
+  detailLoupeIdentityRef.current = detailLoupeIdentity;
+  useEffect(() => {
+    setDetailLoupeTarget(null);
+  }, [detailLoupeIdentity?.imageSessionId, detailLoupeIdentity?.renderRevision, detailLoupeIdentity?.sourceIdentity]);
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -380,6 +409,39 @@ export default function Editor({
   const handleExitLightsOut = useCallback(() => {
     setEditorLightsOutLevel('off');
   }, [setEditorLightsOutLevel]);
+
+  const handleViewerRotate = useCallback(
+    (degrees: number) => {
+      const state = useEditorStore.getState();
+      const identity = captureOrientationRotateCommitIdentity(state);
+      if (identity === null) return;
+      applyEditTransaction(buildOrientationRotateEditTransaction(state, identity, degrees, crypto.randomUUID()));
+    },
+    [applyEditTransaction],
+  );
+
+  const handleViewerFlip = useCallback(
+    (axis: OrientationFlipAxis) => {
+      const state = useEditorStore.getState();
+      if (state.selectedImage === null || state.imageSession === null) return;
+      const geometry = selectEditDocumentGeometry(state.editDocumentV2);
+      const enabled = axis === 'horizontal' ? !geometry.flipHorizontal : !geometry.flipVertical;
+      applyEditTransaction(
+        buildOrientationFlipEditTransaction(
+          state,
+          {
+            adjustmentRevision: state.adjustmentRevision,
+            imageSessionId: state.imageSession.id,
+            sourceIdentity: state.selectedImage.path,
+          },
+          axis,
+          enabled,
+          crypto.randomUUID(),
+        ),
+      );
+    },
+    [applyEditTransaction],
+  );
 
   useEffect(() => {
     const previousLevel = previousLightsOutLevelRef.current;
@@ -711,6 +773,23 @@ export default function Editor({
       selectedImage?.width,
       transformState,
     ],
+  );
+  const handleDetailLoupePointerMove = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      const identity = detailLoupeIdentityRef.current;
+      const container = imageContainerRef.current;
+      if (identity === null || container === null) return;
+      const imageRect = overlayGeometry.displayedImageRectInViewportCssPixels;
+      if (imageRect.width <= 0 || imageRect.height <= 0) return;
+      const containerRect = container.getBoundingClientRect();
+      setDetailLoupeTarget(
+        createDetailLoupeTarget(identity, {
+          x: (event.clientX - containerRect.left - imageRect.x) / imageRect.width,
+          y: (event.clientY - containerRect.top - imageRect.y) / imageRect.height,
+        }),
+      );
+    },
+    [overlayGeometry.displayedImageRectInViewportCssPixels],
   );
   const maskOverlayBinding = useViewerMaskOverlayController({
     context: {
@@ -1605,9 +1684,6 @@ export default function Editor({
   const handleWgpuFailure = useCallback(() => {
     setEditor((state) => ({ wgpuFailureSerial: state.wgpuFailureSerial + 1 }));
   }, [setEditor]);
-  const handleWgpuFrameCommitted = useCallback(() => {
-    setEditor((state) => ({ wgpuFrameSerial: state.wgpuFrameSerial + 1 }));
-  }, [setEditor]);
 
   const requestMaskOverlay = useCallback(
     (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentEditDocumentV2: EditDocumentV2) => {
@@ -1651,7 +1727,6 @@ export default function Editor({
     isCropping,
     isReady: selectedImage?.isReady ?? false,
     maxScaleRef,
-    onWgpuFrameCommitted: handleWgpuFrameCommitted,
     onWgpuFailure: handleWgpuFailure,
     presentationDescriptor,
     showOriginal,
@@ -2260,6 +2335,7 @@ export default function Editor({
           onPointerUpCapture={handlePointerUp}
           onPointerCancelCapture={handlePointerCancel}
           onLostPointerCaptureCapture={handleLostPointerCapture}
+          onPointerMove={handleDetailLoupePointerMove}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
           data-fullscreen-preview={String(isFullScreen)}
@@ -2485,6 +2561,24 @@ export default function Editor({
               </div>
             )}
           </div>
+          <DetailLoupe
+            crop={adjustments.crop}
+            currentIdentity={detailLoupeIdentity}
+            devicePixelRatio={devicePixelRatio}
+            diagnosticMode={detailModifierPreview}
+            imageRect={{
+              height: overlayGeometry.displayedImageRectInViewportCssPixels.height,
+              width: overlayGeometry.displayedImageRectInViewportCssPixels.width,
+              x: overlayGeometry.displayedImageRectInViewportCssPixels.x,
+              y: overlayGeometry.displayedImageRectInViewportCssPixels.y,
+            }}
+            orientationSteps={adjustments.orientationSteps ?? 0}
+            previewUrl={finalPreviewUrl}
+            resolutionState={zoomResolutionState}
+            sourceSize={{ height: selectedImage.height, width: selectedImage.width }}
+            target={detailLoupeTarget}
+            onTargetChange={setDetailLoupeTarget}
+          />
         </div>
         {showPresentationHud && (
           <div
@@ -2532,6 +2626,8 @@ export default function Editor({
           resolvedZoom={resolvedZoom}
           samplerState={viewerSamplerState}
           zoomResolutionState={zoomResolutionState}
+          onFlip={handleViewerFlip}
+          onRotate={handleViewerRotate}
         />
       </div>
     </div>

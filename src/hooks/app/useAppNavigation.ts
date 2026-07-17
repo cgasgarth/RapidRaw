@@ -352,7 +352,7 @@ export function useAppNavigation({
                 !current.isSliderDragging &&
                 !isNativeCommittedHydrationSession(session.id) &&
                 acceptImageOpenMetadataRevision(path, openResult.metadataFingerprint)
-                  ? hydrateImageOpenEditDocumentV2(loadedMetadata)
+                  ? hydrateImageOpenEditDocumentV2(loadedMetadata, path)
                   : null;
               if (
                 authoritativeEditDocument !== null &&

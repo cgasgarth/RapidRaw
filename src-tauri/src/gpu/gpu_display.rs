@@ -156,6 +156,29 @@ pub struct NativeFrameIdentity {
     pub preview_generation: u64,
 }
 
+/// Pixel evidence captured from the exact texture handed to the native surface.
+/// A swapchain submit is not a visibility receipt unless the presented texture
+/// contains finite, non-transparent image content.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativePresentationHealth {
+    pub content_fingerprint: String,
+    pub max_chroma: f32,
+    pub max_luminance: f32,
+    pub sample_count: u32,
+    pub visible_sample_count: u32,
+}
+
+impl NativePresentationHealth {
+    pub fn is_visible(&self) -> bool {
+        self.sample_count > 0
+            && self.visible_sample_count > 0
+            && self.max_luminance.is_finite()
+            && self.max_chroma.is_finite()
+            && self.content_fingerprint.starts_with("sha256:")
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct PresentationDirty(u8);
 
@@ -354,7 +377,11 @@ impl WgpuPresentationScheduler {
         image_size: [u32; 2],
         texture_size: [u32; 2],
         identity: Option<NativeFrameIdentity>,
+        health: &NativePresentationHealth,
     ) -> Result<(), String> {
+        if !health.is_visible() {
+            return Err("presentation_content_not_visible".into());
+        }
         let (sender, receiver) = std::sync::mpsc::sync_channel(1);
         self.publish_texture_for_frame_with_receipt(
             view,
@@ -929,6 +956,36 @@ pub(crate) fn create_wgpu_display(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn health(visible_sample_count: u32) -> NativePresentationHealth {
+        NativePresentationHealth {
+            content_fingerprint: format!("sha256:{}", "a".repeat(64)),
+            max_chroma: 0.2,
+            max_luminance: 0.5,
+            sample_count: 25,
+            visible_sample_count,
+        }
+    }
+
+    #[test]
+    fn native_visibility_requires_nonblank_finite_content_proof() {
+        assert!(health(1).is_visible());
+        assert!(!health(0).is_visible());
+        assert!(
+            !NativePresentationHealth {
+                max_luminance: f32::NAN,
+                ..health(1)
+            }
+            .is_visible()
+        );
+        assert!(
+            !NativePresentationHealth {
+                content_fingerprint: String::new(),
+                ..health(1)
+            }
+            .is_visible()
+        );
+    }
 
     #[test]
     fn native_receipt_requires_texture_and_visible_geometry() {

@@ -566,7 +566,10 @@ export function useTauriListeners({
           imageSessionId: session.generation,
           sourceImagePath: session.path,
         });
-        const committed = wgpuFramePresentationAuthority.recordFrameReady(payload.previewOperationIdentity);
+        const committed = wgpuFramePresentationAuthority.recordFrameReady(
+          payload.previewOperationIdentity,
+          payload.presentationHealth,
+        );
         if (committed === null) return;
         editor.setEditor((state) => {
           const currentSession = state.imageSession;

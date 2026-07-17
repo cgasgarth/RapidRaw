@@ -1,5 +1,22 @@
 import cx from 'clsx';
-import { Check, ChevronDown, Loader2, Minus, MoreHorizontal, Plus, TriangleAlert } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  Columns2,
+  Eye,
+  EyeOff,
+  FlipHorizontal2,
+  FlipVertical2,
+  Loader2,
+  Minus,
+  MoreHorizontal,
+  Plus,
+  RotateCcw,
+  RotateCw,
+  ScanSearch,
+  SplitSquareHorizontal,
+  TriangleAlert,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -36,6 +53,8 @@ interface ViewerFooterProps {
   resolvedZoom: ResolvedEditorZoom;
   samplerState: ViewerSamplerState | null;
   zoomResolutionState: EditorZoomResolutionState;
+  onFlip?: (axis: 'horizontal' | 'vertical') => void;
+  onRotate?: (degrees: number) => void;
 }
 
 const filenameFromPath = (path: string): string => path.split(/[\\/]/u).pop() || path;
@@ -62,6 +81,8 @@ export default function ViewerFooter({
   resolvedZoom,
   samplerState,
   zoomResolutionState,
+  onFlip,
+  onRotate,
 }: ViewerFooterProps) {
   const { t } = useTranslation();
   const footerRef = useRef<HTMLDivElement>(null);
@@ -76,10 +97,12 @@ export default function ViewerFooter({
       exportSoftProofRecipeId: state.exportSoftProofRecipeId,
       exportSoftProofTransform: state.exportSoftProofTransform,
       gamutWarningOverlay: state.gamutWarningOverlay,
+      isGamutWarningOverlayVisible: state.isGamutWarningOverlayVisible,
       isExportSoftProofEnabled: state.isExportSoftProofEnabled,
       previewQualityStatus: state.previewQualityStatus,
       previewScopeStatus: state.previewScopeStatus,
       selectedImage: state.selectedImage,
+      referenceMatchReferences: state.referenceMatchReferences,
     })),
   );
 
@@ -143,10 +166,55 @@ export default function ViewerFooter({
   const executeZoom = (command: EditorZoomCommand) => {
     useEditorStore.getState().setEditor({ zoomMode: getEditorZoomModeForCommand(command, resolvedZoom) });
   };
+  const reference = editor.referenceMatchReferences[0] ?? null;
+  const referenceActive = editor.compare.source.kind === 'reference';
+  const softProofActive = editor.isExportSoftProofEnabled;
+  const gamutWarningActive = editor.isGamutWarningOverlayVisible;
+  const iconButton = cx(
+    editorChromeTokens.button.base,
+    editorChromeTokens.button.iconCompact,
+    editorChromeTokens.button.quiet,
+    editorChromeTokens.focusRing,
+  );
+  const buttonClassName = cx(iconButton, 'h-7 w-7');
+  const toggleReference = () => {
+    if (referenceActive) {
+      useEditorStore.getState().dispatchCompare({ identity: null, type: 'set-original-source' });
+      useEditorStore.getState().dispatchCompare({ mode: 'off', type: 'set-mode' });
+      return;
+    }
+    if (reference === null) return;
+    useEditorStore
+      .getState()
+      .dispatchCompare({ identity: reference.id, label: reference.label, type: 'set-reference-source' });
+    useEditorStore.getState().dispatchCompare({ mode: 'side-by-side', type: 'set-mode' });
+  };
+  const toggleSoftProof = () => {
+    const state = useEditorStore.getState();
+    state.setEditor({ isExportSoftProofEnabled: !softProofActive });
+  };
+  const toggleGamutWarning = () => {
+    const state = useEditorStore.getState();
+    if (!softProofActive || editor.gamutWarningOverlay === null) return;
+    state.setEditor({ isGamutWarningOverlayVisible: !gamutWarningActive });
+  };
   const zoomLabel = formatEditorZoomLabel(resolvedZoom, {
     fill: t('editor.viewerFooter.zoom.fill'),
     fit: t('editor.viewerFooter.zoom.fit'),
   });
+  const toolbarLabels = {
+    beforeAfter: t('editor.viewerFooter.toolbar.beforeAfter'),
+    flipHorizontal: t('editor.viewerFooter.toolbar.flipHorizontal'),
+    flipVertical: t('editor.viewerFooter.toolbar.flipVertical'),
+    gamutWarning: t('editor.viewerFooter.toolbar.gamutWarning'),
+    loupe: t('editor.viewerFooter.toolbar.loupe'),
+    noReference: t('editor.viewerFooter.toolbar.noReference'),
+    original: t('editor.viewerFooter.toolbar.original'),
+    reference: t('editor.viewerFooter.toolbar.reference'),
+    rotateLeft: t('editor.viewerFooter.toolbar.rotateLeft'),
+    rotateRight: t('editor.viewerFooter.toolbar.rotateRight'),
+    softProof: t('editor.viewerFooter.toolbar.softProof'),
+  };
   const statusIcon =
     renderStatus.phase === 'error' || renderStatus.phase === 'degraded' ? (
       <TriangleAlert aria-hidden="true" size={13} />
@@ -155,19 +223,13 @@ export default function ViewerFooter({
     ) : (
       <Check aria-hidden="true" size={13} />
     );
-  const iconButton = cx(
-    editorChromeTokens.button.base,
-    editorChromeTokens.button.iconCompact,
-    editorChromeTokens.button.quiet,
-    editorChromeTokens.focusRing,
-  );
 
   return (
     <div
       aria-label={t('editor.viewerFooter.accessibilityLabel')}
       className={cx(
         editorChromeTokens.region.viewerStatusFooter,
-        'z-[130] grid min-h-9 w-full grid-cols-[minmax(0,1fr)_minmax(9rem,auto)_minmax(0,1fr)] items-center gap-2 overflow-visible py-0.5 text-[11px]',
+        'z-[130] grid min-h-9 w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 overflow-visible border-t border-editor-divider bg-editor-panel px-2 py-0.5 text-[11px]',
         isFullScreen &&
           'absolute inset-x-0 bottom-0 border-editor-overlay-stroke bg-editor-overlay-surface/95 opacity-35 shadow-[0_-10px_28px_var(--editor-overlay-shadow)] transition-opacity hover:opacity-100 focus-within:opacity-100',
       )}
@@ -178,7 +240,7 @@ export default function ViewerFooter({
       ref={footerRef}
       role="region"
     >
-      <div className="flex min-w-0 items-center gap-2 overflow-hidden" data-testid="viewer-footer-left">
+      <div className="flex min-w-0 items-center gap-1 overflow-hidden" data-testid="viewer-footer-left">
         <span className="shrink-0 font-medium tabular-nums text-text-primary">{selection.primary}</span>
         {responsive.showFilename && selection.filename && (
           <span className="min-w-0 truncate text-text-secondary" title={selection.filename}>
@@ -195,7 +257,124 @@ export default function ViewerFooter({
         )}
       </div>
 
-      <div className="flex min-w-0 items-center justify-center gap-2" data-testid="viewer-footer-center">
+      <div className="flex min-w-0 items-center justify-center gap-0.5" data-testid="viewer-footer-center">
+        <button
+          aria-label={toolbarLabels.loupe}
+          className={cx(buttonClassName, editor.compare.mode === 'off' && 'text-text-primary')}
+          data-testid="viewer-toolbar-loupe"
+          onClick={() => executeZoom({ kind: 'fit' })}
+          title={toolbarLabels.loupe}
+          type="button"
+        >
+          <ScanSearch aria-hidden="true" size={14} />
+        </button>
+        <button
+          aria-label={toolbarLabels.beforeAfter}
+          aria-pressed={editor.compare.mode !== 'off'}
+          className={buttonClassName}
+          data-testid="viewer-toolbar-before-after"
+          onClick={() => useEditorStore.getState().dispatchCompare({ type: 'toggle-original' })}
+          title={toolbarLabels.beforeAfter}
+          type="button"
+        >
+          <Columns2 aria-hidden="true" size={14} />
+        </button>
+        <button
+          aria-label={toolbarLabels.reference}
+          aria-pressed={referenceActive}
+          className={cx(buttonClassName, referenceActive && editorChromeTokens.button.selectedQuiet)}
+          data-testid="viewer-toolbar-reference"
+          disabled={reference === null}
+          onClick={toggleReference}
+          title={reference === null ? toolbarLabels.noReference : toolbarLabels.reference}
+          type="button"
+        >
+          <SplitSquareHorizontal aria-hidden="true" size={14} />
+        </button>
+        <button
+          aria-label={toolbarLabels.original}
+          aria-pressed={editor.compare.isOriginalHeld || editor.compare.mode === 'hold-original'}
+          className={buttonClassName}
+          data-testid="viewer-toolbar-original"
+          onClick={() => useEditorStore.getState().dispatchCompare({ type: 'toggle-original' })}
+          title={toolbarLabels.original}
+          type="button"
+        >
+          {editor.compare.isOriginalHeld ? (
+            <EyeOff aria-hidden="true" size={14} />
+          ) : (
+            <Eye aria-hidden="true" size={14} />
+          )}
+        </button>
+        <span className="mx-1 h-4 w-px bg-editor-border" />
+        <button
+          aria-label={toolbarLabels.rotateLeft}
+          className={buttonClassName}
+          data-testid="viewer-toolbar-rotate-left"
+          disabled={onRotate === undefined}
+          onClick={() => onRotate?.(-90)}
+          title={toolbarLabels.rotateLeft}
+          type="button"
+        >
+          <RotateCcw aria-hidden="true" size={14} />
+        </button>
+        <button
+          aria-label={toolbarLabels.rotateRight}
+          className={buttonClassName}
+          data-testid="viewer-toolbar-rotate-right"
+          disabled={onRotate === undefined}
+          onClick={() => onRotate?.(90)}
+          title={toolbarLabels.rotateRight}
+          type="button"
+        >
+          <RotateCw aria-hidden="true" size={14} />
+        </button>
+        <button
+          aria-label={toolbarLabels.flipHorizontal}
+          className={buttonClassName}
+          data-testid="viewer-toolbar-flip-horizontal"
+          disabled={onFlip === undefined}
+          onClick={() => onFlip?.('horizontal')}
+          title={toolbarLabels.flipHorizontal}
+          type="button"
+        >
+          <FlipHorizontal2 aria-hidden="true" size={14} />
+        </button>
+        <button
+          aria-label={toolbarLabels.flipVertical}
+          className={buttonClassName}
+          data-testid="viewer-toolbar-flip-vertical"
+          disabled={onFlip === undefined}
+          onClick={() => onFlip?.('vertical')}
+          title={toolbarLabels.flipVertical}
+          type="button"
+        >
+          <FlipVertical2 aria-hidden="true" size={14} />
+        </button>
+        <span className="mx-1 h-4 w-px bg-editor-border" />
+        <button
+          aria-label={toolbarLabels.softProof}
+          aria-pressed={softProofActive}
+          className={cx(buttonClassName, softProofActive && editorChromeTokens.button.selectedQuiet)}
+          data-testid="viewer-toolbar-soft-proof"
+          onClick={toggleSoftProof}
+          title={toolbarLabels.softProof}
+          type="button"
+        >
+          {toolbarLabels.softProof.slice(0, 2)}
+        </button>
+        <button
+          aria-label={toolbarLabels.gamutWarning}
+          aria-pressed={gamutWarningActive}
+          className={cx(buttonClassName, gamutWarningActive && editorChromeTokens.button.selectedQuiet)}
+          data-testid="viewer-toolbar-gamut-warning"
+          disabled={!softProofActive || editor.gamutWarningOverlay === null}
+          onClick={toggleGamutWarning}
+          title={toolbarLabels.gamutWarning}
+          type="button"
+        >
+          {toolbarLabels.gamutWarning.slice(0, 1)}
+        </button>
         <span
           aria-busy={renderStatus.busy}
           className={cx(

@@ -135,10 +135,31 @@ describe('viewer footer', () => {
     expect(live()?.getAttribute('aria-live')).toBe('assertive');
     expect(live()?.getAttribute('role')).toBe('alert');
   });
+
+  test('wires Lightroom viewer actions to compare, zoom, proof, and geometry authority', async () => {
+    prepareStores();
+    const calls: string[] = [];
+    const { container } = await renderFooter({
+      onFlip: (axis) => calls.push(`flip:${axis}`),
+      onRotate: (degrees) => calls.push(`rotate:${String(degrees)}`),
+    });
+
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="viewer-toolbar-before-after"]')?.click());
+    expect(useEditorStore.getState().compare.mode).toBe('hold-original');
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="viewer-toolbar-original"]')?.click());
+    expect(useEditorStore.getState().compare.mode).toBe('off');
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="viewer-toolbar-soft-proof"]')?.click());
+    expect(useEditorStore.getState().isExportSoftProofEnabled).toBe(true);
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="viewer-toolbar-loupe"]')?.click());
+    expect(useEditorStore.getState().zoomMode).toEqual({ kind: 'fit' });
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="viewer-toolbar-rotate-left"]')?.click());
+    act(() => container.querySelector<HTMLButtonElement>('[data-testid="viewer-toolbar-flip-horizontal"]')?.click());
+    expect(calls).toEqual(['rotate:-90', 'flip:horizontal']);
+  });
 });
 
 function prepareStores(previewQualityStatus: PreviewQualityStatus | null = null) {
-  useEditorStore.getState().setEditor({ selectedImage, zoomMode: resolvedZoom.mode });
+  useEditorStore.getState().setEditor({ isExportSoftProofEnabled: false, selectedImage, zoomMode: resolvedZoom.mode });
   useEditorStore.getState().setEditor({ previewQualityStatus });
   useLibraryStore.setState({ imageList: [libraryImage], multiSelectedPaths: [selectedImage.path] });
 }
@@ -147,10 +168,14 @@ async function renderFooter({
   activeTool = 'none',
   isFullScreen = false,
   isRendering = false,
+  onFlip,
+  onRotate,
 }: {
   activeTool?: ViewerActiveTool;
   isFullScreen?: boolean;
   isRendering?: boolean;
+  onFlip?: (axis: 'horizontal' | 'vertical') => void;
+  onRotate?: (degrees: number) => void;
 }) {
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
@@ -169,6 +194,8 @@ async function renderFooter({
         resolvedZoom,
         samplerState: null,
         zoomResolutionState: 'ready',
+        ...(onFlip === undefined ? {} : { onFlip }),
+        ...(onRotate === undefined ? {} : { onRotate }),
       }),
     ),
   );

@@ -361,6 +361,8 @@
       }
     },
     "details": {
+      "altPreviewNoiseReduction": "Alt preview · noise reduction (transient)",
+      "altPreviewSharpening": "Alt preview · sharpening (transient)",
       "amount": "Amount",
       "blueYellow": "Blue/Yellow",
       "blurRadius": "Blur radius",
@@ -379,9 +381,11 @@
       "haloGuard": "Halo guard",
       "localContrastRadius": "Local contrast radius",
       "localContrastStatus": "UI controls only · halo-guarded runtime contrast remains tracked separately",
+      "loupe": "Detail loupe",
       "luminance": "Luminance",
       "midtoneMask": "Midtone mask",
       "minSpotRadius": "Min spot radius",
+      "moveLoupeTarget": "Move loupe inspection target",
       "naturalGrain": "Natural grain",
       "noiseReduction": "Noise Reduction",
       "presence": "Presence",
@@ -779,9 +783,12 @@
       },
       "scopedSections": {
         "basic": "Light",
+        "calibration": "Calibration",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
+        "lensCorrection": "Lens Corrections",
+        "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
       "search": {
@@ -1494,6 +1501,15 @@
         "summary": "{{generator}} - {{status}}",
         "title": "Remove"
       },
+      "removeWorkflow": {
+        "cancel": "Cancel",
+        "canvasReady": "Canvas ready",
+        "complete": "Complete",
+        "hideSpots": "Hide spots",
+        "inProgress": "Editing",
+        "showSpots": "Show spots",
+        "title": "Remove tool"
+      },
       "retouchSource": {
         "feather": "Feather",
         "modes": {
@@ -1550,18 +1566,40 @@
       },
       "addNewMask": "Add New Mask",
       "aiPeopleParts": {
+        "candidate": "Person {{index}}",
         "classes": "Classes",
         "description": "Runtime-backed person parts are enabled; planned targets stay disabled until provider proof lands.",
+        "empty": "No people detected",
+        "error": "People detection failed",
         "model": "Model",
         "notAvailable": "n/a",
+        "pending": "Finding people…",
         "provenanceTitle": "Generated mask provenance",
         "provider": "Provider",
         "target": "Target",
         "title": "Person part masks",
         "unknown": "Unknown"
       },
+      "aiScene": {
+        "analyzing": "Analyzing…",
+        "apply": "Apply mask",
+        "ariaLabel": "AI scene masks",
+        "background": "Background",
+        "cancel": "Cancel",
+        "cancelled": "Cancelled",
+        "failed": "Mask generation failed.",
+        "previewReady": "Preview ready · refine before applying",
+        "refine": "Refine",
+        "refinePlaceholder": "Feather or grow (optional)",
+        "retry": "Retry",
+        "select": "Select scene mask",
+        "sky": "Sky",
+        "subject": "Subject",
+        "title": "Scene masks"
+      },
       "brush": {
         "brush": "Brush",
+        "density": "Density",
         "eraser": "Eraser",
         "feather": "Brush Feather",
         "flow": "Flow",
@@ -1580,16 +1618,26 @@
       "maskingTitle": "Masking",
       "masksTitle": "Masks",
       "objectPrompt": {
+        "apply": "Apply mask",
         "background": "Background",
         "box": "Box",
         "boxReady": "1 box",
+        "cancel": "Cancel",
         "clear": "Clear",
         "foreground": "Foreground",
         "generate": "Generate SAM proposal",
         "points": "{{count}} points",
         "points_one": "{{count}} point",
         "points_other": "{{count}} points",
-        "receipt": "Replay receipt: {{provider}}, {{promptKind}}, {{latency}} ms"
+        "receipt": "Replay receipt: {{provider}}, {{promptKind}}, {{latency}} ms",
+        "status": {
+          "accepted": "Mask applied",
+          "cancelled": "Selection cancelled",
+          "empty": "Add a point or box to begin",
+          "error": "Selection failed",
+          "pending": "Finding object…",
+          "review": "Review selection"
+        }
       },
       "overlay": {
         "edgeThreshold": "Edge Threshold",
@@ -1614,6 +1662,19 @@
       "quickAddComplete": "Ready",
       "quickAddGradient": "Add gradient",
       "quickAddRange": "Add color range",
+      "rangeMask": {
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "feather": "Feather",
+        "hueCenter": "Hue center",
+        "hueTolerance": "Hue tolerance",
+        "preview": "Preview",
+        "previewHint": "Preview before apply",
+        "refine": "Refine",
+        "saturation": "Saturation",
+        "smooth": "Smooth",
+        "title": "editor.masks.rangeMask.title"
+      },
       "refinement": {
         "density": "Density",
         "edgeContrast": "Edge Contrast",
@@ -2170,6 +2231,19 @@
     "viewerFooter": {
       "accessibilityLabel": "Viewer status and controls",
       "moreStatus": "More viewer status",
+      "toolbar": {
+        "beforeAfter": "Before and after",
+        "flipHorizontal": "Flip horizontal",
+        "flipVertical": "Flip vertical",
+        "gamutWarning": "Gamut warning",
+        "loupe": "Loupe",
+        "noReference": "No reference available",
+        "original": "Show original",
+        "reference": "Reference view",
+        "rotateLeft": "Rotate left",
+        "rotateRight": "Rotate right",
+        "softProof": "Soft proof"
+      },
       "zoom": {
         "fill": "Fill",
         "fit": "Fit",

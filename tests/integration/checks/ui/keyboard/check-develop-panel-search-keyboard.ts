@@ -72,6 +72,7 @@ async function validateDevelopPanelSearchKeyboard() {
   useUIStore.getState().setUI({
     collapsibleSectionsState: {
       basic: true,
+      calibration: false,
       color: false,
       curves: false,
       details: false,

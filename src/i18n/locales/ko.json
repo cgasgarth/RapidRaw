@@ -426,9 +426,12 @@
       },
       "scopedSections": {
         "basic": "Light",
+        "calibration": "보정",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
+        "lensCorrection": "Lens Corrections",
+        "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
       "rawProcessingModeOverride": {
@@ -706,6 +709,23 @@
         "switchToSubtract": "빼기 모드로 전환"
       },
       "addNewMask": "새 마스크 추가",
+      "aiScene": {
+        "analyzing": "분석 중…",
+        "apply": "마스크 적용",
+        "ariaLabel": "AI 장면 마스크",
+        "background": "배경",
+        "cancel": "취소",
+        "cancelled": "취소됨",
+        "failed": "마스크 생성에 실패했습니다.",
+        "previewReady": "미리보기 준비됨 · 적용 전에 다듬으세요",
+        "refine": "다듬기",
+        "refinePlaceholder": "페더 또는 확장(선택 사항)",
+        "retry": "다시 시도",
+        "select": "장면 마스크 선택",
+        "sky": "하늘",
+        "subject": "피사체",
+        "title": "장면 마스크"
+      },
       "brush": {
         "brush": "브러시",
         "eraser": "지우개",

@@ -4019,6 +4019,89 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn raw_basic_view_converts_ap1_before_srgb_encoding() {
+        use glam::Vec3;
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+
+        let source_pixel = [0.6_f32, 0.15, 0.08];
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            1,
+            1,
+            Rgba([source_pixel[0], source_pixel[1], source_pixel[2], 1.0]),
+        ));
+        let adjustments = crate::render_plan::current_render_adjustments(json!({
+            "rawEngineEditGraphVersion": 2
+        }));
+        let plan = crate::render_plan::compile_render_plan(
+            &adjustments,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&adjustments, 1, 2, 3),
+                is_raw: true,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("raw basic view plan compiles");
+        let rendered = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .expect("CPU raw basic view renders")
+        .to_rgba32f()
+        .get_pixel(0, 0)
+        .0;
+
+        let encode = |value: f32| {
+            let magnitude = value.abs();
+            let encoded = if magnitude <= 0.003_130_8 {
+                magnitude * 12.92
+            } else {
+                1.055 * magnitude.powf(1.0 / 2.4) - 0.055
+            };
+            value.signum() * encoded
+        };
+        let basic_view = |linear: [f32; 3]| {
+            let encoded = Vec3::from_array(linear.map(encode));
+            let gamma = encoded.map(|channel| channel.max(0.0).powf(1.0 / 1.1));
+            let contrast = gamma * gamma * (Vec3::splat(3.0) - gamma * 2.0);
+            gamma.lerp(contrast, 0.75).to_array()
+        };
+        let expected = basic_view(
+            crate::color::working_to_output_transform::acescg_to_srgb_linear(source_pixel),
+        );
+        let legacy_wrong = basic_view(source_pixel);
+        for (actual, expected) in rendered[..3].iter().zip(expected) {
+            assert!(
+                (actual - expected).abs() < 2.0e-4,
+                "actual={actual} expected={expected}"
+            );
+        }
+        let corrected_distance = rendered[..3]
+            .iter()
+            .zip(expected)
+            .map(|(actual, expected)| (actual - expected).abs())
+            .sum::<f32>();
+        let legacy_distance = rendered[..3]
+            .iter()
+            .zip(legacy_wrong)
+            .map(|(actual, legacy)| (actual - legacy).abs())
+            .sum::<f32>();
+        assert!(
+            corrected_distance < 6.0e-4,
+            "corrected output drifted from the AP1 display reference: rendered={rendered:?} expected={expected:?} distance={corrected_distance}"
+        );
+        assert!(
+            legacy_distance > 0.02,
+            "legacy output unexpectedly matched: {rendered:?}"
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn scene_referred_v2_preserves_extended_values_and_has_an_explicit_pixel_delta() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
@@ -5612,6 +5695,90 @@ mod blur_pass_tests {
             cold_removed.to_rgba16().into_raw()
         );
     }
+
+    #[test]
+    fn presentation_health_rejects_black_and_accepts_visible_texture_samples() {
+        let pixel = |rgba: [f32; 4]| {
+            rgba.into_iter()
+                .flat_map(|channel| f16::from_f32(channel).to_bits().to_le_bytes())
+                .collect::<Vec<_>>()
+        };
+        let black = [pixel([0.0, 0.0, 0.0, 1.0]), pixel([0.0, 0.0, 0.0, 1.0])].concat();
+        let black_health = presentation_health_from_rgba16f_samples(&black).expect("black proof");
+        assert_eq!(black_health.visible_sample_count, 0);
+        assert!(!black_health.is_visible());
+
+        let visible = [pixel([0.0, 0.0, 0.0, 1.0]), pixel([0.2, 0.4, 0.8, 1.0])].concat();
+        let visible_health =
+            presentation_health_from_rgba16f_samples(&visible).expect("visible proof");
+        assert_eq!(visible_health.sample_count, 2);
+        assert_eq!(visible_health.visible_sample_count, 1);
+        assert!(visible_health.max_luminance > 0.0);
+        assert!(visible_health.max_chroma > 0.0);
+        assert!(visible_health.is_visible());
+    }
+
+    #[cfg(all(feature = "tauri-test", target_os = "macos"))]
+    #[test]
+    fn presentation_health_reads_nonblank_pixels_from_the_exact_metal_texture() {
+        use tauri::Manager;
+
+        let _test_guard = acquire_gpu_test_lock();
+        let app = tauri::test::mock_builder()
+            .manage(AppState::new())
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .unwrap();
+        let state = app.state::<AppState>();
+        let context = get_or_init_compute_gpu_context_for_tests(&state).unwrap();
+        let pixels = (0..25_u32)
+            .flat_map(|index| {
+                let red = index as f32 / 24.0;
+                [red, 0.25, 0.75, 1.0]
+                    .into_iter()
+                    .flat_map(|channel| f16::from_f32(channel).to_bits().to_le_bytes())
+            })
+            .collect::<Vec<_>>();
+        let texture = context.device.create_texture_with_data(
+            &context.queue,
+            &wgpu::TextureDescriptor {
+                label: Some("Presentation Health Metal Proof"),
+                size: wgpu::Extent3d {
+                    width: 5,
+                    height: 5,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba16Float,
+                usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
+                view_formats: &[],
+            },
+            TextureDataOrder::MipMajor,
+            &pixels,
+        );
+        let mut encoder = context
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Presentation Health Metal Proof"),
+            });
+        let samples = encode_presentation_health_samples(
+            &context.device,
+            &mut encoder,
+            &texture,
+            [0, 0],
+            5,
+            5,
+        );
+        context.queue.submit(Some(encoder.finish()));
+        let health =
+            read_presentation_health(&context.device, &samples).expect("Metal health proof");
+        assert_eq!(health.sample_count, 25);
+        assert!(health.visible_sample_count > 0);
+        assert!(health.max_luminance > 0.25);
+        assert!(health.max_chroma > 0.0);
+        assert!(health.is_visible());
+    }
 }
 
 pub fn process_and_get_dynamic_image(
@@ -5636,7 +5803,7 @@ pub fn process_and_get_dynamic_image(
         false,
         None,
     )
-    .map(|(image, _)| image)
+    .map(|(image, _, _)| image)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5662,7 +5829,7 @@ pub fn process_and_get_unclamped_dynamic_image(
         true,
         None,
     )
-    .map(|(image, _)| image)
+    .map(|(image, _, _)| image)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -5684,7 +5851,7 @@ pub fn process_and_get_unclamped_dynamic_image_with_film_tap(
             return Err("film_runtime_proof_compiled_film_node_missing".to_string());
         }
     };
-    let (image, receipt) = process_and_get_dynamic_image_inner(
+    let (image, receipt, _) = process_and_get_dynamic_image_inner(
         context,
         state,
         base_image,
@@ -5703,6 +5870,11 @@ pub fn process_and_get_unclamped_dynamic_image_with_film_tap(
         .ok_or_else(|| "film_runtime_proof_missing_production_gpu_tap".to_string())
 }
 
+pub struct GpuPreviewRenderOutput {
+    pub image: DynamicImage,
+    pub presentation_health: Option<crate::gpu_display::NativePresentationHealth>,
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn process_and_get_dynamic_image_with_analytics(
     context: &GpuContext,
@@ -5715,7 +5887,7 @@ pub fn process_and_get_dynamic_image_with_analytics(
     presentation_identity: Option<crate::gpu_display::NativeFrameIdentity>,
     presentation_is_current: Option<&dyn Fn() -> bool>,
     analytics_config: Option<crate::AnalyticsConfig>,
-) -> Result<DynamicImage, String> {
+) -> Result<GpuPreviewRenderOutput, String> {
     process_and_get_dynamic_image_inner(
         context,
         state,
@@ -5730,7 +5902,10 @@ pub fn process_and_get_dynamic_image_with_analytics(
         false,
         None,
     )
-    .map(|(image, _)| image)
+    .map(|(image, _, presentation_health)| GpuPreviewRenderOutput {
+        image,
+        presentation_health,
+    })
 }
 
 fn submit_preview_analytics(analytics: crate::AnalyticsConfig, image: DynamicImage) {
@@ -5755,6 +5930,127 @@ fn submit_preview_analytics(analytics: crate::AnalyticsConfig, image: DynamicIma
     }
 }
 
+const PRESENTATION_HEALTH_GRID_SIZE: u32 = 5;
+const PRESENTATION_BLACK_EPSILON: f32 = 1.0 / 4096.0;
+
+fn presentation_health_from_rgba16f_samples(
+    samples: &[u8],
+) -> Result<crate::gpu_display::NativePresentationHealth, String> {
+    if samples.is_empty()
+        || !samples
+            .len()
+            .is_multiple_of(GPU_OUTPUT_BYTES_PER_PIXEL as usize)
+    {
+        return Err("presentation_health_samples_invalid".into());
+    }
+    let mut max_chroma = 0.0_f32;
+    let mut max_luminance = 0.0_f32;
+    let mut visible_sample_count = 0_u32;
+    for pixel in samples.chunks_exact(GPU_OUTPUT_BYTES_PER_PIXEL as usize) {
+        let channel = |offset: usize| {
+            f16::from_bits(u16::from_le_bytes([pixel[offset], pixel[offset + 1]])).to_f32()
+        };
+        let [red, green, blue, alpha] = [channel(0), channel(2), channel(4), channel(6)];
+        if ![red, green, blue, alpha].into_iter().all(f32::is_finite) {
+            continue;
+        }
+        let luminance =
+            (red.max(0.0) * 0.2126) + (green.max(0.0) * 0.7152) + (blue.max(0.0) * 0.0722);
+        let chroma = red.max(green).max(blue) - red.min(green).min(blue);
+        max_luminance = max_luminance.max(luminance);
+        max_chroma = max_chroma.max(chroma.max(0.0));
+        if alpha > PRESENTATION_BLACK_EPSILON
+            && red.max(green).max(blue) > PRESENTATION_BLACK_EPSILON
+        {
+            visible_sample_count += 1;
+        }
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"rapidraw-native-presentation-health-v1\0");
+    hasher.update(samples);
+    Ok(crate::gpu_display::NativePresentationHealth {
+        content_fingerprint: format!("sha256:{}", hex::encode(hasher.finalize())),
+        max_chroma,
+        max_luminance,
+        sample_count: (samples.len() / GPU_OUTPUT_BYTES_PER_PIXEL as usize) as u32,
+        visible_sample_count,
+    })
+}
+
+fn encode_presentation_health_samples(
+    device: &wgpu::Device,
+    encoder: &mut wgpu::CommandEncoder,
+    texture: &wgpu::Texture,
+    origin: [u32; 2],
+    width: u32,
+    height: u32,
+) -> wgpu::Buffer {
+    let sample_count = PRESENTATION_HEALTH_GRID_SIZE * PRESENTATION_HEALTH_GRID_SIZE;
+    let sample_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Native Presentation Health Samples"),
+        size: u64::from(sample_count * GPU_OUTPUT_BYTES_PER_PIXEL),
+        usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+        mapped_at_creation: false,
+    });
+    for sample_y in 0..PRESENTATION_HEALTH_GRID_SIZE {
+        for sample_x in 0..PRESENTATION_HEALTH_GRID_SIZE {
+            let x = origin[0]
+                + (width.saturating_sub(1) * sample_x)
+                    / PRESENTATION_HEALTH_GRID_SIZE.saturating_sub(1).max(1);
+            let y = origin[1]
+                + (height.saturating_sub(1) * sample_y)
+                    / PRESENTATION_HEALTH_GRID_SIZE.saturating_sub(1).max(1);
+            let sample_index = sample_y * PRESENTATION_HEALTH_GRID_SIZE + sample_x;
+            encoder.copy_texture_to_buffer(
+                wgpu::TexelCopyTextureInfo {
+                    texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d { x, y, z: 0 },
+                    aspect: wgpu::TextureAspect::All,
+                },
+                wgpu::TexelCopyBufferInfo {
+                    buffer: &sample_buffer,
+                    layout: wgpu::TexelCopyBufferLayout {
+                        offset: u64::from(sample_index * GPU_OUTPUT_BYTES_PER_PIXEL),
+                        bytes_per_row: None,
+                        rows_per_image: None,
+                    },
+                },
+                wgpu::Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
+    }
+    sample_buffer
+}
+
+fn read_presentation_health(
+    device: &wgpu::Device,
+    buffer: &wgpu::Buffer,
+) -> Result<crate::gpu_display::NativePresentationHealth, String> {
+    let slice = buffer.slice(..);
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    slice.map_async(wgpu::MapMode::Read, move |result| {
+        let _ = sender.send(result);
+    });
+    device
+        .poll(wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: Some(Duration::from_millis(750)),
+        })
+        .map_err(|error| format!("presentation_health_poll_failed:{error}"))?;
+    receiver
+        .recv_timeout(Duration::from_millis(750))
+        .map_err(|_| "presentation_health_readback_timeout".to_string())?
+        .map_err(|error| format!("presentation_health_map_failed:{error}"))?;
+    let bytes = slice.get_mapped_range().to_vec();
+    buffer.unmap();
+    presentation_health_from_rgba16f_samples(&bytes)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn process_and_get_dynamic_image_inner(
     context: &GpuContext,
@@ -5769,7 +6065,14 @@ fn process_and_get_dynamic_image_inner(
     analytics_config: Option<crate::AnalyticsConfig>,
     preserve_unclamped_float_readback: bool,
     capture_post_film: Option<GpuPostFilmTapIdentityV1>,
-) -> Result<(DynamicImage, Option<GpuPostFilmTapReceiptV1>), String> {
+) -> Result<
+    (
+        DynamicImage,
+        Option<GpuPostFilmTapReceiptV1>,
+        Option<crate::gpu_display::NativePresentationHealth>,
+    ),
+    String,
+> {
     let start_time = Instant::now();
     let (width, height) = base_image.dimensions();
     let device = &context.device;
@@ -5810,7 +6113,7 @@ fn process_and_get_dynamic_image_inner(
             request.lut.as_deref(),
             edit_graph,
         )
-        .map(|image| (image, None))
+        .map(|image| (image, None, None))
         .map_err(str::to_owned);
     }
 
@@ -6029,6 +6332,7 @@ fn process_and_get_dynamic_image_inner(
     let mut async_readback_buffer: Option<wgpu::Buffer> = None;
     let mut async_padded_bpr: u32 = 0;
     let mut async_unpadded_bpr: u32 = 0;
+    let mut presentation_health_buffer: Option<wgpu::Buffer> = None;
 
     if analytics_config.is_some() && skip_readback {
         let unpadded_bytes_per_row = GPU_OUTPUT_BYTES_PER_PIXEL * out_w;
@@ -6103,12 +6407,25 @@ fn process_and_get_dynamic_image_inner(
                 depth_or_array_layers: 1,
             },
         );
+        presentation_health_buffer = Some(encode_presentation_health_samples(
+            device,
+            &mut final_encoder,
+            &processor.output_texture,
+            [out_x, out_y],
+            out_w,
+            out_h,
+        ));
         submit_final_encoder = true;
     }
 
     if submit_final_encoder {
         queue.submit(Some(final_encoder.finish()));
     }
+
+    let presentation_health = presentation_health_buffer
+        .as_ref()
+        .map(|buffer| read_presentation_health(device, buffer))
+        .transpose()?;
 
     if let Some(analytics) = analytics_config {
         if let Some(buffer) = async_readback_buffer {
@@ -6178,11 +6495,15 @@ fn process_and_get_dynamic_image_inner(
         if presentation_is_current.is_some_and(|is_current| !is_current()) {
             return Err("presentation_stale_frame".into());
         }
+        let health = presentation_health
+            .as_ref()
+            .ok_or_else(|| "presentation_health_missing".to_string())?;
         context.presentation.present_texture_for_frame(
             processor.output_texture_view.clone(),
             [width, height],
             [processor_state.width, processor_state.height],
             presentation_identity,
+            health,
         )?;
     }
 
@@ -6200,7 +6521,7 @@ fn process_and_get_dynamic_image_inner(
             duration,
             fps
         );
-        return Ok((DynamicImage::new_rgba8(0, 0), None));
+        return Ok((DynamicImage::new_rgba8(0, 0), None, presentation_health));
     }
 
     let duration = start_time.elapsed();
@@ -6225,5 +6546,5 @@ fn process_and_get_dynamic_image_inner(
     } else {
         rgba16float_readback_to_dynamic_image(out_w, out_h, processed_pixels)
     }?;
-    Ok((image, post_film_receipt))
+    Ok((image, post_film_receipt, None))
 }

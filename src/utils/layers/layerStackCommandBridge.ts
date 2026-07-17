@@ -141,6 +141,7 @@ function toBrushMaskV1(subMask: MaskContainer['subMasks'][number]): BrushMaskV1 
     flow?: number;
     lines?: Array<{
       brushSize?: number;
+      density?: number;
       feather?: number;
       flow?: number;
       points?: Array<{ pressure?: number; x: number; y: number }>;
@@ -156,16 +157,17 @@ function toBrushMaskV1(subMask: MaskContainer['subMasks'][number]): BrushMaskV1 
   }
   const maximumDimension = Math.max(width, height);
   const strokes = (parameters.lines ?? []).map((line, index) => {
-    if (line.tool === 'eraser') throw new Error('Authoritative brush masks do not support erase strokes yet.');
     const size = line.brushSize ?? line.size;
     if (!Number.isFinite(size) || !size) throw new Error('Authoritative brush stroke size is invalid.');
     const feather = line.feather ?? 0;
     const hardness = line.brushSize === undefined ? 1 - feather / 100 : 1 - feather;
     const flow = (line.flow ?? parameters.flow ?? 100) / 100;
     return {
+      ...(line.density === undefined ? {} : { density: line.density }),
       flow,
       hardness,
       id: `${subMask.id}_stroke_${index + 1}`,
+      ...(line.tool === undefined ? {} : { mode: line.tool === 'eraser' ? ('erase' as const) : ('paint' as const) }),
       points: (line.points ?? []).map((point) => ({
         ...(point.pressure === undefined ? {} : { pressure: point.pressure }),
         x: point.x / width,
@@ -223,6 +225,35 @@ export function buildLayerStackSidecarFromMasks(
     sourceImagePath: parsedContext.imagePath,
     storage: 'sidecar_artifact',
   };
+}
+
+/**
+ * Keep an existing native layer sidecar aligned with the typed layer authority
+ * without re-serializing brush payloads that may only exist in the sidecar.
+ * Local mask controls can update tone values while the native mask remains
+ * authoritative for rendering and reopen.
+ */
+export function updateLayerStackSidecarToneColorFromMasks(
+  sidecar: LayerStackSidecarV1,
+  masks: ReadonlyArray<MaskContainer>,
+): LayerStackSidecarV1 {
+  const masksById = new Map(masks.map((mask) => [mask.id, mask]));
+  return layerStackSidecarV1Schema.parse({
+    ...sidecar,
+    layers: sidecar.layers.flatMap((layer) => {
+      const mask = masksById.get(layer.id);
+      if (mask === undefined) return [];
+      return [
+        {
+          ...layer,
+          adjustments: {
+            ...(layer.adjustments ?? {}),
+            toneColor: toLayerScopedToneAdjustment(mask.adjustments),
+          },
+        },
+      ];
+    }),
+  });
 }
 
 export function applyLayerStackCommandBridgeOperation(
@@ -528,36 +559,9 @@ function materializeMasksFromSidecar(
           ? [operation.subMask]
           : [...previous.subMasks.filter((subMask) => subMask.id !== operation.subMask.id), operation.subMask]
         : previous.subMasks;
-    const serializedSubMasks: Array<MaskContainer['subMasks'][number]> = (layer.subMasks ?? []).flatMap((candidate) => {
-      const parsed = brushMaskV1Schema.safeParse(candidate);
-      if (!parsed.success) return [];
-      const mask = parsed.data;
-      return [
-        {
-          id: mask.id,
-          invert: false,
-          mode: SubMaskMode.Additive,
-          name: 'Brush',
-          opacity: mask.opacity * 100,
-          parameters: {
-            lines: mask.strokes.map((stroke) => ({
-              feather: (1 - stroke.hardness) * 100,
-              points: stroke.points,
-              size: stroke.radius * 2,
-              tool: 'brush' as const,
-            })),
-            rawEngine: {
-              contentHash: `native:${mask.id}`,
-              coordinateSpace: mask.coordinateSpace,
-              height: 1,
-              width: 1,
-            },
-          },
-          type: Mask.Brush,
-          visible: true,
-        },
-      ];
-    });
+    const serializedSubMasks: Array<MaskContainer['subMasks'][number]> = (layer.subMasks ?? []).flatMap(
+      materializePersistedSubMask,
+    );
     const availableSubMasks = [
       ...serializedSubMasks,
       ...operationSubMasks.filter(
@@ -591,6 +595,74 @@ function materializeMasksFromSidecar(
     }
     return materializedMask;
   });
+}
+
+const isMaskType = (value: string): value is Mask => Object.values(Mask).some((maskType) => maskType === value);
+
+const isSubMaskMode = (value: string): value is SubMaskMode =>
+  Object.values(SubMaskMode).some((mode) => mode === value);
+
+function materializePersistedSubMask(
+  candidate: NonNullable<LayerStackSidecarLayerV1['subMasks']>[number],
+): Array<MaskContainer['subMasks'][number]> {
+  const brush = brushMaskV1Schema.safeParse(candidate);
+  if (brush.success) {
+    const mask = brush.data;
+    return [
+      {
+        id: mask.id,
+        invert: false,
+        mode: SubMaskMode.Additive,
+        name: 'Brush',
+        opacity: mask.opacity * 100,
+        parameters: {
+          lines: mask.strokes.map((stroke) => ({
+            ...(stroke.density === undefined ? {} : { density: stroke.density * 100 }),
+            feather: (1 - stroke.hardness) * 100,
+            points: stroke.points,
+            size: stroke.radius * 2,
+            tool: stroke.mode === 'erase' ? ('eraser' as const) : ('brush' as const),
+          })),
+          rawEngine: {
+            contentHash: `native:${mask.id}`,
+            coordinateSpace: mask.coordinateSpace,
+            height: 1,
+            width: 1,
+          },
+        },
+        type: Mask.Brush,
+        visible: true,
+      },
+    ];
+  }
+
+  const parsed = z
+    .looseObject({
+      id: z.string().trim().min(1),
+      invert: z.boolean().optional(),
+      mode: z.string().trim().min(1).optional(),
+      name: z.string().trim().min(1).optional(),
+      opacity: z.number().min(0).max(100).optional(),
+      parameters: z.record(z.string(), z.unknown()).optional(),
+      type: z.string().trim().min(1).optional(),
+      visible: z.boolean().optional(),
+    })
+    .safeParse(candidate);
+  if (!parsed.success || parsed.data.type === undefined || !isMaskType(parsed.data.type)) return [];
+  const mode =
+    parsed.data.mode !== undefined && isSubMaskMode(parsed.data.mode) ? parsed.data.mode : SubMaskMode.Additive;
+  return [
+    {
+      id: parsed.data.id,
+      invert: parsed.data.invert ?? false,
+      mode,
+      ...(parsed.data.name === undefined ? {} : { name: parsed.data.name }),
+      opacity: parsed.data.opacity ?? 100,
+      ...(parsed.data.parameters === undefined ? {} : { parameters: parsed.data.parameters }),
+      type: parsed.data.type,
+      visible: parsed.data.visible ?? true,
+    },
+  ];
 }
 
 function materializeSubMasksFromIds(
