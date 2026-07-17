@@ -486,7 +486,10 @@ const Slider = ({
     if (Number.isNaN(newValue)) {
       newValue = value;
     } else {
-      newValue = Math.max(min, Math.min(max, newValue));
+      // Numeric entry uses the same bounded step policy as the range track.
+      // This keeps integer tone controls and fractional exposure controls
+      // valid for their typed edit-document schemas.
+      newValue = snapToStep(newValue);
     }
     const syntheticEvent = {
       target: {
@@ -535,7 +538,8 @@ const Slider = ({
         currentNum = value;
       }
       const direction = e.key === 'ArrowUp' ? 1 : -1;
-      const newValue = currentNum + direction * step;
+      const multiplier = e.shiftKey || e.altKey ? FINE_ADJUSTMENT_MULTIPLIER : 1;
+      const newValue = currentNum + direction * step * multiplier;
       const snappedNewValue = snapToStep(newValue);
       setInputValue(String(snappedNewValue));
       onChange({
@@ -554,6 +558,17 @@ const Slider = ({
     }
     if (['ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp'].includes(e.key)) {
       beginInteraction();
+      if (e.shiftKey || e.altKey) {
+        // Native range inputs have no fine-step modifier. Apply the bounded
+        // fine increment ourselves and let keyup commit the interaction.
+        if (e.key.startsWith('Arrow')) {
+          e.preventDefault();
+          const direction = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 1 : -1;
+          const next = snapToStep(rangeValue + direction * step * FINE_ADJUSTMENT_MULTIPLIER);
+          setInteractionDraft(next);
+          onChange({ target: { value: next } });
+        }
+      }
     }
     if (e.ctrlKey || e.metaKey) {
       e.currentTarget.blur();
