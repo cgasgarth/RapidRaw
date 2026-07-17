@@ -447,7 +447,7 @@ export default function ColorPanel({
         label: t('adjustments.color.workspaceTabs.foundation'),
         panel: (
           <div className="space-y-px" data-testid="color-foundation-controls">
-            {!isForMask && (
+            {!isForMask ? (
               <ColorProfileToneControls
                 adjustmentVisibility={adjustmentVisibility}
                 adjustments={adjustments}
@@ -455,8 +455,9 @@ export default function ColorPanel({
                 rawDevelopmentReport={selectedImage?.rawDevelopmentReport ?? null}
                 onDragStateChange={onDragStateChange}
                 setAdjustments={setAdjustments}
+                showCameraProfile={false}
               />
-            )}
+            ) : null}
             <ColorQuickControls
               adjustments={adjustments}
               appSettings={appSettings}
@@ -468,6 +469,7 @@ export default function ColorPanel({
               }
               onDragStateChange={onDragStateChange}
               setAdjustments={setAdjustments}
+              showWhiteBalance={isForMask}
               {...(toggleWbPicker ? { toggleWbPicker } : {})}
             />
           </div>
