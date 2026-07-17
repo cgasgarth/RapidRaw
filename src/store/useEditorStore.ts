@@ -29,6 +29,7 @@ import {
   reduceBasicToneSliderInteractionPreview,
 } from '../utils/basicToneSliderInteraction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
+import type { CropEditDraft } from '../utils/cropEditSession';
 import type { DetailModifierPreview } from '../utils/detailLoupe';
 import { selectEditDocumentSourceArtifacts } from '../utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2, type EditDocumentV2CopyPayload } from '../utils/editDocumentV2';
@@ -45,12 +46,6 @@ import {
   reduceEditorCompare,
 } from '../utils/editorCompare';
 import {
-  DEFAULT_EDITOR_REFERENCE_VIEW_STATE,
-  type EditorReferenceViewCommand,
-  type EditorReferenceViewState,
-  reduceEditorReferenceView,
-} from '../utils/editorReferenceView';
-import {
   type EditorNamedSnapshot,
   hasDuplicateSnapshotLabel,
   normalizeSnapshotLabel,
@@ -59,6 +54,12 @@ import {
   stripNamedSnapshots,
   withNamedSnapshots,
 } from '../utils/editorNamedSnapshots';
+import {
+  DEFAULT_EDITOR_REFERENCE_VIEW_STATE,
+  type EditorReferenceViewCommand,
+  type EditorReferenceViewState,
+  reduceEditorReferenceView,
+} from '../utils/editorReferenceView';
 import {
   type EditorTeardownTransactionRequest,
   type EditorTeardownTransactionResult,
@@ -261,6 +262,8 @@ interface EditorState {
   isWbPickerActive: boolean;
   lastWhiteBalancePickerReceipt: WhiteBalancePickerRuntimeReceipt | null;
   liveRotation: number | null;
+  /** Transient canvas-first Crop draft; never persisted or added to history until Done. */
+  cropDraft: CropEditDraft | null;
   brushSettings: BrushSettings | null;
 
   // Masks & AI
@@ -693,6 +696,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   isWbPickerActive: false,
   lastWhiteBalancePickerReceipt: null,
   liveRotation: null,
+  cropDraft: null,
 
   copiedSectionAdjustments: null,
   copiedMask: null,
@@ -779,6 +783,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         referenceMatchSpatialAnalysis: null,
         referenceMatchPreview: null,
         selectedImage: null,
+        cropDraft: null,
         viewportRevision: state.viewportRevision + 1,
         previewViewportTransform: { positionX: 0, positionY: 0, scale: 1 },
         waveform: null,
