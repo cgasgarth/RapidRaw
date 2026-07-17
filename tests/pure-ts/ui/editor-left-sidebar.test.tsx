@@ -27,6 +27,13 @@ test('renders one ordered Develop workflow with stable accessible slots and one 
   expect(getRequiredElement(container, '[data-testid="editor-left-resizer"]').getAttribute('aria-label')).toBe(
     'Resize Develop workflow',
   );
+  expect(region.querySelector('h2')).toBeNull();
+  expect(
+    getRequiredElement<HTMLElement>(region, '[data-editor-left-slot="navigator"]').dataset['editorLeftPrimary'],
+  ).toBe('true');
+  expect(getRequiredElement<HTMLElement>(region, '[data-editor-left-slot="presets"]').className).not.toContain(
+    'bg-editor-panel-well',
+  );
 });
 
 test('persists section disclosure changes through the typed callback', async () => {
@@ -58,6 +65,30 @@ test('collapse restores focus to the stable expand control and preserves geometr
   expect(container.querySelector('[data-testid="editor-left-resizer"]')).toBeNull();
 });
 
+test('fullscreen temporarily removes left-rail focus and restores the prior control', async () => {
+  const rendered = await renderSidebar();
+  const collapse = getRequiredElement<HTMLButtonElement>(rendered.container, '[data-testid="editor-left-collapse"]');
+  collapse.focus();
+
+  rendered.rerender(
+    createElement(
+      I18nextProvider,
+      { i18n: await createTestI18n() },
+      createElement(SidebarHarness, { isFullScreen: true }),
+    ),
+  );
+  await waitFor(() => expect(document.activeElement).not.toBe(collapse));
+
+  rendered.rerender(
+    createElement(
+      I18nextProvider,
+      { i18n: await createTestI18n() },
+      createElement(SidebarHarness, { isFullScreen: false }),
+    ),
+  );
+  await waitFor(() => expect(document.activeElement?.getAttribute('data-testid')).toBe('editor-left-collapse'));
+});
+
 test('unmounts Presets workflow when its section or sidebar collapses', async () => {
   const user = userEvent.setup();
   const lifecycle: string[] = [];
@@ -87,9 +118,11 @@ function PresetsLifecycleProbe({ lifecycle }: { lifecycle: string[] }) {
 
 function SidebarHarness({
   changes = [],
+  isFullScreen = false,
   lifecycle,
 }: {
   changes?: Array<[EditorLeftSectionId, boolean]>;
+  isFullScreen?: boolean;
   lifecycle?: string[];
 }) {
   const [expandedSections, setExpandedSections] = useState<EditorLeftSectionId[]>(['navigator', 'presets']);
@@ -97,7 +130,7 @@ function SidebarHarness({
 
   return createElement(EditorLeftSidebar, {
     expandedSections,
-    isFullScreen: false,
+    isFullScreen,
     isResizing: false,
     isVisible,
     onResizeStart: () => undefined,
@@ -115,9 +148,11 @@ function SidebarHarness({
 
 async function renderSidebar({
   changes = [],
+  isFullScreen = false,
   lifecycle,
 }: {
   changes?: Array<[EditorLeftSectionId, boolean]>;
+  isFullScreen?: boolean;
   lifecycle?: string[];
 } = {}) {
   const i18n = i18next.createInstance();
@@ -126,9 +161,19 @@ async function renderSidebar({
     createElement(
       I18nextProvider,
       { i18n },
-      createElement(SidebarHarness, { changes, ...(lifecycle === undefined ? {} : { lifecycle }) }),
+      createElement(SidebarHarness, {
+        changes,
+        isFullScreen,
+        ...(lifecycle === undefined ? {} : { lifecycle }),
+      }),
     ),
   );
+}
+
+async function createTestI18n() {
+  const instance = i18next.createInstance();
+  await instance.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', react: { useSuspense: false } });
+  return instance;
 }
 
 function getRequiredElement<T extends Element = Element>(container: Element, selector: string): T {
