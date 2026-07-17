@@ -104,6 +104,7 @@ import CurveGraph, { type CurveAdjustmentUpdater, type CurveAdjustmentView } fro
 import CalibrationPanel from '../../../adjustments/color/CalibrationPanel';
 import DetailsPanel, { type DetailAdjustmentUpdate, type DetailAdjustmentView } from '../../../adjustments/Details';
 import EffectsPanel, { type EffectAdjustmentUpdate, type EffectAdjustmentView } from '../../../adjustments/Effects';
+import LensCorrections from '../../../adjustments/LensCorrections';
 import ReferenceMatchPanel from '../../../adjustments/ReferenceMatchPanel';
 import TransformLens, {
   type TransformLensAdjustmentUpdate,
@@ -1178,6 +1179,28 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
         suffix: '%',
         truncate: true,
       }),
+      sliderControl({
+        aliases: ['lens', 'ca', 'chromatic aberration', 'remove chromatic aberration'],
+        id: DetailsAdjustment.ChromaticAberrationRedCyan,
+        key: DetailsAdjustment.ChromaticAberrationRedCyan,
+        label: t('adjustments.details.redCyan'),
+        max: 100,
+        min: -100,
+        sectionName: 'lensCorrection',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        aliases: ['lens', 'ca', 'chromatic aberration', 'remove chromatic aberration'],
+        id: DetailsAdjustment.ChromaticAberrationBlueYellow,
+        key: DetailsAdjustment.ChromaticAberrationBlueYellow,
+        label: t('adjustments.details.blueYellow'),
+        max: 100,
+        min: -100,
+        sectionName: 'lensCorrection',
+        step: 1,
+        truncate: true,
+      }),
     ];
 
     const detailControls: DevelopPanelControl[] = [
@@ -1781,12 +1804,11 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
         );
       case 'lensCorrection':
         return (
-          <TransformLens
+          <LensCorrections
             adjustments={{
               ...adjustments.geometry,
               ...selectEditDocumentNode(adjustments, 'lens_correction').params,
             }}
-            mode="lens"
             selectedImage={selectedImage}
             setAdjustments={setTransformLensAdjustments}
             onDragStateChange={onDragStateChange}
