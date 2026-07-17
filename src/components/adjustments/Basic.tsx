@@ -2,11 +2,13 @@ import cx from 'clsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import { useEditorActions } from '../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { type BasicToneCommitIdentity, buildBasicToneEditTransaction } from '../../utils/basicToneEditTransaction';
+import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import {
   buildToneEqualizerEditTransaction,
@@ -17,6 +19,9 @@ import type { AppSettings } from '../ui/AppProperties';
 import { compactInspectorSliderTokens } from '../ui/inspectorTokens';
 import InspectorSegmentedControl from '../ui/primitives/InspectorSegmentedControl';
 import AdjustmentSlider from './AdjustmentSlider';
+import { ColorProfileToneControls } from './color/ColorProfileToneControls';
+import { ColorQuickControls } from './color/ColorQuickControls';
+import type { ColorPanelAdjustmentView } from './color/types';
 
 export type BasicAdjustmentView = EditDocumentNodeParamsV2<'scene_global_color_tone'> &
   EditDocumentNodeParamsV2<'scene_to_view_transform'> &
@@ -29,7 +34,10 @@ interface BasicAdjustmentsProps {
   isForMask?: boolean;
   onRequireEditGraphV2?: () => void;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
-  appSettings?: Pick<AppSettings, 'tonemapperOverrideEnabled'> | null;
+  appSettings?: Pick<AppSettings, 'adjustmentVisibility' | 'tonemapperOverrideEnabled' | 'useWgpuRenderer'> | null;
+  cameraInputAdjustments?: ColorPanelAdjustmentView;
+  isWbPickerActive?: boolean;
+  toggleWbPicker?: () => void;
 }
 
 interface ToneMapperSwitchProps {
@@ -37,6 +45,36 @@ interface ToneMapperSwitchProps {
   onMapperChange: (mapper: BasicAdjustmentView['toneMapper']) => void;
   onReset: () => void;
 }
+
+interface BasicTreatmentProps {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}
+
+const BasicTreatment = ({ enabled, onChange }: BasicTreatmentProps) => {
+  const { t } = useTranslation();
+  const treatmentLabel = t('adjustments.basic.treatment', { defaultValue: 'Treatment' });
+  return (
+    <section
+      className="border-b border-editor-border pb-1.5"
+      data-testid="basic-treatment"
+      data-treatment={enabled ? 'black_and_white' : 'color'}
+    >
+      <div className="grid grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-0.5 py-0.5">
+        <span className="truncate text-[10px] leading-4 text-text-secondary">{treatmentLabel}</span>
+        <InspectorSegmentedControl
+          ariaLabel={treatmentLabel}
+          onChange={(value) => onChange(value === 'black_and_white')}
+          options={[
+            { label: t('adjustments.basic.color', { defaultValue: 'Color' }), value: 'color' },
+            { label: t('adjustments.basic.blackAndWhite', { defaultValue: 'B&W' }), value: 'black_and_white' },
+          ]}
+          value={enabled ? 'black_and_white' : 'color'}
+        />
+      </div>
+    </section>
+  );
+};
 
 type AdjustmentUpdate = BasicAdjustmentUpdate;
 
@@ -124,8 +162,12 @@ export default function BasicAdjustments({
   onRequireEditGraphV2,
   onDragStateChange,
   appSettings,
+  cameraInputAdjustments,
+  isWbPickerActive = false,
+  toggleWbPicker,
 }: BasicAdjustmentsProps) {
   const { t } = useTranslation();
+  const { commitEditNodeOperations } = useEditorActions();
   const [toneAdvancedOpen, setToneAdvancedOpen] = useState(false);
   const [tonePlacementStatus, setTonePlacementStatus] = useState<string | null>(null);
   const [toneHistogram, setToneHistogram] = useState<number[]>([]);
@@ -142,6 +184,8 @@ export default function BasicAdjustments({
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const selectedRawDevelopmentReport = useEditorStore((state) => state.selectedImage?.rawDevelopmentReport ?? null);
+  const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
   const basicToneCommitIdentity = useMemo<BasicToneCommitIdentity | null>(
     () =>
       !isForMask && selectedImagePath !== null
@@ -248,6 +292,19 @@ export default function BasicAdjustments({
       ...prev,
       toneMapper: INITIAL_ADJUSTMENTS.toneMapper,
     }));
+  };
+
+  const handleTreatmentChange = (enabled: boolean) => {
+    if (isForMask || cameraInputAdjustments === undefined) return;
+    const current = selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'black_white_mixer').params;
+    if (current.blackWhiteMixer.enabled === enabled) return;
+    commitEditNodeOperations([
+      {
+        nodeType: 'black_white_mixer',
+        patch: { blackWhiteMixer: { ...current.blackWhiteMixer, enabled } },
+        type: 'patch-edit-document-node',
+      },
+    ]);
   };
 
   const handleViewSettingChange = (key: keyof BasicAdjustmentView['viewTransform'], value: number) => {
@@ -400,6 +457,33 @@ export default function BasicAdjustments({
       data-commit-source-identity={basicToneCommitIdentity?.sourceIdentity}
       data-testid="basic-light-controls"
     >
+      {!isForMask && cameraInputAdjustments ? (
+        <div className="space-y-px" data-testid="basic-camera-input-controls">
+          <BasicTreatment enabled={cameraInputAdjustments.blackWhiteMixer.enabled} onChange={handleTreatmentChange} />
+          <ColorProfileToneControls
+            adjustmentVisibility={appSettings?.adjustmentVisibility ?? {}}
+            adjustments={cameraInputAdjustments}
+            appSettings={null}
+            rawDevelopmentReport={selectedRawDevelopmentReport}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={() => undefined}
+            showToneCurve={false}
+          />
+          <ColorQuickControls
+            adjustments={cameraInputAdjustments}
+            appSettings={null}
+            isForMask={false}
+            isWbPickerActive={isWbPickerActive}
+            isWgpuEnabled={isWgpuEnabled}
+            inputSemantics={selectedRawDevelopmentReport ? 'raw_scene_linear' : 'rendered_scene_linear_approximation'}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={() => undefined}
+            showPresence={false}
+            {...(toggleWbPicker ? { toggleWbPicker } : {})}
+          />
+        </div>
+      ) : null}
+
       {!hideToneMapper && (
         <ToneMapperSwitch
           selectedMapper={adjustments.toneMapper}

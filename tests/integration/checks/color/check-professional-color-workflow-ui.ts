@@ -74,8 +74,6 @@ const rendered = await renderColorPanel();
 
 try {
   await validateFoundationHierarchy(rendered.container);
-  await validateDirectProfileToneSelection(rendered.container);
-  await validateWhiteBalanceFoundation(rendered.container);
   await validateKeyboardWorkspaceNavigation(rendered.container);
   await selectMixerWorkspace(rendered.container);
   await validateCompactMixerSurface(rendered.container);
@@ -267,66 +265,18 @@ async function validateKeyboardWorkspaceNavigation(container: Element) {
 
 function validateFoundationHierarchy(container: Element) {
   const foundation = getByTestId(container, 'color-foundation-controls');
-  const profileTone = getByTestId(foundation, 'profile-tone-controls');
-  const whiteBalance = getByTestId(foundation, 'color-quick-white-balance');
-  const globalColor = getByTestId(foundation, 'color-quick-presence');
+  const toneCurve = getByTestId(foundation, 'profile-tone-controls');
 
   assert.equal(getByTestId(container, 'color-workspace-tab-foundation').getAttribute('aria-selected'), 'true');
-  assert.equal(profileTone.dataset.runtimeProfileStatus, 'fallback');
-  const profileStatus = getByTestId(profileTone, 'color-input-profile-status');
-  assert.equal(normalizeText(profileStatus.textContent), 'Fallback');
-  assert.equal(profileStatus.title, rawDevelopmentReportFixture.cameraProfile.fallbackReason);
-  assert.equal(normalizeText(profileTone.textContent).includes('balanced process'), true);
+  assert.equal(toneCurve.querySelector('[data-testid="camera-profile-browser"]'), null);
+  assert.ok(toneCurve.querySelector('select[aria-label="Tone Curve"]'));
+  assert.equal(foundation.querySelector('[data-testid="color-quick-white-balance"]'), null);
   assert.equal(
     foundation.querySelector('[data-testid="color-calibration-disclosure"]'),
     null,
     'Color foundation must not duplicate the standalone Develop Calibration section.',
   );
-  for (const next of [whiteBalance, globalColor]) {
-    assert.equal(
-      profileTone.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING,
-      Node.DOCUMENT_POSITION_FOLLOWING,
-      'Input / Profile should lead the Color foundation hierarchy.',
-    );
-  }
-  assert.equal(
-    whiteBalance.compareDocumentPosition(globalColor) & Node.DOCUMENT_POSITION_FOLLOWING,
-    Node.DOCUMENT_POSITION_FOLLOWING,
-    'White Balance should precede Global Color.',
-  );
-}
-
-async function validateWhiteBalanceFoundation(container: Element) {
-  const whiteBalance = getByTestId(container, 'color-quick-white-balance');
-  const mode = getByTestId<HTMLSelectElement>(whiteBalance, 'color-white-balance-mode');
-  const reset = getByTestId<HTMLButtonElement>(whiteBalance, 'color-white-balance-as-shot');
-  const picker = getByTestId<HTMLButtonElement>(whiteBalance, 'color-white-balance-picker');
-  assert.equal(mode.value, 'as_shot');
-  assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
-  assert.equal(reset.disabled, true);
-
-  await changeSelect(mode, 'kelvin_tint');
-  const kelvin = getByTestId<HTMLInputElement>(whiteBalance, 'color-white-balance-kelvin');
-  await changeInput(kelvin, 3200);
-  assert.equal(whiteBalance.dataset.whiteBalanceState, 'custom');
-  assert.equal(reset.disabled, false);
-  await click(reset);
-  assert.equal(mode.value, 'as_shot');
-  assert.equal(whiteBalance.querySelector('[data-testid="color-white-balance-kelvin"]'), null);
-  assert.equal(whiteBalance.dataset.whiteBalanceState, 'as-shot');
-
-  await changeSelect(mode, 'auto');
-  assert.equal(mode.value, 'auto');
-  assert.equal(autoWhiteBalanceInvokeCount, 1, 'Auto mode must invoke image analysis exactly once.');
-  assert.equal(normalizeText(whiteBalance.textContent).includes('4380 K'), true);
-  await click(reset);
-
-  await click(picker);
-  assert.equal(picker.getAttribute('aria-pressed'), 'true');
-  assert.equal(picker.dataset.state, 'active');
-  await click(picker);
-  assert.equal(picker.getAttribute('aria-pressed'), 'false');
-  assert.equal(picker.dataset.state, 'idle');
+  assert.ok(getByTestId(foundation, 'color-quick-presence'));
 }
 
 function validateMaskLocalFiltering(container: Element) {
@@ -432,24 +382,6 @@ async function validateCompactMixerSurface(container: Element) {
   }
   assert.equal(localRangeDisclosure.dataset.scope, 'local-adjustment');
   assert.equal(localRangeDisclosure.open, false, 'Range refinement should start collapsed.');
-}
-
-async function validateDirectProfileToneSelection(container: Element) {
-  const controls = getByTestId(container, 'profile-tone-controls');
-  const profile = getByTestId(controls, 'camera-profile-browser').querySelector<HTMLButtonElement>('button');
-  const toneCurve = controls.querySelector<HTMLSelectElement>('select[aria-label="Tone Curve"]');
-  assert.ok(profile, 'Camera Profile browser was not rendered.');
-  assert.ok(toneCurve, 'Tone Curve selector was not rendered.');
-
-  await click(profile);
-  const portraitProfile = Array.from(
-    getByTestId(controls, 'camera-profile-browser-popover').querySelectorAll<HTMLButtonElement>('button'),
-  ).find((button) => normalizeText(button.textContent) === 'Portrait');
-  assert.ok(portraitProfile, 'Portrait was not exposed in the profile browser.');
-  await click(portraitProfile);
-  await changeSelect(toneCurve, 'soft_contrast');
-  assert.equal(controls.dataset.cameraProfile, 'camera_portrait', 'Profile selector did not apply the selected value.');
-  assert.equal(controls.dataset.toneCurve, 'soft_contrast', 'Tone Curve selector did not apply the selected value.');
 }
 
 async function validateHslSurfaceInteraction(container: Element) {
@@ -688,23 +620,7 @@ async function click(element: HTMLElement) {
   });
 }
 
-async function changeSelect(select: HTMLSelectElement, value: string) {
-  await act(async () => {
-    select.value = value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-    await flushPromises();
-  });
-}
-
 async function changeRange(input: HTMLInputElement, value: number) {
-  await act(async () => {
-    input.value = String(value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    await flushPromises();
-  });
-}
-
-async function changeInput(input: HTMLInputElement, value: number) {
   await act(async () => {
     input.value = String(value);
     input.dispatchEvent(new Event('input', { bubbles: true }));

@@ -1,8 +1,10 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "Затемнение",
       "brightness": "Яркость",
+      "color": "",
       "contrast": "Контрастность",
       "evShift": "Сдвиг экспозиции",
       "exposure": "Экспозиция",
@@ -41,6 +43,7 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "Тональное отображение",
+      "treatment": "",
       "viewContrast": "Контраст отображения",
       "whites": "Светлые тона"
     },
