@@ -191,7 +191,14 @@ export function useLightroomAiSceneMasks() {
         const generatedMaskArtifactId = readRuntimeParameter(parameters, 'generatedMaskArtifactId');
         const generatedMaskCoverage = readRuntimeParameter(parameters, 'generatedMaskCoverage');
         const subjectApplyResult = runtimeResult.subjectTool === null ? null : await runtimeResult.subjectTool.apply();
-        if (subjectApplyResult?.status === 'blocked') throw new Error(subjectApplyResult.userVisibleMessage);
+        if (subjectApplyResult?.status === 'blocked') {
+          setJob((current) =>
+            current?.authority.requestId === requestId
+              ? markLightroomAiSceneMaskUnavailable(current, subjectApplyResult.userVisibleMessage)
+              : current,
+          );
+          return;
+        }
         const postApplyState = useEditorStore.getState();
         const postApplySessionId =
           postApplyState.imageSession?.id ?? `editor-image-session:${String(postApplyState.imageSessionId)}`;
@@ -280,6 +287,7 @@ export function useLightroomAiSceneMasks() {
         : { imageDimensions: { width: state.selectedImage.width, height: state.selectedImage.height } }),
     });
     const result = state.applyEditTransaction(transaction);
+    if (result.noOp) return false;
     const container = createLightroomAiSceneMaskContainer({
       capability: current.authority.capability,
       result: current.result,
@@ -289,7 +297,7 @@ export function useLightroomAiSceneMasks() {
     });
     state.setEditor({ activeMaskContainerId: container.id, activeMaskId: container.subMasks[0]?.id ?? null });
     setJob((jobState) => (jobState === null ? null : { ...jobState, status: 'current' }));
-    return !result.noOp;
+    return true;
   }, [job]);
 
   return { apply, cancel, job, refine, retry, start };
