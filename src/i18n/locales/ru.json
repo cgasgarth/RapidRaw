@@ -736,6 +736,21 @@
         "action": "Сбросить точки",
         "title": "Риск клиппинга"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Закреплено",
         "unpin": "Открепить {{control}}"

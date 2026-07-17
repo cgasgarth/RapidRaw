@@ -726,6 +726,21 @@
         "action": "Reset endpoints",
         "title": "Clipping risk"
       },
+      "customize": {
+        "close": "Close customization",
+        "description": "Basic, Histogram, and tools stay fixed. Utilities remain available separately.",
+        "fixed": "Fixed",
+        "hide": "Hide",
+        "keyboardHint": "↑ ↓ reorder",
+        "list": "Develop panels",
+        "moveDown": "Move panel down",
+        "moveUp": "Move panel up",
+        "open": "Customize Develop Panel",
+        "restore": "Restore Default Order",
+        "show": "Show",
+        "title": "Customize Develop Panel",
+        "visibility": "Show or hide panel"
+      },
       "pinnedControls": {
         "title": "Pinned",
         "unpin": "Unpin {{control}}"

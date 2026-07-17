@@ -4,6 +4,7 @@ import {
   Aperture,
   ClipboardPaste,
   Copy,
+  MoreHorizontal,
   Pin,
   PinOff,
   RotateCcw,
@@ -93,6 +94,7 @@ import {
   readDevelopInspectorSoloMode,
   saveDevelopInspectorSoloMode,
 } from '../../../../utils/developInspectorStack';
+import { type DevelopPanelId, normalizeDevelopPanelOrder } from '../../../../utils/developPanelCustomization';
 import {
   selectEditDocumentControlValue,
   selectEditDocumentGeometry,
@@ -136,6 +138,7 @@ import {
   selectColorPanelAdjustmentView,
   useColorPanelAdjustmentView,
 } from './ColorWorkspacePanel';
+import DevelopPanelCustomization from './DevelopPanelCustomization';
 
 const ADJUSTMENT_SECTION_NAMES = DEVELOP_INSPECTOR_SECTION_ORDER;
 type AdjustmentSectionName = DevelopInspectorSectionId;
@@ -326,6 +329,7 @@ export default function Controls() {
   const { showContextMenu } = useContextMenu();
   const { commitEditNodeOperations, setEditorSectionEnabled, handleLutSelect } = useEditorActions();
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
+  const [isDevelopPanelCustomizationOpen, setIsDevelopPanelCustomizationOpen] = useState(false);
   const [autoEditProposal, setAutoEditProposal] = useState<AutoEditProposalV1 | null>(null);
   const [autoEditSelectedGroups, setAutoEditSelectedGroups] = useState<Set<AutoEditGroup>>(new Set());
   const [autoEditImpact, setAutoEditImpact] = useState(1);
@@ -351,15 +355,24 @@ export default function Controls() {
   const {
     collapsibleSectionsState,
     developPanelPinnedControlIds,
+    developPanelOrder,
+    hiddenDevelopPanelIds,
     setDevelopPanelPinnedControlIds,
     setEditorSectionExpanded,
   } = useUIStore(
     useShallow((state) => ({
       collapsibleSectionsState: state.collapsibleSectionsState,
       developPanelPinnedControlIds: state.developPanelPinnedControlIds,
+      developPanelOrder: state.developPanelOrder,
+      hiddenDevelopPanelIds: state.hiddenDevelopPanelIds,
       setDevelopPanelPinnedControlIds: state.setDevelopPanelPinnedControlIds,
       setEditorSectionExpanded: state.setEditorSectionExpanded,
     })),
+  );
+
+  const orderedAdjustmentSectionNames = useMemo<AdjustmentSectionName[]>(
+    () => ['basic', ...normalizeDevelopPanelOrder(developPanelOrder)] as AdjustmentSectionName[],
+    [developPanelOrder],
   );
 
   const {
@@ -1501,8 +1514,13 @@ export default function Controls() {
     [developPanelControls, isDevelopPanelSearching, normalizedDevelopPanelSearchQuery],
   );
   const matchingDevelopPanelSections = useMemo(
-    () => new Set(filteredDevelopPanelControls.map((control) => control.sectionName)),
-    [filteredDevelopPanelControls],
+    () =>
+      new Set(
+        filteredDevelopPanelControls
+          .filter((control) => !hiddenDevelopPanelIds.includes(control.sectionName as DevelopPanelId))
+          .map((control) => control.sectionName),
+      ),
+    [filteredDevelopPanelControls, hiddenDevelopPanelIds],
   );
   const effectiveCollapsibleSectionsState = useMemo(
     () =>
@@ -1924,6 +1942,39 @@ export default function Controls() {
       actions={
         <>
           <button
+            aria-controls={isDevelopPanelCustomizationOpen ? 'develop-panel-customization' : undefined}
+            aria-expanded={isDevelopPanelCustomizationOpen}
+            aria-haspopup="dialog"
+            aria-label={t('editor.adjustments.customize.open', { defaultValue: 'Customize Develop Panel' })}
+            className={density.frame.actionButton}
+            data-testid="develop-panel-customization-trigger"
+            data-tooltip={t('editor.adjustments.customize.open', { defaultValue: 'Customize Develop Panel' })}
+            onClick={() => {
+              setIsDevelopPanelCustomizationOpen((open) => !open);
+            }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              showContextMenu(event.clientX, event.clientY, [
+                {
+                  label: t('editor.adjustments.customize.open', { defaultValue: 'Customize Develop Panel' }),
+                  onClick: () => {
+                    setIsDevelopPanelCustomizationOpen(true);
+                  },
+                },
+              ]);
+            }}
+            type="button"
+          >
+            <MoreHorizontal size={PANEL_ACTION_ICON_SIZE} />
+          </button>
+          {isDevelopPanelCustomizationOpen && (
+            <DevelopPanelCustomization
+              onClose={() => {
+                setIsDevelopPanelCustomizationOpen(false);
+              }}
+            />
+          )}
+          <button
             aria-label={t('editor.adjustments.tooltips.autoAdjust')}
             className={density.frame.actionButton}
             disabled={!selectedImage?.isReady || isAutoEditAnalyzing}
@@ -2041,7 +2092,10 @@ export default function Controls() {
         data-testid="develop-panel-stack"
         ref={developPanelScrollRootRef}
       >
-        {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
+        {orderedAdjustmentSectionNames.map((sectionName) => {
+          if (sectionName !== 'basic' && hiddenDevelopPanelIds.includes(sectionName as DevelopPanelId)) {
+            return null;
+          }
           if (isDevelopPanelSearching && !matchingDevelopPanelSections.has(sectionName)) {
             return null;
           }

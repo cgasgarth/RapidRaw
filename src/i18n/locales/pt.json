@@ -716,6 +716,21 @@
         "action": "Redefinir extremos",
         "title": "Risco de corte"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Fixados",
         "unpin": "Desafixar {{control}}"

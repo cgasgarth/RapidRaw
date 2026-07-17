@@ -723,6 +723,21 @@
         "action": "Endpunkte zurücksetzen",
         "title": "Clipping-Risiko"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Angeheftet",
         "unpin": "{{control}} lösen"
