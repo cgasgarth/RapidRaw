@@ -119,6 +119,7 @@ export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
       : activeRightPanel === Panel.Color
         ? 'color-analytics-header'
         : 'editor-analytics-header';
+  const renderHostAnalyticsHeader = activeRightPanel !== Panel.Adjustments && activeRightPanel !== Panel.Color;
   const renderLoadingFallback = () => {
     if (predecessorPanel === null || predecessorPanel === activeRightPanel) return <EditorRightPanelSkeleton />;
     return <Suspense fallback={<EditorRightPanelSkeleton />}>{renderPanel(predecessorPanel)}</Suspense>;
@@ -142,7 +143,7 @@ export function EditorRightPanelHost(props: EditorRightPanelHostProps) {
       ref={hostRef}
     >
       <div className="flex h-full min-h-0 w-full flex-col" data-right-panel-focus-entry="true" tabIndex={-1}>
-        <InspectorAnalyticsHeader includeDevelopToolStrip testId={analyticsTestId} />
+        {renderHostAnalyticsHeader && <InspectorAnalyticsHeader includeDevelopToolStrip testId={analyticsTestId} />}
         <div className="min-h-0 min-w-0 flex-1">
           {RIGHT_PANEL_ENTRIES.filter((entry) => entry.host.keepAlive === 'session').map(({ id }) => {
             const isActive = activeRightPanel === id;

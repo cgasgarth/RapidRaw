@@ -18,6 +18,7 @@ import type { EditNodeOperation } from '../../../../utils/editTransaction';
 import ColorPanel from '../../../adjustments/Color';
 import type { AdjustmentUpdate, ColorPanelAdjustmentView } from '../../../adjustments/color/types';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
+import InspectorAnalyticsHeader from '../inspector/InspectorAnalyticsHeader';
 import InspectorPanelFrame, {
   type InspectorPanelNotice,
   type InspectorPanelStatus,
@@ -141,7 +142,11 @@ const buildColorPanelOperations = (
   }),
 ];
 
-export default function ColorWorkspacePanel() {
+interface ColorWorkspacePanelProps {
+  embeddedHeader?: boolean;
+}
+
+export default function ColorWorkspacePanel({ embeddedHeader = false }: ColorWorkspacePanelProps = {}) {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { commitEditNodeOperations, setEditorSectionEnabled } = useEditorActions();
@@ -253,6 +258,7 @@ export default function ColorWorkspacePanel() {
       status={panelStatus}
       testId="color-workspace-panel"
     >
+      {!embeddedHeader && <InspectorAnalyticsHeader includeDevelopToolStrip testId="color-analytics-header" />}
       <div
         className="grow overflow-y-auto bg-editor-panel px-2.5 py-1"
         data-right-panel-scroll-root="true"

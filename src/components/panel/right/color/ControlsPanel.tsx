@@ -115,6 +115,7 @@ import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens'
 import Input from '../../../ui/primitives/Input';
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
+import InspectorAnalyticsHeader from '../inspector/InspectorAnalyticsHeader';
 import InspectorPanelFrame, {
   type InspectorPanelNotice,
   type InspectorPanelStatus,
@@ -280,7 +281,11 @@ const toHeaderAction = (option: Option, testId: string): CollapsibleSectionHeade
   };
 };
 
-export default function Controls() {
+interface ControlsProps {
+  embeddedHeader?: boolean;
+}
+
+export default function Controls({ embeddedHeader = false }: ControlsProps = {}) {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
@@ -1853,6 +1858,7 @@ export default function Controls() {
       status={panelStatus}
       testId="adjustments-inspector"
     >
+      {!embeddedHeader && <InspectorAnalyticsHeader includeDevelopToolStrip testId="adjustments-analytics-header" />}
       <ReferenceMatchPanel />
 
       <div
