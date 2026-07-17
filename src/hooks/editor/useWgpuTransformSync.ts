@@ -128,7 +128,12 @@ export function useWgpuTransformSync({
         bgSecondary: state.bgSecondary,
       };
 
-      const payload = !shouldSubmitVisibleWgpuTransform(state.useWgpuRenderer, state.isReady)
+      const viewportCanShowWgpu =
+        presentationDescriptor.semanticZoom.mode.kind === 'fit' &&
+        Math.abs(transformStateRef.current.positionX) <= 0.01 &&
+        Math.abs(transformStateRef.current.positionY) <= 0.01 &&
+        Math.abs(transformStateRef.current.scale - 1) <= 0.01;
+      const payload = !shouldSubmitVisibleWgpuTransform(state.useWgpuRenderer, state.isReady, viewportCanShowWgpu)
         ? buildHiddenWgpuTransformPayload({ containerRect: currentRect, dpr, windowWidth, windowHeight }, colors)
         : buildVisibleWgpuTransformPayload(
             {

@@ -25,6 +25,7 @@ const rect = {
 describe('wgpu transform payload', () => {
   test('submits visible geometry before the first native frame receipt', () => {
     expect(shouldSubmitVisibleWgpuTransform(true, true)).toBe(true);
+    expect(shouldSubmitVisibleWgpuTransform(true, true, false)).toBe(false);
     expect(shouldSubmitVisibleWgpuTransform(true, false)).toBe(false);
     expect(shouldSubmitVisibleWgpuTransform(false, true)).toBe(false);
   });
