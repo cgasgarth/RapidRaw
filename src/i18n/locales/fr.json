@@ -716,6 +716,21 @@
         "action": "Réinitialiser les points",
         "title": "Risque d'écrêtage"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Épinglés",
         "unpin": "Désépingler {{control}}"

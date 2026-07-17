@@ -692,6 +692,21 @@
         "action": "端点をリセット",
         "title": "クリッピングリスク"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "ピン留め",
         "unpin": "{{control}} のピン留めを解除"

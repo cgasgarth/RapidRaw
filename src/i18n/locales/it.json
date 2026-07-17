@@ -716,6 +716,21 @@
         "action": "Ripristina estremi",
         "title": "Rischio clipping"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Fissati",
         "unpin": "Rimuovi {{control}}"

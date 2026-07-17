@@ -56,6 +56,12 @@ import {
 } from '../schemas/negative-lab/negativeLabWorkspaceLayout';
 import type { MaskContainer } from '../utils/adjustments';
 import {
+  DEFAULT_DEVELOP_PANEL_ORDER,
+  type DevelopPanelId,
+  normalizeDevelopPanelHidden,
+  normalizeDevelopPanelOrder,
+} from '../utils/developPanelCustomization';
+import {
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
   type EditorWorkspaceViewport,
   getEffectiveEditorWorkspaceLayout,
@@ -459,6 +465,8 @@ export interface UIState {
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
   developPanelPinnedControlIds: string[];
+  developPanelOrder: DevelopPanelId[];
+  hiddenDevelopPanelIds: DevelopPanelId[];
   toneEqualizerPickerActive: boolean;
   toneEqualizerPickerReceipt: ToneEqualizerPickerUiReceipt | null;
   pointColorPickerActive: boolean;
@@ -507,6 +515,9 @@ export interface UIState {
   markLayerMaskProvenanceStale: (input: { layerIds?: string[]; reason: LayerMaskProvenanceInvalidationReason }) => void;
   recordLayerMaskPreviewReceipt: (input: { appliedCommandId: string; masks: Array<MaskContainer> }) => void;
   setDevelopPanelPinnedControlIds: (controlIds: string[]) => void;
+  setDevelopPanelOrder: (order: readonly DevelopPanelId[]) => void;
+  setDevelopPanelVisibility: (panelId: DevelopPanelId, visible: boolean) => void;
+  resetDevelopPanelCustomization: () => void;
   hydrateEditorWorkspacePreferences: () => void;
   hydrateLibraryWorkspacePreferences: () => void;
   setDefaultEditorCompareMode: (mode: EditorWorkspaceCompareMode) => void;
@@ -596,6 +607,8 @@ export const useUIStore = create<UIState>((set, get) => {
     slideDirection: 1,
     collapsibleSectionsState: createCollapsibleSectionsState(initialPreferences),
     developPanelPinnedControlIds: initialPreferences.rightInspector.pinnedControlIds,
+    developPanelOrder: normalizeDevelopPanelOrder(initialPreferences.rightInspector.developPanelOrder),
+    hiddenDevelopPanelIds: normalizeDevelopPanelHidden(initialPreferences.rightInspector.developPanelHidden),
     toneEqualizerPickerActive: false,
     toneEqualizerPickerReceipt: null,
     pointColorPickerActive: false,
@@ -721,6 +734,58 @@ export const useUIStore = create<UIState>((set, get) => {
       });
     },
 
+    setDevelopPanelOrder: (order) => {
+      const normalizedOrder = normalizeDevelopPanelOrder(order);
+      set((state) => {
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          rightInspector: {
+            ...state.editorWorkspacePreferences.rightInspector,
+            developPanelOrder: normalizedOrder,
+          },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { developPanelOrder: normalizedOrder, editorWorkspacePreferences: preferences };
+      });
+    },
+
+    setDevelopPanelVisibility: (panelId, visible) => {
+      set((state) => {
+        const currentHidden = normalizeDevelopPanelHidden(state.hiddenDevelopPanelIds);
+        const nextHidden = visible
+          ? currentHidden.filter((id) => id !== panelId)
+          : [...new Set([...currentHidden, panelId])];
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          rightInspector: {
+            ...state.editorWorkspacePreferences.rightInspector,
+            developPanelHidden: nextHidden,
+          },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { hiddenDevelopPanelIds: nextHidden, editorWorkspacePreferences: preferences };
+      });
+    },
+
+    resetDevelopPanelCustomization: () => {
+      set((state) => {
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          rightInspector: {
+            ...state.editorWorkspacePreferences.rightInspector,
+            developPanelHidden: [],
+            developPanelOrder: [...DEFAULT_DEVELOP_PANEL_ORDER],
+          },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return {
+          developPanelOrder: [...DEFAULT_DEVELOP_PANEL_ORDER],
+          hiddenDevelopPanelIds: [],
+          editorWorkspacePreferences: preferences,
+        };
+      });
+    },
+
     hydrateEditorWorkspacePreferences: () => {
       const preferences = readEditorWorkspacePreferences();
       saveEditorWorkspacePreferences(preferences);
@@ -732,6 +797,8 @@ export const useUIStore = create<UIState>((set, get) => {
           activeRightPanel === Panel.Crop ? 'crop' : activeRightPanel === Panel.Masks ? 'masking' : null,
         collapsibleSectionsState: createCollapsibleSectionsState(preferences),
         developPanelPinnedControlIds: preferences.rightInspector.pinnedControlIds,
+        developPanelOrder: normalizeDevelopPanelOrder(preferences.rightInspector.developPanelOrder),
+        hiddenDevelopPanelIds: normalizeDevelopPanelHidden(preferences.rightInspector.developPanelHidden),
         recentRightPanels: preferences.rightInspector.recentPanels,
         renderedRightPanel: preferences.rightInspector.activePanel,
       });
