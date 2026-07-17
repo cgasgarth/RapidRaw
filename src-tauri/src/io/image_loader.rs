@@ -1206,7 +1206,7 @@ pub(crate) fn load_image_open_metadata(
         persisted.outcome,
         crate::exif_processing::PersistedStateOutcome::Absent
             | crate::exif_processing::PersistedStateOutcome::Current
-    );
+    ) || !persisted.reason_codes.is_empty();
     if recovered {
         let _ = app_handle.emit(
             "persisted-render-state-recovered",
