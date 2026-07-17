@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render } from '@testing-library/react';
 import i18next from 'i18next';
 import { createElement, useMemo, useState } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
@@ -79,6 +79,22 @@ test('Detail mask controls keep local denoise values outside the global transact
 
   expect(container.querySelector('[data-testid="mask-denoise-state"]')?.textContent).toBe('-20');
   expect(useEditorStore.getState().adjustmentRevision).toBe(0);
+});
+
+test('Alt sharpening diagnostics are transient and publish only during the slider drag', async () => {
+  installEditorSession();
+  const container = await renderHarness(createElement(DenoiseControlsHarness));
+  const sharpening = findSliderByLabel(container, 'Sharpness');
+  if (sharpening === null) throw new Error('Expected Sharpness slider');
+
+  fireEvent.keyDown(window, { altKey: true, key: 'Alt' });
+  fireEvent.mouseDown(sharpening, { clientX: 2 });
+  expect(useEditorStore.getState().detailModifierPreview).toBe('sharpening');
+
+  fireEvent.mouseUp(window);
+  expect(useEditorStore.getState().detailModifierPreview).toBeNull();
+
+  fireEvent.keyUp(window, { altKey: false, key: 'Alt' });
 });
 
 function DenoiseControlsHarness() {

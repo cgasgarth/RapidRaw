@@ -328,6 +328,7 @@ export default function Editor({
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [viewerSamplerState, setViewerSamplerState] = useState<ViewerSamplerState | null>(null);
+  const detailModifierPreview = useEditorStore((s) => s.detailModifierPreview);
   const detailLoupeIdentity = useMemo(
     () =>
       selectedImage === null
@@ -2564,6 +2565,7 @@ export default function Editor({
             crop={adjustments.crop}
             currentIdentity={detailLoupeIdentity}
             devicePixelRatio={devicePixelRatio}
+            diagnosticMode={detailModifierPreview}
             imageRect={{
               height: overlayGeometry.displayedImageRectInViewportCssPixels.height,
               width: overlayGeometry.displayedImageRectInViewportCssPixels.width,

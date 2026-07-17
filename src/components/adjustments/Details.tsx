@@ -48,6 +48,7 @@ export default function DetailsPanel({
   const { t } = useTranslation();
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const setEditor = useEditorStore((state) => state.setEditor);
   const imageSessionId = useEditorStore(
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
@@ -70,17 +71,18 @@ export default function DetailsPanel({
       altKeyRef.current = false;
       draggingModifierRef.current = null;
       setModifierPreview(null);
+      setEditor({ detailModifierPreview: null });
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!event.altKey) return;
       altKeyRef.current = true;
-      setModifierPreview(
-        resolveDetailModifierPreview({
-          altKey: true,
-          dragging: draggingModifierRef.current !== null,
-          hovered: draggingModifierRef.current ?? hoveredModifier,
-        }),
-      );
+      const nextPreview = resolveDetailModifierPreview({
+        altKey: true,
+        dragging: draggingModifierRef.current !== null,
+        hovered: draggingModifierRef.current ?? hoveredModifier,
+      });
+      setModifierPreview(nextPreview);
+      setEditor({ detailModifierPreview: nextPreview });
     };
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.key === 'Alt' || !event.altKey) clearModifierPreview();
@@ -93,15 +95,19 @@ export default function DetailsPanel({
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', clearModifierPreview);
     };
-  }, [hoveredModifier]);
+  }, [hoveredModifier, setEditor]);
+  useEffect(() => () => setEditor({ detailModifierPreview: null }), [setEditor]);
   useEffect(() => {
     draggingModifierRef.current = null;
     setModifierPreview(null);
-  }, [detailCommitIdentity?.sourceIdentity, isForMask]);
+    setEditor({ detailModifierPreview: null });
+  }, [detailCommitIdentity?.imageSessionId, detailCommitIdentity?.sourceIdentity, isForMask, setEditor]);
   const handleModifierDragState = (kind: DetailModifierPreview, dragging: boolean) => {
     onDragStateChange?.(dragging);
     draggingModifierRef.current = dragging ? kind : null;
-    setModifierPreview(resolveDetailModifierPreview({ altKey: altKeyRef.current, dragging, hovered: kind }));
+    const nextPreview = resolveDetailModifierPreview({ altKey: altKeyRef.current, dragging, hovered: kind });
+    setModifierPreview(nextPreview);
+    setEditor({ detailModifierPreview: nextPreview });
   };
 
   const handleAdjustmentChange = (key: DetailsAdjustment, value: number) => {
@@ -234,7 +240,10 @@ export default function DetailsPanel({
           onPointerEnter={() => setHoveredModifier('sharpening')}
           onPointerLeave={() => {
             setHoveredModifier(null);
-            if (!draggingModifierRef.current) setModifierPreview(null);
+            if (!draggingModifierRef.current) {
+              setModifierPreview(null);
+              setEditor({ detailModifierPreview: null });
+            }
           }}
         >
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
@@ -393,7 +402,10 @@ export default function DetailsPanel({
           onPointerEnter={() => setHoveredModifier('noise-reduction')}
           onPointerLeave={() => {
             setHoveredModifier(null);
-            if (!draggingModifierRef.current) setModifierPreview(null);
+            if (!draggingModifierRef.current) {
+              setModifierPreview(null);
+              setEditor({ detailModifierPreview: null });
+            }
           }}
         >
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>

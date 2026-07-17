@@ -85,6 +85,7 @@ describe('detail loupe', () => {
       ),
     );
     expect(view.container.querySelector('[data-detail-loupe-phase="current"]')).not.toBeNull();
+    expect(view.container.querySelector('[data-detail-loupe-diagnostic="sharpening"]')).not.toBeNull();
     expect(view.container.querySelector('[data-testid="detail-loupe-diagnostic-label"]')?.textContent).toContain(
       'Sharpening',
     );
