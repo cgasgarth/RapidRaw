@@ -48,6 +48,11 @@ test('Develop Calibration panel exposes typed primary controls and commits one c
   });
 
   const container = testingRender(createElement(I18nextProvider, { i18n }, createElement(CalibrationPanel))).container;
+  const controls = container.querySelector('[data-testid="calibration-controls"]');
+  if (!(controls instanceof HTMLElement)) throw new Error('missing Develop Calibration controls surface');
+  expect(controls.dataset['commitSourceIdentity']).toBe(sourcePath);
+  expect(controls.dataset['commitImageSession']).toBe('editor-image-session:6150');
+  expect(controls.dataset['commitAdjustmentRevision']).toBe('0');
   const tint = container.querySelector('[data-testid="calibration-shadows-tint-range"] input[type="range"]');
   if (!(tint instanceof window.HTMLInputElement)) throw new Error('missing Calibration tint control');
   act(() => {

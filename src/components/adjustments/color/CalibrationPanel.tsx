@@ -87,7 +87,13 @@ export default function CalibrationPanel({ onDragStateChange }: CalibrationPanel
   const activePrimaryLabel = primaryColors.find((primary) => primary.name === activePrimary)?.label ?? activePrimary;
 
   return (
-    <section className="space-y-1.5 py-1.5" data-testid="calibration-controls">
+    <section
+      className="space-y-1.5 py-1.5"
+      data-commit-adjustment-revision={commitIdentity?.adjustmentRevision}
+      data-commit-image-session={commitIdentity?.imageSessionId}
+      data-commit-source-identity={commitIdentity?.sourceIdentity}
+      data-testid="calibration-controls"
+    >
       <CompactInspectorSectionHeader
         actions={
           <button
