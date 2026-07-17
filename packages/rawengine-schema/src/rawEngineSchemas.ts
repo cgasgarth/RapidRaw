@@ -1904,6 +1904,7 @@ export const layerMaskGradientV1Schema = z.discriminatedUnion('gradientKind', [
       invert: z.boolean(),
       radiusX: z.number().positive().max(1),
       radiusY: z.number().positive().max(1),
+      rotation: z.number().min(-180).max(180).default(0),
     })
     .strict(),
 ]);

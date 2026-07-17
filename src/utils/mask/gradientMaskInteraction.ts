@@ -48,32 +48,41 @@ const isCurrent = (state: GradientMaskWorkflowState, identity: GradientMaskWorkf
   state.selectedImage?.path === identity.sourceIdentity &&
   state.sourceRevision === identity.sourceRevision;
 
+const finiteNumber = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
 const normalizeParameters = (
   tool: GradientMaskTool,
   parameters: Readonly<Record<string, unknown>>,
 ): GradientMaskParameters =>
   tool === Mask.Linear
     ? normalizeLinearGradientParameters({
-        endX: Number(parameters['endX']),
-        endY: Number(parameters['endY']),
-        range: Number(parameters['range']),
-        startX: Number(parameters['startX']),
-        startY: Number(parameters['startY']),
+        endX: finiteNumber(parameters['endX'], 0),
+        endY: finiteNumber(parameters['endY'], 0),
+        range: finiteNumber(parameters['range'], 50),
+        startX: finiteNumber(parameters['startX'], 0),
+        startY: finiteNumber(parameters['startY'], 0),
       })
     : normalizeRadialGradientParameters({
-        centerX: Number(parameters['centerX']),
-        centerY: Number(parameters['centerY']),
-        feather: Number(parameters['feather']),
-        radiusX: Number(parameters['radiusX']),
-        radiusY: Number(parameters['radiusY']),
-        rotation: Number(parameters['rotation']),
+        centerX: finiteNumber(parameters['centerX'], 0),
+        centerY: finiteNumber(parameters['centerY'], 0),
+        feather: finiteNumber(parameters['feather'], 0.5),
+        radiusX: finiteNumber(parameters['radiusX'], 1),
+        radiusY: finiteNumber(parameters['radiusY'], 1),
+        rotation: finiteNumber(parameters['rotation'], 0),
       });
 
 const patchSubMask = (subMask: SubMask, identity: GradientMaskWorkflowIdentity, patch: GradientMaskPatch): SubMask => {
   if (subMask.id !== identity.subMaskId) return subMask;
   if (subMask.type !== identity.tool) throw new Error('gradient_mask_transaction.tool_mismatch');
+  const currentParameters = subMask.parameters ?? {};
   const parameters =
-    patch.parameters === undefined ? subMask.parameters : normalizeParameters(identity.tool, patch.parameters);
+    patch.parameters === undefined
+      ? subMask.parameters
+      : {
+          ...currentParameters,
+          ...normalizeParameters(identity.tool, { ...currentParameters, ...patch.parameters }),
+        };
   return {
     ...subMask,
     ...(patch.invert === undefined ? {} : { invert: patch.invert }),

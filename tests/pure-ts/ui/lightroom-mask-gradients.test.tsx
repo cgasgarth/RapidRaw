@@ -14,7 +14,15 @@ import {
 import { buildRadialGradientMaskCommandFromParameters } from '../../../src/utils/mask/radialGradientMaskCommandBridge';
 
 const sourcePath = '/fixture/gradient-workflow.ARW';
-const baselineParameters = { endX: 400, endY: 800, range: 120, startX: 400, startY: 100 };
+const baselineParameters = {
+  endX: 400,
+  endY: 800,
+  imageHeight: 2000,
+  imageWidth: 4000,
+  range: 120,
+  startX: 400,
+  startY: 100,
+};
 const identity: GradientMaskWorkflowIdentity = {
   containerId: 'layer:gradient',
   containerKind: 'masks',
@@ -109,6 +117,31 @@ describe('gradient mask workflow', () => {
       invert: true,
       parameters: { range: 180 },
     });
+    expect(operation.patch.masks[0]?.subMasks[0]?.parameters).toMatchObject({
+      imageHeight: 2000,
+      imageWidth: 4000,
+    });
+  });
+
+  test('merges a partial geometry patch without dropping existing metadata', () => {
+    const transaction = buildGradientMaskEditTransaction(
+      state,
+      identity,
+      { parameters: { range: 240 } },
+      'gradient:gesture:partial',
+    );
+    const operation = transaction.operations[0];
+    if (operation === undefined || operation.type !== 'patch-edit-document-node' || operation.nodeType !== 'layers')
+      throw new Error('Expected layers transaction.');
+    expect(operation.patch.masks?.[0]?.subMasks?.[0]?.parameters).toEqual({
+      endX: 400,
+      endY: 800,
+      imageHeight: 2000,
+      imageWidth: 4000,
+      range: 240,
+      startX: 400,
+      startY: 100,
+    });
   });
 
   test('rejects stale geometry/session/source before mutating the graph', () => {
@@ -150,6 +183,7 @@ describe('gradient mask workflow', () => {
       gradientKind: 'radial',
       radiusX: 0.15,
       radiusY: 0.15,
+      rotation: 22,
     });
   });
 

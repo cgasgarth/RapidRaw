@@ -65,6 +65,7 @@ export const buildRadialGradientMaskCommandFromParameters = (
         invert,
         radiusX: roundMetric(normalized(parsed.radiusX, parsedContext.imageSize.width)),
         radiusY: roundMetric(normalized(parsed.radiusY, parsedContext.imageSize.height)),
+        rotation: roundMetric(parsed.rotation),
       },
       maskName: parsedContext.maskName,
     },
