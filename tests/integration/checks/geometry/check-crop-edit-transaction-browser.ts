@@ -14,17 +14,7 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z
-      .object({
-        crop: z.object({
-          height: z.number(),
-          unit: z.enum(['%', 'normalized', 'px']),
-          width: z.number(),
-          x: z.number(),
-          y: z.number(),
-        }),
-      })
-      .passthrough(),
+    editDocumentV2: editDocumentV2Schema,
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -186,6 +176,19 @@ try {
   await page.mouse.move(end.x, end.y, { steps: 5 });
   await page.mouse.up();
   await selection.waitFor({ timeout: 10_000 });
+  const croppedBounds = await selection.boundingBox();
+  if (croppedBounds === null || croppedBounds.width <= 100 || croppedBounds.width >= rootBounds.width - 40) {
+    throw new Error('Crop drag did not visibly create a bounded selection.');
+  }
+  await page.waitForTimeout(300);
+  const draftSaves = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0,
+  );
+  if (draftSaves !== baselineSaves) throw new Error('Crop draft persisted before Done.');
+  await page.getByRole('button', { name: /^Apply$/u }).click();
   const saveDeadline = Date.now() + 10_000;
   let observedSaves = baselineSaves;
   while (Date.now() < saveDeadline) {
@@ -202,20 +205,17 @@ try {
     throw new Error(`Crop selection completed without one persistence receipt: ${String(observedSaves)} saves.`);
   }
 
-  const croppedBounds = await selection.boundingBox();
-  if (croppedBounds === null || croppedBounds.width <= 100 || croppedBounds.width >= rootBounds.width - 40) {
-    throw new Error('Crop drag did not visibly create a bounded selection.');
-  }
-  const persisted = persistenceSchema.parse(
-    await page.evaluate(
-      () =>
-        window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
-          .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
-          .at(-1)?.args ?? null,
-    ),
+  const persistedRaw = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+        .at(-1)?.args ?? null,
   );
+  const persisted = persistenceSchema.parse(persistedRaw);
+  const persistedCrop = persisted.editDocumentV2.geometry.crop;
   if (
-    persisted.adjustments.crop.width <= 0 ||
+    persistedCrop === null ||
+    persistedCrop.width <= 0 ||
     persisted.transaction.imageSessionId !== identity.imageSessionId ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
   ) {
@@ -247,7 +247,7 @@ try {
   const previewDocument = previewRequest.editDocumentV2;
   if (
     !sameJsonValue(previewDocument.geometry, previewDocument.nodes.geometry?.params) ||
-    !sameJsonValue(previewDocument.geometry.crop, persisted.adjustments.crop)
+    !sameJsonValue(previewDocument.geometry.crop, persistedCrop)
   ) {
     throw new Error(
       `Crop preview did not carry atomic geometry authority: ${JSON.stringify(previewDocument.geometry)}`,

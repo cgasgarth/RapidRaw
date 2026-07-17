@@ -33,7 +33,7 @@ import { useUIStore } from '../../store/useUIStore';
 import type { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
 import { resolveAutoEditRenderSnapshot } from '../../utils/autoEditTransaction';
 import { resolveBasicToneSliderRenderSnapshot } from '../../utils/basicToneSliderInteraction';
-import { buildCropEditTransaction } from '../../utils/cropEditTransaction';
+import { isCropEditDraftCurrent } from '../../utils/cropEditSession';
 import {
   activeCropDraft,
   type CropInteraction,
@@ -204,6 +204,7 @@ export default function Editor({
   const isFullScreen = useUIStore((s) => s.isFullScreen);
   const lightsOutLevel = useUIStore((s) => s.editorWorkspacePreferences.viewer.lightsOutLevel);
   const activeRightPanel = useUIStore((s) => s.activeRightPanel);
+  const isCropping = activeRightPanel === Panel.Crop;
   const setUI = useUIStore((s) => s.setUI);
   const setDefaultEditorCompareMode = useUIStore((s) => s.setDefaultEditorCompareMode);
   const setEditorLightsOutLevel = useUIStore((s) => s.setEditorLightsOutLevel);
@@ -217,10 +218,21 @@ export default function Editor({
   const maskOverlayImageSessionId =
     editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`;
   const editDocumentV2 = useEditorStore((s) => s.editDocumentV2);
-  const adjustments = selectEditDocumentGeometry(editDocumentV2);
+  const cropDraft = useEditorStore((s) => s.cropDraft);
+  const committedAdjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
+  const committedAdjustments = selectEditDocumentGeometry(editDocumentV2);
+  const draftIdentity =
+    selectedImage !== null
+      ? {
+          baseAdjustmentRevision: committedAdjustmentRevision,
+          imageSessionId: editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`,
+          sourceIdentity: selectedImage.path,
+        }
+      : null;
+  const hasCurrentCropDraft = isCropping && draftIdentity !== null && isCropEditDraftCurrent(cropDraft, draftIdentity);
+  const adjustments = hasCurrentCropDraft && cropDraft !== null ? cropDraft.geometry : committedAdjustments;
   const masks = selectEditDocumentMasks(editDocumentV2);
   const aiPatches = selectEditDocumentSourceArtifacts(editDocumentV2).aiPatches;
-  const committedAdjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
   const basicToneSliderInteraction = useEditorStore((s) => s.basicToneSliderInteraction);
   const lastEditApplicationReceipt = useEditorStore((s) => s.lastEditApplicationReceipt);
@@ -238,7 +250,7 @@ export default function Editor({
   const adjustmentGeometryRevision = autoEditRenderSnapshot.geometryRevision;
   const adjustmentRevision = autoEditRenderSnapshot.renderRevision;
   const referenceMatchPreview = useEditorStore((s) => s.referenceMatchPreview);
-  const renderAdjustments =
+  const baseRenderAdjustments =
     autoEditRenderSnapshot === adjustmentSnapshot
       ? resolveReferenceMatchRenderDocument({
           adjustmentRevision,
@@ -247,6 +259,10 @@ export default function Editor({
           targetPath: selectedImage?.path ?? null,
         })
       : autoEditRenderSnapshot.editDocumentV2;
+  const renderAdjustments =
+    hasCurrentCropDraft && cropDraft !== null
+      ? { ...baseRenderAdjustments, geometry: structuredClone(cropDraft.geometry) }
+      : baseRenderAdjustments;
   const adjustmentsHistory = useEditorStore((s) => s.history);
   const adjustmentsHistoryIndex = useEditorStore((s) => s.historyIndex);
   const finalPreviewUrl = useEditorStore((s) => s.finalPreviewUrl);
@@ -494,6 +510,71 @@ export default function Editor({
   const handleStraighten = useCallback(
     (angleCorrection: number, identity: CropStraightenSessionIdentity) => {
       const state = useEditorStore.getState();
+      if (
+        hasCurrentCropDraft &&
+        draftIdentity !== null &&
+        identity.imageSessionId === draftIdentity.imageSessionId &&
+        identity.sourceIdentity === draftIdentity.sourceIdentity &&
+        identity.operationGeneration === adjustmentGeometryRevision &&
+        identity.sourceRevision === viewerSampleGraphRevision
+      ) {
+        setEditor((current) => {
+          if (!isCropEditDraftCurrent(current.cropDraft, draftIdentity)) return {};
+          const previous = current.cropDraft.geometry;
+          const rotation = (previous.rotation || 0) + angleCorrection;
+          const crop =
+            angleCorrection !== 0 && selectedImage !== null && selectedImage.width > 0 && selectedImage.height > 0
+              ? resolveNextCropForGeometryChange({
+                  aspectRatio: previous.aspectRatio,
+                  currentCrop: previous.crop
+                    ? pixelCropFromNormalizedCrop(
+                        previous.crop,
+                        getOrientedDimensions(selectedImage.width, selectedImage.height, previous.orientationSteps || 0)
+                          .width,
+                        getOrientedDimensions(selectedImage.width, selectedImage.height, previous.orientationSteps || 0)
+                          .height,
+                      )
+                    : null,
+                  effectiveRotation: rotation,
+                  imageHeight: selectedImage.height,
+                  imageWidth: selectedImage.width,
+                  isDraggingRotation: false,
+                  orientationSteps: previous.orientationSteps || 0,
+                  previousParams: {
+                    aspectRatio: previous.aspectRatio,
+                    orientationSteps: previous.orientationSteps || 0,
+                    rotation: previous.rotation || 0,
+                  },
+                  rotation,
+                }).nextPixelCrop
+              : null;
+          const oriented = getOrientedDimensions(
+            selectedImage?.width ?? 0,
+            selectedImage?.height ?? 0,
+            previous.orientationSteps || 0,
+          );
+          return {
+            cropDraft: {
+              ...current.cropDraft,
+              geometry: {
+                ...previous,
+                crop: crop
+                  ? {
+                      height: crop.height / oriented.height,
+                      unit: 'normalized',
+                      width: crop.width / oriented.width,
+                      x: crop.x / oriented.width,
+                      y: crop.y / oriented.height,
+                    }
+                  : previous.crop,
+                rotation,
+              },
+            },
+          };
+        });
+        setEditor({ isStraightenActive: false });
+        return;
+      }
       applyEditTransaction(
         buildStraightenEditTransaction(
           {
@@ -508,7 +589,15 @@ export default function Editor({
       );
       setEditor({ isStraightenActive: false });
     },
-    [adjustmentGeometryRevision, applyEditTransaction, setEditor, viewerSampleGraphRevision],
+    [
+      adjustmentGeometryRevision,
+      applyEditTransaction,
+      draftIdentity,
+      hasCurrentCropDraft,
+      selectedImage,
+      setEditor,
+      viewerSampleGraphRevision,
+    ],
   );
 
   const updateSubMaskLocal = useCallback(
@@ -582,7 +671,6 @@ export default function Editor({
     dispatchCompare({ type: 'exit' });
   }, [dispatchCompare, isFullScreen]);
 
-  const isCropping = activeRightPanel === Panel.Crop;
   const isMasking = activeRightPanel === Panel.Masks;
   const isAiEditing = activeRightPanel === Panel.Ai;
 
@@ -2102,8 +2190,44 @@ export default function Editor({
 
   const handleCropStart = useCallback(() => {
     if (!canonicalPercentCrop) return;
+    if (selectedImage !== null && draftIdentity !== null && !hasCurrentCropDraft) {
+      setEditor((state) =>
+        isCropEditDraftCurrent(state.cropDraft, draftIdentity)
+          ? {}
+          : {
+              cropDraft: {
+                baseAdjustmentRevision: draftIdentity.baseAdjustmentRevision,
+                geometry: structuredClone(selectEditDocumentGeometry(state.editDocumentV2)),
+                imageSessionId: draftIdentity.imageSessionId,
+                overlayMode: state.overlayMode,
+                overlayRotation: state.overlayRotation,
+                sourceIdentity: draftIdentity.sourceIdentity,
+              },
+            },
+      );
+    }
     setCropInteraction(updateCropDraft(cropSessionKey, cropGeometryKey, canonicalPercentCrop));
-  }, [canonicalPercentCrop, cropGeometryKey, cropSessionKey]);
+  }, [
+    canonicalPercentCrop,
+    cropGeometryKey,
+    cropSessionKey,
+    draftIdentity,
+    hasCurrentCropDraft,
+    selectedImage,
+    setEditor,
+  ]);
+
+  const updateCropDraftGeometry = useCallback(
+    (update: (geometry: typeof adjustments) => typeof adjustments) => {
+      const identity = draftIdentity;
+      if (!hasCurrentCropDraft || identity === null) return;
+      setEditor((state) => {
+        if (!isCropEditDraftCurrent(state.cropDraft, identity)) return {};
+        return { cropDraft: { ...state.cropDraft, geometry: update(state.cropDraft.geometry) } };
+      });
+    },
+    [draftIdentity, hasCurrentCropDraft, setEditor],
+  );
 
   const handleCropComplete = useCallback(
     (_crop: Crop, completedPercentCrop: PercentCrop, identity: CropStraightenSessionIdentity) => {
@@ -2128,19 +2252,20 @@ export default function Editor({
         x: pc.x / 100,
         y: pc.y / 100,
       };
-      const state = useEditorStore.getState();
-      applyEditTransaction(
-        buildCropEditTransaction(
-          {
-            ...state,
-            operationGeneration: adjustmentGeometryRevision,
-            sourceRevision: viewerSampleGraphRevision,
-          },
-          identity,
-          normalizedCrop,
-          crypto.randomUUID(),
-        ),
-      );
+      if (identity.tool !== 'crop' || !hasCurrentCropDraft || draftIdentity === null) {
+        setCropInteraction({ kind: 'idle' });
+        return;
+      }
+      if (
+        identity.imageSessionId !== draftIdentity.imageSessionId ||
+        identity.sourceIdentity !== draftIdentity.sourceIdentity ||
+        identity.operationGeneration !== adjustmentGeometryRevision ||
+        identity.sourceRevision !== viewerSampleGraphRevision
+      ) {
+        setCropInteraction({ kind: 'idle' });
+        return;
+      }
+      updateCropDraftGeometry((geometry) => ({ ...geometry, crop: normalizedCrop }));
       setCropInteraction({ kind: 'idle' });
     },
     [
@@ -2151,7 +2276,9 @@ export default function Editor({
       liveRotation,
       selectedImage,
       adjustmentGeometryRevision,
-      applyEditTransaction,
+      draftIdentity,
+      hasCurrentCropDraft,
+      updateCropDraftGeometry,
       viewerSampleGraphRevision,
     ],
   );
