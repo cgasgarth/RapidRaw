@@ -470,18 +470,6 @@ export default function ColorPanel({
               setAdjustments={setAdjustments}
               {...(toggleWbPicker ? { toggleWbPicker } : {})}
             />
-            {!isForMask && isColorCalibrationVisible ? (
-              <ColorAdvancedControls
-                adjustmentVisibility={adjustmentVisibility}
-                adjustments={adjustments}
-                appSettings={appSettings}
-                isColorCalibrationVisible={isColorCalibrationVisible}
-                levelsClippingWarnings={levelsClippingWarnings}
-                mode="calibration"
-                onDragStateChange={onDragStateChange}
-                setAdjustments={setAdjustments}
-              />
-            ) : null}
           </div>
         ),
       },

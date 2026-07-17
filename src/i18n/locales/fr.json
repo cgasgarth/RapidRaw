@@ -773,6 +773,7 @@
       },
       "scopedSections": {
         "basic": "Light",
+        "calibration": "Étalonnage",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",

@@ -43,6 +43,7 @@ describe('adjustment section state', () => {
   test('defaults generic adjustments to tone sections without opening color', () => {
     expect(DEFAULT_COLLAPSIBLE_SECTIONS_STATE).toEqual({
       basic: true,
+      calibration: false,
       color: false,
       curves: true,
       details: false,

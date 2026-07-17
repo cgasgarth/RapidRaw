@@ -778,6 +778,7 @@
       },
       "scopedSections": {
         "basic": "Light",
+        "calibration": "校准",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",

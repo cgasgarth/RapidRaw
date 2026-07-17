@@ -65,6 +65,7 @@ async function validateClippingWarningAction() {
   useUIStore.getState().setUI({
     collapsibleSectionsState: {
       basic: true,
+      calibration: false,
       color: false,
       curves: false,
       details: false,
