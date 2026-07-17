@@ -1312,6 +1312,7 @@
         "flipHoriz": "Inverter imagem horizontalmente",
         "flipVert": "Inverter imagem verticalmente",
         "lens": "Correção de distorção de lente",
+        "lockAspect": "",
         "overlayDetails": "Sobreposição: {{name}}{{rotateHint}}",
         "resetFineRotation": "Redefinir Rotação Fina",
         "rotateHint": " (Shift+O para girar)",
@@ -1321,7 +1322,8 @@
         "switchOrientation": "Mudar orientação",
         "switchToLandscape": "Mudar para paisagem",
         "switchToPortrait": "Mudar para retrato",
-        "transform": "Correção de perspectiva e keystone"
+        "transform": "Correção de perspectiva e keystone",
+        "unlockAspect": ""
       }
     },
     "developTools": {
