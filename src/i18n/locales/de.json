@@ -321,6 +321,7 @@
       }
     },
     "curves": {
+      "advancedDomains": "",
       "channels": {
         "blue": "Blau",
         "green": "Grün",
@@ -359,7 +360,8 @@
         "outputTitle": "",
         "sceneAxis": "",
         "sceneTab": "",
-        "sceneTitle": ""
+        "sceneTitle": "",
+        "toneCurveTab": ""
       }
     },
     "details": {
@@ -788,6 +790,7 @@
         "details": "Detail",
         "effects": "Effects",
         "lensCorrection": "Lens Corrections",
+        "toneCurve": "",
         "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
