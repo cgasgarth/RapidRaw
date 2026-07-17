@@ -174,7 +174,7 @@ const getAdjustmentSectionNodeTypes = (sectionName: AdjustmentSectionName): read
     case 'colorMixer':
       return ['black_white_mixer', 'channel_mixer', 'color_balance_rgb', 'point_color', 'selective_color_mixer'];
     case 'colorGrading':
-      return ['color_balance_rgb', 'perceptual_grading'];
+      return ['perceptual_grading'];
     case 'basic':
     case 'curves':
     case 'details':
