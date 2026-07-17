@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import {
   acceptLightroomAiSceneMaskResult,
   buildLightroomAiSceneMaskTransaction,
@@ -9,7 +10,11 @@ import {
   markLightroomAiSceneMaskUnavailable,
 } from '../../../src/utils/ai/lightroomAiSceneMaskGeneration';
 import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
-import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import {
+  createDefaultEditDocumentV2,
+  patchEditDocumentV2Node,
+  prepareEditDocumentV2ForPersistence,
+} from '../../../src/utils/editDocumentV2';
 
 const authority = (requestId = 'request-1', capability: 'background' | 'sky' | 'subject' = 'subject') =>
   createLightroomAiSceneMaskAuthority({
@@ -142,4 +147,25 @@ test('Apply builds a typed single-entry layer transaction without mutating the s
   expect(transaction.history).toBe('single-entry');
   expect(transaction.operations).toHaveLength(1);
   expect(selectEditDocumentNode(document, 'layers').params.masks).toHaveLength(0);
+});
+
+test('scene mask persistence projects source-only layer fields before native save', () => {
+  const result = {
+    authority: authority('request-persistence', 'subject'),
+    generatedMaskArtifactId: 'artifact-persistence',
+    generatedMaskCoverage: 0.5,
+    parameters: {},
+  };
+  const mask = createLightroomAiSceneMaskContainer({ capability: 'subject', result });
+  const parsedMask = editDocumentLayersV2Schema.parse({ masks: [mask] }).masks[0];
+  if (parsedMask === undefined) throw new Error('Expected scene mask.');
+  const contaminated = {
+    ...parsedMask,
+    adjustments: { ...parsedMask.adjustments, aiPatches: [] },
+  };
+  const withMask = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'layers', { masks: [contaminated] });
+  const persisted = prepareEditDocumentV2ForPersistence(withMask);
+  const persistedMask = persisted.layers.masks[0];
+  expect(persistedMask?.adjustments).not.toHaveProperty('aiPatches');
+  expect(persistedMask?.subMasks[0]?.parameters?.['generatedMaskArtifactId']).toBe('artifact-persistence');
 });
