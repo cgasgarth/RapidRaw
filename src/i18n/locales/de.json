@@ -1330,6 +1330,9 @@
         "transform": "Perspektiv- und Trapezkorrektur"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "Collapse group",

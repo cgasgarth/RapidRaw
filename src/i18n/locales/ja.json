@@ -1284,6 +1284,9 @@
         "transform": "遠近歪みとあおり補正"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "",

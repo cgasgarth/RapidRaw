@@ -15,7 +15,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
-import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   editDocumentDetailDenoiseDehazeV2Schema,
@@ -489,6 +489,8 @@ export function LayerStackPanel({
 }: LayerStackPanelProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
+  const activeDevelopTool = useUIStore((state) => state.activeDevelopTool);
+  const activeDevelopToolRequestId = useUIStore((state) => state.activeDevelopToolRequestId);
   const detailNodeParamsRaw = useEditorStore((state) => state.editDocumentV2.nodes['detail_denoise_dehaze']?.params);
   const detailNodeParams = useMemo(
     () => editDocumentDetailDenoiseDehazeV2Schema.safeParse(detailNodeParamsRaw).data ?? null,
@@ -508,6 +510,7 @@ export function LayerStackPanel({
   const [lastCommandType, setLastCommandType] = useState('none');
   const [lastChangedLayerCount, setLastChangedLayerCount] = useState(0);
   const [lastBrushLocalReceiptId, setLastBrushLocalReceiptId] = useState('');
+  const handledDevelopToolRequestRef = useRef<number | null>(null);
   useEffect(() => {
     const spotsVisible = detailNodeParams?.dustSpotOverlayEnabled;
     if (spotsVisible === undefined) return;
@@ -1096,6 +1099,20 @@ export function LayerStackPanel({
     if (tool === 'heal') createHealLayer();
     if (tool === 'remove') createRemoveLayer();
   };
+
+  useEffect(() => {
+    if (activeDevelopTool !== 'remove' || handledDevelopToolRequestRef.current === activeDevelopToolRequestId) {
+      return;
+    }
+    handledDevelopToolRequestRef.current = activeDevelopToolRequestId;
+    const existingRemoveRow = rows.find((row) => row.retouchRemoveSource !== null);
+    if (existingRemoveRow !== undefined) {
+      selectRow(existingRemoveRow);
+      return;
+    }
+    if (selectedImage !== null) activateRetouchTool('remove');
+  }, [activeDevelopTool, activeDevelopToolRequestId, rows, selectedImage]);
+
   const toggleRetouchSpots = () => {
     setRetouchRemoveWorkflow((state) => reduceRetouchRemoveWorkflow(state, { type: 'toggle-spots' }));
     const state = useEditorStore.getState();

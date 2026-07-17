@@ -1318,6 +1318,9 @@
         "transform": "Correction de perspective et de trapèze"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "",

@@ -1318,6 +1318,9 @@
         "transform": "Correção de perspectiva e keystone"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "",

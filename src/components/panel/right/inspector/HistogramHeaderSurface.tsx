@@ -11,7 +11,7 @@ import {
   Settings2,
   ShieldCheck,
 } from 'lucide-react';
-import type { KeyboardEventHandler, PointerEventHandler } from 'react';
+import type { KeyboardEventHandler, PointerEventHandler, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PanelScopesLayout, PreviewScopeStatus } from '../../../../store/useEditorStore';
 import { DisplayMode } from '../../../../utils/adjustments';
@@ -225,6 +225,7 @@ interface HistogramHeaderSurfaceProps extends HistogramPlotFrameProps {
   onToggleAdvanced: () => void;
   photoIdentity: string;
   photoSettings: string | null;
+  toolStrip?: ReactNode;
 }
 
 export function HistogramHeaderSurface({
@@ -232,6 +233,7 @@ export function HistogramHeaderSurface({
   onToggleAdvanced,
   photoIdentity,
   photoSettings,
+  toolStrip,
   ...plotProps
 }: HistogramHeaderSurfaceProps) {
   const { t } = useTranslation();
@@ -269,7 +271,9 @@ export function HistogramHeaderSurface({
           )}
         </button>
       </div>
-      <div data-develop-tool-strip-slot="true" data-testid={`${plotProps.testId}-tool-strip-mount`} />
+      <div data-develop-tool-strip-slot="true" data-testid={`${plotProps.testId}-tool-strip-mount`}>
+        {toolStrip}
+      </div>
     </div>
   );
 }

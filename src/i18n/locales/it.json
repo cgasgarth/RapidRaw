@@ -1318,6 +1318,9 @@
         "transform": "Correzione prospettiva e distorsione trapezoidale"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "",

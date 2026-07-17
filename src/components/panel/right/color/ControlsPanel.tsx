@@ -115,7 +115,6 @@ import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens'
 import Input from '../../../ui/primitives/Input';
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
-import InspectorAnalyticsHeader from '../inspector/InspectorAnalyticsHeader';
 import InspectorPanelFrame, {
   type InspectorPanelNotice,
   type InspectorPanelStatus,
@@ -1839,8 +1838,6 @@ export default function Controls() {
       status={panelStatus}
       testId="adjustments-inspector"
     >
-      <InspectorAnalyticsHeader testId="adjustments-analytics-header" />
-
       <ReferenceMatchPanel />
 
       <div

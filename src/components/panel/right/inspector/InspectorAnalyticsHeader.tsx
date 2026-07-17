@@ -18,6 +18,7 @@ import { requestColorOutputFocus } from '../../../../utils/colorWorkspaceNavigat
 import { PANEL_SCOPES_HEIGHT } from '../../../../utils/waveformSizing';
 import { type ExifData, Panel } from '../../../ui/AppProperties';
 import { getHistogramClippingSummary, type HistogramHoverSample } from '../../editor/Waveform';
+import DevelopToolStrip from './DevelopToolStrip';
 import {
   AdvancedScopesDrawer,
   type HistogramHeaderState,
@@ -26,6 +27,7 @@ import {
 } from './HistogramHeaderSurface';
 
 interface InspectorAnalyticsHeaderProps {
+  includeDevelopToolStrip?: boolean;
   testId: string;
 }
 
@@ -117,7 +119,10 @@ export const formatDevelopPhotoMetadata = (exif: ExifData | null): DevelopPhotoM
   return { camera, settings: settings || null };
 };
 
-export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsHeaderProps) {
+export default function InspectorAnalyticsHeader({
+  includeDevelopToolStrip = false,
+  testId,
+}: InspectorAnalyticsHeaderProps) {
   const { t } = useTranslation();
   const {
     handleWaveformResize,
@@ -302,6 +307,7 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
         retryLabel={recoverScopesLabel}
         stateLabel={stateLabel}
         testId={testId}
+        toolStrip={includeDevelopToolStrip ? <DevelopToolStrip /> : undefined}
         zoneLabel={zoneLabel}
       />
       <AdvancedScopesDrawer

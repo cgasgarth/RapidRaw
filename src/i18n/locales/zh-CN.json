@@ -1323,6 +1323,9 @@
         "transform": "透视和梯形校正"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "Collapse group",

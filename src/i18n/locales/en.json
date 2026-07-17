@@ -1365,6 +1365,12 @@
         "transform": "Perspective and keystone correction"
       }
     },
+    "developTools": {
+      "crop": "Crop",
+      "label": "Develop tools",
+      "masking": "Masking",
+      "remove": "Remove"
+    },
     "layers": {
       "actions": {
         "collapseGroup": "Collapse group",

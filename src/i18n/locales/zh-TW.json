@@ -1284,6 +1284,9 @@
         "transform": "透視和梯形校正"
       }
     },
+    "developTools": {
+      "label": ""
+    },
     "layers": {
       "actions": {
         "collapseGroup": "",

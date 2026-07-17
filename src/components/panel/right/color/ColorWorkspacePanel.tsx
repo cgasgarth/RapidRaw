@@ -18,7 +18,6 @@ import type { EditNodeOperation } from '../../../../utils/editTransaction';
 import ColorPanel from '../../../adjustments/Color';
 import type { AdjustmentUpdate, ColorPanelAdjustmentView } from '../../../adjustments/color/types';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
-import InspectorAnalyticsHeader from '../inspector/InspectorAnalyticsHeader';
 import InspectorPanelFrame, {
   type InspectorPanelNotice,
   type InspectorPanelStatus,
@@ -254,8 +253,6 @@ export default function ColorWorkspacePanel() {
       status={panelStatus}
       testId="color-workspace-panel"
     >
-      <InspectorAnalyticsHeader testId="color-analytics-header" />
-
       <div
         className="grow overflow-y-auto bg-editor-panel px-2.5 py-1"
         data-right-panel-scroll-root="true"
