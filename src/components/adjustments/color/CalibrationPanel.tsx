@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useEditorStore } from '../../../store/useEditorStore';
-import { ColorAdjustment, type ColorCalibration, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { type ColorCalibration, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import {
   buildColorCalibrationEditTransaction,
   type ColorCalibrationCommitIdentity,
