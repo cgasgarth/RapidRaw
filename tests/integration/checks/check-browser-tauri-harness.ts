@@ -4736,7 +4736,18 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
   await page.getByTestId('right-panel-switcher-button-adjustments').click();
   await page.getByTestId('adjustments-inspector').waitFor({ state: 'visible', timeout: 10_000 });
   const toneAdvanced = page.getByTestId('tone-equalizer-advanced');
-  if (!(await toneAdvanced.isVisible())) await page.getByTestId('tone-equalizer-advanced-toggle').click();
+  if (!(await toneAdvanced.isVisible())) {
+    // Basic now owns a single collapsed Advanced disclosure around Tone Mapper
+    // and Tone Equalizer. Open that canonical disclosure before addressing the
+    // nested picker controls; retain the nested selector for already-open views.
+    const canonicalAdvancedToggle = page.getByTestId('basic-tone-advanced-toggle');
+    if (await canonicalAdvancedToggle.isVisible()) {
+      await canonicalAdvancedToggle.click();
+    } else {
+      await page.getByTestId('tone-equalizer-advanced-toggle').click();
+    }
+  }
+  await toneAdvanced.waitFor({ state: 'visible', timeout: 10_000 });
   const tonePicker = page.getByTestId('tone-equalizer-picker');
   await tonePicker.scrollIntoViewIfNeeded();
   await waitForStablePreview(page);

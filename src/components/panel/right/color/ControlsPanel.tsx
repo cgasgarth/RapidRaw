@@ -1686,6 +1686,13 @@ export default function Controls() {
               toggleWbPicker={() => {
                 setEditor({ isWbPickerActive: !isWbPickerActive });
               }}
+              onAutoAdjust={() => {
+                void beginAutoEdit();
+              }}
+              autoAdjustDisabled={!selectedImage?.isReady || isAutoEditAnalyzing || isAutoEditApplying}
+              autoAdjustStatus={
+                isAutoEditAnalyzing || isAutoEditApplying ? 'busy' : autoEditError !== null ? 'error' : 'idle'
+              }
             />
           </>
         );
