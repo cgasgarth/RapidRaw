@@ -1540,6 +1540,23 @@
         "title": "Person part masks",
         "unknown": "Unknown"
       },
+      "aiScene": {
+        "analyzing": "",
+        "apply": "",
+        "ariaLabel": "",
+        "background": "",
+        "cancel": "",
+        "cancelled": "",
+        "failed": "",
+        "previewReady": "",
+        "refine": "",
+        "refinePlaceholder": "",
+        "retry": "",
+        "select": "",
+        "sky": "",
+        "subject": "",
+        "title": ""
+      },
       "brush": {
         "brush": "Pinsel",
         "density": "",

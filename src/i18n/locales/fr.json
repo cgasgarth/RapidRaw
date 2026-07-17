@@ -1519,6 +1519,23 @@
         "title": "Masques de parties de personne",
         "unknown": ""
       },
+      "aiScene": {
+        "analyzing": "",
+        "apply": "",
+        "ariaLabel": "",
+        "background": "",
+        "cancel": "",
+        "cancelled": "",
+        "failed": "",
+        "previewReady": "",
+        "refine": "",
+        "refinePlaceholder": "",
+        "retry": "",
+        "select": "",
+        "sky": "",
+        "subject": "",
+        "title": ""
+      },
       "brush": {
         "brush": "Pinceau",
         "density": "",

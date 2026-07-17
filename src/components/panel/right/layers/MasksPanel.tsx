@@ -168,6 +168,7 @@ import Resizer from '../../../ui/Resizer';
 import { BrushMaskControls, type BrushSettingsUpdater } from '../../editor/BrushMaskControls';
 import Waveform from '../../editor/Waveform';
 import { type MaskLocalAdjustmentSection, MaskLocalAdjustmentStack } from './MaskLocalAdjustmentStack';
+import { LightroomAiSceneMaskChooser } from './LightroomAiSceneMaskChooser';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
 import {
   formatMaskTypeName,
@@ -2307,6 +2308,7 @@ export function MasksPanel() {
         </AnimatePresence>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-2">
+          <LightroomAiSceneMaskChooser />
           <AnimatePresence mode="wait">
             {adjustments.length === 0 ? (
               <motion.div
