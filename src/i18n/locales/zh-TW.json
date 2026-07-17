@@ -1382,6 +1382,15 @@
         "summary": "",
         "title": ""
       },
+      "removeWorkflow": {
+        "cancel": "",
+        "canvasReady": "",
+        "complete": "",
+        "hideSpots": "",
+        "inProgress": "",
+        "showSpots": "",
+        "title": ""
+      },
       "retouchSource": {
         "feather": "",
         "modes": {
