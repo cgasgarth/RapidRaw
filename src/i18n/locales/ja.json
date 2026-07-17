@@ -1,8 +1,10 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "黒レベル",
       "brightness": "明るさ",
+      "color": "",
       "contrast": "コントラスト",
       "evShift": "露出補正",
       "exposure": "露光量",
@@ -41,6 +43,7 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "トーンマッパー",
+      "treatment": "",
       "viewContrast": "ビューコントラスト",
       "whites": "白レベル"
     },

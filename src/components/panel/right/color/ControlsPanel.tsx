@@ -119,6 +119,7 @@ import InspectorPanelFrame, {
   type InspectorPanelNotice,
   type InspectorPanelStatus,
 } from '../inspector/InspectorPanelFrame';
+import { selectColorPanelAdjustmentView } from './ColorWorkspacePanel';
 
 const ADJUSTMENT_SECTION_NAMES = [
   'basic',
@@ -326,6 +327,7 @@ export default function Controls() {
     histogram,
     selectedImage,
     selectedImageSessionId,
+    isWbPickerActive,
     setEditor,
   } = useEditorStore(
     useShallow((state) => ({
@@ -336,6 +338,7 @@ export default function Controls() {
       histogram: state.histogram,
       selectedImage: state.selectedImage,
       selectedImageSessionId: currentAutoEditImageSessionId(state),
+      isWbPickerActive: state.isWbPickerActive,
       setEditor: state.setEditor,
     })),
   );
@@ -1676,7 +1679,12 @@ export default function Controls() {
               }}
               setAdjustments={setBasicAdjustments}
               appSettings={appSettings}
+              cameraInputAdjustments={selectColorPanelAdjustmentView(adjustments)}
+              isWbPickerActive={isWbPickerActive}
               onDragStateChange={onDragStateChange}
+              toggleWbPicker={() => {
+                setEditor({ isWbPickerActive: !isWbPickerActive });
+              }}
             />
           </>
         );

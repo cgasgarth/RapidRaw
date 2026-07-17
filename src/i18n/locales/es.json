@@ -1,8 +1,10 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "Negros",
       "brightness": "Brillo",
+      "color": "",
       "contrast": "Contraste",
       "evShift": "Compensación EV",
       "exposure": "Exposición",
@@ -41,6 +43,7 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "Mapeador de tonos",
+      "treatment": "",
       "viewContrast": "Contraste de vista",
       "whites": "Blancos"
     },
