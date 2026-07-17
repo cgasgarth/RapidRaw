@@ -29,6 +29,7 @@ import {
   reduceBasicToneSliderInteractionPreview,
 } from '../utils/basicToneSliderInteraction';
 import { isPendingExportSoftProofGamutWarningOverlay } from '../utils/color/runtime/gamutWarningDisplay';
+import type { DetailModifierPreview } from '../utils/detailLoupe';
 import { selectEditDocumentSourceArtifacts } from '../utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2, type EditDocumentV2CopyPayload } from '../utils/editDocumentV2';
 import {
@@ -223,6 +224,8 @@ interface EditorState {
 
   // Interaction State
   isSliderDragging: boolean;
+  /** Transient Alt/Option diagnostic state; never persisted or included in edit history. */
+  detailModifierPreview: DetailModifierPreview | null;
   zoom: number;
   zoomMode: EditorZoomMode;
   displaySize: ImageDimensions;
@@ -447,6 +450,14 @@ const applyEditorStateUpdate = (
       update.isSliderDragging = false;
     }
 
+    if (
+      ('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) ||
+      ('imageSession' in update && update.imageSession?.id !== state.imageSession?.id) ||
+      ('imageSessionId' in update && update.imageSessionId !== state.imageSessionId)
+    ) {
+      update.detailModifierPreview = null;
+    }
+
     if ('editDocumentV2' in update && update.editDocumentV2 !== undefined) {
       if (!('adjustmentRevision' in update)) {
         update.adjustmentRevision = allowRenderAuthority ? state.adjustmentRevision : state.adjustmentRevision + 1;
@@ -613,6 +624,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   panelScopesLayout: 'stacked',
 
   isSliderDragging: false,
+  detailModifierPreview: null,
   interactivePatch: null,
   previewQualityStatus: null,
   activeMaskContainerId: null,
@@ -716,6 +728,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isMaskControlHovered: false,
         isWbPickerActive: false,
         isSliderDragging: false,
+        detailModifierPreview: null,
         lastBasicToneCommand: null,
         lastEditApplicationReceipt: null,
         lastReferenceMatchApplicationReceipt: null,

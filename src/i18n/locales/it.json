@@ -339,6 +339,8 @@
       }
     },
     "details": {
+      "altPreviewNoiseReduction": "",
+      "altPreviewSharpening": "",
       "amount": "",
       "blueYellow": "Blu/Giallo",
       "blurRadius": "",
@@ -357,9 +359,11 @@
       "haloGuard": "",
       "localContrastRadius": "",
       "localContrastStatus": "",
+      "loupe": "",
       "luminance": "Luminanza",
       "midtoneMask": "",
       "minSpotRadius": "",
+      "moveLoupeTarget": "",
       "naturalGrain": "Grana naturale",
       "noiseReduction": "Riduzione Rumore",
       "presence": "Presenza",
