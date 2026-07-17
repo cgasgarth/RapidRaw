@@ -2018,6 +2018,19 @@
     "viewerFooter": {
       "accessibilityLabel": "",
       "moreStatus": "",
+      "toolbar": {
+        "beforeAfter": "",
+        "flipHorizontal": "",
+        "flipVertical": "",
+        "gamutWarning": "",
+        "loupe": "",
+        "noReference": "",
+        "original": "",
+        "reference": "",
+        "rotateLeft": "",
+        "rotateRight": "",
+        "softProof": ""
+      },
       "zoom": {
         "fill": "",
         "fit": "",

@@ -2162,6 +2162,19 @@
     "viewerFooter": {
       "accessibilityLabel": "Viewer status and controls",
       "moreStatus": "More viewer status",
+      "toolbar": {
+        "beforeAfter": "Before and after",
+        "flipHorizontal": "Flip horizontal",
+        "flipVertical": "Flip vertical",
+        "gamutWarning": "Gamut warning",
+        "loupe": "Loupe",
+        "noReference": "No reference available",
+        "original": "Show original",
+        "reference": "Reference view",
+        "rotateLeft": "Rotate left",
+        "rotateRight": "Rotate right",
+        "softProof": "Soft proof"
+      },
       "zoom": {
         "fill": "Fill",
         "fit": "Fit",
