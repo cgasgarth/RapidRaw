@@ -426,6 +426,7 @@
       },
       "scopedSections": {
         "basic": "Light",
+        "calibration": "보정",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",

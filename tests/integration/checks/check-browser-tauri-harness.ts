@@ -5170,10 +5170,16 @@ async function verifySceneCurveTransaction(page: Page): Promise<void> {
 }
 
 async function verifyColorCalibrationTransaction(page: Page): Promise<void> {
-  await page.getByTestId('color-workspace-tab-foundation').click();
-  const disclosure = page.getByTestId('color-calibration-disclosure');
-  if ((await disclosure.getAttribute('open')) === null) await disclosure.locator('summary').click();
-  const controls = page.getByTestId('color-calibration-controls');
+  // Calibration is a Develop adjustment section, not a duplicate Color workspace
+  // disclosure. Keep this proof bound to the canonical section and its toggle.
+  await page.getByTestId('right-panel-switcher-button-adjustments').click();
+  const inspector = page.getByTestId('adjustments-inspector');
+  await inspector.waitFor({ timeout: 10_000 });
+  const disclosure = page.getByTestId('adjustments-section-calibration');
+  await disclosure.waitFor({ timeout: 10_000 });
+  const disclosureToggle = disclosure.getByRole('button').first();
+  if ((await disclosureToggle.getAttribute('aria-expanded')) !== 'true') await disclosureToggle.click();
+  const controls = disclosure.getByTestId('calibration-controls');
   const identity = await controls.evaluate((element) => ({
     adjustmentRevision: element.dataset.commitAdjustmentRevision,
     imageSessionId: element.dataset.commitImageSession,
@@ -5187,8 +5193,8 @@ async function verifyColorCalibrationTransaction(page: Page): Promise<void> {
     throw new Error(`Color Calibration controls did not expose complete commit identity: ${JSON.stringify(identity)}`);
   }
 
-  const shadowsSlider = page.getByTestId('color-calibration-shadows-tint-range').locator('input[type="range"]');
-  const hueSlider = page.getByTestId('color-calibration-primary-hue-range').locator('input[type="range"]');
+  const shadowsSlider = page.getByTestId('calibration-shadows-tint-range').locator('input[type="range"]');
+  const hueSlider = page.getByTestId('calibration-primary-hue-range').locator('input[type="range"]');
   await shadowsSlider.scrollIntoViewIfNeeded();
   const baseline = await page.evaluate(() => {
     const calls = window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls ?? [];
@@ -5199,10 +5205,10 @@ async function verifyColorCalibrationTransaction(page: Page): Promise<void> {
   });
   await page.evaluate(() => {
     const shadows = document.querySelector<HTMLInputElement>(
-      '[data-testid="color-calibration-shadows-tint-range"] input[type="range"]',
+      '[data-testid="calibration-shadows-tint-range"] input[type="range"]',
     );
     const redHue = document.querySelector<HTMLInputElement>(
-      '[data-testid="color-calibration-primary-hue-range"] input[type="range"]',
+      '[data-testid="calibration-primary-hue-range"] input[type="range"]',
     );
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     if (shadows === null || redHue === null || setValue === undefined) {
@@ -5279,12 +5285,12 @@ async function verifyColorCalibrationTransaction(page: Page): Promise<void> {
     () =>
       (
         document.querySelector(
-          '[data-testid="color-calibration-shadows-tint-range"] input[type="range"]',
+          '[data-testid="calibration-shadows-tint-range"] input[type="range"]',
         ) as HTMLInputElement | null
       )?.value === '18' &&
       (
         document.querySelector(
-          '[data-testid="color-calibration-primary-hue-range"] input[type="range"]',
+          '[data-testid="calibration-primary-hue-range"] input[type="range"]',
         ) as HTMLInputElement | null
       )?.value === '0',
     undefined,
@@ -5295,12 +5301,17 @@ async function verifyColorCalibrationTransaction(page: Page): Promise<void> {
     () =>
       (
         document.querySelector(
-          '[data-testid="color-calibration-shadows-tint-range"] input[type="range"]',
+          '[data-testid="calibration-shadows-tint-range"] input[type="range"]',
         ) as HTMLInputElement | null
       )?.value === '0',
     undefined,
     { timeout: 10_000 },
   );
+
+  // Leave the inspector in the same workspace expected by the following picker
+  // proof, which owns its own Adjustments-panel navigation.
+  await page.getByTestId('right-panel-switcher-button-color').click();
+  await page.getByRole('heading', { exact: true, name: 'Color' }).waitFor({ timeout: 10_000 });
 }
 
 async function waitForStableGeometryEpoch(page: Page): Promise<void> {

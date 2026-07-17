@@ -270,7 +270,6 @@ function validateFoundationHierarchy(container: Element) {
   const profileTone = getByTestId(foundation, 'profile-tone-controls');
   const whiteBalance = getByTestId(foundation, 'color-quick-white-balance');
   const globalColor = getByTestId(foundation, 'color-quick-presence');
-  const calibration = getByTestId<HTMLDetailsElement>(foundation, 'color-calibration-disclosure');
 
   assert.equal(getByTestId(container, 'color-workspace-tab-foundation').getAttribute('aria-selected'), 'true');
   assert.equal(profileTone.dataset.runtimeProfileStatus, 'fallback');
@@ -278,8 +277,12 @@ function validateFoundationHierarchy(container: Element) {
   assert.equal(normalizeText(profileStatus.textContent), 'Fallback');
   assert.equal(profileStatus.title, rawDevelopmentReportFixture.cameraProfile.fallbackReason);
   assert.equal(normalizeText(profileTone.textContent).includes('balanced process'), true);
-  assert.equal(calibration.open, false, 'Calibration should start collapsed.');
-  for (const next of [whiteBalance, globalColor, calibration]) {
+  assert.equal(
+    foundation.querySelector('[data-testid="color-calibration-disclosure"]'),
+    null,
+    'Color foundation must not duplicate the standalone Develop Calibration section.',
+  );
+  for (const next of [whiteBalance, globalColor]) {
     assert.equal(
       profileTone.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING,
       Node.DOCUMENT_POSITION_FOLLOWING,

@@ -100,6 +100,7 @@ import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import { AutoEditReviewPopover } from '../../../adjustments/AutoEditReviewPopover';
 import BasicAdjustments, { type BasicAdjustmentUpdate, type BasicAdjustmentView } from '../../../adjustments/Basic';
 import CurveGraph, { type CurveAdjustmentUpdater, type CurveAdjustmentView } from '../../../adjustments/Curves';
+import CalibrationPanel from '../../../adjustments/color/CalibrationPanel';
 import DetailsPanel, { type DetailAdjustmentUpdate, type DetailAdjustmentView } from '../../../adjustments/Details';
 import EffectsPanel, { type EffectAdjustmentUpdate, type EffectAdjustmentView } from '../../../adjustments/Effects';
 import ReferenceMatchPanel from '../../../adjustments/ReferenceMatchPanel';
@@ -120,7 +121,15 @@ import InspectorPanelFrame, {
   type InspectorPanelStatus,
 } from '../inspector/InspectorPanelFrame';
 
-const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'transform', 'lensCorrection', 'details', 'effects'] as const;
+const ADJUSTMENT_SECTION_NAMES = [
+  'basic',
+  'curves',
+  'transform',
+  'lensCorrection',
+  'details',
+  'effects',
+  'calibration',
+] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
 type CollapsibleSectionsUpdater =
   | CollapsibleSectionsState
@@ -151,7 +160,9 @@ const getAdjustmentSectionNodeTypes = (sectionName: AdjustmentSectionName): read
     ? ['geometry']
     : sectionName === 'lensCorrection'
       ? ['lens_correction']
-      : getEditDocumentNodeTypesForEditorSection(sectionName);
+      : sectionName === 'calibration'
+        ? ['color_calibration']
+        : getEditDocumentNodeTypesForEditorSection(sectionName);
 
 const copyPayloadToReplaceOperations = (payload: EditDocumentV2CopyPayload): EditNodeOperation[] =>
   Object.entries(payload.nodes).flatMap(([nodeType, node]) =>
@@ -172,6 +183,7 @@ type NumericAdjustmentKey = keyof {
 
 const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> = {
   basic: 'Light',
+  calibration: 'Calibration',
   curves: 'Curve',
   details: 'Detail',
   effects: 'Effects',
@@ -220,6 +232,12 @@ const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionN
     case 'basic':
       return String(
         t('editor.adjustments.scopedSections.basic', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.basic }),
+      );
+    case 'calibration':
+      return String(
+        t('editor.adjustments.scopedSections.calibration', {
+          defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.calibration,
+        }),
       );
     case 'curves':
       return String(
@@ -1369,6 +1387,7 @@ export default function Controls() {
       deriveEffectiveDisclosureState(
         {
           basic: collapsibleSectionsState.basic,
+          calibration: collapsibleSectionsState.calibration ?? false,
           curves: collapsibleSectionsState.curves,
           details: collapsibleSectionsState.details,
           effects: collapsibleSectionsState.effects,
@@ -1485,8 +1504,20 @@ export default function Controls() {
 
   const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
     if (sectionName === 'transform' || sectionName === 'lensCorrection') return;
-    const nodeTypes = getEditDocumentNodeTypesForEditorSection(sectionName);
+    const nodeTypes = getAdjustmentSectionNodeTypes(sectionName);
     const enabled = nodeTypes.every((nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false);
+    if (sectionName === 'calibration') {
+      const calibrationNode = editDocumentV2.nodes['color_calibration'];
+      if (calibrationNode === undefined) return;
+      commitEditNodeOperations([
+        {
+          nodeType: 'color_calibration',
+          node: { ...calibrationNode, enabled: !enabled },
+          type: 'replace-edit-document-node',
+        },
+      ]);
+      return;
+    }
     setEditorSectionEnabled(sectionName, !enabled);
   };
 
@@ -1714,6 +1745,8 @@ export default function Controls() {
             onDragStateChange={onDragStateChange}
           />
         );
+      case 'calibration':
+        return <CalibrationPanel onDragStateChange={onDragStateChange} />;
     }
   };
 
@@ -1966,7 +1999,7 @@ export default function Controls() {
           const sectionActions = buildSectionActions(sectionName);
           const canToggleVisibility = sectionName !== 'transform' && sectionName !== 'lensCorrection';
           const isContentVisible = canToggleVisibility
-            ? getEditDocumentNodeTypesForEditorSection(sectionName).every(
+            ? getAdjustmentSectionNodeTypes(sectionName).every(
                 (nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false,
               )
             : true;

@@ -293,9 +293,8 @@ export async function assertAdjustmentsPanelRetune(page) {
   }
 
   // Transform and Lens Corrections are intentionally separate Develop surfaces.
-  // Keep this contract aligned with ControlsPanel rather than reaching through the
-  // old combined `transformLens` section that was removed by the Lightroom split.
-  const sectionNames = ['basic', 'curves', 'transform', 'lensCorrection', 'details', 'effects'];
+  // Calibration is a first-class Develop section and remains the final primary surface.
+  const sectionNames = ['basic', 'curves', 'transform', 'lensCorrection', 'details', 'effects', 'calibration'];
   const sectionBounds = await Promise.all(
     sectionNames.map(async (sectionName) => {
       const section = panel.getByTestId(`adjustments-section-${sectionName}`);
@@ -308,7 +307,7 @@ export async function assertAdjustmentsPanelRetune(page) {
   }
   if (sectionBounds.some((bounds, index) => index > 0 && (bounds?.y ?? 0) <= (sectionBounds[index - 1]?.y ?? 0))) {
     throw new Error(
-      'Adjust inspector sections should follow the Light, Curve, Transform, Lens Corrections, Detail, Effects order.',
+      'Adjust inspector sections should follow the Light, Curve, Transform, Lens Corrections, Detail, Effects, Calibration order.',
     );
   }
 
@@ -316,6 +315,10 @@ export async function assertAdjustmentsPanelRetune(page) {
     await panel.getByTestId(`adjustments-section-${sectionName}`).waitFor({
       timeout: 10_000,
     });
+  }
+
+  if ((await panel.getByTestId('calibration-controls').count()) !== 1) {
+    throw new Error('Develop Adjustments should expose exactly one canonical Calibration controls surface.');
   }
 
   const colorSectionCount = await panel.getByTestId('adjustments-section-color').count();
