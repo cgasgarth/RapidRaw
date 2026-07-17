@@ -327,6 +327,28 @@ export function fingerprintPreviewSessionIdentity(value: PreviewSessionIdentity)
   return JSON.stringify(previewSessionIdentitySchema.parse(value));
 }
 
+/**
+ * Identifies the rendered content independently of the preview resolution and
+ * viewport revision. A duplicate request for the same content must not replace
+ * a sharp frame with a lower-resolution artifact while it is settling.
+ */
+export function fingerprintPreviewContentIdentity(value: PreviewSessionIdentity): string {
+  const session = previewSessionIdentitySchema.parse(value);
+  return JSON.stringify({
+    adjustmentRevision: session.adjustmentRevision,
+    displayGeneration: session.displayGeneration,
+    geometryRevision: session.geometryRevision,
+    graphRevision: session.graphRevision,
+    imageSessionId: session.imageSessionId,
+    maskRevision: session.maskRevision,
+    patchRevision: session.patchRevision,
+    proofRevision: session.proofRevision,
+    roiFingerprint: session.roiFingerprint,
+    sourceImagePath: session.sourceImagePath,
+    sourceRevision: session.sourceRevision,
+  });
+}
+
 export function fingerprintPreviewGraphRevision(value: PreviewGraphRevision): string {
   return JSON.stringify(previewGraphRevisionSchema.parse(value));
 }
@@ -1029,6 +1051,25 @@ export function reducePreviewCoordinator(
         state = { ...state, originalArtifact: event.artifact };
       }
       return { effects, state: withReceipt(state, event, 'operation-presented', identity.operationId) };
+    }
+    const lowerResolutionThanVisibleSettled =
+      event.artifact !== undefined &&
+      identity.kind === 'settled' &&
+      state.visibleArtifact?.identity.kind === 'settled' &&
+      fingerprintPreviewContentIdentity(state.visibleArtifact.identity.session) ===
+        fingerprintPreviewContentIdentity(identity.session) &&
+      Math.max(identity.session.targetWidth, identity.session.targetHeight) <
+        Math.max(
+          state.visibleArtifact.identity.session.targetWidth,
+          state.visibleArtifact.identity.session.targetHeight,
+        );
+    if (lowerResolutionThanVisibleSettled && event.artifact !== undefined) {
+      effects.push({ type: 'release-url', url: event.artifact.url, reason: 'lower-resolution-artifact-rejected' });
+      state = updateOperation(state, identity.kind, { identity, status: 'superseded' });
+      return {
+        effects,
+        state: withReceipt(state, event, 'lower-resolution-artifact-rejected', identity.operationId),
+      };
     }
     const settledPresentationMatchesInteractiveInputs =
       identity.kind === 'interactive' &&
