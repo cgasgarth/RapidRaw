@@ -29,7 +29,7 @@ afterEach(() => {
 test('tone equalizer advanced controls commit typed zone and preview settings', async () => {
   const { container, getAdjustments } = await renderBasic();
   await act(async () => {
-    getRequiredElement<HTMLButtonElement>(container, '[data-testid="tone-equalizer-advanced-toggle"]').click();
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="basic-tone-advanced-toggle"]').click();
     await flushPromises();
   });
 
@@ -79,9 +79,9 @@ test('Light controls use the canonical tonal order and stable aligned rows', asy
     'basic-control-shadows',
     'basic-control-whites',
     'basic-control-blacks',
-    'basic-control-brightness',
   ]);
-  expect(container.querySelector('[data-testid="basic-secondary-controls"]')?.textContent).toContain('Brightness');
+  expect(container.querySelector('[data-testid="basic-secondary-controls"]')).toBeNull();
+  expect(container.querySelector('[data-testid="basic-tone-advanced"]')).toBeNull();
 
   for (const row of rows) {
     expect(row.getAttribute('data-density')).toBe('compact');
@@ -98,6 +98,10 @@ test('tone mapper switching preserves tone values and exposes edited/reset state
     exposure: 0.65,
   };
   const { container, getAdjustments } = await renderBasic({ initialAdjustments });
+  await act(async () => {
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="basic-tone-advanced-toggle"]').click();
+    await flushPromises();
+  });
   const mapperRow = getRequiredElement<HTMLDivElement>(container, '[data-testid="basic-tone-mapper"]');
   const agx = getRequiredElement<HTMLButtonElement>(mapperRow, '[role="radio"]:last-child');
 
@@ -145,7 +149,15 @@ test('mask and forced tone-mapper contexts omit only the global process selector
   expect(overrideRender.container.querySelector('[data-testid="basic-tone-mapper"]')).toBeNull();
   expect(
     overrideRender.container.querySelectorAll('[data-density="compact"][data-testid^="basic-control-"]'),
-  ).toHaveLength(7);
+  ).toHaveLength(6);
+});
+
+test('Tone defaults to collapsed Advanced and reports unavailable Auto without an image action', async () => {
+  const { container } = await renderBasic();
+  const advancedToggle = getRequiredElement<HTMLButtonElement>(container, '[data-testid="basic-tone-advanced-toggle"]');
+  expect(advancedToggle.getAttribute('aria-expanded')).toBe('false');
+  expect(container.querySelector('[data-testid="basic-tone-advanced"]')).toBeNull();
+  expect(getRequiredElement<HTMLButtonElement>(container, '[data-testid="basic-tone-auto"]').disabled).toBe(true);
 });
 
 test('current Basic view settings round-trip without a flat sidecar shape', () => {
