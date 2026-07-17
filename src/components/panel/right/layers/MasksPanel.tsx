@@ -159,6 +159,7 @@ import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens'
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
+import { BrushMaskControls, type BrushSettingsUpdater } from '../../editor/BrushMaskControls';
 import Waveform from '../../editor/Waveform';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
 import {
@@ -290,8 +291,6 @@ interface SubMaskConfig {
   showBrushTools?: boolean;
   showFlowControl?: boolean;
 }
-
-type BrushSettingsUpdater = BrushSettings | ((settings: BrushSettings | null) => BrushSettings);
 
 type CollapsibleState = Record<string, boolean>;
 type MaskContainerPatch = Partial<MaskContainer>;
@@ -784,81 +783,6 @@ function AiPersonMaskProvenance({ parameters }: { parameters: unknown }) {
   );
 }
 
-const BrushTools = ({
-  settings,
-  onSettingsChange,
-  onDragStateChange,
-}: {
-  settings: BrushSettings;
-  onSettingsChange: (updater: BrushSettingsUpdater) => void;
-  onDragStateChange?: ((isDragging: boolean) => void) | undefined;
-}) => {
-  const { t } = useTranslation();
-
-  return (
-    <div>
-      <AdjustmentSlider
-        density="compact"
-        defaultValue={100}
-        label={t('editor.masks.brush.size')}
-        max={200}
-        min={1}
-        onValueChange={(value) => {
-          onSettingsChange((settings) => ({
-            ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-            size: value,
-          }));
-        }}
-        step={1}
-        value={settings.size}
-        fillOrigin="min"
-        onDragStateChange={onDragStateChange}
-      />
-      <AdjustmentSlider
-        density="compact"
-        defaultValue={50}
-        label={t('editor.masks.brush.feather')}
-        max={100}
-        min={0}
-        onValueChange={(value) => {
-          onSettingsChange((settings) => ({
-            ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-            feather: value,
-          }));
-        }}
-        step={1}
-        value={settings.feather}
-        fillOrigin="min"
-        onDragStateChange={onDragStateChange}
-      />
-      <div className="grid grid-cols-2 gap-1.5 pt-1.5">
-        <button
-          className={`flex min-h-7 items-center justify-center gap-2 rounded px-2 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring ${settings.tool === ToolType.Brush ? 'bg-editor-primary-active text-editor-primary-active-text' : 'bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}`}
-          onClick={() => {
-            onSettingsChange((settings) => ({
-              ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-              tool: ToolType.Brush,
-            }));
-          }}
-        >
-          {t('editor.masks.brush.brush')}
-        </button>
-        <button
-          className={`flex min-h-7 items-center justify-center gap-2 rounded px-2 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring ${settings.tool === ToolType.Eraser ? 'bg-editor-primary-active text-editor-primary-active-text' : 'bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}`}
-          onClick={() => {
-            onSettingsChange((settings) => ({
-              ...(settings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-              tool: ToolType.Eraser,
-            }));
-          }}
-        >
-          {t('editor.masks.brush.eraser')}
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const FlowBrushTool = ({
   flow,
   onFlowChange,
@@ -890,7 +814,12 @@ const FlowBrushTool = ({
         fillOrigin="min"
         onDragStateChange={onDragStateChange}
       />
-      <BrushTools settings={settings} onSettingsChange={onSettingsChange} onDragStateChange={onDragStateChange} />
+      <BrushMaskControls
+        settings={settings}
+        onSettingsChange={onSettingsChange}
+        onDragStateChange={onDragStateChange}
+        showFlow={false}
+      />
     </div>
   );
 };
@@ -4403,7 +4332,7 @@ function SettingsPanel({
                     onDragStateChange={onDragStateChange}
                   />
                 ) : (
-                  <BrushTools
+                  <BrushMaskControls
                     settings={brushSettings}
                     onSettingsChange={setBrushSettings}
                     onDragStateChange={onDragStateChange}

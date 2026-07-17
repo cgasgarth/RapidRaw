@@ -103,6 +103,7 @@ import Input from '../../../ui/primitives/Input';
 import Slider from '../../../ui/primitives/Slider';
 import Switch from '../../../ui/primitives/Switch';
 import UiText from '../../../ui/primitives/Text';
+import { BrushMaskControls, type BrushSettingsUpdater } from '../../editor/BrushMaskControls';
 import InspectorPanelFrame, { type InspectorPanelStatus } from '../inspector/InspectorPanelFrame';
 import {
   AI_PANEL_CREATION_TYPES,
@@ -162,7 +163,6 @@ interface SubMaskConfig {
   showBrushTools?: boolean;
 }
 
-type BrushSettingsUpdater = BrushSettings | ((settings: BrushSettings) => BrushSettings);
 type NumericChangeEvent = ChangeEvent<HTMLInputElement> | { target: { value: number | string } };
 type UpdatePatch = (id: string, data: Partial<AiPatch>) => void;
 type UpdateSubMask = (id: string, data: Partial<SubMask>) => void;
@@ -172,7 +172,7 @@ interface AiPanelCollapsibleState {
   properties: boolean;
 }
 
-const DEFAULT_BRUSH_SETTINGS: BrushSettings = { size: 50, feather: 50, tool: ToolType.Brush };
+const DEFAULT_BRUSH_SETTINGS: BrushSettings = { density: 100, feather: 50, flow: 100, size: 50, tool: ToolType.Brush };
 const getNumericEventValue = (event: NumericChangeEvent): number => Number(event.target.value);
 
 const PLACEHOLDER_PATCH: AiPatch = {
@@ -226,70 +226,6 @@ const SUB_MASK_CONFIG: Partial<Record<Mask, SubMaskConfig>> = {
 
 const parameterLabelFallback = (key: string) =>
   key.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
-
-interface BrushToolsProps {
-  settings: BrushSettings;
-  onSettingsChange: (updater: BrushSettingsUpdater) => void;
-}
-
-const BrushTools = ({ settings, onSettingsChange }: BrushToolsProps) => {
-  const { t } = useTranslation();
-
-  return (
-    <div>
-      <Slider
-        defaultValue={100}
-        label={t('editor.ai.brush.size')}
-        max={200}
-        min={1}
-        onChange={(event: NumericChangeEvent) => {
-          onSettingsChange((settings) => ({ ...settings, size: getNumericEventValue(event) }));
-        }}
-        step={1}
-        value={settings.size}
-        fillOrigin="min"
-      />
-      <Slider
-        defaultValue={50}
-        label={t('editor.ai.brush.feather')}
-        max={100}
-        min={0}
-        onChange={(event: NumericChangeEvent) => {
-          onSettingsChange((settings) => ({ ...settings, feather: getNumericEventValue(event) }));
-        }}
-        step={1}
-        value={settings.feather}
-        fillOrigin="min"
-      />
-      <div className="grid grid-cols-2 gap-2 pt-2">
-        <button
-          className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-            settings.tool === ToolType.Brush
-              ? 'text-primary bg-surface'
-              : 'bg-surface text-text-secondary hover:bg-card-active'
-          }`}
-          onClick={() => {
-            onSettingsChange((settings) => ({ ...settings, tool: ToolType.Brush }));
-          }}
-        >
-          {t('editor.ai.brush.add')}
-        </button>
-        <button
-          className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-            settings.tool === ToolType.Eraser
-              ? 'text-primary bg-surface'
-              : 'bg-surface text-text-secondary hover:bg-card-active'
-          }`}
-          onClick={() => {
-            onSettingsChange((settings) => ({ ...settings, tool: ToolType.Eraser }));
-          }}
-        >
-          {t('editor.ai.brush.erase')}
-        </button>
-      </div>
-    </div>
-  );
-};
 
 interface ConnectionStatusProps {
   aiProvider: AiProviderIdType;
@@ -2705,7 +2641,7 @@ function SettingsPanel({
               ))}
 
               {subMaskConfig.showBrushTools && brushSettings && (
-                <BrushTools settings={brushSettings} onSettingsChange={setBrushSettings} />
+                <BrushMaskControls settings={brushSettings} onSettingsChange={setBrushSettings} />
               )}
             </>
           )}

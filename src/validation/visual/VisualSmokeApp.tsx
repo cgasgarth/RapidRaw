@@ -2889,6 +2889,8 @@ function BrushMaskCanvasVisualSmoke() {
             data-mask-id={brushMaskCanvasSubMaskId}
             data-point-counts={pointCounts}
             data-refine-brush-feather={brushSettings.feather}
+            data-refine-brush-flow={brushSettings.flow ?? 100}
+            data-refine-brush-density={brushSettings.density ?? 100}
             data-refine-brush-size={brushSettings.size}
             data-stroke-count={lines.length}
             data-testid="brush-mask-canvas-ui-proof"
@@ -2907,6 +2909,24 @@ function BrushMaskCanvasVisualSmoke() {
               type="button"
             >
               {copy.brushSize96}
+            </button>
+            <button
+              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
+              onClick={() => {
+                setBrushSettings((current) => ({ ...current, flow: 64 }));
+              }}
+              type="button"
+            >
+              {copy.brushFlow64}
+            </button>
+            <button
+              className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
+              onClick={() => {
+                setBrushSettings((current) => ({ ...current, density: 72 }));
+              }}
+              type="button"
+            >
+              {copy.brushDensity72}
             </button>
             <button
               className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs"
@@ -4159,6 +4179,8 @@ const copy = {
   activeLayerCount: '3 active',
   brushMaskCanvasUi: 'Brush mask canvas UI',
   brushFeather64: 'Feather 64',
+  brushFlow64: 'Flow 64',
+  brushDensity72: 'Density 72',
   brushSize96: 'Size 96',
   pointCounts: 'Point counts',
   runtimeProof: 'Runtime proof',

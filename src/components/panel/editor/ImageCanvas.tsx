@@ -633,7 +633,8 @@ export const ImageCanvas = memo(
       () => (activeSubMask ? toMaskParameters(activeSubMask.parameters) : null),
       [activeSubMask],
     );
-    const activeLineFlow = activeSubMask?.type === Mask.Flow ? (activeSubMaskParameters?.flow ?? 10) : undefined;
+    const activeLineFlow =
+      activeSubMask?.type === Mask.Flow ? (activeSubMaskParameters?.flow ?? 10) : (brushSettings?.flow ?? 100);
     const activeBrushMaskId = isMasking ? activeMaskId : activeAiSubMaskId;
     const viewerBrushContext: ViewerBrushCurrentContext = {
       active: isBrushActive && activeBrushMaskId !== null,
@@ -940,6 +941,7 @@ export const ImageCanvas = memo(
         parameters: activeSubMaskParameters,
         settings: {
           canonicalTool: canonicalBrushTool === ToolType.Eraser ? 'eraser' : 'brush',
+          ...(brushSettings?.density === undefined ? {} : { density: brushSettings.density / 100 }),
           feather: brushSettings?.feather ? brushSettings.feather / 100 : 0,
           ...(activeLineFlow === undefined ? {} : { flow: activeLineFlow }),
           imageSpaceSize: brushImageSpaceSize,
@@ -1509,6 +1511,18 @@ export const ImageCanvas = memo(
               data-brush-command-type={viewerBrushBinding.commandCapture?.commandType ?? ''}
               data-brush-command-validation-status={viewerBrushBinding.commandCapture?.validationStatus ?? ''}
               data-brush-controller-active={String(viewerBrushContext.active)}
+              data-brush-session-state={
+                viewerBrushBinding.liveLine !== null
+                  ? 'painting'
+                  : viewerBrushBinding.cursor.visible
+                    ? 'cursor'
+                    : 'idle'
+              }
+              data-brush-paint-tool={canonicalBrushTool === ToolType.Eraser ? 'erase' : 'paint'}
+              data-brush-size={String(brushSettings?.size ?? 0)}
+              data-brush-feather={String(brushSettings?.feather ?? 0)}
+              data-brush-flow={String(brushSettings?.flow ?? activeLineFlow ?? 100)}
+              data-brush-density={String(brushSettings?.density ?? 100)}
               data-brush-live-preview-mode={viewerBrushBinding.liveLine?.tool ?? ''}
               data-brush-live-preview-point-count={viewerBrushBinding.liveLine?.points.length ?? 0}
               data-brush-live-preview-first-x={viewerBrushBinding.liveLine?.points[0]?.x ?? ''}

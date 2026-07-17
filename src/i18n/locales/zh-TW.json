@@ -1448,6 +1448,7 @@
       },
       "brush": {
         "brush": "畫筆",
+        "density": "",
         "eraser": "橡皮擦",
         "feather": "畫筆羽化",
         "flow": "流量",

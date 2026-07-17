@@ -6,9 +6,11 @@ export const brushMaskPointV1Schema = z.object({ pressure: finite01.optional(), 
 
 export const brushMaskStrokeV1Schema = z
   .object({
+    density: finite01.optional(),
     flow: finite01,
     hardness: finite01,
     id: z.string().trim().min(1),
+    mode: z.enum(['paint', 'erase']).optional(),
     points: z.array(brushMaskPointV1Schema).min(1).max(4096),
     radius: z.number().finite().positive().max(1),
   })

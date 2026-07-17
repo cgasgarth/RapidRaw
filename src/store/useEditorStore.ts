@@ -642,7 +642,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   copiedSectionAdjustments: null,
   copiedMask: null,
-  brushSettings: { size: 50, feather: 50, tool: ToolType.Brush },
+  brushSettings: { density: 100, feather: 50, flow: 100, size: 50, tool: ToolType.Brush },
   copiedEditDocumentV2: null,
   presetApplication: null,
 

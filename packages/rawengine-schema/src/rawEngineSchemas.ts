@@ -1876,6 +1876,7 @@ export const layerMaskPointV1Schema = z
 
 export const layerMaskBrushStrokeV1Schema = z
   .object({
+    density: z.number().min(0).max(1).optional(),
     flow: z.number().min(0).max(1),
     hardness: z.number().min(0).max(1),
     mode: z.enum(['paint', 'erase']),

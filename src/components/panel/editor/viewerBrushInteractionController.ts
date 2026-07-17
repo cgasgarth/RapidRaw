@@ -9,6 +9,7 @@ export interface ViewerBrushPoint {
 
 export interface ViewerBrushLine {
   readonly brushSize: number;
+  readonly density?: number;
   readonly feather: number;
   readonly flow?: number;
   readonly points: Array<ViewerBrushPoint>;
@@ -46,6 +47,7 @@ export interface ViewerBrushPointerSample {
 
 export interface ViewerBrushSettings {
   readonly canonicalTool: ViewerBrushTool;
+  readonly density?: number;
   readonly feather: number;
   readonly flow?: number;
   readonly imageSpaceSize: number;
@@ -113,6 +115,7 @@ const lineFromSamples = (
   settings: ViewerBrushSettings,
 ): ViewerBrushLine => ({
   brushSize: settings.imageSpaceSize,
+  ...(settings.density === undefined ? {} : { density: settings.density }),
   feather: settings.feather,
   ...(settings.flow === undefined ? {} : { flow: settings.flow }),
   points: samples.map(({ imagePoint }) => imagePoint),

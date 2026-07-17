@@ -141,6 +141,7 @@ function toBrushMaskV1(subMask: MaskContainer['subMasks'][number]): BrushMaskV1 
     flow?: number;
     lines?: Array<{
       brushSize?: number;
+      density?: number;
       feather?: number;
       flow?: number;
       points?: Array<{ pressure?: number; x: number; y: number }>;
@@ -156,16 +157,17 @@ function toBrushMaskV1(subMask: MaskContainer['subMasks'][number]): BrushMaskV1 
   }
   const maximumDimension = Math.max(width, height);
   const strokes = (parameters.lines ?? []).map((line, index) => {
-    if (line.tool === 'eraser') throw new Error('Authoritative brush masks do not support erase strokes yet.');
     const size = line.brushSize ?? line.size;
     if (!Number.isFinite(size) || !size) throw new Error('Authoritative brush stroke size is invalid.');
     const feather = line.feather ?? 0;
     const hardness = line.brushSize === undefined ? 1 - feather / 100 : 1 - feather;
     const flow = (line.flow ?? parameters.flow ?? 100) / 100;
     return {
+      ...(line.density === undefined ? {} : { density: line.density }),
       flow,
       hardness,
       id: `${subMask.id}_stroke_${index + 1}`,
+      ...(line.tool === undefined ? {} : { mode: line.tool === 'eraser' ? ('erase' as const) : ('paint' as const) }),
       points: (line.points ?? []).map((point) => ({
         ...(point.pressure === undefined ? {} : { pressure: point.pressure }),
         x: point.x / width,
@@ -541,10 +543,11 @@ function materializeMasksFromSidecar(
           opacity: mask.opacity * 100,
           parameters: {
             lines: mask.strokes.map((stroke) => ({
+              ...(stroke.density === undefined ? {} : { density: stroke.density * 100 }),
               feather: (1 - stroke.hardness) * 100,
               points: stroke.points,
               size: stroke.radius * 2,
-              tool: 'brush' as const,
+              tool: stroke.mode === 'erase' ? ('eraser' as const) : ('brush' as const),
             })),
             rawEngine: {
               contentHash: `native:${mask.id}`,

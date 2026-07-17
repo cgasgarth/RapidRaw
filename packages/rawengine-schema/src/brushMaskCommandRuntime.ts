@@ -204,8 +204,11 @@ export const renderBrushMask = (request: BrushMaskRenderRequest): BrushMaskRende
           parsedRequest.width,
           parsedRequest.height,
         );
+        const weightedCoverage = coverage * (stroke.density ?? 1);
         alpha[index] =
-          stroke.mode === 'paint' ? Math.max(alpha[index] ?? 0, coverage) : (alpha[index] ?? 0) * (1 - coverage);
+          stroke.mode === 'paint'
+            ? Math.max(alpha[index] ?? 0, weightedCoverage)
+            : (alpha[index] ?? 0) * (1 - weightedCoverage);
       }
     }
   }
