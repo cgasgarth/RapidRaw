@@ -1328,6 +1328,8 @@ export function LayerStackPanel({
         spotsVisible={retouchRemoveWorkflow.spotsVisible}
         onCancel={() => {
           setRetouchRemoveWorkflow((state) => reduceRetouchRemoveWorkflow(state, { type: 'cancel-session' }));
+          setLocalSelectedLayerId(BASE_LAYER_ID);
+          onSelectMaskContainer(null);
         }}
         onComplete={() => {
           setRetouchRemoveWorkflow((state) => reduceRetouchRemoveWorkflow(state, { type: 'complete-session' }));
