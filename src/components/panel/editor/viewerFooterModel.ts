@@ -88,6 +88,7 @@ const toolHints: Record<Exclude<ViewerActiveTool, 'none'>, ViewerFooterToolHint>
   'point-color': { cancelHint: 'Esc', label: 'Click a color to create a Point Color sample', tool: 'point-color' },
   retouch: { cancelHint: 'Esc', label: 'Click to place the retouch source and target', tool: 'retouch' },
   straighten: { cancelHint: 'Esc', label: 'Drag along a horizon to straighten', tool: 'straighten' },
+  'tone-curve': { cancelHint: 'Esc', label: 'Click or drag a tone to target its curve region', tool: 'tone-curve' },
   'tone-equalizer': { cancelHint: 'Esc', label: 'Click or drag a tone to target its band', tool: 'tone-equalizer' },
   'white-balance': { cancelHint: 'Esc', label: 'Click a neutral area to set white balance', tool: 'white-balance' },
 };

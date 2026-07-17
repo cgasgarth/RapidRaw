@@ -11,6 +11,7 @@ export type ViewerActiveTool =
   | 'point-color'
   | 'retouch'
   | 'straighten'
+  | 'tone-curve'
   | 'tone-equalizer'
   | 'white-balance';
 export type ViewerCursor =
@@ -49,7 +50,12 @@ export const isViewerDrag = (start: { x: number; y: number }, current: { x: numb
   Math.hypot(current.x - start.x, current.y - start.y) > VIEWER_DRAG_THRESHOLD_PX;
 
 const cursorForTool = (activeTool: ViewerActiveTool): ViewerCursor => {
-  if (activeTool === 'point-color' || activeTool === 'tone-equalizer' || activeTool === 'white-balance')
+  if (
+    activeTool === 'point-color' ||
+    activeTool === 'tone-curve' ||
+    activeTool === 'tone-equalizer' ||
+    activeTool === 'white-balance'
+  )
     return 'crosshair';
   if (
     activeTool === 'brush' ||
@@ -117,6 +123,7 @@ export const resolveViewerInput = ({
         activeTool === 'point-color' ||
         activeTool === 'retouch' ||
         activeTool === 'straighten' ||
+        activeTool === 'tone-curve' ||
         activeTool === 'tone-equalizer',
     };
   }
