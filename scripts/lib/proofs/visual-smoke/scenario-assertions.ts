@@ -913,35 +913,60 @@ async function assertProfessionalFilmstripContext(page) {
   const context = page.getByTestId('professional-filmstrip-context-expanded');
   await context.waitFor({ timeout: 10_000 });
 
-  const summary = context.getByTestId('filmstrip-selection-summary');
-  await summary.waitFor({ timeout: 10_000 });
+  const edgeHeader = context.getByTestId('filmstrip-edge-header');
+  await edgeHeader.waitFor({ timeout: 10_000 });
 
-  const summaryDataset = await summary.evaluate((element) => ({ ...element.dataset }));
+  const edgeDataset = await edgeHeader.evaluate((element) => ({ ...element.dataset }));
   if (
-    summaryDataset.selectedCount !== '4' ||
-    summaryDataset.activeFilename !== 'filmstrip-context-active.ARW' ||
-    summaryDataset.editedCount !== '2' ||
-    summaryDataset.rawQualityImageCount !== '3' ||
-    summaryDataset.rawQualityBadgeCount !== '4' ||
-    summaryDataset.ratingCount !== '4' ||
-    summaryDataset.colorLabelCount !== '4' ||
-    summaryDataset.virtualCopyCount !== '1'
+    edgeDataset.filmstripSelectedCount !== '4' ||
+    edgeDataset.activeFilename !== 'filmstrip-context-active.ARW' ||
+    edgeDataset.filmstripImageCount !== '5' ||
+    edgeDataset.filmstripFiltered !== 'true'
   ) {
-    throw new Error(
-      `Filmstrip selection summary did not expose selected runtime badge state: ${JSON.stringify(summaryDataset)}`,
-    );
+    throw new Error(`Filmstrip edge header did not expose selection/source state: ${JSON.stringify(edgeDataset)}`);
   }
 
-  await context
-    .getByTestId('filmstrip-selection-summary-selected-count')
-    .getByText('4 selected', { exact: true })
-    .waitFor({
-      timeout: 10_000,
-    });
-  await context
-    .getByTestId('filmstrip-selection-summary-active-filename')
-    .getByText('filmstrip-context-active.ARW', { exact: true })
-    .waitFor({ timeout: 10_000 });
+  const badgeCounts = await context.evaluate((root) => ({
+    color: Array.from(root.querySelectorAll('[data-testid="filmstrip-thumbnail"][aria-selected="true"]')).reduce(
+      (count, thumbnail) => count + thumbnail.querySelectorAll('[data-testid="filmstrip-color-tag-badge"]').length,
+      0,
+    ),
+    edited: Array.from(root.querySelectorAll('[data-testid="filmstrip-thumbnail"][aria-selected="true"]')).reduce(
+      (count, thumbnail) => count + thumbnail.querySelectorAll('[data-testid="filmstrip-edit-badge"]').length,
+      0,
+    ),
+    rating: Array.from(root.querySelectorAll('[data-testid="filmstrip-thumbnail"][aria-selected="true"]')).reduce(
+      (count, thumbnail) => count + thumbnail.querySelectorAll('[data-testid="filmstrip-rating-badge"]').length,
+      0,
+    ),
+    rawQualityImages: Array.from(
+      root.querySelectorAll('[data-testid="filmstrip-thumbnail"][aria-selected="true"]'),
+    ).reduce(
+      (count, thumbnail) => count + thumbnail.querySelectorAll('[data-testid="filmstrip-raw-quality-badges"]').length,
+      0,
+    ),
+    rawQualityBadges: Array.from(
+      root.querySelectorAll<HTMLElement>(
+        '[data-testid="filmstrip-thumbnail"][aria-selected="true"] [data-testid="filmstrip-raw-quality-badges"]',
+      ),
+    ).reduce((count, element) => count + Number(element.dataset.rawQualityBadgeCount ?? 0), 0),
+    virtualCopies: Array.from(
+      root.querySelectorAll('[data-testid="filmstrip-thumbnail"][aria-selected="true"]'),
+    ).reduce(
+      (count, thumbnail) => count + thumbnail.querySelectorAll('[data-testid="filmstrip-virtual-copy-badge"]').length,
+      0,
+    ),
+  }));
+  if (
+    badgeCounts.edited !== 2 ||
+    badgeCounts.rawQualityImages !== 3 ||
+    badgeCounts.rawQualityBadges !== 4 ||
+    badgeCounts.rating !== 4 ||
+    badgeCounts.color !== 4 ||
+    badgeCounts.virtualCopies !== 1
+  ) {
+    throw new Error(`Filmstrip thumbnails did not expose selected runtime badge state: ${JSON.stringify(badgeCounts)}`);
+  }
 
   const selectedBeforeClear = await context
     .locator('[data-testid="filmstrip-thumbnail"][aria-selected="true"]')
@@ -995,10 +1020,10 @@ async function assertProfessionalFilmstripContext(page) {
   await activeThumbnail.focus();
   await page.keyboard.press('ArrowRight');
   await page.waitForFunction(() => {
-    const summaryElement = document.querySelector('[data-testid="filmstrip-selection-summary"]');
+    const summaryElement = document.querySelector('[data-testid="filmstrip-edge-header"]');
     return (
       summaryElement?.getAttribute('data-active-filename') === 'filmstrip-context-selected.NEF' &&
-      summaryElement?.getAttribute('data-selected-count') === '1'
+      summaryElement?.getAttribute('data-filmstrip-selected-count') === '1'
     );
   });
 
@@ -1021,10 +1046,10 @@ async function assertProfessionalFilmstripContext(page) {
     throw new Error(`Filmstrip roving keyboard state mismatch: ${JSON.stringify(rovingState)}`);
   }
 
-  await context.getByTestId('filmstrip-selection-summary-clear').click();
+  await context.getByTestId('filmstrip-edge-clear-selection').click();
   await page.waitForFunction(() => {
-    const summaryElement = document.querySelector('[data-testid="filmstrip-selection-summary"]');
-    return summaryElement?.getAttribute('data-selected-count') === '0';
+    const header = document.querySelector('[data-testid="filmstrip-edge-header"]');
+    return header?.getAttribute('data-filmstrip-selected-count') === '0';
   });
 
   const selectedAfterClear = await context.locator('[data-testid="filmstrip-thumbnail"][aria-selected="true"]').count();

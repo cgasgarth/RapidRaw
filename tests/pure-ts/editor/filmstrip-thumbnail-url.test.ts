@@ -9,6 +9,7 @@ import Filmstrip, {
   FilmstripThumbnail,
   getFilmstripColumnWidth,
   resolveFilmstripThumbnailUrl,
+  truncateFilmstripFilename,
 } from '../../../src/components/panel/Filmstrip.tsx';
 import {
   DecodedThumbnailReadinessCache,
@@ -225,6 +226,52 @@ describe('filmstrip thumbnail decode handoff', () => {
 test('uses fixed virtual geometry regardless of thumbnail presentation mode', () => {
   expect(getFilmstripColumnWidth(100)).toBe(108);
   expect(getFilmstripColumnWidth(66)).toBe(74);
+});
+
+test('keeps selection/source state in one edge header instead of a second summary row', async () => {
+  const images = Array.from({ length: 120 }, (_value, index) => image(`/validation/edge-header-${index}.ARW`));
+  const rendered = await renderFilmstrip(images);
+
+  expect(rendered.container.querySelector('[data-testid="filmstrip-selection-summary"]')).toBeNull();
+  const header = rendered.container.querySelector<HTMLElement>('[data-testid="filmstrip-edge-header"]');
+  if (!header) throw new Error('Expected the compact filmstrip edge header.');
+  expect(header.dataset['filmstripImageCount']).toBe('120');
+  expect(header.dataset['filmstripSelectedCount']).toBe('0');
+  expect(rendered.container.querySelector('[data-testid="filmstrip-navigator-lane"]')).not.toBeNull();
+});
+
+test('bounds long filmstrip filenames without losing the identifying suffix', () => {
+  const filename = '20260717_alaska_summit_glacier_lake_sunrise_original.ARW';
+  const truncated = truncateFilmstripFilename(filename);
+  expect(truncated.length).toBeLessThanOrEqual(40);
+  expect(truncated.startsWith('20260717')).toBe(true);
+  expect(truncated.endsWith('.ARW')).toBe(true);
+});
+
+test('surfaces flag and stack metadata on a thumbnail without changing selection identity', async () => {
+  const flagged = image('/validation/flagged-stack.ARW');
+  flagged.tags = ['flag:pick', 'stack:burst-1'];
+  replaceThumbnails({ [flagged.path]: 'blob:flagged-stack' });
+  const rendered = await renderThumbnail(flagged);
+  await loadImage(requiredImage(rendered.container, 'blob:flagged-stack'));
+
+  expect(
+    rendered.container.querySelector('[data-testid="filmstrip-flag-badge"]')?.getAttribute('data-filmstrip-flag'),
+  ).toBe('pick');
+  expect(rendered.container.querySelector('[data-testid="filmstrip-stack-badge"]')).not.toBeNull();
+  expect(rendered.container.querySelector('[data-image-path="/validation/flagged-stack.ARW"]')).not.toBeNull();
+});
+
+test('surfaces image-record rating and virtual-copy metadata when derived maps are incomplete', async () => {
+  const virtualCopy = image('/validation/record-metadata.ARW');
+  virtualCopy.is_virtual_copy = true;
+  virtualCopy.rating = 4;
+  replaceThumbnails({ [virtualCopy.path]: 'blob:record-metadata' });
+  const rendered = await renderThumbnail(virtualCopy);
+  await loadImage(requiredImage(rendered.container, 'blob:record-metadata'));
+
+  expect(rendered.container.querySelector('[data-testid="filmstrip-rating-badge"]')).not.toBeNull();
+  expect(rendered.container.querySelector('[data-testid="filmstrip-virtual-copy-badge"]')).not.toBeNull();
 });
 
 test('keeps virtual cells settled across unchanged parent renders and applies selection revisions in list order', async () => {
