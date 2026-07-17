@@ -262,6 +262,18 @@ test('surfaces flag and stack metadata on a thumbnail without changing selection
   expect(rendered.container.querySelector('[data-image-path="/validation/flagged-stack.ARW"]')).not.toBeNull();
 });
 
+test('surfaces image-record rating and virtual-copy metadata when derived maps are incomplete', async () => {
+  const virtualCopy = image('/validation/record-metadata.ARW');
+  virtualCopy.is_virtual_copy = true;
+  virtualCopy.rating = 4;
+  replaceThumbnails({ [virtualCopy.path]: 'blob:record-metadata' });
+  const rendered = await renderThumbnail(virtualCopy);
+  await loadImage(requiredImage(rendered.container, 'blob:record-metadata'));
+
+  expect(rendered.container.querySelector('[data-testid="filmstrip-rating-badge"]')).not.toBeNull();
+  expect(rendered.container.querySelector('[data-testid="filmstrip-virtual-copy-badge"]')).not.toBeNull();
+});
+
 test('keeps virtual cells settled across unchanged parent renders and applies selection revisions in list order', async () => {
   let thumbnailExifReads = 0;
   const images = Array.from({ length: 2_000 }, (_value, index) => {

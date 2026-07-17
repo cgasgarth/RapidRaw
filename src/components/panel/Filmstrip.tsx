@@ -247,11 +247,11 @@ export const FilmstripThumbnail = memo(
     const reducedMotion = useReducedMotion();
 
     const visibleLayers = layers.filter((layer) => layer.binding.path === path);
-    const rating = imageRatings?.[path] || 0;
+    const rating = imageRatings?.[path] ?? imageFile.rating ?? 0;
     const colorLabel = getFilmstripColorLabel(tags);
     const flag = getFilmstripFlag(tags);
     const isStacked = hasFilmstripStack(tags);
-    const isVirtualCopy = path.includes('?vc=');
+    const isVirtualCopy = imageFile.is_virtual_copy || path.includes('?vc=');
     const displayEditIcon = useSettingsStore((s) => s.appSettings?.displayEditIcon ?? true);
     const showEditIcon = isEdited && displayEditIcon;
 
