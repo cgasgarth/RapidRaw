@@ -35,6 +35,27 @@ const XYZ_D65_TO_SRGB: [[f64; 3]; 3] = [
     [-0.969_243_636, 1.875_967_502, 0.041_555_057],
     [0.055_630_080, -0.203_976_959, 1.056_971_514],
 ];
+// Scene RAW development is carried in ACEScg/AP1 (D60).  The editor view
+// surface is an sRGB display surface (D65).  Keep this matrix here, beside
+// the export AP1 conversion, so CPU preview and export cannot silently treat
+// AP1 components as if they were already sRGB components.
+const ACESCG_TO_SRGB_LINEAR_D65: [[f64; 3]; 3] = [
+    [
+        1.7050509676513828,
+        -0.6217923268848524,
+        -0.08325865008015032,
+    ],
+    [
+        -0.13025638044824395,
+        1.1408048590335242,
+        -0.010548431206373589,
+    ],
+    [
+        -0.024003384484782515,
+        -0.1289690225292197,
+        1.1529723471988358,
+    ],
+];
 const XYZ_D65_TO_DISPLAY_P3: [[f64; 3]; 3] = [
     [2.493_496_912, -0.931_383_618, -0.402_710_784],
     [-0.829_488_970, 1.762_664_060, 0.023_624_686],
@@ -281,6 +302,17 @@ fn target_linear_from_ap1(pixel: &[f32], profile: &ExportColorProfile) -> Result
     }
 }
 
+/// Convert one ACEScg/AP1 D60 scene-linear pixel to D65 sRGB scene-linear.
+///
+/// RAW previews arrive at the render graph as AP1 after the validated camera
+/// input transform.  This conversion is required before any sRGB transfer
+/// function; applying `linear_to_srgb` directly to AP1 is a channel mix-up
+/// that produces the magenta/blue neutral RAW regression.
+pub(crate) fn acescg_to_srgb_linear(pixel: [f32; 3]) -> [f32; 3] {
+    let source = pixel.map(f64::from);
+    mul(ACESCG_TO_SRGB_LINEAR_D65, source).map(|value| value as f32)
+}
+
 fn mul(matrix: [[f64; 3]; 3], value: [f64; 3]) -> [f64; 3] {
     [
         matrix[0][0] * value[0] + matrix[0][1] * value[1] + matrix[0][2] * value[2],
@@ -386,6 +418,29 @@ mod tests {
         let mislabeled = fixture([0.9, 0.1, 0.05]).to_rgb16().into_raw();
         assert_ne!(pixels, mislabeled);
         assert!(pixels[0] > pixels[1] && pixels[0] > pixels[2]);
+    }
+
+    #[test]
+    fn raw_view_ap1_conversion_matches_srgb_export_scene_matrix() {
+        for pixel in [[0.18, 0.18, 0.18], [0.9, 0.1, 0.05], [0.03, 0.4, 1.2]] {
+            let view = acescg_to_srgb_linear(pixel);
+            let export = target_linear_from_ap1(
+                &[pixel[0], pixel[1], pixel[2], 1.0],
+                &ExportColorProfile::Srgb,
+            )
+            .expect("finite ACEScg scene pixel converts to sRGB");
+            for (view_channel, export_channel) in view.into_iter().zip(export) {
+                assert!((f64::from(view_channel) - export_channel).abs() < 1.0e-6);
+            }
+        }
+    }
+
+    #[test]
+    fn raw_view_neutral_ap1_is_neutral_after_display_conversion() {
+        let converted = acescg_to_srgb_linear([0.18, 0.18, 0.18]);
+        let spread = converted.iter().copied().fold(f32::NEG_INFINITY, f32::max)
+            - converted.iter().copied().fold(f32::INFINITY, f32::min);
+        assert!(spread < 1.0e-5, "converted neutral was {converted:?}");
     }
 
     #[test]

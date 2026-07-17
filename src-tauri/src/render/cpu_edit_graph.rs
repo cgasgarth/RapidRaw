@@ -16,6 +16,7 @@ use crate::color::point_color::apply_gpu_plan_ap1;
 use crate::color::view_transform::{
     RAPID_VIEW_IMPLEMENTATION_VERSION, ViewColorStrategy, ViewTransformPlanV1, ViewTransformProcess,
 };
+use crate::color::working_to_output_transform::acescg_to_srgb_linear;
 use crate::edit_graph::CompiledEditGraph;
 use crate::lut_processing::Lut;
 use crate::mixer_render::{apply_black_white_mixer, apply_channel_mixer, apply_color_balance_rgb};
@@ -428,14 +429,25 @@ pub(crate) fn execute_cpu_edit_graph(
         }
         color = if adjustments.global.tonemapper_mode == 2 {
             let mapped = rapid_view_plan(adjustments).apply_rgb(color.to_array());
-            linear_to_srgb_extended(Vec3::from_array(mapped))
-        } else if adjustments.global.tonemapper_mode == 1 {
-            agx_full_transform(color, adjustments)
-        } else if adjustments.global.is_raw_image == 1 {
-            let encoded = if preserve_extended {
-                linear_to_srgb_extended(color)
+            let display_linear = if adjustments.global.is_raw_image == 1 {
+                Vec3::from_array(acescg_to_srgb_linear(mapped))
             } else {
-                linear_to_srgb(color)
+                Vec3::from_array(mapped)
+            };
+            linear_to_srgb_extended(display_linear)
+        } else if adjustments.global.tonemapper_mode == 1 {
+            let agx_input = if adjustments.global.is_raw_image == 1 {
+                Vec3::from_array(acescg_to_srgb_linear(color.to_array()))
+            } else {
+                color
+            };
+            agx_full_transform(agx_input, adjustments)
+        } else if adjustments.global.is_raw_image == 1 {
+            let display_linear = Vec3::from_array(acescg_to_srgb_linear(color.to_array()));
+            let encoded = if preserve_extended {
+                linear_to_srgb_extended(display_linear)
+            } else {
+                linear_to_srgb(display_linear)
             };
             let gamma = encoded.map(|channel| channel.max(0.0).powf(1.0 / 1.1));
             let contrast = gamma * gamma * (Vec3::splat(3.0) - gamma * 2.0);

@@ -562,6 +562,17 @@ fn linear_to_srgb_extended(c: vec3<f32>) -> vec3<f32> {
     return sign(c) * select(higher, lower, magnitude <= cutoff);
 }
 
+// RAW development is ACEScg/AP1 D60 scene-linear.  The view surface is D65
+// sRGB; applying an sRGB transfer curve directly to AP1 causes the neutral RAW
+// cast because AP1 components are not sRGB components.
+fn acescg_to_srgb_linear(c: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        dot(vec3<f32>(1.70505097, -0.62179233, -0.08325865), c),
+        dot(vec3<f32>(-0.13025638, 1.14080486, -0.01054843), c),
+        dot(vec3<f32>(-0.02400338, -0.12896902, 1.15297235), c),
+    );
+}
+
 fn rgb_to_hsv(c: vec3<f32>) -> vec3<f32> {
     let c_max = max(c.r, max(c.g, c.b));
     let c_min = min(c.r, min(c.g, c.b));
@@ -3031,13 +3042,22 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 
     var base_srgb = color_from_texture;
     if (view_execution_phase && adjustments.global.tonemapper_mode == 2u) {
-        base_srgb = rapid_view_encode_signed(rapid_view_transform(composite_rgb_linear));
+        var rapid_view_linear = rapid_view_transform(composite_rgb_linear);
+        if (is_raw == 1u) {
+            rapid_view_linear = acescg_to_srgb_linear(rapid_view_linear);
+        }
+        base_srgb = rapid_view_encode_signed(rapid_view_linear);
     } else if (view_execution_phase && adjustments.global.tonemapper_mode == 1u) {
-        base_srgb = agx_full_transform(composite_rgb_linear);
+        var agx_input = composite_rgb_linear;
+        if (is_raw == 1u) {
+            agx_input = acescg_to_srgb_linear(agx_input);
+        }
+        base_srgb = agx_full_transform(agx_input);
     } else if (view_execution_phase && is_raw == 1u) {
+        let display_linear = acescg_to_srgb_linear(composite_rgb_linear);
         var srgb_emulated = select(
-            linear_to_srgb(composite_rgb_linear),
-            linear_to_srgb_extended(composite_rgb_linear),
+            linear_to_srgb(display_linear),
+            linear_to_srgb_extended(display_linear),
             preserve_scene_extended,
         );
         const BRIGHTNESS_GAMMA: f32 = 1.1;
