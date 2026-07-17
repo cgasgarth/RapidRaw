@@ -150,13 +150,23 @@ function toBrushMaskV1(subMask: MaskContainer['subMasks'][number]): BrushMaskV1 
     }>;
     rawEngine?: { height?: number; width?: number };
   };
-  const width = parameters.rawEngine?.width;
-  const height = parameters.rawEngine?.height;
-  if (!Number.isFinite(width) || !Number.isFinite(height) || !width || !height) {
+  const rawWidth = parameters.rawEngine?.width;
+  const rawHeight = parameters.rawEngine?.height;
+  const lines = parameters.lines ?? [];
+  const hasImageDimensions =
+    typeof rawWidth === 'number' &&
+    typeof rawHeight === 'number' &&
+    Number.isFinite(rawWidth) &&
+    Number.isFinite(rawHeight) &&
+    rawWidth > 0 &&
+    rawHeight > 0;
+  if (!hasImageDimensions && lines.length > 0) {
     throw new Error('Authoritative brush mask capture requires active-image dimensions.');
   }
+  const width = hasImageDimensions && rawWidth !== undefined ? rawWidth : 1;
+  const height = hasImageDimensions && rawHeight !== undefined ? rawHeight : 1;
   const maximumDimension = Math.max(width, height);
-  const strokes = (parameters.lines ?? []).map((line, index) => {
+  const strokes = lines.map((line, index) => {
     const size = line.brushSize ?? line.size;
     if (!Number.isFinite(size) || !size) throw new Error('Authoritative brush stroke size is invalid.');
     const feather = line.feather ?? 0;
@@ -717,15 +727,16 @@ function cloneSourceForOperation(
 }
 
 function toLayerScopedToneAdjustment(adjustments: MaskContainer['adjustments']): LayerScopedToneAdjustmentV1 {
+  const normalizedAdjustments = { ...INITIAL_MASK_ADJUSTMENTS, ...adjustments };
   return {
-    blackPoint: adjustments.blacks,
-    clarity: adjustments.clarity,
-    contrast: adjustments.contrast,
-    exposureEv: adjustments.exposure,
-    highlights: adjustments.highlights,
-    saturation: adjustments.saturation,
-    shadows: adjustments.shadows,
-    whitePoint: adjustments.whites,
+    blackPoint: normalizedAdjustments.blacks,
+    clarity: normalizedAdjustments.clarity,
+    contrast: normalizedAdjustments.contrast,
+    exposureEv: normalizedAdjustments.exposure,
+    highlights: normalizedAdjustments.highlights,
+    saturation: normalizedAdjustments.saturation,
+    shadows: normalizedAdjustments.shadows,
+    whitePoint: normalizedAdjustments.whites,
   };
 }
 

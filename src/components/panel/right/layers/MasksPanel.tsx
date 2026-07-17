@@ -96,10 +96,7 @@ import {
   type LayerMaskProvenanceInvalidationReason,
   type LayerMaskProvenanceView,
 } from '../../../../utils/layers/layerMaskProvenance';
-import {
-  buildLayerStackSidecarFromMasks,
-  updateLayerStackSidecarToneColorFromMasks,
-} from '../../../../utils/layers/layerStackCommandBridge';
+import { buildLayerStackSidecarFromMasks } from '../../../../utils/layers/layerStackCommandBridge';
 import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../../utils/layers/layerStackSidecarAdjustments';
 import {
   cloneMaskContainerForPaste,
@@ -1889,28 +1886,20 @@ export function MasksPanel() {
               history: 'single-entry' as const,
               persistence: 'commit' as const,
             }
-          : (() => {
-              const sessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
-              const layerStackSidecar =
-                persistedSidecar ??
+          : buildLayerEditTransactionRequest(
+              state,
+              persistLayerStackSidecarInEditDocumentCandidate(
+                state.editDocumentV2,
+                committed.masks,
                 buildLayerStackSidecarFromMasks(committed.masks, {
-                  graphRevision: `history_${String(state.historyIndex)}`,
+                  graphRevision: persistedSidecar?.graphRevision ?? `history_${String(state.historyIndex)}`,
                   imagePath: state.selectedImage.path,
                   operationId: transactionId,
-                  sessionId,
-                });
-              return buildLayerEditTransactionRequest(
-                state,
-                persistLayerStackSidecarInEditDocumentCandidate(
-                  state.editDocumentV2,
-                  committed.masks,
-                  persistedSidecar === undefined
-                    ? layerStackSidecar
-                    : updateLayerStackSidecarToneColorFromMasks(layerStackSidecar, committed.masks),
-                ),
-                transactionId,
-              );
-            })();
+                  sessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+                }),
+              ),
+              transactionId,
+            );
       applyEditTransaction(transaction);
       setEditor({
         activeMaskContainerId: committed.selection.containerId,

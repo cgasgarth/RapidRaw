@@ -1,11 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
-import { createDefaultMaskEditNodes } from '../../../src/utils/adjustments';
+import { createDefaultMaskEditNodes, INITIAL_MASK_CONTAINER } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import {
   buildEditorPersistenceRequest,
   editorPersistenceRequestSchema,
 } from '../../../src/utils/editorPersistenceEffectRunner';
+import { buildLayerEditTransactionRequest } from '../../../src/utils/layers/layerEditTransaction';
+import { buildLayerStackSidecarFromMasks } from '../../../src/utils/layers/layerStackCommandBridge';
+import {
+  hydrateLayerStackMasksInEditDocument,
+  persistLayerStackSidecarInEditDocumentCandidate,
+} from '../../../src/utils/layers/layerStackSidecarAdjustments';
 import {
   buildGradientMaskEditTransaction,
   createGradientMaskWorkflow,
@@ -67,6 +73,7 @@ const state = {
   editDocumentV2,
   geometryEpoch: identity.geometryEpoch,
   imageSession: { id: identity.imageSessionId },
+  imageSessionId: 7,
   selectedImage: { path: sourcePath },
   sourceRevision: identity.sourceRevision,
 };
@@ -197,6 +204,47 @@ describe('gradient mask workflow', () => {
     const serializedRequest = JSON.parse(JSON.stringify(request)) as unknown;
     expect(editorPersistenceRequestSchema.parse(serializedRequest).editDocumentV2.extensions).toEqual({
       rawEngineArtifacts: { layerStackSidecars: [], schemaVersion: 1 },
+    });
+  });
+
+  test('persists and rehydrates gradient masks through the typed sidecar transaction', () => {
+    const gradientMasks = [
+      {
+        ...structuredClone(INITIAL_MASK_CONTAINER),
+        id: identity.containerId,
+        name: 'Gradient layer',
+        subMasks: [structuredClone(linearSubMask)],
+      },
+    ];
+    const sidecar = buildLayerStackSidecarFromMasks(gradientMasks, {
+      graphRevision: 'layer_stack_panel_initial',
+      imagePath: sourcePath,
+      operationId: 'gradient:persistence:1',
+      sessionId: identity.imageSessionId,
+    });
+    const candidate = persistLayerStackSidecarInEditDocumentCandidate(editDocumentV2, gradientMasks, sidecar);
+    const transaction = buildLayerEditTransactionRequest(state, candidate, 'gradient:persistence:1');
+    const artifactsOperation = transaction.operations.find(
+      (operation) => operation.type === 'set-layer-stack-artifacts',
+    );
+    if (artifactsOperation === undefined || artifactsOperation.type !== 'set-layer-stack-artifacts') {
+      throw new Error('Expected typed layer-stack artifacts operation.');
+    }
+    if (artifactsOperation.rawEngineArtifacts === null || artifactsOperation.rawEngineArtifacts === undefined) {
+      throw new Error('Expected typed layer-stack artifact payload.');
+    }
+    expect(artifactsOperation.rawEngineArtifacts.layerStackSidecars).toHaveLength(1);
+    const persistedDocument = structuredClone(editDocumentV2);
+    persistedDocument.extensions['rawEngineArtifacts'] = candidate.rawEngineArtifacts;
+    const reopened = hydrateLayerStackMasksInEditDocument(
+      createDefaultEditDocumentV2(),
+      { editDocumentV2: persistedDocument },
+      sourcePath,
+    );
+    expect(reopened.layers.masks[0]?.subMasks[0]?.parameters).toMatchObject({
+      imageHeight: 2000,
+      imageWidth: 4000,
+      range: 120,
     });
   });
 });
