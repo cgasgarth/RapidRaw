@@ -31,7 +31,6 @@ interface UseWgpuTransformSyncOptions {
   isCropping: boolean;
   isReady: boolean;
   maxScaleRef: RefObject<number>;
-  onWgpuFrameCommitted?: (() => void) | undefined;
   onWgpuFailure?: (() => void) | undefined;
   presentationDescriptor: EditorPresentationDescriptor;
   showOriginal: boolean;
@@ -52,7 +51,6 @@ export function useWgpuTransformSync({
   isCropping,
   isReady,
   maxScaleRef,
-  onWgpuFrameCommitted,
   onWgpuFailure,
   presentationDescriptor,
   showOriginal,
@@ -130,7 +128,12 @@ export function useWgpuTransformSync({
         bgSecondary: state.bgSecondary,
       };
 
-      const payload = !shouldSubmitVisibleWgpuTransform(state.useWgpuRenderer, state.isReady)
+      const viewportCanShowWgpu =
+        presentationDescriptor.semanticZoom.mode.kind === 'fit' &&
+        Math.abs(transformStateRef.current.positionX) <= 0.01 &&
+        Math.abs(transformStateRef.current.positionY) <= 0.01 &&
+        Math.abs(transformStateRef.current.scale - 1) <= 0.01;
+      const payload = !shouldSubmitVisibleWgpuTransform(state.useWgpuRenderer, state.isReady, viewportCanShowWgpu)
         ? buildHiddenWgpuTransformPayload({ containerRect: currentRect, dpr, windowWidth, windowHeight }, colors)
         : buildVisibleWgpuTransformPayload(
             {
@@ -159,9 +162,6 @@ export function useWgpuTransformSync({
               return;
             }
             await flushWgpuPresentation(sequence);
-            if (state.useWgpuRenderer === true && state.isReady && state.hasRenderedFirstFrame) {
-              onWgpuFrameCommitted?.();
-            }
           })
           .catch((err: unknown) => {
             if (state.useWgpuRenderer !== false && state.isReady && state.hasRenderedFirstFrame) {
@@ -189,7 +189,6 @@ export function useWgpuTransformSync({
     imageContainerRef,
     imageRenderSizeRef,
     maxScaleRef,
-    onWgpuFrameCommitted,
     onWgpuFailure,
     presentationDescriptor.fingerprint,
     transformStateRef,

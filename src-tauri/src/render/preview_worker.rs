@@ -89,6 +89,7 @@ fn wgpu_frame_ready_payload(
     width: u32,
     height: u32,
     submit_latency_micros: u64,
+    presentation_health: &crate::gpu_display::NativePresentationHealth,
 ) -> serde_json::Value {
     serde_json::json!({
         "path": path,
@@ -98,6 +99,7 @@ fn wgpu_frame_ready_payload(
         "width": width,
         "height": height,
         "submitLatencyMicros": submit_latency_micros,
+        "presentationHealth": presentation_health,
     })
 }
 
@@ -521,8 +523,8 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         );
     }
 
-    let final_processed_image = match final_processed_image_result {
-        Ok(image) => Arc::new(image),
+    let final_processed_output = match final_processed_image_result {
+        Ok(output) => output,
         Err(_) => {
             log::error!(
                 "[process_preview_job] processing failed after {:.2?}",
@@ -531,9 +533,14 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
             return Err("Processing failed".to_string());
         }
     };
+    let presentation_health = final_processed_output.presentation_health.clone();
+    let final_processed_image = Arc::new(final_processed_output.image);
     cancellation_checkpoint(cancellation, PreviewStage::Readback)?;
 
     if presented_natively {
+        let presentation_health = presentation_health
+            .as_ref()
+            .ok_or_else(|| "presentation_health_missing".to_string())?;
         cancellation_checkpoint(cancellation, PreviewStage::Publish)?;
         log::info!(
             "native_preview_transport session={} generation={} readback_bytes=0 jpeg_bytes=0 response_bytes=11 submit_latency_us={}",
@@ -550,6 +557,7 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
                 preview_width,
                 preview_height,
                 fn_start.elapsed().as_micros().min(u64::MAX as u128) as u64,
+                presentation_health,
             ),
         );
         return Ok(b"WGPU_RENDER".to_vec());
@@ -999,6 +1007,13 @@ mod tests {
         identity.session.image_session_id = 17;
         identity.session.source_image_path = "/fixtures/current.raw".to_string();
         identity.session.graph_revision = "graph-current".to_string();
+        let health = crate::gpu_display::NativePresentationHealth {
+            content_fingerprint: format!("sha256:{}", "a".repeat(64)),
+            max_chroma: 0.25,
+            max_luminance: 0.75,
+            sample_count: 25,
+            visible_sample_count: 24,
+        };
         let payload = wgpu_frame_ready_payload(
             "/fixtures/current.raw",
             crate::preview_scheduler::PreviewRequestId {
@@ -1009,6 +1024,7 @@ mod tests {
             1600,
             1200,
             250,
+            &health,
         );
 
         assert_eq!(payload["path"], "/fixtures/current.raw");
@@ -1021,6 +1037,7 @@ mod tests {
             payload["previewOperationIdentity"]["session"]["graphRevision"],
             "graph-current"
         );
+        assert_eq!(payload["presentationHealth"]["visibleSampleCount"], 24);
     }
 
     #[test]

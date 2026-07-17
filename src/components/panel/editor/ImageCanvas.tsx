@@ -20,7 +20,7 @@ import {
   selectEditDocumentSourceArtifacts,
 } from '../../../utils/editDocumentSelectors';
 import type { EditorCompareOrientation } from '../../../utils/editorCompare';
-import { resolveEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
+import { resolveEditorPreviewSource, retainEditorPreviewSource } from '../../../utils/editorImagePreviewSource';
 import {
   createEditorOverlayGeometry,
   type EditorOverlayGeometry,
@@ -323,6 +323,7 @@ export const ImageCanvas = memo(
     const lastWhiteBalancePickerReceipt = whiteBalanceRuntime?.lastReceipt ?? null;
     const pickerImageSessionId =
       whiteBalanceRuntime?.imageSessionId ?? imageSessionId ?? `viewer-source:${selectedImage.path}`;
+    const retainedCpuPreviewRef = useRef<{ sourceIdentity: string; url: string } | null>(null);
     const [loadedCropPreviewUrl, setLoadedCropPreviewUrl] = useState<string | null>(null);
     const cropImageRef = useRef<HTMLImageElement>(null);
     const [originalPresentation, setOriginalPresentation] = useState<{
@@ -386,9 +387,18 @@ export const ImageCanvas = memo(
       provisionalPreviewUrl,
       thumbnailUrl: selectedImage.thumbnailUrl,
     });
+    // A zoom/resize request can transiently clear the current render URL while
+    // its successor is still rendering. Keep the last same-image CPU layer
+    // available so a pending or invalid WGPU frame cannot blank the viewport.
+    retainedCpuPreviewRef.current = retainEditorPreviewSource({
+      currentSource: previewSource,
+      retainedSource: retainedCpuPreviewRef.current,
+      sourceIdentity: selectedImage.path,
+    });
+    const retainedCpuPreviewSource = retainedCpuPreviewRef.current?.url ?? null;
     const patchGeometryIdentity = adjustmentGeometryRevision;
     const patchContext = {
-      basePreviewUrl: previewSource,
+      basePreviewUrl: retainedCpuPreviewSource,
       geometryIdentity: patchGeometryIdentity,
       sourceImagePath: selectedImage.path,
     };
@@ -503,7 +513,12 @@ export const ImageCanvas = memo(
     const wgpuPreviewVisibility = resolveWgpuPreviewVisibility({
       currentFrameHealth: rendererHandoff.committedBackend === 'wgpu' ? 'fresh' : null,
       hasRenderedFirstFrame,
-      previewSource,
+      hasViewportTransform:
+        presentationDescriptor.semanticZoom.mode.kind !== 'fit' ||
+        Math.abs(transformState.positionX) > 0.01 ||
+        Math.abs(transformState.positionY) > 0.01 ||
+        Math.abs(transformState.scale - 1) > 0.01,
+      previewSource: retainedCpuPreviewSource,
       requiresCpuComposition: hasCurrentCpuPreview || coherentInteractivePatch !== null || isExportSoftProofEnabled,
       selectedImageIsReady: selectedImage.isReady,
       useWgpuRenderer: appSettings?.useWgpuRenderer,
@@ -1372,7 +1387,7 @@ export const ImageCanvas = memo(
             svgPreview={
               <SvgPreviewHandoff
                 baseScopeKey={selectedImage.path}
-                baseSource={previewSource}
+                baseSource={retainedCpuPreviewSource}
                 incomingPatch={coherentInteractivePatch}
                 isCpuPreviewVisible={!isWgpuActive}
                 isMaxZoom={isMaxZoom}

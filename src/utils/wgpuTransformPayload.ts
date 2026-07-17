@@ -44,7 +44,8 @@ const PIXELATED_MAX_SCALE_EPSILON = 0.5;
 export const shouldSubmitVisibleWgpuTransform = (
   useWgpuRenderer: boolean | undefined,
   selectedImageIsReady: boolean,
-): boolean => useWgpuRenderer !== false && selectedImageIsReady;
+  viewportCanShowWgpu = true,
+): boolean => useWgpuRenderer !== false && selectedImageIsReady && viewportCanShowWgpu;
 
 export const parseCssRgbColor = (rgbStr: string): RgbaColor => {
   const match = rgbStr.match(/[\d.]+/g);

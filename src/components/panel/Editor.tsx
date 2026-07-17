@@ -1605,9 +1605,6 @@ export default function Editor({
   const handleWgpuFailure = useCallback(() => {
     setEditor((state) => ({ wgpuFailureSerial: state.wgpuFailureSerial + 1 }));
   }, [setEditor]);
-  const handleWgpuFrameCommitted = useCallback(() => {
-    setEditor((state) => ({ wgpuFrameSerial: state.wgpuFrameSerial + 1 }));
-  }, [setEditor]);
 
   const requestMaskOverlay = useCallback(
     (maskDef: MaskPreviewDefinition, renderSize: RenderSize, currentEditDocumentV2: EditDocumentV2) => {
@@ -1651,7 +1648,6 @@ export default function Editor({
     isCropping,
     isReady: selectedImage?.isReady ?? false,
     maxScaleRef,
-    onWgpuFrameCommitted: handleWgpuFrameCommitted,
     onWgpuFailure: handleWgpuFailure,
     presentationDescriptor,
     showOriginal,

@@ -98,6 +98,30 @@ describe('editor renderer presentation parity', () => {
     expect(state).toMatchObject({ committedBackend: 'wgpu', status: 'wgpu' });
   });
 
+  test('restores CPU presentation across resize and pan until a newer healthy frame wins', () => {
+    let state = createRendererHandoffState(descriptor(), 10);
+    state = advanceRendererHandoff({ descriptor: descriptor(), state, useWgpuRenderer: true, wgpuFrameSerial: 11 });
+    expect(state.committedBackend).toBe('wgpu');
+
+    const resizedAndPannedGeometry = createEditorOverlayGeometry({
+      crop: { height: 1800, unit: 'px', width: 2400, x: 320, y: 180 },
+      devicePixelRatio: 2,
+      geometryEpoch: 13,
+      orientationSteps: 1,
+      renderSize: { height: 720, offsetX: 55, offsetY: 32, scale: 0.4, width: 960 },
+      rotationDegrees: -3.25,
+      semanticZoom: geometry.semanticZoom,
+      sourceSize: { height: 4000, width: 6000 },
+      transform: { positionX: -160, positionY: 84, scale: 2 },
+      viewportSizeCssPixels: { height: 860, width: 1240 },
+    });
+    const changed = descriptor('graph:7', resizedAndPannedGeometry);
+    state = advanceRendererHandoff({ descriptor: changed, state, useWgpuRenderer: true, wgpuFrameSerial: 11 });
+    expect(state).toMatchObject({ committedBackend: 'cpu', generation: 2, status: 'waiting-wgpu' });
+    state = advanceRendererHandoff({ descriptor: changed, state, useWgpuRenderer: true, wgpuFrameSerial: 12 });
+    expect(state).toMatchObject({ committedBackend: 'wgpu', generation: 2, status: 'wgpu' });
+  });
+
   test('documents representative color parity tolerance without changing renderer math', () => {
     const cpu = [0, 0.125, 0.502, 0.749, 0.996, 1];
     const wgpu = [0, 0.1254, 0.5012, 0.7501, 0.9951, 1];

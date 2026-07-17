@@ -12,6 +12,22 @@ export interface WgpuPreviewCommit {
   readonly renderedPreviewResolution?: number;
 }
 
+export interface WgpuPresentationHealth {
+  readonly contentFingerprint: string;
+  readonly maxChroma: number;
+  readonly maxLuminance: number;
+  readonly sampleCount: number;
+  readonly visibleSampleCount: number;
+}
+
+export const isVisibleWgpuPresentation = (health: WgpuPresentationHealth): boolean =>
+  health.sampleCount > 0 &&
+  health.visibleSampleCount > 0 &&
+  health.visibleSampleCount <= health.sampleCount &&
+  Number.isFinite(health.maxLuminance) &&
+  Number.isFinite(health.maxChroma) &&
+  health.contentFingerprint.startsWith('sha256:');
+
 const imageSessionKey = (identity: WgpuImageSessionIdentity): string =>
   JSON.stringify([identity.imageSessionId, identity.sourceImagePath]);
 
@@ -41,8 +57,9 @@ export class WgpuFramePresentationAuthority {
     return this.tryCommit(commit.identity);
   }
 
-  recordFrameReady(identity: PreviewOperationIdentity): WgpuPreviewCommit | null {
+  recordFrameReady(identity: PreviewOperationIdentity, health: WgpuPresentationHealth): WgpuPreviewCommit | null {
     if (this.sessionKey === null || !operationBelongsToSession(identity, this.sessionKey)) return null;
+    if (!isVisibleWgpuPresentation(health)) return null;
     this.readyFrames.add(fingerprintPreviewOperationIdentity(identity));
     return this.tryCommit(identity);
   }
