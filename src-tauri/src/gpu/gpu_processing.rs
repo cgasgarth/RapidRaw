@@ -4019,6 +4019,89 @@ mod blur_pass_tests {
 
     #[cfg(feature = "tauri-test")]
     #[test]
+    fn raw_basic_view_converts_ap1_before_srgb_encoding() {
+        use glam::Vec3;
+        use image::{DynamicImage, ImageBuffer, Rgba};
+        use serde_json::json;
+
+        let source_pixel = [0.6_f32, 0.15, 0.08];
+        let source = DynamicImage::ImageRgba32F(ImageBuffer::from_pixel(
+            1,
+            1,
+            Rgba([source_pixel[0], source_pixel[1], source_pixel[2], 1.0]),
+        ));
+        let adjustments = crate::render_plan::current_render_adjustments(json!({
+            "rawEngineEditGraphVersion": 2
+        }));
+        let plan = crate::render_plan::compile_render_plan(
+            &adjustments,
+            crate::render_plan::CompileRenderPlanContext {
+                revision: crate::render_plan::content_revision(&adjustments, 1, 2, 3),
+                is_raw: true,
+                tonemapper_override: Some(0),
+            },
+            None,
+        )
+        .expect("raw basic view plan compiles");
+        let rendered = crate::cpu_edit_graph::execute_cpu_edit_graph(
+            &source,
+            &plan.adjustments,
+            &[],
+            None,
+            &plan.edit_graph,
+        )
+        .expect("CPU raw basic view renders")
+        .to_rgba32f()
+        .get_pixel(0, 0)
+        .0;
+
+        let encode = |value: f32| {
+            let magnitude = value.abs();
+            let encoded = if magnitude <= 0.003_130_8 {
+                magnitude * 12.92
+            } else {
+                1.055 * magnitude.powf(1.0 / 2.4) - 0.055
+            };
+            value.signum() * encoded
+        };
+        let basic_view = |linear: [f32; 3]| {
+            let encoded = Vec3::from_array(linear.map(encode));
+            let gamma = encoded.map(|channel| channel.max(0.0).powf(1.0 / 1.1));
+            let contrast = gamma * gamma * (Vec3::splat(3.0) - gamma * 2.0);
+            gamma.lerp(contrast, 0.75).to_array()
+        };
+        let expected = basic_view(
+            crate::color::working_to_output_transform::acescg_to_srgb_linear(source_pixel),
+        );
+        let legacy_wrong = basic_view(source_pixel);
+        for (actual, expected) in rendered[..3].iter().zip(expected) {
+            assert!(
+                (actual - expected).abs() < 2.0e-4,
+                "actual={actual} expected={expected}"
+            );
+        }
+        let corrected_distance = rendered[..3]
+            .iter()
+            .zip(expected)
+            .map(|(actual, expected)| (actual - expected).abs())
+            .sum::<f32>();
+        let legacy_distance = rendered[..3]
+            .iter()
+            .zip(legacy_wrong)
+            .map(|(actual, legacy)| (actual - legacy).abs())
+            .sum::<f32>();
+        assert!(
+            corrected_distance < 6.0e-4,
+            "corrected output drifted from the AP1 display reference: rendered={rendered:?} expected={expected:?} distance={corrected_distance}"
+        );
+        assert!(
+            legacy_distance > 0.02,
+            "legacy output unexpectedly matched: {rendered:?}"
+        );
+    }
+
+    #[cfg(feature = "tauri-test")]
+    #[test]
     fn scene_referred_v2_preserves_extended_values_and_has_an_explicit_pixel_delta() {
         use image::{DynamicImage, ImageBuffer, Rgba};
         use serde_json::json;
