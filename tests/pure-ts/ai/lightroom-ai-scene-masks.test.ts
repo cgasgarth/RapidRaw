@@ -6,13 +6,14 @@ import {
   createLightroomAiSceneMaskContainer,
   createLightroomAiSceneMaskJob,
   markLightroomAiSceneMaskCancelled,
+  markLightroomAiSceneMaskUnavailable,
 } from '../../../src/utils/ai/lightroomAiSceneMaskGeneration';
 import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
 
-const authority = (requestId = 'request-1') =>
+const authority = (requestId = 'request-1', capability: 'background' | 'sky' | 'subject' = 'subject') =>
   createLightroomAiSceneMaskAuthority({
-    capability: 'subject',
+    capability,
     cancellationToken: 'cancel-1',
     imageSessionId: 'session-1',
     providerId: 'local',
@@ -59,9 +60,25 @@ test('cancelled scene jobs are terminal and cannot be mistaken for current previ
   ).toBeNull();
 });
 
+test('provider blocks become unavailable without exposing a retry action state', () => {
+  const unavailable = markLightroomAiSceneMaskUnavailable(
+    createLightroomAiSceneMaskJob(authority()),
+    'Local subject model is unavailable.',
+  );
+  expect(unavailable.status).toBe('unavailable');
+  expect(unavailable.errorMessage).toBe('Local subject model is unavailable.');
+  expect(
+    acceptLightroomAiSceneMaskResult(unavailable, {
+      authority: authority(),
+      generatedMaskArtifactId: 'late-artifact',
+      parameters: {},
+    }),
+  ).toBeNull();
+});
+
 test('background applies as one inverted foreground component with provenance', () => {
   const result = {
-    authority: { ...authority(), capability: 'background' as const },
+    authority: authority('request-background', 'background'),
     generatedMaskArtifactId: 'artifact-background',
     generatedMaskCoverage: 0.42,
     parameters: { feather: 4 },
@@ -75,6 +92,35 @@ test('background applies as one inverted foreground component with provenance', 
     capability: 'background',
     providerId: 'local',
   });
+});
+
+test('subject and sky preserve provider payloads in typed mask components', () => {
+  const subjectResult = {
+    authority: authority('request-subject', 'subject'),
+    maskDataBase64: 'data:image/png;base64,subject',
+    parameters: { rotation: 90, providerId: 'rawengine-local-ai' },
+  };
+  const subject = createLightroomAiSceneMaskContainer({
+    capability: 'subject',
+    imageDimensions: { height: 1200, width: 1600 },
+    result: subjectResult,
+  });
+  expect(subject.subMasks[0]?.type).toBe('ai-subject');
+  expect(subject.subMasks[0]?.invert).toBe(false);
+  expect(subject.subMasks[0]?.parameters).toMatchObject({
+    imageHeight: 1200,
+    imageWidth: 1600,
+    maskDataBase64: 'data:image/png;base64,subject',
+  });
+
+  const skyResult = {
+    authority: authority('request-sky', 'sky'),
+    maskDataBase64: 'data:image/png;base64,sky',
+    parameters: {},
+  };
+  const sky = createLightroomAiSceneMaskContainer({ capability: 'sky', result: skyResult });
+  expect(sky.subMasks[0]?.type).toBe('ai-sky');
+  expect(sky.subMasks[0]?.invert).toBe(false);
 });
 
 test('Apply builds a typed single-entry layer transaction without mutating the source document', () => {

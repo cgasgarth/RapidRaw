@@ -16,12 +16,29 @@ import {
   markLightroomAiSceneMaskCancelled,
   markLightroomAiSceneMaskFailed,
   markLightroomAiSceneMaskRunning,
+  markLightroomAiSceneMaskUnavailable,
   refineLightroomAiSceneMaskResult,
 } from '../../utils/ai/lightroomAiSceneMaskGeneration';
-import { selectEditDocumentGeometry } from '../../utils/editDocumentSelectors';
+import { selectEditDocumentGeometry, selectEditDocumentNode } from '../../utils/editDocumentSelectors';
 import { formatUnknownError } from '../../utils/errorFormatting';
 
 type RuntimeMaskParameters = Record<string, unknown>;
+
+const LOCAL_RUNTIME_PROVIDER_ID = 'rawengine-local-ai';
+
+const toRuntimeProviderId = (providerId: AiProviderId): string =>
+  providerId === AiProviderId.Local ? LOCAL_RUNTIME_PROVIDER_ID : providerId;
+
+const toRuntimeProviderClass = (
+  providerId: AiProviderId,
+): 'cloud_service' | 'local_model' | 'self_hosted_connector' => {
+  if (providerId === AiProviderId.Local) return 'local_model';
+  if (providerId === AiProviderId.Connector) return 'self_hosted_connector';
+  return 'cloud_service';
+};
+
+const sceneMaskSourceAssetIdentity = (selectedImage: { path: string; width: number; height: number } | null): string =>
+  `${selectedImage?.path ?? ''}:${selectedImage?.width ?? 0}x${selectedImage?.height ?? 0}`;
 
 const asRuntimeMaskParameters = (value: unknown): RuntimeMaskParameters => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -31,6 +48,63 @@ const asRuntimeMaskParameters = (value: unknown): RuntimeMaskParameters => {
 };
 
 const readRuntimeParameter = (parameters: RuntimeMaskParameters, key: string): unknown => parameters[key];
+
+type PreparedSubjectMaskTool = Extract<
+  Awaited<ReturnType<typeof prepareAiSubjectMaskAppServerTool>>,
+  { status: 'prepared' }
+>;
+
+type SceneMaskRuntimeResult =
+  | { payload: RuntimeMaskParameters; status: 'ready'; subjectTool: PreparedSubjectMaskTool | null }
+  | { message: string; status: 'unavailable' };
+
+const invokeSceneMaskRuntime = async (input: {
+  capability: LightroomAiSceneMaskCapability;
+  geometry: ReturnType<typeof selectEditDocumentGeometry>;
+  providerClass: 'cloud_service' | 'local_model' | 'self_hosted_connector';
+  providerId: string;
+  requestId: string;
+  selectedImagePath: string;
+  transformAdjustments: Record<string, unknown>;
+}): Promise<SceneMaskRuntimeResult> => {
+  let subjectTool: PreparedSubjectMaskTool | null = null;
+  if (input.capability === 'subject') {
+    const prepared = await prepareAiSubjectMaskAppServerTool({
+      maskName: 'Subject mask',
+      operationId: `lightroom-scene-${input.requestId}`,
+      providerClass: input.providerClass,
+      providerId: input.providerId,
+      requestId: input.requestId,
+      selectedImagePath: input.selectedImagePath,
+    });
+    if (prepared.status === 'blocked') return { message: prepared.userVisibleMessage, status: 'unavailable' };
+    subjectTool = prepared;
+  }
+
+  const payload =
+    input.capability === 'subject'
+      ? await invoke<RuntimeMaskParameters>(Invokes.GenerateAiSubjectMask, {
+          endPoint: [1, 1],
+          flipHorizontal: input.geometry.flipHorizontal,
+          flipVertical: input.geometry.flipVertical,
+          jsAdjustments: input.transformAdjustments,
+          orientationSteps: input.geometry.orientationSteps,
+          path: input.selectedImagePath,
+          rotation: input.geometry.rotation,
+          startPoint: [0, 0],
+        })
+      : await invoke<RuntimeMaskParameters>(
+          input.capability === 'sky' ? Invokes.GenerateAiSkyMask : Invokes.GenerateAiForegroundMask,
+          {
+            flipHorizontal: input.geometry.flipHorizontal,
+            flipVertical: input.geometry.flipVertical,
+            jsAdjustments: input.transformAdjustments,
+            orientationSteps: input.geometry.orientationSteps,
+            rotation: input.geometry.rotation,
+          },
+        );
+  return { payload, status: 'ready', subjectTool };
+};
 
 export function useLightroomAiSceneMasks() {
   const aiProvider = useSettingsStore((state) => normalizeAiProviderId(state.appSettings?.aiProvider));
@@ -49,18 +123,22 @@ export function useLightroomAiSceneMasks() {
       const state = useEditorStore.getState();
       const selectedImage = state.selectedImage;
       if (selectedImage === null || !selectedImage.path) {
+        if (operationRef.current !== null) operationRef.current.cancelled = true;
+        operationRef.current = null;
         setJob(null);
+        useEditorStore.getState().setEditor({ isGeneratingAiMask: false });
         return;
       }
       const requestId = crypto.randomUUID();
       const operation = { cancelled: false, requestId };
       operationRef.current = operation;
+      const runtimeProviderId = toRuntimeProviderId(aiProvider);
       const authority = createLightroomAiSceneMaskAuthority({
         capability,
         cancellationToken: crypto.randomUUID(),
         imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
         modelVersion: 'runtime-v1',
-        providerId: aiProvider,
+        providerId: runtimeProviderId,
         renderRevision: state.adjustmentRevision,
         requestId,
         sourceAssetIdentity: `${selectedImage.path}:${selectedImage.width}x${selectedImage.height}`,
@@ -72,66 +150,63 @@ export function useLightroomAiSceneMasks() {
 
       try {
         const geometry = selectEditDocumentGeometry(state.editDocumentV2);
-        const subjectTool =
-          capability === 'subject'
-            ? await prepareAiSubjectMaskAppServerTool({
-                maskName: 'Subject mask',
-                operationId: `lightroom-scene-${requestId}`,
-                providerClass:
-                  aiProvider === AiProviderId.Local
-                    ? 'local_model'
-                    : aiProvider === AiProviderId.Connector
-                      ? 'self_hosted_connector'
-                      : 'cloud_service',
-                providerId: aiProvider,
-                requestId,
-                selectedImagePath: selectedImage.path,
-              })
-            : null;
-        if (subjectTool?.status === 'blocked') throw new Error(subjectTool.userVisibleMessage);
-        const payload =
-          capability === 'subject'
-            ? await invoke<RuntimeMaskParameters>(Invokes.GenerateAiSubjectMask, {
-                endPoint: [1, 1],
-                flipHorizontal: geometry.flipHorizontal,
-                flipVertical: geometry.flipVertical,
-                jsAdjustments: { ...geometry },
-                orientationSteps: geometry.orientationSteps,
-                path: selectedImage.path,
-                rotation: geometry.rotation,
-                startPoint: [0, 0],
-              })
-            : await invoke<RuntimeMaskParameters>(
-                capability === 'sky' ? Invokes.GenerateAiSkyMask : Invokes.GenerateAiForegroundMask,
-                {
-                  flipHorizontal: geometry.flipHorizontal,
-                  flipVertical: geometry.flipVertical,
-                  jsAdjustments: { ...geometry },
-                  orientationSteps: geometry.orientationSteps,
-                  rotation: geometry.rotation,
-                },
-              );
-        const latestState = useEditorStore.getState();
-        const latestImage = latestState.selectedImage;
-        const latestSessionId =
-          latestState.imageSession?.id ?? `editor-image-session:${String(latestState.imageSessionId)}`;
-        if (
-          operation.cancelled ||
-          operationRef.current?.requestId !== requestId ||
-          latestSessionId !== authority.imageSessionId ||
-          latestState.adjustmentRevision !== authority.renderRevision ||
-          `${latestImage?.path ?? ''}:${latestImage?.width ?? 0}x${latestImage?.height ?? 0}` !==
-            authority.sourceAssetIdentity
-        ) {
-          setJob((current) => (current === null ? null : markLightroomAiSceneMaskCancelled(current)));
+        const transformAdjustments = {
+          ...geometry,
+          ...selectEditDocumentNode(state.editDocumentV2, 'lens_correction').params,
+        };
+        const runtimeResult = await invokeSceneMaskRuntime({
+          capability,
+          geometry,
+          providerClass: toRuntimeProviderClass(aiProvider),
+          providerId: runtimeProviderId,
+          requestId,
+          selectedImagePath: selectedImage.path,
+          transformAdjustments,
+        });
+        if (runtimeResult.status === 'unavailable') {
+          setJob((current) =>
+            current?.authority.requestId === requestId
+              ? markLightroomAiSceneMaskUnavailable(current, runtimeResult.message)
+              : current,
+          );
           return;
         }
-        const parameters = asRuntimeMaskParameters(payload);
+        const latestState = useEditorStore.getState();
+        const latestSessionId =
+          latestState.imageSession?.id ?? `editor-image-session:${String(latestState.imageSessionId)}`;
+        const isCurrent =
+          !operation.cancelled &&
+          operationRef.current?.requestId === requestId &&
+          latestSessionId === authority.imageSessionId &&
+          latestState.adjustmentRevision === authority.renderRevision &&
+          sceneMaskSourceAssetIdentity(latestState.selectedImage) === authority.sourceAssetIdentity;
+        if (!isCurrent) {
+          setJob((current) =>
+            current?.authority.requestId === requestId ? markLightroomAiSceneMaskCancelled(current) : current,
+          );
+          return;
+        }
+        const parameters = asRuntimeMaskParameters(runtimeResult.payload);
         const maskDataBase64 = readRuntimeParameter(parameters, 'maskDataBase64');
         const generatedMaskArtifactId = readRuntimeParameter(parameters, 'generatedMaskArtifactId');
         const generatedMaskCoverage = readRuntimeParameter(parameters, 'generatedMaskCoverage');
-        const subjectApplyResult = subjectTool?.status === 'prepared' ? await subjectTool.apply() : null;
+        const subjectApplyResult = runtimeResult.subjectTool === null ? null : await runtimeResult.subjectTool.apply();
         if (subjectApplyResult?.status === 'blocked') throw new Error(subjectApplyResult.userVisibleMessage);
+        const postApplyState = useEditorStore.getState();
+        const postApplySessionId =
+          postApplyState.imageSession?.id ?? `editor-image-session:${String(postApplyState.imageSessionId)}`;
+        const isCurrentAfterSubjectApply =
+          !operation.cancelled &&
+          operationRef.current?.requestId === requestId &&
+          postApplySessionId === authority.imageSessionId &&
+          postApplyState.adjustmentRevision === authority.renderRevision &&
+          sceneMaskSourceAssetIdentity(postApplyState.selectedImage) === authority.sourceAssetIdentity;
+        if (!isCurrentAfterSubjectApply) {
+          setJob((current) =>
+            current?.authority.requestId === requestId ? markLightroomAiSceneMaskCancelled(current) : current,
+          );
+          return;
+        }
         const accepted = acceptLightroomAiSceneMaskResult(
           { authority, errorMessage: null, progress: 0.9, result: null, status: 'running' },
           {
@@ -141,11 +216,11 @@ export function useLightroomAiSceneMasks() {
             generatedMaskCoverage: typeof generatedMaskCoverage === 'number' ? generatedMaskCoverage : null,
             parameters: {
               ...parameters,
-              ...(subjectTool?.status === 'prepared' && subjectApplyResult?.status === 'applied'
+              ...(runtimeResult.subjectTool !== null && subjectApplyResult?.status === 'applied'
                 ? {
                     rawEngine: {
-                      dryRunPlanHash: subjectTool.dryRunResult.dryRunPlanHash,
-                      dryRunPlanId: subjectTool.dryRunResult.dryRunPlanId,
+                      dryRunPlanHash: runtimeResult.subjectTool.dryRunResult.dryRunPlanHash,
+                      dryRunPlanId: runtimeResult.subjectTool.dryRunResult.dryRunPlanId,
                       appliedGraphRevision: subjectApplyResult.applyResult.appliedGraphRevision,
                       commandId: subjectApplyResult.applyResult.commandId,
                     },

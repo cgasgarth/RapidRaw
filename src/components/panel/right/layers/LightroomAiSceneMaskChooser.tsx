@@ -118,6 +118,11 @@ export function LightroomAiSceneMaskChooser() {
           </button>
         </div>
       )}
+      {job?.status === 'unavailable' && (
+        <div className="mt-1.5 text-[10px] text-text-tertiary" data-testid="lightroom-ai-scene-mask-unavailable">
+          {job.errorMessage ?? t('editor.masks.aiScene.failed')}
+        </div>
+      )}
       {job?.status === 'cancelled' && (
         <div className="mt-1 text-[10px] text-text-tertiary" data-testid="lightroom-ai-scene-mask-cancelled">
           {t('editor.masks.aiScene.cancelled')}
