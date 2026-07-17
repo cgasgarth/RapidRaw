@@ -103,8 +103,17 @@ try {
   await setSlider(page, 'Contrast', '18');
   await page.getByTestId('editor-left-history-toggle').click();
   const historySection = page.locator('[data-editor-left-slot="history"]');
+  await historySection.locator('[data-history-group="applied"]').waitFor({ timeout: 10_000 });
   await historySection.getByRole('option', { name: /Contrast/u }).waitFor({ timeout: 10_000 });
   await historySection.getByRole('option', { name: /Brightened base/u }).click();
+
+  const historyPosition = await historySection.getByTestId('editor-history-position').innerText();
+  if (!/^Step \d+ of \d+$/u.test(historyPosition)) {
+    throw new Error(`History position did not identify the current authoritative step: ${historyPosition}`);
+  }
+  if ((await historySection.locator('[data-history-group="future"]').count()) !== 1) {
+    throw new Error('Selecting an earlier history step did not expose the redo branch group.');
+  }
 
   const redoButton = page.getByRole('button', { name: /Redo/u }).first();
   if (!(await redoButton.isEnabled())) {

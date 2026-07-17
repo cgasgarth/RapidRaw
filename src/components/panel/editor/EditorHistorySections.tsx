@@ -1,12 +1,19 @@
 import cx from 'clsx';
-import { Bookmark, BookmarkPlus, Check, Pencil, X } from 'lucide-react';
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Bookmark, BookmarkPlus, Check, Pencil, Redo2, Undo2, X } from 'lucide-react';
+import { type KeyboardEvent, type MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
+import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { buildEditHistoryItems, type EditHistoryItem } from '../../../utils/editHistory';
 import { editorChromeTokens } from '../../ui/editorChromeTokens';
 
 const rowClassName =
   'flex min-h-8 w-full items-center gap-2 px-3 py-1.5 text-left text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-editor-focus-ring';
+
+const formatCheckpointTime = (createdAt: string): string => {
+  const timestamp = Date.parse(createdAt);
+  if (!Number.isFinite(timestamp)) return '';
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(timestamp);
+};
 
 function getNextHistoryIndex(event: KeyboardEvent, current: number, last: number): number | null {
   if (event.key === 'ArrowDown') return Math.min(current + 1, last);
@@ -21,8 +28,15 @@ export function EditorHistorySection() {
   const checkpoints = useEditorStore((state) => state.historyCheckpoints);
   const historyIndex = useEditorStore((state) => state.historyIndex);
   const goToHistoryIndex = useEditorStore((state) => state.goToHistoryIndex);
+  const undo = useEditorStore((state) => state.undo);
+  const redo = useEditorStore((state) => state.redo);
   const activeRowRef = useRef<HTMLButtonElement | null>(null);
   const items = useMemo(() => buildEditHistoryItems(history, checkpoints), [checkpoints, history]);
+  const currentIndex = items.length === 0 ? -1 : Math.min(Math.max(historyIndex, 0), items.length - 1);
+  const canUndo = currentIndex > 0;
+  const canRedo = currentIndex >= 0 && currentIndex < items.length - 1;
+  const appliedItems = items.filter((item) => item.historyIndex <= currentIndex);
+  const futureItems = items.filter((item) => item.historyIndex > currentIndex);
 
   useEffect(() => {
     activeRowRef.current?.scrollIntoView({ block: 'nearest' });
@@ -37,17 +51,107 @@ export function EditorHistorySection() {
 
   if (items.length === 0) {
     // i18next-instrument-ignore
-    return <p className="px-3 py-4 text-xs text-text-secondary">No edits in this session.</p>;
+    return (
+      <div className="px-3 py-3 text-xs text-text-secondary" data-testid="editor-sidebar-history-empty">
+        <p>No edits in this session.</p>
+        <p className="mt-1 text-[10px]">The base document is current.</p>
+      </div>
+    );
   }
 
   return (
     /* i18next-instrument-ignore */
-    <div aria-label="Edit history" className="max-h-72 overflow-y-auto py-1" role="listbox">
+    <div aria-label="Edit history" className="py-1" data-testid="editor-sidebar-history" role="region">
+      <div className="flex items-center justify-between border-b border-editor-border px-2 py-1">
+        <span className="text-[10px] tabular-nums text-text-secondary" data-testid="editor-history-position">
+          {currentIndex < 0 ? 'Base' : `Step ${String(currentIndex + 1)} of ${String(items.length)}`}
+        </span>
+        <div aria-label="History commands" className="flex items-center gap-0.5" role="toolbar">
+          <button
+            aria-label="Undo history step"
+            className={cx(
+              editorChromeTokens.button.base,
+              editorChromeTokens.button.iconCompact,
+              editorChromeTokens.button.quiet,
+            )}
+            data-testid="editor-sidebar-history-undo"
+            disabled={!canUndo}
+            onClick={undo}
+            title="Undo history step"
+            type="button"
+          >
+            <Undo2 aria-hidden="true" size={13} />
+          </button>
+          <button
+            aria-label="Redo history step"
+            className={cx(
+              editorChromeTokens.button.base,
+              editorChromeTokens.button.iconCompact,
+              editorChromeTokens.button.quiet,
+            )}
+            data-testid="editor-sidebar-history-redo"
+            disabled={!canRedo}
+            onClick={redo}
+            title="Redo history step"
+            type="button"
+          >
+            <Redo2 aria-hidden="true" size={13} />
+          </button>
+        </div>
+      </div>
+      <div aria-label="Edit history steps" className="max-h-72 overflow-y-auto" role="listbox">
+        <HistoryGroup
+          currentIndex={currentIndex}
+          items={appliedItems}
+          lastIndex={items.length - 1}
+          onActivate={activate}
+          rowRef={activeRowRef}
+          title="Applied edits"
+        />
+        {futureItems.length > 0 ? (
+          <HistoryGroup
+            currentIndex={currentIndex}
+            items={futureItems}
+            lastIndex={items.length - 1}
+            onActivate={activate}
+            rowRef={activeRowRef}
+            title="Redo branch"
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function HistoryGroup({
+  currentIndex,
+  items,
+  lastIndex,
+  onActivate,
+  rowRef,
+  title,
+}: {
+  currentIndex: number;
+  items: readonly EditHistoryItem<EditDocumentV2>[];
+  lastIndex: number;
+  onActivate: (index: number, focus?: boolean) => void;
+  rowRef: MutableRefObject<HTMLButtonElement | null>;
+  title: string;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div aria-label={title} data-history-group={title === 'Redo branch' ? 'future' : 'applied'} role="group">
+      <div className="px-3 pb-0.5 pt-1 text-[10px] font-medium uppercase leading-4 tracking-wide text-text-tertiary">
+        {title}
+      </div>
       {items.map((item) => {
-        const isCurrent = item.historyIndex === historyIndex;
-        const isFuture = item.historyIndex > historyIndex;
+        const isCurrent = item.historyIndex === currentIndex;
+        const isFuture = item.historyIndex > currentIndex;
+        const checkpointTime = item.checkpoint ? formatCheckpointTime(item.checkpoint.createdAt) : '';
         return (
           <button
+            aria-current={isCurrent ? 'step' : undefined}
+            aria-label={`${item.label}${isCurrent ? ', current step' : ''}`}
             aria-selected={isCurrent}
             className={cx(
               rowClassName,
@@ -57,21 +161,32 @@ export function EditorHistorySection() {
             )}
             data-active={isCurrent}
             data-history-index={item.historyIndex}
+            data-history-state={isCurrent ? 'current' : isFuture ? 'future' : 'applied'}
             data-testid={isCurrent ? 'editor-sidebar-history-active-row' : 'editor-sidebar-history-row'}
             key={item.historyIndex}
-            onClick={() => activate(item.historyIndex)}
+            onClick={() => onActivate(item.historyIndex)}
             onKeyDown={(event) => {
-              const nextIndex = getNextHistoryIndex(event, item.historyIndex, items.length - 1);
+              const nextIndex = getNextHistoryIndex(event, item.historyIndex, lastIndex);
               if (nextIndex === null) return;
               event.preventDefault();
-              activate(nextIndex, true);
+              onActivate(nextIndex, true);
             }}
-            ref={isCurrent ? activeRowRef : undefined}
+            ref={isCurrent ? rowRef : undefined}
             role="option"
             tabIndex={isCurrent ? 0 : -1}
+            title={item.checkpoint?.createdAt ?? undefined}
             type="button"
           >
+            <span
+              aria-hidden="true"
+              className={cx('h-1.5 w-1.5 shrink-0 rounded-full', isCurrent ? 'bg-text-button' : 'bg-text-tertiary')}
+            />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {checkpointTime ? (
+              <time className="shrink-0 text-[10px] tabular-nums opacity-60" dateTime={item.checkpoint?.createdAt}>
+                {checkpointTime}
+              </time>
+            ) : null}
             <span aria-hidden="true" className="shrink-0 tabular-nums opacity-60">
               {item.historyIndex + 1}
             </span>
