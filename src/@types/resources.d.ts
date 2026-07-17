@@ -588,6 +588,8 @@ export default interface Resources {
           curves: 'Tone Curves';
           details: 'Detail';
           effects: 'Effects & Looks';
+          lensCorrection: 'Lens Corrections';
+          transform: 'Transform';
         };
         search: {
           clear: 'Clear search';

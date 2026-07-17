@@ -120,7 +120,7 @@ import InspectorPanelFrame, {
   type InspectorPanelStatus,
 } from '../inspector/InspectorPanelFrame';
 
-const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'transformLens', 'details', 'effects'] as const;
+const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'transform', 'lensCorrection', 'details', 'effects'] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
 type CollapsibleSectionsUpdater =
   | CollapsibleSectionsState
@@ -147,9 +147,11 @@ const projectOwnedParams = <Params extends object>(current: Params, next: object
 const hasViewChanged = (current: object, next: object): boolean => JSON.stringify(current) !== JSON.stringify(next);
 
 const getAdjustmentSectionNodeTypes = (sectionName: AdjustmentSectionName): readonly EditDocumentNodeTypeV2[] =>
-  sectionName === 'transformLens'
-    ? ['geometry', 'lens_correction']
-    : getEditDocumentNodeTypesForEditorSection(sectionName);
+  sectionName === 'transform'
+    ? ['geometry']
+    : sectionName === 'lensCorrection'
+      ? ['lens_correction']
+      : getEditDocumentNodeTypesForEditorSection(sectionName);
 
 const copyPayloadToReplaceOperations = (payload: EditDocumentV2CopyPayload): EditNodeOperation[] =>
   Object.entries(payload.nodes).flatMap(([nodeType, node]) =>
@@ -173,7 +175,8 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   curves: 'Curve',
   details: 'Detail',
   effects: 'Effects',
-  transformLens: 'Geometry & Lens',
+  transform: 'Transform',
+  lensCorrection: 'Lens Corrections',
 };
 const TRANSFORM_LENS_CONTROL_LABELS = {
   correctionAmount: 'Correction amount',
@@ -230,10 +233,16 @@ const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionN
       return String(
         t('editor.adjustments.scopedSections.effects', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.effects }),
       );
-    case 'transformLens':
+    case 'transform':
       return String(
-        t('editor.adjustments.scopedSections.transformLens', {
-          defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.transformLens,
+        t('editor.adjustments.scopedSections.transform', {
+          defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.transform,
+        }),
+      );
+    case 'lensCorrection':
+      return String(
+        t('editor.adjustments.scopedSections.lensCorrection', {
+          defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.lensCorrection,
         }),
       );
   }
@@ -697,7 +706,7 @@ export default function Controls() {
       }
       if (sectionName === 'basic') {
         setBasicAdjustments((prev) => ({ ...prev, [key]: nextValue }));
-      } else if (sectionName === 'transformLens') {
+      } else if (sectionName === 'transform' || sectionName === 'lensCorrection') {
         setTransformLensAdjustments((prev) => ({ ...prev, [key]: nextValue }));
       } else if (sectionName === 'effects') {
         setEffectAdjustments((prev) => ({ ...prev, [key]: nextValue }));
@@ -965,7 +974,7 @@ export default function Controls() {
     const lensAvailability = getLensCorrectionAvailability(
       selectEditDocumentNode(adjustments, 'lens_correction').params['lensDistortionParams'],
     );
-    const transformLensControls: DevelopPanelControl[] = [
+    const transformControls: DevelopPanelControl[] = [
       sliderControl({
         aliases: ['keystone', 'perspective'],
         id: TransformAdjustment.TransformVertical,
@@ -973,7 +982,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.vertical,
         max: 100,
         min: -100,
-        sectionName: 'transformLens',
+        sectionName: 'transform',
         step: 1,
         truncate: true,
       }),
@@ -984,7 +993,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.horizontal,
         max: 100,
         min: -100,
-        sectionName: 'transformLens',
+        sectionName: 'transform',
         step: 1,
         truncate: true,
       }),
@@ -995,7 +1004,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.rotation,
         max: 45,
         min: -45,
-        sectionName: 'transformLens',
+        sectionName: 'transform',
         step: 0.1,
         suffix: '°',
       }),
@@ -1006,7 +1015,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.scale,
         max: 150,
         min: 50,
-        sectionName: 'transformLens',
+        sectionName: 'transform',
         step: 1,
         suffix: '%',
         truncate: true,
@@ -1018,7 +1027,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.xOffset,
         max: 100,
         min: -100,
-        sectionName: 'transformLens',
+        sectionName: 'transform',
         step: 1,
         truncate: true,
       }),
@@ -1029,7 +1038,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.yOffset,
         max: 100,
         min: -100,
-        sectionName: 'transformLens',
+        sectionName: 'transform',
         step: 1,
         truncate: true,
       }),
@@ -1040,7 +1049,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.opticalDistortion,
         max: 100,
         min: -100,
-        sectionName: 'transformLens',
+        sectionName: 'transform',
         step: 1,
         truncate: true,
       }),
@@ -1055,7 +1064,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.distortionAmount,
         max: 200,
         min: 0,
-        sectionName: 'transformLens',
+        sectionName: 'lensCorrection',
         step: 1,
         suffix: '%',
         truncate: true,
@@ -1070,7 +1079,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.correctionAmount,
         max: 200,
         min: 0,
-        sectionName: 'transformLens',
+        sectionName: 'lensCorrection',
         step: 1,
         suffix: '%',
         truncate: true,
@@ -1086,7 +1095,7 @@ export default function Controls() {
         label: TRANSFORM_LENS_CONTROL_LABELS.vignetteAmount,
         max: 200,
         min: 0,
-        sectionName: 'transformLens',
+        sectionName: 'lensCorrection',
         step: 1,
         suffix: '%',
         truncate: true,
@@ -1316,7 +1325,7 @@ export default function Controls() {
       }),
     ];
 
-    return [...basicControls, ...curveControls, ...transformLensControls, ...detailControls, ...effectControls];
+    return [...basicControls, ...curveControls, ...transformControls, ...detailControls, ...effectControls];
   }, [
     adjustments,
     onDragStateChange,
@@ -1357,7 +1366,18 @@ export default function Controls() {
   );
   const effectiveCollapsibleSectionsState = useMemo(
     () =>
-      deriveEffectiveDisclosureState(collapsibleSectionsState, isDevelopPanelSearching, matchingDevelopPanelSections),
+      deriveEffectiveDisclosureState(
+        {
+          basic: collapsibleSectionsState.basic,
+          curves: collapsibleSectionsState.curves,
+          details: collapsibleSectionsState.details,
+          effects: collapsibleSectionsState.effects,
+          lensCorrection: collapsibleSectionsState.lensCorrection ?? false,
+          transform: collapsibleSectionsState.transform ?? false,
+        },
+        isDevelopPanelSearching,
+        matchingDevelopPanelSections,
+      ),
     [collapsibleSectionsState, isDevelopPanelSearching, matchingDevelopPanelSections],
   );
 
@@ -1464,7 +1484,7 @@ export default function Controls() {
   );
 
   const handleToggleVisibility = (sectionName: AdjustmentSectionName) => {
-    if (sectionName === 'transformLens') return;
+    if (sectionName === 'transform' || sectionName === 'lensCorrection') return;
     const nodeTypes = getEditDocumentNodeTypesForEditorSection(sectionName);
     const enabled = nodeTypes.every((nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false);
     setEditorSectionEnabled(sectionName, !enabled);
@@ -1640,13 +1660,27 @@ export default function Controls() {
             onDragStateChange={onDragStateChange}
           />
         );
-      case 'transformLens':
+      case 'transform':
         return (
           <TransformLens
             adjustments={{
               ...adjustments.geometry,
               ...selectEditDocumentNode(adjustments, 'lens_correction').params,
             }}
+            selectedImage={selectedImage}
+            mode="transform"
+            setAdjustments={setTransformLensAdjustments}
+            onDragStateChange={onDragStateChange}
+          />
+        );
+      case 'lensCorrection':
+        return (
+          <TransformLens
+            adjustments={{
+              ...adjustments.geometry,
+              ...selectEditDocumentNode(adjustments, 'lens_correction').params,
+            }}
+            mode="lens"
             selectedImage={selectedImage}
             setAdjustments={setTransformLensAdjustments}
             onDragStateChange={onDragStateChange}
@@ -1930,7 +1964,7 @@ export default function Controls() {
 
           const title = getAdjustmentSectionLabel(t, sectionName);
           const sectionActions = buildSectionActions(sectionName);
-          const canToggleVisibility = sectionName !== 'transformLens';
+          const canToggleVisibility = sectionName !== 'transform' && sectionName !== 'lensCorrection';
           const isContentVisible = canToggleVisibility
             ? getEditDocumentNodeTypesForEditorSection(sectionName).every(
                 (nodeType) => editDocumentV2.nodes[nodeType]?.enabled !== false,

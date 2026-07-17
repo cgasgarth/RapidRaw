@@ -823,6 +823,8 @@
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
+        "lensCorrection": "Lens Corrections",
+        "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
       "search": {

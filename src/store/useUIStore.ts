@@ -84,6 +84,8 @@ export interface CollapsibleSectionsState {
   curves: boolean;
   details: boolean;
   effects: boolean;
+  lensCorrection?: boolean;
+  transform?: boolean;
   transformLens: boolean;
 }
 
@@ -155,6 +157,9 @@ const createCollapsibleSectionsState = (preferences: EditorWorkspacePreferences)
   curves: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('curves') ?? false,
   details: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('details') ?? false,
   effects: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('effects') ?? false,
+  lensCorrection:
+    preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('lensCorrection') ?? false,
+  transform: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('transform') ?? false,
   transformLens:
     preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('transformLens') ?? false,
 });

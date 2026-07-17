@@ -234,10 +234,10 @@ try {
   const panelButton = page.getByTestId('right-panel-switcher-button-adjustments');
   if ((await panelButton.getAttribute('aria-pressed')) !== 'true') await panelButton.click();
 
-  const section = page.getByTestId('adjustments-section-transformLens');
+  const section = page.getByTestId('adjustments-section-lensCorrection');
   const disclosure = section.locator('button[aria-expanded]').first();
   if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click();
-  const controls = page.getByTestId('transform-lens-inspector');
+  const controls = section.getByTestId('transform-lens-inspector');
   await controls.waitFor({ timeout: 10_000 });
   const identity = await controls.evaluate((element) => ({
     adjustmentRevision: element.dataset.commitAdjustmentRevision,
