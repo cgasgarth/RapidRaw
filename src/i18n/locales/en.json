@@ -361,6 +361,8 @@
       }
     },
     "details": {
+      "altPreviewNoiseReduction": "Alt preview · noise reduction (transient)",
+      "altPreviewSharpening": "Alt preview · sharpening (transient)",
       "amount": "Amount",
       "blueYellow": "Blue/Yellow",
       "blurRadius": "Blur radius",
@@ -379,9 +381,11 @@
       "haloGuard": "Halo guard",
       "localContrastRadius": "Local contrast radius",
       "localContrastStatus": "UI controls only · halo-guarded runtime contrast remains tracked separately",
+      "loupe": "Detail loupe",
       "luminance": "Luminance",
       "midtoneMask": "Midtone mask",
       "minSpotRadius": "Min spot radius",
+      "moveLoupeTarget": "Move loupe inspection target",
       "naturalGrain": "Natural grain",
       "noiseReduction": "Noise Reduction",
       "presence": "Presence",

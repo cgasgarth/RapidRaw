@@ -3,6 +3,7 @@ import { Eye, Maximize, Minimize2, MoonStar } from 'lucide-react';
 import {
   lazy,
   type MouseEvent,
+  type PointerEvent,
   type RefObject,
   Suspense,
   useCallback,
@@ -45,6 +46,7 @@ import {
   resolveNextCropForGeometryChange,
   updateCropDraft,
 } from '../../utils/cropUtils';
+import { createDetailLoupeTarget, type DetailLoupeTarget } from '../../utils/detailLoupe';
 import {
   selectEditDocumentGeometry,
   selectEditDocumentMasks,
@@ -109,6 +111,7 @@ import {
 import { Panel } from '../ui/AppProperties';
 import { editorChromeTokens } from '../ui/editorChromeTokens';
 import type { CropStraightenSessionIdentity } from './editor/cropStraightenController';
+import DetailLoupe from './editor/DetailLoupe';
 import EditorToolbar from './editor/EditorToolbar';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
 import { useViewerMaskOverlayController } from './editor/useViewerMaskOverlayController';
@@ -325,6 +328,23 @@ export default function Editor({
   const [isMaskTouchInteracting, setIsMaskTouchInteracting] = useState(false);
   const [isLoaderVisible, setIsLoaderVisible] = useState(false);
   const [viewerSamplerState, setViewerSamplerState] = useState<ViewerSamplerState | null>(null);
+  const detailLoupeIdentity = useMemo(
+    () =>
+      selectedImage === null
+        ? null
+        : {
+            imageSessionId: editorImageSession?.id ?? `editor-image-session:${String(editorImageSessionGeneration)}`,
+            renderRevision: committedAdjustmentRevision,
+            sourceIdentity: selectedImage.path,
+          },
+    [committedAdjustmentRevision, editorImageSession?.id, editorImageSessionGeneration, selectedImage],
+  );
+  const [detailLoupeTarget, setDetailLoupeTarget] = useState<DetailLoupeTarget | null>(null);
+  const detailLoupeIdentityRef = useRef(detailLoupeIdentity);
+  detailLoupeIdentityRef.current = detailLoupeIdentity;
+  useEffect(() => {
+    setDetailLoupeTarget(null);
+  }, [detailLoupeIdentity?.imageSessionId, detailLoupeIdentity?.renderRevision, detailLoupeIdentity?.sourceIdentity]);
 
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -752,6 +772,23 @@ export default function Editor({
       selectedImage?.width,
       transformState,
     ],
+  );
+  const handleDetailLoupePointerMove = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      const identity = detailLoupeIdentityRef.current;
+      const container = imageContainerRef.current;
+      if (identity === null || container === null) return;
+      const imageRect = overlayGeometry.displayedImageRectInViewportCssPixels;
+      if (imageRect.width <= 0 || imageRect.height <= 0) return;
+      const containerRect = container.getBoundingClientRect();
+      setDetailLoupeTarget(
+        createDetailLoupeTarget(identity, {
+          x: (event.clientX - containerRect.left - imageRect.x) / imageRect.width,
+          y: (event.clientY - containerRect.top - imageRect.y) / imageRect.height,
+        }),
+      );
+    },
+    [overlayGeometry.displayedImageRectInViewportCssPixels],
   );
   const maskOverlayBinding = useViewerMaskOverlayController({
     context: {
@@ -2297,6 +2334,7 @@ export default function Editor({
           onPointerUpCapture={handlePointerUp}
           onPointerCancelCapture={handlePointerCancel}
           onLostPointerCaptureCapture={handleLostPointerCapture}
+          onPointerMove={handleDetailLoupePointerMove}
           onClick={handleClick}
           onDoubleClick={handleDoubleClick}
           data-fullscreen-preview={String(isFullScreen)}
@@ -2522,6 +2560,23 @@ export default function Editor({
               </div>
             )}
           </div>
+          <DetailLoupe
+            crop={adjustments.crop}
+            currentIdentity={detailLoupeIdentity}
+            devicePixelRatio={devicePixelRatio}
+            imageRect={{
+              height: overlayGeometry.displayedImageRectInViewportCssPixels.height,
+              width: overlayGeometry.displayedImageRectInViewportCssPixels.width,
+              x: overlayGeometry.displayedImageRectInViewportCssPixels.x,
+              y: overlayGeometry.displayedImageRectInViewportCssPixels.y,
+            }}
+            orientationSteps={adjustments.orientationSteps ?? 0}
+            previewUrl={finalPreviewUrl}
+            resolutionState={zoomResolutionState}
+            sourceSize={{ height: selectedImage.height, width: selectedImage.width }}
+            target={detailLoupeTarget}
+            onTargetChange={setDetailLoupeTarget}
+          />
         </div>
         {showPresentationHud && (
           <div

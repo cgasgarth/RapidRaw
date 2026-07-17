@@ -339,6 +339,8 @@
       }
     },
     "details": {
+      "altPreviewNoiseReduction": "",
+      "altPreviewSharpening": "",
       "amount": "",
       "blueYellow": "藍/黃",
       "blurRadius": "",
@@ -357,9 +359,11 @@
       "haloGuard": "",
       "localContrastRadius": "",
       "localContrastStatus": "",
+      "loupe": "",
       "luminance": "亮度",
       "midtoneMask": "",
       "minSpotRadius": "",
+      "moveLoupeTarget": "",
       "naturalGrain": "自然顆粒",
       "noiseReduction": "降噪",
       "presence": "質感",
