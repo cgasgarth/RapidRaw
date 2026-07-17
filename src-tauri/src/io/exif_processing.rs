@@ -170,21 +170,31 @@ pub fn load_sidecar_recovering(
         }
     };
 
-    if let Some(envelope) = envelope {
+    if let Some(mut envelope) = envelope {
+        let quarantined_layers = quarantine_invalid_layer_masks(&mut envelope.edit_document_v2);
+        if !quarantined_layers.is_empty() {
+            reasons.push("edit_document_layer_masks_quarantined".to_string());
+            let metadata = metadata_from_envelope(&envelope, &source_identity)?;
+            let backup_path = quarantine_original_bytes(sidecar_path, &bytes)?;
+            save_sidecar_metadata_atomic(sidecar_path, &metadata)?;
+            log::warn!(
+                "persisted_state_outcome=current sidecar={} reasons={} quarantined_layers={}",
+                sidecar_path.display(),
+                reasons.join(","),
+                quarantined_layers.len()
+            );
+            return Ok(PersistedStateLoad {
+                metadata,
+                outcome: PersistedStateOutcome::Current,
+                backup_path: Some(backup_path),
+                reason_codes: reasons,
+            });
+        }
         let validation = validate_current_envelope(&envelope, &source_identity);
         match validation {
             Ok(()) => {
                 return Ok(PersistedStateLoad {
-                    metadata: ImageMetadata {
-                        rating: envelope.rating,
-                        adjustments: JsonValue::Null,
-                        edit_document_v2: Some(envelope.edit_document_v2),
-                        tags: envelope.tags,
-                        exif: envelope.exif,
-                        raw_engine_artifacts: envelope.raw_engine_artifacts,
-                        source_identity: envelope.source_identity,
-                        edit_revision: envelope.edit_revision,
-                    },
+                    metadata: metadata_from_envelope(&envelope, &source_identity)?,
                     outcome: PersistedStateOutcome::Current,
                     backup_path: None,
                     reason_codes: Vec::new(),
@@ -214,6 +224,73 @@ pub fn load_sidecar_recovering(
         backup_path: Some(backup_path),
         reason_codes: reasons,
     })
+}
+
+fn metadata_from_envelope(
+    envelope: &CurrentSidecarEnvelope,
+    expected_source_identity: &str,
+) -> Result<ImageMetadata, String> {
+    let edit_revision = render_state_revision(
+        &envelope.edit_document_v2,
+        envelope.raw_engine_artifacts.as_ref(),
+    )?;
+    Ok(ImageMetadata {
+        rating: envelope.rating,
+        adjustments: JsonValue::Null,
+        edit_document_v2: Some(envelope.edit_document_v2.clone()),
+        tags: envelope.tags.clone(),
+        exif: envelope.exif.clone(),
+        raw_engine_artifacts: envelope.raw_engine_artifacts.clone(),
+        source_identity: expected_source_identity.to_string(),
+        edit_revision,
+    })
+}
+
+fn quarantine_invalid_layer_masks(document: &mut JsonValue) -> Vec<JsonValue> {
+    let Some(masks) = document
+        .pointer("/layers/masks")
+        .and_then(JsonValue::as_array)
+        .cloned()
+    else {
+        return Vec::new();
+    };
+    let mut valid = Vec::with_capacity(masks.len());
+    let mut quarantined = Vec::new();
+    for layer in masks {
+        let invalid = layer.as_object().is_some_and(|layer| {
+            layer.get("layerGroupId").is_some_and(JsonValue::is_null)
+                || layer.get("layerGroupName").is_some_and(JsonValue::is_null)
+        });
+        if invalid {
+            quarantined.push(layer);
+        } else {
+            valid.push(layer);
+        }
+    }
+    if quarantined.is_empty() {
+        return quarantined;
+    }
+    if let Some(layers) = document.pointer_mut("/layers/masks") {
+        *layers = JsonValue::Array(valid.clone());
+    }
+    if let Some(node_masks) = document.pointer_mut("/nodes/layers/params/masks") {
+        *node_masks = JsonValue::Array(valid);
+    }
+    let extensions = document
+        .pointer_mut("/extensions")
+        .and_then(JsonValue::as_object_mut)
+        .expect("current edit document extensions must be an object");
+    let quarantine = extensions
+        .entry("quarantinedNodes")
+        .or_insert_with(|| JsonValue::Object(serde_json::Map::new()));
+    let quarantine = quarantine
+        .as_object_mut()
+        .expect("quarantinedNodes must be an object");
+    quarantine.insert(
+        "layerMasks".to_string(),
+        JsonValue::Array(quarantined.clone()),
+    );
+    quarantined
 }
 
 fn validate_current_envelope(
@@ -1779,6 +1856,48 @@ mod tests {
         metadata
     }
 
+    fn valid_brush_layer() -> JsonValue {
+        let document = neutral_current_edit_document();
+        let scene = &document["nodes"]["scene_global_color_tone"]["params"];
+        let presence = &document["nodes"]["color_presence"]["params"];
+        let curves = &document["nodes"]["scene_curve"]["params"];
+        let detail = &document["nodes"]["detail_denoise_dehaze"]["params"];
+        let creative = &document["nodes"]["display_creative"]["params"];
+        let selective = &document["nodes"]["selective_color_mixer"]["params"];
+        let grading = &document["nodes"]["perceptual_grading"]["params"];
+        let tone_equalizer = &document["nodes"]["tone_equalizer"]["params"];
+        serde_json::json!({
+            "adjustments": {
+                "blacks": scene["blacks"], "brightness": scene["brightness"],
+                "clarity": detail["clarity"], "colorGrading": grading["colorGrading"],
+                "perceptualGradingV1": grading["perceptualGradingV1"],
+                "colorNoiseReduction": detail["colorNoiseReduction"], "contrast": scene["contrast"],
+                "curves": curves["curves"], "pointCurves": curves["pointCurves"],
+                "parametricCurve": curves["parametricCurve"], "curveMode": curves["curveMode"],
+                "dehaze": detail["dehaze"], "effectsEnabled": true, "exposure": 0.4,
+                "flareAmount": creative["flareAmount"], "glowAmount": creative["glowAmount"],
+                "halationAmount": creative["halationAmount"], "highlights": scene["highlights"],
+                "hue": presence["hue"], "hsl": selective["hsl"],
+                "selectiveColorRangeControls": selective["selectiveColorRangeControls"],
+                "lumaNoiseReduction": detail["lumaNoiseReduction"], "saturation": presence["saturation"],
+                "shadows": scene["shadows"], "sharpness": detail["sharpness"],
+                "sharpnessThreshold": detail["sharpnessThreshold"], "structure": detail["structure"],
+                "temperature": 0, "tint": 0, "toneEqualizer": tone_equalizer["toneEqualizer"],
+                "vibrance": presence["vibrance"], "whites": scene["whites"]
+            },
+            "blendMode": "normal",
+            "editNodes": { "basic": { "enabled": false }, "color": { "enabled": false },
+                "curves": { "enabled": false }, "details": { "enabled": false } },
+            "editNodeSchemaVersion": 1, "id": "brush-layer", "invert": false,
+            "name": "Brush Layer", "opacity": 100, "subMasks": [{
+                "id": "brush-mask", "invert": false, "mode": "additive", "name": "Brush",
+                "opacity": 100, "parameters": { "density": 0.82, "feather": 26, "flow": 0.77,
+                    "points": [{ "x": 0.2, "y": 0.3 }, { "x": 0.6, "y": 0.3 }], "size": 131,
+                    "tool": "eraser" }, "type": "brush", "visible": true
+            }], "visible": true
+        })
+    }
+
     #[test]
     fn current_sidecar_roundtrip_is_deterministic_and_has_one_pixel_authority() {
         let temp = tempfile::tempdir().unwrap();
@@ -1829,6 +1948,65 @@ mod tests {
 
         save_sidecar_metadata_atomic(&sidecar, &loaded.metadata).unwrap();
         assert_eq!(fs::read(&sidecar).unwrap(), first_bytes);
+    }
+
+    #[test]
+    fn malformed_layer_masks_are_quarantined_while_valid_brush_reopens() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("brush-recovery.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let valid = valid_brush_layer();
+        let mut malformed = valid.clone();
+        malformed["layerGroupId"] = JsonValue::Null;
+        malformed["layerGroupName"] = JsonValue::Null;
+        let mut metadata = metadata_for(&source);
+        let document = metadata.edit_document_v2.as_mut().unwrap();
+        document["layers"]["masks"] = serde_json::json!([valid]);
+        document["nodes"]["layers"]["params"]["masks"] = document["layers"]["masks"].clone();
+        save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
+        let mut tampered: JsonValue = serde_json::from_slice(&fs::read(&sidecar).unwrap()).unwrap();
+        tampered["editDocumentV2"]["layers"]["masks"] = serde_json::json!([malformed, valid]);
+        tampered["editDocumentV2"]["nodes"]["layers"]["params"]["masks"] =
+            tampered["editDocumentV2"]["layers"]["masks"].clone();
+        let original = serde_json::to_vec_pretty(&tampered).unwrap();
+        fs::write(&sidecar, &original).unwrap();
+
+        let recovered = load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref()))
+            .expect("malformed layer entry is recovered");
+        assert_eq!(recovered.outcome, PersistedStateOutcome::Current);
+        assert_eq!(
+            recovered.reason_codes,
+            ["edit_document_layer_masks_quarantined"]
+        );
+        assert_eq!(
+            recovered.metadata.edit_document_v2.as_ref().unwrap()["layers"]["masks"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(
+            recovered.metadata.edit_document_v2.as_ref().unwrap()["layers"]["masks"][0]["id"],
+            "brush-layer"
+        );
+        assert_eq!(
+            recovered.metadata.edit_document_v2.as_ref().unwrap()["extensions"]["quarantinedNodes"]
+                ["layerMasks"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(fs::read(recovered.backup_path.unwrap()).unwrap(), original);
+
+        let reopened = load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref()))
+            .expect("recovered sidecar reopens");
+        assert_eq!(reopened.outcome, PersistedStateOutcome::Current);
+        assert!(reopened.reason_codes.is_empty());
+        assert_eq!(
+            reopened.metadata.edit_document_v2.unwrap()["layers"]["masks"][0]["subMasks"][0]["type"],
+            "brush"
+        );
     }
 
     #[test]

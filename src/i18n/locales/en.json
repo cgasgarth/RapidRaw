@@ -1562,6 +1562,7 @@
       },
       "brush": {
         "brush": "Brush",
+        "density": "Density",
         "eraser": "Eraser",
         "feather": "Brush Feather",
         "flow": "Flow",

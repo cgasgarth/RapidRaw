@@ -1451,6 +1451,7 @@
       },
       "brush": {
         "brush": "ブラシ",
+        "density": "",
         "eraser": "消しゴム",
         "feather": "ブラシのぼかし",
         "flow": "流量",

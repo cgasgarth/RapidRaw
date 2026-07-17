@@ -1515,6 +1515,7 @@
       },
       "brush": {
         "brush": "画笔",
+        "density": "",
         "eraser": "橡皮擦",
         "feather": "画笔羽化",
         "flow": "流量",

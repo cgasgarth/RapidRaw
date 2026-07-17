@@ -53,7 +53,7 @@ export function useImageLoader() {
           buildImageOpenHydrationEditTransaction(
             state,
             { adjustmentRevision: state.adjustmentRevision, imageSessionId: sessionId, path: selectedImagePath },
-            hydrateImageOpenEditDocumentV2(metadata.metadata),
+            hydrateImageOpenEditDocumentV2(metadata.metadata, selectedImagePath),
             `image-open-hydration:${sessionId}:${metadata.metadataFingerprint}`,
           ),
         );
@@ -133,7 +133,7 @@ export function useImageLoader() {
           );
           const decodedEditDocument =
             shouldHydrateDecodedMetadata && !isNativeCommittedHydrationSession(sessionId)
-              ? hydrateImageOpenEditDocumentV2(loadedMetadata)
+              ? hydrateImageOpenEditDocumentV2(loadedMetadata, selectedImagePath)
               : null;
 
           const { width, height } = loadImageResult;
