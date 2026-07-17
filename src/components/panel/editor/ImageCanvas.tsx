@@ -188,6 +188,8 @@ export interface ViewerToolRuntimeDescriptor {
   readonly input?: { readonly activeTool: ViewerActiveTool; readonly isTemporaryHand: boolean };
   readonly isAiEditing: boolean;
   readonly isMaskControlHovered: boolean;
+  readonly maskHandlesVisible?: boolean;
+  readonly maskSelectedPinVisible?: boolean;
   readonly isMasking: boolean;
   readonly isRotationActive: boolean;
   readonly onSamplerStateChange?: (state: ViewerSamplerState) => void;
@@ -289,6 +291,8 @@ export const ImageCanvas = memo(
       input: viewerInputState,
       isAiEditing,
       isMaskControlHovered,
+      maskHandlesVisible = true,
+      maskSelectedPinVisible = true,
       isMasking,
       isRotationActive,
       onSamplerStateChange: onViewerSamplerStateChange,
@@ -1663,7 +1667,8 @@ export const ImageCanvas = memo(
                               <MaskOverlay
                                 geometry={overlayGeometry}
                                 interactionResetEpoch={viewerMaskShapeBinding.resetEpoch}
-                                isSelected={renderSubMask.id === activeId}
+                                isSelected={renderSubMask.id === activeId && maskSelectedPinVisible}
+                                showHandles={maskHandlesVisible}
                                 isToolActive={isToolActive}
                                 onMaskInteractionCancel={viewerMaskShapeBinding.cancel}
                                 onMaskInteractionEnd={viewerMaskShapeBinding.end}
