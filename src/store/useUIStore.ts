@@ -82,6 +82,8 @@ export interface CollapsibleSectionsState {
   basic: boolean;
   calibration: boolean;
   color: boolean;
+  colorGrading?: boolean;
+  colorMixer?: boolean;
   curves: boolean;
   details: boolean;
   effects: boolean;
@@ -159,6 +161,9 @@ const createCollapsibleSectionsState = (preferences: EditorWorkspacePreferences)
   basic: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('basic') ?? false,
   calibration: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('calibration') ?? false,
   color: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('color') ?? false,
+  colorGrading:
+    preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('colorGrading') ?? false,
+  colorMixer: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('colorMixer') ?? false,
   curves: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('curves') ?? false,
   details: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('details') ?? false,
   effects: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('effects') ?? false,

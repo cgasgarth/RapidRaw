@@ -784,6 +784,8 @@
       "scopedSections": {
         "basic": "Light",
         "calibration": "校准",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
@@ -805,6 +807,10 @@
         "details": "细节",
         "effects": "效果"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
         "editedSections_other": "",
         "loadingImage": ""
@@ -814,6 +820,9 @@
         "autoAdjust": "自动调整图像",
         "resetAdjustments": "重置调整",
         "toggleAnalytics": "切换分析显示"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {
