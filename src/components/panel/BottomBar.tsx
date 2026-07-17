@@ -326,6 +326,7 @@ function EditorOrganizationMenu({
 
 function EditorFilmstripLane({
   filmstripHeight,
+  hasActiveFilters = false,
   imageList = [],
   imageRatings,
   isFilmstripVisible,
@@ -338,6 +339,7 @@ function EditorFilmstripLane({
   onImageSelect,
   onRequestThumbnails,
   selectedImage,
+  totalImages,
   thumbnailAspectRatio,
 }: Pick<
   BottomBarProps,
@@ -353,8 +355,9 @@ function EditorFilmstripLane({
   | 'onImageSelect'
   | 'onRequestThumbnails'
   | 'selectedImage'
+  | 'totalImages'
   | 'thumbnailAspectRatio'
-> & { laneRef: React.RefObject<HTMLDivElement | null> }) {
+> & { hasActiveFilters?: boolean; laneRef: React.RefObject<HTMLDivElement | null> }) {
   const height = filmstripHeight ?? 0;
   return (
     <div
@@ -368,6 +371,7 @@ function EditorFilmstripLane({
     >
       <div className="w-full p-2" style={{ height: `${height}px` }}>
         <Filmstrip
+          hasActiveFilters={hasActiveFilters}
           imageList={imageList}
           imageRatings={imageRatings}
           isLoading={isLoading}
@@ -379,6 +383,7 @@ function EditorFilmstripLane({
           selectedImage={selectedImage}
           selectedImageThumbnailUrl={selectedImage?.thumbnailUrl}
           thumbnailAspectRatio={thumbnailAspectRatio}
+          totalImages={totalImages}
         />
       </div>
     </div>
@@ -447,6 +452,7 @@ function EditorBottomCommandBar(props: BottomBarProps) {
       {props.showFilmstrip ? (
         <EditorFilmstripLane
           {...props}
+          hasActiveFilters={model.hasActiveFilters}
           imageList={imageList}
           laneRef={laneRef}
           multiSelectedPaths={multiSelectedPaths}
