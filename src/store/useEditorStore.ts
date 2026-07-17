@@ -258,6 +258,8 @@ interface EditorState {
   overlayMode: OverlayMode;
   overlayRotation: number;
   maskOverlaySettings: MaskOverlaySettings;
+  maskSelectedPinVisible: boolean;
+  maskHandlesVisible: boolean;
   isStraightenActive: boolean;
   isWbPickerActive: boolean;
   lastWhiteBalancePickerReceipt: WhiteBalancePickerRuntimeReceipt | null;
@@ -691,6 +693,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   overlayMode: 'thirds',
   overlayRotation: 0,
   maskOverlaySettings: loadMaskOverlaySettingsPreference(),
+  maskSelectedPinVisible: true,
+  maskHandlesVisible: true,
   transformedOriginalUrl: null,
   isStraightenActive: false,
   isWbPickerActive: false,
@@ -772,6 +776,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         imageSession: null,
         imageSessionId,
         isMaskControlHovered: false,
+        maskSelectedPinVisible: true,
+        maskHandlesVisible: true,
         isWbPickerActive: false,
         isSliderDragging: false,
         detailModifierPreview: null,
