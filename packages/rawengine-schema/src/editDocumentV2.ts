@@ -1511,13 +1511,44 @@ const editDocumentV2ObjectSchema = z
 
 export const editDocumentV2Schema = editDocumentV2ObjectSchema;
 
+/**
+ * Source-owned named snapshots are metadata rather than render inputs, but they
+ * must travel through the current sidecar boundary to survive a reopen. Keep
+ * the nested document on the same typed authority schema so malformed metadata
+ * cannot be persisted.
+ */
+export const editDocumentNamedSnapshotsEnvelopeSchema = z
+  .object({
+    snapshots: z
+      .array(
+        z
+          .object({
+            createdAt: z.string().datetime({ offset: true }),
+            editDocumentV2: z.lazy(() => editDocumentV2Schema),
+            id: z.string().min(1),
+            label: z.string().trim().min(1),
+            sourceImagePath: z.string().min(1),
+            sourceSessionId: z.string().min(1),
+          })
+          .strict(),
+      )
+      .max(128),
+    version: z.literal(1),
+  })
+  .strict();
+
 /** Strict current render/persistence boundary; only current artifacts and future-node quarantine may cross it. */
 export const currentRenderEditDocumentV2Schema = editDocumentV2Schema.superRefine((document, context) => {
   const extensionKeys = Object.keys(document.extensions);
-  if (extensionKeys.some((key) => key !== 'quarantinedNodes' && key !== 'rawEngineArtifacts')) {
+  if (
+    extensionKeys.some(
+      (key) => key !== 'quarantinedNodes' && key !== 'rawEngineArtifacts' && key !== 'rawengineNamedSnapshots',
+    )
+  ) {
     context.addIssue({
       code: 'custom',
-      message: 'Current render documents may only carry rawEngineArtifacts and quarantinedNodes.',
+      message:
+        'Current render documents may only carry rawEngineArtifacts, quarantinedNodes, and rawengineNamedSnapshots.',
     });
   }
   const quarantinedNodes = document.extensions['quarantinedNodes'];
@@ -1533,6 +1564,13 @@ export const currentRenderEditDocumentV2Schema = editDocumentV2Schema.superRefin
     !layerStackSidecarPersistenceEnvelopeV1Schema.safeParse({ rawEngineArtifacts }).success
   ) {
     context.addIssue({ code: 'custom', message: 'rawEngineArtifacts must satisfy the current artifact contract.' });
+  }
+  const namedSnapshots = document.extensions['rawengineNamedSnapshots'];
+  if (namedSnapshots !== undefined && !editDocumentNamedSnapshotsEnvelopeSchema.safeParse(namedSnapshots).success) {
+    context.addIssue({
+      code: 'custom',
+      message: 'rawengineNamedSnapshots must satisfy the current named snapshot metadata contract.',
+    });
   }
 });
 

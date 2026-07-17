@@ -2144,7 +2144,11 @@ function ProfessionalEditorShellFixture({ state }: { state: 'collapsed' | 'defau
                 </div>
               </div>
               {['Presets', 'Snapshots', 'History'].map((label) => (
-                <div className="flex h-7 items-center border-b border-editor-divider px-2 text-[11px]" key={label}>
+                <div
+                  className="flex h-7 items-center border-b border-editor-divider px-2 text-[11px]"
+                  data-testid={label === 'Snapshots' ? 'professional-editor-left-snapshots' : undefined}
+                  key={label}
+                >
                   {label}
                 </div>
               ))}

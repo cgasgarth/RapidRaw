@@ -1954,6 +1954,36 @@ mod tests {
     }
 
     #[test]
+    fn named_snapshot_metadata_survives_sidecar_save_and_reopen() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("named-snapshot.arw");
+        let sidecar = get_primary_sidecar_path(&source);
+        let mut metadata = metadata_for(&source);
+        let snapshot_document = metadata.edit_document_v2.clone().unwrap();
+        metadata.edit_document_v2.as_mut().unwrap()["extensions"]["rawengineNamedSnapshots"] = serde_json::json!({
+            "version": 1,
+            "snapshots": [{
+                "createdAt": "2026-07-17T12:00:00.000Z",
+                "editDocumentV2": snapshot_document,
+                "id": "snapshot-1",
+                "label": "Saved look",
+                "sourceImagePath": source.to_string_lossy(),
+                "sourceSessionId": format!("editor-image-source:{}", source.display())
+            }]
+        });
+
+        save_sidecar_metadata_atomic(&sidecar, &metadata).unwrap();
+        let reopened = load_sidecar_recovering(&sidecar, Some(source.to_string_lossy().as_ref()))
+            .expect("named snapshot sidecar reopens");
+        assert_eq!(reopened.outcome, PersistedStateOutcome::Current);
+        assert_eq!(
+            reopened.metadata.edit_document_v2.unwrap()["extensions"]["rawengineNamedSnapshots"]["snapshots"]
+                [0]["label"],
+            "Saved look"
+        );
+    }
+
+    #[test]
     fn malformed_layer_masks_are_quarantined_while_valid_brush_reopens() {
         let temp = tempfile::tempdir().unwrap();
         let source = temp.path().join("brush-recovery.arw");

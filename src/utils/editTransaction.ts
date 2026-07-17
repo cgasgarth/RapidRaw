@@ -26,6 +26,7 @@ export type EditMutationSource =
   | 'film-workspace'
   | 'layer-command'
   | 'reference-match'
+  | 'snapshot'
   | 'ai-edit'
   | 'agent-command'
   | 'reset'
@@ -34,6 +35,7 @@ export type EditMutationSource =
 
 export type EditTransactionHistory =
   | 'single-entry'
+  | 'metadata'
   | 'coalesced-interaction'
   | 'navigation'
   | 'compensation'
