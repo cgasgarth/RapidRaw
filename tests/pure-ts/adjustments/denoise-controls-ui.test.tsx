@@ -97,6 +97,19 @@ test('Alt sharpening diagnostics are transient and publish only during the slide
   fireEvent.keyUp(window, { altKey: false, key: 'Alt' });
 });
 
+test('Detail diagnostics reset when the editor image session changes', () => {
+  installEditorSession();
+  const state = useEditorStore.getState();
+  const selectedImage = state.selectedImage;
+  if (selectedImage === null) throw new Error('Expected an installed editor image session');
+  state.setEditor({ detailModifierPreview: 'noise-reduction' });
+  state.setEditor({
+    imageSession: createEditorImageSession({ generation: 2, path: '/fixture/next-detail.ARW', source: 'cold-load' }),
+    selectedImage: { ...selectedImage, path: '/fixture/next-detail.ARW' },
+  });
+  expect(useEditorStore.getState().detailModifierPreview).toBeNull();
+});
+
 function DenoiseControlsHarness() {
   const document = useEditorStore((state) => state.editDocumentV2);
   const adjustments = useMemo<DetailAdjustmentView>(
