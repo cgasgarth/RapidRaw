@@ -10,8 +10,10 @@ import {
 import { Mask, type SubMask } from '../../components/panel/right/layers/Masks';
 import { AiProviderId, normalizeAiProviderId } from '../../schemas/ai/aiProviderSchemas';
 import {
-  aiPeopleMaskTargetSchema,
   type AiPeopleMaskPart,
+  aiPeopleMaskAnalysisSchema,
+  aiPeopleMaskPartSchema,
+  aiPeopleMaskTargetSchema,
   parseAiPatchDataJson,
 } from '../../schemas/masks/aiMaskingSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
@@ -32,6 +34,11 @@ import { mergeMaskParameters, toMaskParameterRecord } from '../../utils/mask/mas
 import { useEditorActions } from '../editor/useEditorActions';
 
 type SubMaskParameters = Record<string, unknown>;
+
+export const parseAiPeopleMaskAnalysis = (value: unknown) => aiPeopleMaskAnalysisSchema.safeParse(value);
+
+export const parseAiPeopleMaskPart = (value: string): AiPeopleMaskPart =>
+  aiPeopleMaskPartSchema.catch('full_person').parse(value);
 
 const aiMaskBoxAsyncOperationsModule = import('../../utils/ai/aiMaskBoxAsyncOperations.js');
 

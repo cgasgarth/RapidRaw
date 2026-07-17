@@ -48,20 +48,17 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import {
+  type EditDocumentV2,
   editDocumentLayersV2Schema,
   readLayerStackSidecarsFromSidecar,
 } from '../../../../../packages/rawengine-schema/src';
 import { useContextMenu } from '../../../../context/ContextMenuContext';
-import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
+import { parseAiPeopleMaskAnalysis, parseAiPeopleMaskPart, useAiMasking } from '../../../../hooks/ai/useAiMasking';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { type UserPreset, usePresets } from '../../../../hooks/editor/usePresets';
 import { useWaveformControls } from '../../../../hooks/editor/useWaveformControls';
 import { useManagedFocus } from '../../../../hooks/ui/useManagedFocus';
-import {
-  type AiPeopleMaskPart,
-  aiPeopleMaskAnalysisSchema,
-  aiPeopleMaskPartSchema,
-} from '../../../../schemas/masks/aiMaskingSchemas';
+import type { AiPeopleMaskPart } from '../../../../schemas/masks/aiMaskingSchemas';
 import type { MaskOverlaySettings } from '../../../../schemas/masks/maskOverlaySchemas';
 import {
   aiDepthMaskParametersSchema,
@@ -138,6 +135,7 @@ import {
   acceptObjectMaskProposal,
   buildObjectMaskProposalCommandInput,
   clearObjectPromptCanvasState,
+  type ObjectMaskProposalReplayReceipt,
   type ObjectPromptMode,
   readObjectMaskProposalReplayReceipt,
   readObjectPromptCanvasState,
@@ -660,6 +658,255 @@ const maskContainerBlendModes = (
   ...blendMode,
   supported: isMaskContainerRuntimeBlendMode(blendMode.value),
 }));
+
+interface ObjectPromptGenerationContext {
+  adjustmentRevision: number;
+  geometryIdentity: string;
+  imageSessionId: string | null;
+  maskId: string;
+  sourcePath: string;
+}
+
+interface ObjectPromptWorkflowState {
+  cancelled: boolean;
+  error: string | null;
+  isGenerating: boolean;
+  pendingProposal: { maskId: string; proposal: AiObjectMaskProposal } | null;
+}
+
+type AiSelectionStatus = 'empty' | 'pending' | 'review' | 'accepted' | 'cancelled' | 'error';
+
+type ObjectPromptCommandInput = ReturnType<typeof buildObjectMaskProposalCommandInput>;
+type AiPeopleMaskAnalysisResult = ReturnType<typeof parseAiPeopleMaskAnalysis>;
+
+const resolveObjectPromptStatus = ({
+  commandInput,
+  error,
+  hasPendingProposal,
+  isCancelled,
+  isGenerating,
+  replayReceipt,
+}: {
+  commandInput: ObjectPromptCommandInput;
+  error: string | null;
+  hasPendingProposal: boolean;
+  isCancelled: boolean;
+  isGenerating: boolean;
+  replayReceipt: ObjectMaskProposalReplayReceipt | null;
+}): AiSelectionStatus => {
+  if (isGenerating) return 'pending';
+  if (error !== null) return 'error';
+  if (hasPendingProposal) return 'review';
+  if (replayReceipt !== null) return 'accepted';
+  if (commandInput === null) return 'empty';
+  return isCancelled ? 'cancelled' : 'review';
+};
+
+const resolvePeoplePickerStatus = (
+  isGenerating: boolean,
+  analysis: AiPeopleMaskAnalysisResult | null,
+): AiSelectionStatus => {
+  if (isGenerating) return 'pending';
+  return analysis?.success === true && analysis.data.people.length > 0 ? 'review' : 'empty';
+};
+
+const readPeopleTargetPersonId = (target: unknown): string | null => {
+  if (typeof target !== 'object' || target === null || !('personId' in target)) return null;
+  const personId = target.personId;
+  return typeof personId === 'string' ? personId : null;
+};
+
+const readPeopleTargetPart = (target: unknown): AiPeopleMaskPart => {
+  if (typeof target !== 'object' || target === null || !('part' in target)) return 'full_person';
+  const part = target.part;
+  return typeof part === 'string' ? parseAiPeopleMaskPart(part) : 'full_person';
+};
+
+const isCurrentObjectPromptGeneration = (
+  state: {
+    activeMaskId: string | null;
+    adjustmentRevision: number;
+    editDocumentV2: EditDocumentV2;
+    imageSession: { id: string } | null;
+    selectedImage: { path: string } | null;
+  },
+  context: ObjectPromptGenerationContext,
+): boolean =>
+  state.activeMaskId === context.maskId &&
+  state.selectedImage?.path === context.sourcePath &&
+  (state.imageSession?.id ?? null) === context.imageSessionId &&
+  state.adjustmentRevision === context.adjustmentRevision &&
+  JSON.stringify(selectEditDocumentGeometry(state.editDocumentV2)) === context.geometryIdentity;
+
+interface ObjectPromptWorkflowControlsProps {
+  activeSubMask: SubMask | null;
+  displayAdjustments: Adjustments;
+  updateSubMask: (id: string, data: SubMaskPatch) => void;
+}
+
+function ObjectPromptWorkflowControls({
+  activeSubMask,
+  displayAdjustments,
+  updateSubMask,
+}: ObjectPromptWorkflowControlsProps) {
+  const { t } = useTranslation();
+  const selectedImage = useEditorStore((state) => state.selectedImage);
+  const editorDocument = useEditorStore((state) => state.editDocumentV2);
+  const editorGeometry = selectEditDocumentGeometry(editorDocument);
+  const editorLensCorrection = selectEditDocumentNode(editorDocument, 'lens_correction').params;
+  const [objectPromptWorkflow, setObjectPromptWorkflow] = useState<ObjectPromptWorkflowState>({
+    cancelled: false,
+    error: null,
+    isGenerating: false,
+    pendingProposal: null,
+  });
+  const objectPromptRequestRef = useRef(0);
+  const objectPromptState =
+    activeSubMask?.type === Mask.AiObject ? readObjectPromptCanvasState(activeSubMask.parameters) : null;
+  const objectPromptCommandInput =
+    objectPromptState !== null && selectedImage !== null
+      ? buildObjectMaskProposalCommandInput(objectPromptState, {
+          crop: editorGeometry.crop,
+          height: selectedImage.height,
+          orientationSteps: editorGeometry.orientationSteps,
+          width: selectedImage.width,
+        })
+      : null;
+  const objectPromptRuntimeAdjustments: Adjustments = {
+    ...displayAdjustments,
+    ...editorGeometry,
+    ...editorLensCorrection,
+  };
+  const objectPromptParameters = toMaskParameterRecord(activeSubMask?.parameters);
+  const objectPromptProviderStatus = objectPromptParameters['providerStatus'];
+  const objectPromptProviderStatusText =
+    typeof objectPromptProviderStatus === 'string' ? objectPromptProviderStatus : 'empty';
+  const objectPromptReplayReceipt =
+    objectPromptState !== null && activeSubMask !== null
+      ? readObjectMaskProposalReplayReceipt(activeSubMask.parameters)
+      : null;
+  const hasPendingObjectProposal = objectPromptWorkflow.pendingProposal?.maskId === activeSubMask?.id;
+  const objectPromptStatus = resolveObjectPromptStatus({
+    commandInput: objectPromptCommandInput,
+    error: objectPromptWorkflow.error,
+    hasPendingProposal: hasPendingObjectProposal,
+    isCancelled: objectPromptWorkflow.cancelled,
+    isGenerating: objectPromptWorkflow.isGenerating,
+    replayReceipt: objectPromptReplayReceipt,
+  });
+
+  const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
+    if (!activeSubMask || objectPromptState === null) return;
+    setObjectPromptWorkflow((current) => ({ ...current, cancelled: false }));
+    updateSubMask(activeSubMask.id, {
+      parameters: writeObjectPromptCanvasState(activeSubMask.parameters, setObjectPromptMode(objectPromptState, mode)),
+    });
+  };
+  const handleClearObjectPrompts = () => {
+    objectPromptRequestRef.current += 1;
+    setObjectPromptWorkflow((current) => ({ ...current, cancelled: false, error: null, pendingProposal: null }));
+    if (!activeSubMask || objectPromptState === null) return;
+    updateSubMask(activeSubMask.id, {
+      parameters: writeObjectPromptCanvasState(
+        activeSubMask.parameters,
+        clearObjectPromptCanvasState(objectPromptState),
+      ),
+    });
+  };
+  const handleGenerateObjectProposal = async () => {
+    if (!activeSubMask || objectPromptState === null || objectPromptCommandInput === null || !selectedImage?.path)
+      return;
+    const requestId = objectPromptRequestRef.current + 1;
+    objectPromptRequestRef.current = requestId;
+    const maskId = activeSubMask.id;
+    const sourcePath = selectedImage.path;
+    const sourceState = useEditorStore.getState();
+    const generationContext: ObjectPromptGenerationContext = {
+      adjustmentRevision: sourceState.adjustmentRevision,
+      geometryIdentity: JSON.stringify(selectEditDocumentGeometry(sourceState.editDocumentV2)),
+      imageSessionId: sourceState.imageSession?.id ?? null,
+      maskId,
+      sourcePath,
+    };
+    setObjectPromptWorkflow((current) => ({
+      ...current,
+      cancelled: false,
+      error: null,
+      isGenerating: true,
+      pendingProposal: null,
+    }));
+    useEditorStore.getState().setEditor({ isGeneratingAiMask: true });
+    try {
+      const proposal = await invoke<AiObjectMaskProposal>(Invokes.GenerateAiObjectMaskProposal, {
+        endPoint: objectPromptCommandInput.endPoint,
+        flipHorizontal: editorGeometry.flipHorizontal,
+        flipVertical: editorGeometry.flipVertical,
+        jsAdjustments: getObjectMaskTransformAdjustments(objectPromptRuntimeAdjustments),
+        orientationSteps: editorGeometry.orientationSteps,
+        path: selectedImage.path,
+        rotation: editorGeometry.rotation,
+        startPoint: objectPromptCommandInput.startPoint,
+      });
+      if (requestId !== objectPromptRequestRef.current) return;
+      const currentEditor = useEditorStore.getState();
+      if (!isCurrentObjectPromptGeneration(currentEditor, generationContext)) return;
+      setObjectPromptWorkflow((current) => ({ ...current, pendingProposal: { maskId, proposal } }));
+    } catch (error) {
+      if (requestId === objectPromptRequestRef.current) {
+        setObjectPromptWorkflow((current) => ({
+          ...current,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      }
+    } finally {
+      setObjectPromptWorkflow((current) => ({ ...current, isGenerating: false }));
+      useEditorStore.getState().setEditor({ isGeneratingAiMask: false });
+    }
+  };
+  const handleAcceptObjectProposal = () => {
+    if (
+      !activeSubMask ||
+      objectPromptState === null ||
+      objectPromptWorkflow.pendingProposal?.maskId !== activeSubMask.id
+    )
+      return;
+    updateSubMask(activeSubMask.id, {
+      parameters: acceptObjectMaskProposal(
+        activeSubMask.parameters,
+        objectPromptState,
+        objectPromptWorkflow.pendingProposal.proposal,
+      ),
+    });
+    setObjectPromptWorkflow((current) => ({ ...current, cancelled: false, error: null, pendingProposal: null }));
+  };
+  const handleCancelObjectProposal = () => {
+    objectPromptRequestRef.current += 1;
+    setObjectPromptWorkflow((current) => ({ ...current, cancelled: true, error: null, pendingProposal: null }));
+  };
+
+  if (objectPromptState === null) return null;
+  return (
+    <ObjectPromptControls
+      commandInput={objectPromptCommandInput}
+      error={objectPromptWorkflow.error}
+      hasPendingProposal={hasPendingObjectProposal}
+      isGenerating={objectPromptWorkflow.isGenerating}
+      onAccept={handleAcceptObjectProposal}
+      onCancelProposal={handleCancelObjectProposal}
+      onClear={handleClearObjectPrompts}
+      onGenerate={() => {
+        void handleGenerateObjectProposal();
+      }}
+      onModeChange={handleObjectPromptModeChange}
+      providerStatusText={objectPromptProviderStatusText}
+      replayReceipt={objectPromptReplayReceipt}
+      selectedImagePath={selectedImage?.path}
+      status={objectPromptStatus}
+      state={objectPromptState}
+      t={t}
+    />
+  );
+}
 
 function MaskProvenanceBadge({ view }: { view: LayerMaskProvenanceView }) {
   const { t } = useTranslation();
@@ -3632,18 +3879,6 @@ function SettingsPanel({
   const { showContextMenu } = useContextMenu();
   const isActive = !!container;
   const presetButtonRef = useRef<HTMLButtonElement>(null);
-  const selectedImage = useEditorStore((state) => state.selectedImage);
-  const editorDocument = useEditorStore((state) => state.editDocumentV2);
-  const editorGeometry = selectEditDocumentGeometry(editorDocument);
-  const editorLensCorrection = selectEditDocumentNode(editorDocument, 'lens_correction').params;
-  const [isGeneratingObjectProposal, setIsGeneratingObjectProposal] = useState(false);
-  const [pendingObjectProposal, setPendingObjectProposal] = useState<{
-    maskId: string;
-    proposal: AiObjectMaskProposal;
-  } | null>(null);
-  const [objectPromptError, setObjectPromptError] = useState<string | null>(null);
-  const [objectPromptCancelled, setObjectPromptCancelled] = useState(false);
-  const objectPromptRequestRef = useRef(0);
 
   const placeholderContainer = {
     ...INITIAL_MASK_CONTAINER,
@@ -3769,46 +4004,6 @@ function SettingsPanel({
 
   const activeSubMaskType = activeSubMask?.type;
   const subMaskConfig = activeSubMaskType ? SUB_MASK_CONFIG[activeSubMaskType] : {};
-  const objectPromptState =
-    activeSubMaskType === Mask.AiObject && activeSubMask !== null
-      ? readObjectPromptCanvasState(activeSubMask.parameters)
-      : null;
-  const objectPromptCommandInput =
-    objectPromptState !== null && selectedImage !== null
-      ? buildObjectMaskProposalCommandInput(objectPromptState, {
-          crop: editorGeometry.crop,
-          height: selectedImage.height,
-          orientationSteps: editorGeometry.orientationSteps,
-          width: selectedImage.width,
-        })
-      : null;
-  const objectPromptRuntimeAdjustments: Adjustments = {
-    ...displayAdjustments,
-    ...editorGeometry,
-    ...editorLensCorrection,
-  };
-  const objectPromptProviderStatus = toMaskParameterRecord(activeSubMask?.parameters)['providerStatus'];
-  const objectPromptProviderStatusText =
-    typeof objectPromptProviderStatus === 'string' ? objectPromptProviderStatus : 'empty';
-  const objectPromptReplayReceipt =
-    activeSubMaskType === Mask.AiObject && activeSubMask !== null
-      ? readObjectMaskProposalReplayReceipt(activeSubMask.parameters)
-      : null;
-  const hasPendingObjectProposal = pendingObjectProposal?.maskId === activeSubMask?.id;
-  const objectPromptStatus: 'empty' | 'pending' | 'review' | 'accepted' | 'cancelled' | 'error' =
-    isGeneratingObjectProposal
-      ? 'pending'
-      : objectPromptError !== null
-        ? 'error'
-        : hasPendingObjectProposal
-          ? 'review'
-          : objectPromptReplayReceipt !== null
-            ? 'accepted'
-            : objectPromptCommandInput === null
-              ? 'empty'
-              : objectPromptCancelled
-                ? 'cancelled'
-                : 'review';
   const brushLocalAdjustmentReceipt =
     activeSubMaskType === Mask.Brush && activeSubMask !== null
       ? readBrushLocalAdjustmentReceipt(activeSubMask.parameters)
@@ -3819,19 +4014,13 @@ function SettingsPanel({
       : null;
   const peopleAnalysis =
     activeSubMaskType === Mask.AiPerson && activeSubMask !== null
-      ? aiPeopleMaskAnalysisSchema.safeParse(toMaskParameterRecord(activeSubMask.parameters)['peopleAnalysis'])
+      ? parseAiPeopleMaskAnalysis(toMaskParameterRecord(activeSubMask.parameters)['peopleAnalysis'])
       : null;
   const peopleTarget =
     activeSubMaskType === Mask.AiPerson && activeSubMask !== null
       ? toMaskParameterRecord(activeSubMask.parameters)['target']
       : null;
-  const selectedPersonId =
-    typeof peopleTarget === 'object' &&
-    peopleTarget !== null &&
-    'personId' in peopleTarget &&
-    typeof peopleTarget.personId === 'string'
-      ? peopleTarget.personId
-      : null;
+  const selectedPersonId = readPeopleTargetPersonId(peopleTarget);
   const handlePeoplePartSelect = (part: AiPeopleMaskPart) => {
     if (!activeSubMask) return;
     const target = { part, personId: selectedPersonId };
@@ -3841,98 +4030,10 @@ function SettingsPanel({
   const handlePeoplePersonSelect = (personId: string) => {
     if (!activeSubMask) return;
     const currentTarget = toMaskParameterRecord(activeSubMask.parameters)['target'];
-    const part =
-      typeof currentTarget === 'object' &&
-      currentTarget !== null &&
-      'part' in currentTarget &&
-      typeof currentTarget.part === 'string'
-        ? aiPeopleMaskPartSchema.catch('full_person').parse(currentTarget.part)
-        : 'full_person';
+    const part = readPeopleTargetPart(currentTarget);
     updateSubMask(activeSubMask.id, {
       parameters: mergeMaskParameters(activeSubMask.parameters, { target: { part, personId } }),
     });
-  };
-  const handleObjectPromptModeChange = (mode: ObjectPromptMode) => {
-    if (!activeSubMask || objectPromptState === null) return;
-    setObjectPromptCancelled(false);
-    updateSubMask(activeSubMask.id, {
-      parameters: writeObjectPromptCanvasState(activeSubMask.parameters, setObjectPromptMode(objectPromptState, mode)),
-    });
-  };
-  const handleClearObjectPrompts = () => {
-    objectPromptRequestRef.current += 1;
-    setPendingObjectProposal(null);
-    setObjectPromptError(null);
-    setObjectPromptCancelled(false);
-    if (!activeSubMask || objectPromptState === null) return;
-    updateSubMask(activeSubMask.id, {
-      parameters: writeObjectPromptCanvasState(
-        activeSubMask.parameters,
-        clearObjectPromptCanvasState(objectPromptState),
-      ),
-    });
-  };
-  const handleGenerateObjectProposal = async () => {
-    if (!activeSubMask || objectPromptState === null || objectPromptCommandInput === null || !selectedImage?.path)
-      return;
-    const requestId = objectPromptRequestRef.current + 1;
-    objectPromptRequestRef.current = requestId;
-    const maskId = activeSubMask.id;
-    const sourcePath = selectedImage.path;
-    const sourceState = useEditorStore.getState();
-    const sourceSessionId = sourceState.imageSession?.id ?? null;
-    const sourceAdjustmentRevision = sourceState.adjustmentRevision;
-    const sourceGeometryIdentity = JSON.stringify(selectEditDocumentGeometry(sourceState.editDocumentV2));
-    setObjectPromptError(null);
-    setPendingObjectProposal(null);
-    setObjectPromptCancelled(false);
-    setIsGeneratingObjectProposal(true);
-    useEditorStore.getState().setEditor({ isGeneratingAiMask: true });
-    try {
-      const proposal = await invoke<AiObjectMaskProposal>(Invokes.GenerateAiObjectMaskProposal, {
-        endPoint: objectPromptCommandInput.endPoint,
-        flipHorizontal: editorGeometry.flipHorizontal,
-        flipVertical: editorGeometry.flipVertical,
-        jsAdjustments: getObjectMaskTransformAdjustments(objectPromptRuntimeAdjustments),
-        orientationSteps: editorGeometry.orientationSteps,
-        path: selectedImage.path,
-        rotation: editorGeometry.rotation,
-        startPoint: objectPromptCommandInput.startPoint,
-      });
-      if (requestId !== objectPromptRequestRef.current) return;
-      const currentEditor = useEditorStore.getState();
-      if (
-        currentEditor.activeMaskId !== maskId ||
-        currentEditor.selectedImage?.path !== sourcePath ||
-        (currentEditor.imageSession?.id ?? null) !== sourceSessionId ||
-        currentEditor.adjustmentRevision !== sourceAdjustmentRevision ||
-        JSON.stringify(selectEditDocumentGeometry(currentEditor.editDocumentV2)) !== sourceGeometryIdentity
-      )
-        return;
-      setPendingObjectProposal({ maskId, proposal });
-    } catch (error) {
-      if (requestId === objectPromptRequestRef.current) {
-        setObjectPromptError(error instanceof Error ? error.message : String(error));
-      }
-    } finally {
-      setIsGeneratingObjectProposal(false);
-      useEditorStore.getState().setEditor({ isGeneratingAiMask: false });
-    }
-  };
-  const handleAcceptObjectProposal = () => {
-    if (!activeSubMask || objectPromptState === null || pendingObjectProposal?.maskId !== activeSubMask.id) return;
-    updateSubMask(activeSubMask.id, {
-      parameters: acceptObjectMaskProposal(activeSubMask.parameters, objectPromptState, pendingObjectProposal.proposal),
-    });
-    setPendingObjectProposal(null);
-    setObjectPromptError(null);
-    setObjectPromptCancelled(false);
-  };
-  const handleCancelObjectProposal = () => {
-    objectPromptRequestRef.current += 1;
-    setPendingObjectProposal(null);
-    setObjectPromptError(null);
-    setObjectPromptCancelled(true);
   };
   const isAiMask =
     activeSubMaskType !== undefined &&
@@ -4419,39 +4520,19 @@ function SettingsPanel({
                       onPartSelect={handlePeoplePartSelect}
                       onPersonSelect={handlePeoplePersonSelect}
                       selectedPersonId={selectedPersonId}
-                      status={
-                        _isGeneratingAiMask
-                          ? 'pending'
-                          : peopleAnalysis?.success === true && peopleAnalysis.data.people.length > 0
-                            ? 'review'
-                            : 'empty'
-                      }
+                      status={resolvePeoplePickerStatus(_isGeneratingAiMask, peopleAnalysis)}
                     />
                   </Suspense>
                   <AiPersonMaskProvenance parameters={activeSubMask.parameters} />
                 </>
               )}
 
-              {objectPromptState !== null && (
+              {activeSubMask.type === Mask.AiObject && (
                 <Suspense fallback={<LazyMaskPanelFallback testId="object-prompt-controls-lazy-fallback" />}>
-                  <ObjectPromptControls
-                    commandInput={objectPromptCommandInput}
-                    error={objectPromptError}
-                    hasPendingProposal={hasPendingObjectProposal}
-                    isGenerating={isGeneratingObjectProposal}
-                    onAccept={handleAcceptObjectProposal}
-                    onCancelProposal={handleCancelObjectProposal}
-                    onClear={handleClearObjectPrompts}
-                    onGenerate={() => {
-                      void handleGenerateObjectProposal();
-                    }}
-                    onModeChange={handleObjectPromptModeChange}
-                    providerStatusText={objectPromptProviderStatusText}
-                    replayReceipt={objectPromptReplayReceipt}
-                    selectedImagePath={selectedImage?.path}
-                    status={objectPromptStatus}
-                    state={objectPromptState}
-                    t={t}
+                  <ObjectPromptWorkflowControls
+                    activeSubMask={activeSubMask}
+                    displayAdjustments={displayAdjustments}
+                    updateSubMask={updateSubMask}
                   />
                 </Suspense>
               )}
