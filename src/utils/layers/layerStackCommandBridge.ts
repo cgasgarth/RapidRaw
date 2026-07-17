@@ -559,37 +559,9 @@ function materializeMasksFromSidecar(
           ? [operation.subMask]
           : [...previous.subMasks.filter((subMask) => subMask.id !== operation.subMask.id), operation.subMask]
         : previous.subMasks;
-    const serializedSubMasks: Array<MaskContainer['subMasks'][number]> = (layer.subMasks ?? []).flatMap((candidate) => {
-      const parsed = brushMaskV1Schema.safeParse(candidate);
-      if (!parsed.success) return [];
-      const mask = parsed.data;
-      return [
-        {
-          id: mask.id,
-          invert: false,
-          mode: SubMaskMode.Additive,
-          name: 'Brush',
-          opacity: mask.opacity * 100,
-          parameters: {
-            lines: mask.strokes.map((stroke) => ({
-              ...(stroke.density === undefined ? {} : { density: stroke.density * 100 }),
-              feather: (1 - stroke.hardness) * 100,
-              points: stroke.points,
-              size: stroke.radius * 2,
-              tool: stroke.mode === 'erase' ? ('eraser' as const) : ('brush' as const),
-            })),
-            rawEngine: {
-              contentHash: `native:${mask.id}`,
-              coordinateSpace: mask.coordinateSpace,
-              height: 1,
-              width: 1,
-            },
-          },
-          type: Mask.Brush,
-          visible: true,
-        },
-      ];
-    });
+    const serializedSubMasks: Array<MaskContainer['subMasks'][number]> = (layer.subMasks ?? []).flatMap(
+      materializePersistedSubMask,
+    );
     const availableSubMasks = [
       ...serializedSubMasks,
       ...operationSubMasks.filter(
@@ -623,6 +595,74 @@ function materializeMasksFromSidecar(
     }
     return materializedMask;
   });
+}
+
+const isMaskType = (value: string): value is Mask => Object.values(Mask).some((maskType) => maskType === value);
+
+const isSubMaskMode = (value: string): value is SubMaskMode =>
+  Object.values(SubMaskMode).some((mode) => mode === value);
+
+function materializePersistedSubMask(
+  candidate: NonNullable<LayerStackSidecarLayerV1['subMasks']>[number],
+): Array<MaskContainer['subMasks'][number]> {
+  const brush = brushMaskV1Schema.safeParse(candidate);
+  if (brush.success) {
+    const mask = brush.data;
+    return [
+      {
+        id: mask.id,
+        invert: false,
+        mode: SubMaskMode.Additive,
+        name: 'Brush',
+        opacity: mask.opacity * 100,
+        parameters: {
+          lines: mask.strokes.map((stroke) => ({
+            ...(stroke.density === undefined ? {} : { density: stroke.density * 100 }),
+            feather: (1 - stroke.hardness) * 100,
+            points: stroke.points,
+            size: stroke.radius * 2,
+            tool: stroke.mode === 'erase' ? ('eraser' as const) : ('brush' as const),
+          })),
+          rawEngine: {
+            contentHash: `native:${mask.id}`,
+            coordinateSpace: mask.coordinateSpace,
+            height: 1,
+            width: 1,
+          },
+        },
+        type: Mask.Brush,
+        visible: true,
+      },
+    ];
+  }
+
+  const parsed = z
+    .looseObject({
+      id: z.string().trim().min(1),
+      invert: z.boolean().optional(),
+      mode: z.string().trim().min(1).optional(),
+      name: z.string().trim().min(1).optional(),
+      opacity: z.number().min(0).max(100).optional(),
+      parameters: z.record(z.string(), z.unknown()).optional(),
+      type: z.string().trim().min(1).optional(),
+      visible: z.boolean().optional(),
+    })
+    .safeParse(candidate);
+  if (!parsed.success || parsed.data.type === undefined || !isMaskType(parsed.data.type)) return [];
+  const mode =
+    parsed.data.mode !== undefined && isSubMaskMode(parsed.data.mode) ? parsed.data.mode : SubMaskMode.Additive;
+  return [
+    {
+      id: parsed.data.id,
+      invert: parsed.data.invert ?? false,
+      mode,
+      ...(parsed.data.name === undefined ? {} : { name: parsed.data.name }),
+      opacity: parsed.data.opacity ?? 100,
+      ...(parsed.data.parameters === undefined ? {} : { parameters: parsed.data.parameters }),
+      type: parsed.data.type,
+      visible: parsed.data.visible ?? true,
+    },
+  ];
 }
 
 function materializeSubMasksFromIds(

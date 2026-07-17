@@ -9,7 +9,13 @@ import {
 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { Mask, type SubMask } from '../../components/panel/right/layers/Masks';
 import { AiProviderId, normalizeAiProviderId } from '../../schemas/ai/aiProviderSchemas';
-import { type AiPeopleMaskPart, parseAiPatchDataJson } from '../../schemas/masks/aiMaskingSchemas';
+import {
+  type AiPeopleMaskPart,
+  aiPeopleMaskAnalysisSchema,
+  aiPeopleMaskPartSchema,
+  aiPeopleMaskTargetSchema,
+  parseAiPatchDataJson,
+} from '../../schemas/masks/aiMaskingSchemas';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { Invokes } from '../../tauri/commands';
@@ -24,10 +30,15 @@ import {
   selectEditDocumentSourceArtifacts,
 } from '../../utils/editDocumentSelectors';
 import { formatUnknownError } from '../../utils/errorFormatting';
-import { mergeMaskParameters } from '../../utils/mask/maskParameterAccess';
+import { mergeMaskParameters, toMaskParameterRecord } from '../../utils/mask/maskParameterAccess';
 import { useEditorActions } from '../editor/useEditorActions';
 
 type SubMaskParameters = Record<string, unknown>;
+
+export const parseAiPeopleMaskAnalysis = (value: unknown) => aiPeopleMaskAnalysisSchema.safeParse(value);
+
+export const parseAiPeopleMaskPart = (value: string): AiPeopleMaskPart =>
+  aiPeopleMaskPartSchema.catch('full_person').parse(value);
 
 const aiMaskBoxAsyncOperationsModule = import('../../utils/ai/aiMaskBoxAsyncOperations.js');
 
@@ -43,6 +54,51 @@ const getTransformAdjustments = (document: EditDocumentV2) => ({
   ...selectEditDocumentGeometry(document),
   ...selectEditDocumentNode(document, 'lens_correction').params,
 });
+
+interface AiMaskGenerationContext {
+  adjustmentRevision: number;
+  geometryIdentity: string;
+  imageSessionId: string;
+  sourceIdentity: string;
+}
+
+const captureAiMaskGenerationContext = (state: {
+  adjustmentRevision: number;
+  editDocumentV2: EditDocumentV2;
+  imageSession: { id: string } | null;
+  imageSessionId: number;
+  selectedImage: { path: string } | null;
+}): AiMaskGenerationContext => ({
+  adjustmentRevision: state.adjustmentRevision,
+  geometryIdentity: JSON.stringify(selectEditDocumentGeometry(state.editDocumentV2)),
+  imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+  sourceIdentity: state.selectedImage?.path ?? '',
+});
+
+const isAiMaskGenerationCurrent = (
+  state: {
+    adjustmentRevision: number;
+    editDocumentV2: EditDocumentV2;
+    imageSession: { id: string } | null;
+    imageSessionId: number;
+    selectedImage: { path: string } | null;
+  },
+  context: AiMaskGenerationContext,
+): boolean => {
+  const imageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+  return (
+    state.adjustmentRevision === context.adjustmentRevision &&
+    imageSessionId === context.imageSessionId &&
+    state.selectedImage?.path === context.sourceIdentity &&
+    JSON.stringify(selectEditDocumentGeometry(state.editDocumentV2)) === context.geometryIdentity
+  );
+};
+
+const findAiSubMask = (document: EditDocumentV2, subMaskId: string): SubMask | undefined =>
+  [
+    ...selectEditDocumentMasks(document).flatMap((container) => container.subMasks),
+    ...selectEditDocumentSourceArtifacts(document).aiPatches.flatMap((patch) => patch.subMasks),
+  ].find((subMask) => subMask.id === subMaskId);
 
 export function useAiMasking() {
   const { commitEditNodeOperations } = useEditorActions();
@@ -270,8 +326,10 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiWholePersonMask = async (subMaskId: string) => {
-    const { selectedImage, editDocumentV2: adjustments, patchResidency } = useEditorStore.getState();
+    const initialState = useEditorStore.getState();
+    const { selectedImage, editDocumentV2: adjustments, patchResidency } = initialState;
     if (!selectedImage?.path) return;
+    const generationContext = captureAiMaskGenerationContext(initialState);
     setEditor({ isGeneratingAiMask: true });
 
     try {
@@ -284,12 +342,12 @@ export function useAiMasking() {
         rotation: selectEditDocumentGeometry(adjustments).rotation,
       });
 
-      const subMask = selectEditDocumentSourceArtifacts(adjustments)
-        .aiPatches.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
+      const currentState = useEditorStore.getState();
+      if (!isAiMaskGenerationCurrent(currentState, generationContext)) return;
+      const subMask = findAiSubMask(currentState.editDocumentV2, subMaskId);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, {
         ...newParameters,
-        providerTier: 'macos_vision',
+        providerTier: getAiPeopleMaskPartCapability('full_person').providerTier,
         target: { part: 'full_person', personId: null },
       });
       patchResidency.remove(subMaskId);
@@ -302,7 +360,8 @@ export function useAiMasking() {
   };
 
   const handleGenerateAiPersonPartMask = async (subMaskId: string, part: AiPeopleMaskPart) => {
-    const { selectedImage, editDocumentV2: adjustments, patchResidency } = useEditorStore.getState();
+    const initialState = useEditorStore.getState();
+    const { selectedImage, editDocumentV2: adjustments, patchResidency } = initialState;
     if (!selectedImage?.path) return;
 
     const capability = getAiPeopleMaskPartCapability(part);
@@ -313,6 +372,7 @@ export function useAiMasking() {
     }
 
     setEditor({ isGeneratingAiMask: true });
+    const generationContext = captureAiMaskGenerationContext(initialState);
 
     try {
       const transformAdjustments = getTransformAdjustments(adjustments);
@@ -325,14 +385,14 @@ export function useAiMasking() {
         rotation: selectEditDocumentGeometry(adjustments).rotation,
       });
 
-      const subMask = selectEditDocumentSourceArtifacts(adjustments)
-        .aiPatches.flatMap((p: AiPatch) => p.subMasks)
-        .find((sm: SubMask) => sm.id === subMaskId);
+      const currentState = useEditorStore.getState();
+      if (!isAiMaskGenerationCurrent(currentState, generationContext)) return;
+      const subMask = findAiSubMask(currentState.editDocumentV2, subMaskId);
+      const target = aiPeopleMaskTargetSchema.safeParse(toMaskParameterRecord(subMask?.parameters)['target']);
       const mergedParameters = mergeMaskParameters(subMask?.parameters, {
         ...newParameters,
-        providerTier:
-          part === 'face' ? 'macos_face' : part === 'clothing' || part === 'hair' ? 'person_parser' : 'macos_vision',
-        target: { part, personId: null },
+        providerTier: capability.providerTier,
+        target: { part, personId: target.success ? target.data.personId : null },
       });
       patchResidency.remove(subMaskId);
       updateSubMask(subMaskId, { parameters: mergedParameters });

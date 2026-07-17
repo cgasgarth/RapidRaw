@@ -87,6 +87,12 @@ export interface ObjectMaskProposalCommandInput {
 }
 
 export interface ObjectPromptImageDimensions {
+  crop?: {
+    height: number;
+    width: number;
+    x: number;
+    y: number;
+  } | null;
   height: number;
   orientationSteps: number;
   width: number;
@@ -180,13 +186,34 @@ export function buildObjectMaskProposalCommandInput(
   const orientedHeight = dimensions.orientationSteps % 2 === 1 ? dimensions.width : dimensions.height;
   if (orientedWidth <= 0 || orientedHeight <= 0) return null;
 
+  // Canvas prompts are normalized to the visible crop, while SAM receives
+  // pixels in the full oriented image returned by the warp cache. Keep the
+  // crop origin/size in this contract so a cropped image cannot silently send
+  // coordinates for a different image region.
+  const crop = dimensions.crop ?? { height: 1, width: 1, x: 0, y: 0 };
+  if (
+    !Number.isFinite(crop.x) ||
+    !Number.isFinite(crop.y) ||
+    !Number.isFinite(crop.width) ||
+    !Number.isFinite(crop.height) ||
+    crop.x < 0 ||
+    crop.y < 0 ||
+    crop.width <= 0 ||
+    crop.height <= 0 ||
+    crop.x + crop.width > 1 ||
+    crop.y + crop.height > 1
+  ) {
+    return null;
+  }
+
+  const toOrientedImagePoint = (x: number, y: number): [number, number] =>
+    toPixelPoint(crop.x + x * crop.width, crop.y + y * crop.height, orientedWidth, orientedHeight);
+
   if (state.boxPrompt !== null) {
-    const start = toPixelPoint(state.boxPrompt.x, state.boxPrompt.y, orientedWidth, orientedHeight);
-    const end = toPixelPoint(
+    const start = toOrientedImagePoint(state.boxPrompt.x, state.boxPrompt.y);
+    const end = toOrientedImagePoint(
       state.boxPrompt.x + state.boxPrompt.width,
       state.boxPrompt.y + state.boxPrompt.height,
-      orientedWidth,
-      orientedHeight,
     );
     return { endPoint: end, promptKind: 'box', startPoint: start };
   }
@@ -195,7 +222,7 @@ export function buildObjectMaskProposalCommandInput(
     state.pointPrompts.find((prompt) => prompt.label === 'foreground') ??
     state.pointPrompts.find((prompt) => prompt.label !== 'background');
   if (foregroundPoint === undefined) return null;
-  const point = toPixelPoint(foregroundPoint.x, foregroundPoint.y, orientedWidth, orientedHeight);
+  const point = toOrientedImagePoint(foregroundPoint.x, foregroundPoint.y);
   return { endPoint: point, promptKind: 'point', startPoint: point };
 }
 

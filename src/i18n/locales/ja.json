@@ -1455,10 +1455,14 @@
       },
       "addNewMask": "新しいマスクを追加",
       "aiPeopleParts": {
+        "candidate": "",
         "classes": "",
         "description": "Runtime-backed person parts are enabled; planned targets stay disabled until provider proof lands.",
+        "empty": "",
+        "error": "",
         "model": "",
         "notAvailable": "",
+        "pending": "",
         "provenanceTitle": "",
         "provider": "",
         "target": "",
@@ -1503,16 +1507,26 @@
       "maskingTitle": "マスク処理",
       "masksTitle": "マスク一覧",
       "objectPrompt": {
+        "apply": "",
         "background": "Background",
         "box": "Box",
         "boxReady": "1 box",
+        "cancel": "",
         "clear": "Clear",
         "foreground": "Foreground",
         "generate": "Generate SAM proposal",
         "points": "{{count}} points",
         "points_one": "{{count}} point",
         "points_other": "{{count}} points",
-        "receipt": "Replay receipt: {{provider}}, {{promptKind}}, {{latency}} ms"
+        "receipt": "Replay receipt: {{provider}}, {{promptKind}}, {{latency}} ms",
+        "status": {
+          "accepted": "",
+          "cancelled": "",
+          "empty": "",
+          "error": "",
+          "pending": "",
+          "review": ""
+        }
       },
       "overlay": {
         "edgeThreshold": "",

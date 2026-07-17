@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { editDocumentLayersV2Schema } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
 import { INITIAL_MASK_CONTAINER } from '../../../src/utils/adjustments';
 import {
   createLightroomAiSceneMaskAuthority,
@@ -59,6 +60,47 @@ describe('image-open current-document hydration', () => {
     expect(reopened.layers.masks).toHaveLength(1);
     expect(reopened.layers.masks[0]?.id).toBe(layer.id);
     expect(reopened.nodes['layers']).toMatchObject({ params: { masks: [{ id: layer.id }] } });
+  });
+
+  test('migrates a valid quarantined local SAM mask into typed layer authority', () => {
+    const imagePath = '/fixtures/quarantined-local-sam.raw';
+    const layer = {
+      ...structuredClone(INITIAL_MASK_CONTAINER),
+      id: 'local-sam-layer',
+      name: 'Object mask',
+      subMasks: [
+        {
+          id: 'local-sam-sub-mask',
+          invert: false,
+          mode: SubMaskMode.Additive,
+          name: 'Object',
+          opacity: 100,
+          parameters: {
+            maskDataBase64: 'data:image/png;base64,AA==',
+            providerStatus: 'local_sam_proposal_v1',
+          },
+          type: Mask.AiObject,
+          visible: true,
+        },
+      ],
+    };
+    const document = {
+      ...patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'layers', { masks: [] }),
+      extensions: {
+        quarantinedNodes: {
+          layerMasks: [{ ...layer, layerGroupId: null, layerGroupName: null }],
+        },
+      },
+    };
+
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: document }, imagePath);
+    expect(reopened.layers.masks).toHaveLength(1);
+    expect(reopened.layers.masks[0]?.subMasks[0]).toMatchObject({
+      id: 'local-sam-sub-mask',
+      type: Mask.AiObject,
+      parameters: { providerStatus: 'local_sam_proposal_v1' },
+    });
+    expect(reopened.extensions['quarantinedNodes']).toBeUndefined();
   });
 
   test('rehydrates an incomplete layer artifact without dropping typed scene masks', () => {

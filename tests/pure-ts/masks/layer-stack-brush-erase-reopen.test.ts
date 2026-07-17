@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
   brushMaskV1Schema,
+  editDocumentLayersV2Schema,
   layerStackSidecarPersistenceEnvelopeV1Schema,
 } from '../../../packages/rawengine-schema/src';
 import { Mask, SubMaskMode } from '../../../src/components/panel/right/layers/Masks';
@@ -12,6 +13,8 @@ import {
 } from '../../../src/utils/adjustments';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import { buildEditorPersistenceRequest } from '../../../src/utils/editorPersistenceEffectRunner';
+import { hydrateImageOpenEditDocumentV2 } from '../../../src/utils/imageOpenAdjustmentHydration';
+import { buildLayerEditTransactionRequest } from '../../../src/utils/layers/layerEditTransaction';
 import { buildLayerStackSidecarFromMasks } from '../../../src/utils/layers/layerStackCommandBridge';
 import {
   hydrateLayerStackMasksFromMetadata,
@@ -107,6 +110,79 @@ describe('typed brush sidecar reopen', () => {
     const reopenedLines = reopenedBrush.parameters?.['lines'];
     if (!Array.isArray(reopenedLines)) throw new Error('Expected reopened brush lines.');
     expect(reopenedLines[0]).toMatchObject({ density: 42, tool: 'eraser' });
+  });
+
+  test('round-trips a local SAM proposal mask through first save and reopen', () => {
+    const imagePath = '/fixtures/local-sam-proposal.raw';
+    const layer: MaskContainer = {
+      adjustments: structuredClone(INITIAL_MASK_ADJUSTMENTS),
+      editNodes: createDefaultMaskEditNodes(),
+      editNodeSchemaVersion: 1,
+      id: 'layer:local-sam-proposal',
+      invert: false,
+      name: 'Object mask',
+      opacity: 100,
+      subMasks: [
+        {
+          id: 'mask:local-sam-proposal',
+          invert: false,
+          mode: SubMaskMode.Additive,
+          name: 'Object',
+          opacity: 100,
+          parameters: {
+            maskDataBase64: 'data:image/png;base64,AA==',
+            pointPrompts: [{ label: 'foreground', x: 0.5, y: 0.4 }],
+            proposal: {
+              clickToMaskLatencyMs: 42,
+              decoderLatencyMs: 20,
+              imageHeight: 100,
+              imageWidth: 100,
+              maskDataBase64: 'data:image/png;base64,AA==',
+              modelId: 'sam-vit-h',
+              promptCount: 1,
+              promptKind: 'point',
+              providerId: 'local-sam',
+            },
+            providerStatus: 'local_sam_proposal_v1',
+          },
+          type: Mask.AiObject,
+          visible: true,
+        },
+      ],
+      visible: true,
+    };
+    const document = createDefaultEditDocumentV2();
+    const sidecar = buildLayerStackSidecarFromMasks([layer], {
+      graphRevision: 'graph:local-sam-proposal',
+      imagePath,
+      operationId: 'local-sam-proposal',
+      sessionId: 'test-session',
+    });
+    const persisted = persistLayerStackSidecarInEditDocumentCandidate(document, [layer], sidecar);
+    const transaction = buildLayerEditTransactionRequest(
+      {
+        adjustmentRevision: 0,
+        editDocumentV2: document,
+        imageSessionId: 1,
+        imageSession: { id: 'test-session' },
+      },
+      persisted,
+      'local-sam-proposal',
+    );
+    expect(transaction.operations).toEqual(
+      expect.arrayContaining([{ rawEngineArtifacts: expect.anything(), type: 'set-layer-stack-artifacts' }]),
+    );
+
+    const withMask = patchEditDocumentV2Node(document, 'layers', editDocumentLayersV2Schema.parse({ masks: [layer] }));
+    withMask.extensions['rawEngineArtifacts'] = persisted.rawEngineArtifacts;
+    const saved = buildEditorPersistenceRequest({ editDocumentV2: withMask, path: imagePath });
+    const reopened = hydrateImageOpenEditDocumentV2({ editDocumentV2: saved.editDocumentV2 }, imagePath);
+    expect(reopened.layers.masks).toHaveLength(1);
+    expect(reopened.layers.masks[0]?.subMasks[0]).toMatchObject({
+      id: 'mask:local-sam-proposal',
+      type: Mask.AiObject,
+      parameters: { providerStatus: 'local_sam_proposal_v1' },
+    });
   });
 });
 

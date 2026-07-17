@@ -1546,10 +1546,14 @@
       },
       "addNewMask": "Добавить новую маску",
       "aiPeopleParts": {
+        "candidate": "",
         "classes": "",
         "description": "Runtime-backed person parts are enabled; planned targets stay disabled until provider proof lands.",
+        "empty": "",
+        "error": "",
         "model": "",
         "notAvailable": "",
+        "pending": "",
         "provenanceTitle": "",
         "provider": "",
         "target": "",
@@ -1594,9 +1598,11 @@
       "maskingTitle": "Маскирование",
       "masksTitle": "Маски",
       "objectPrompt": {
+        "apply": "",
         "background": "Background",
         "box": "Box",
         "boxReady": "1 box",
+        "cancel": "",
         "clear": "Clear",
         "foreground": "Foreground",
         "generate": "Generate SAM proposal",
@@ -1605,7 +1611,15 @@
         "points_few": "",
         "points_many": "",
         "points_other": "{{count}} points",
-        "receipt": "Replay receipt: {{provider}}, {{promptKind}}, {{latency}} ms"
+        "receipt": "Replay receipt: {{provider}}, {{promptKind}}, {{latency}} ms",
+        "status": {
+          "accepted": "",
+          "cancelled": "",
+          "empty": "",
+          "error": "",
+          "pending": "",
+          "review": ""
+        }
       },
       "overlay": {
         "edgeThreshold": "",

@@ -1606,10 +1606,14 @@
       },
       "addNewMask": "Dodaj nową maskę",
       "aiPeopleParts": {
+        "candidate": "",
         "classes": "",
         "description": "Czesci z runtime sa wlaczone; planowane cele pozostaja wylaczone do czasu dowodu provider.",
+        "empty": "",
+        "error": "",
         "model": "",
         "notAvailable": "",
+        "pending": "",
         "provenanceTitle": "",
         "provider": "",
         "target": "",
@@ -1654,9 +1658,11 @@
       "maskingTitle": "Maskowanie",
       "masksTitle": "Maski",
       "objectPrompt": {
+        "apply": "",
         "background": "Background",
         "box": "Box",
         "boxReady": "1 box",
+        "cancel": "",
         "clear": "Clear",
         "foreground": "Foreground",
         "generate": "Generate SAM proposal",
@@ -1665,7 +1671,15 @@
         "points_few": "{{count}} points",
         "points_many": "{{count}} points",
         "points_other": "{{count}} points",
-        "receipt": "Potwierdzenie replay: {{provider}}, {{promptKind}}, {{latency}} ms"
+        "receipt": "Potwierdzenie replay: {{provider}}, {{promptKind}}, {{latency}} ms",
+        "status": {
+          "accepted": "",
+          "cancelled": "",
+          "empty": "",
+          "error": "",
+          "pending": "",
+          "review": ""
+        }
       },
       "overlay": {
         "edgeThreshold": "Próg krawędzi",
