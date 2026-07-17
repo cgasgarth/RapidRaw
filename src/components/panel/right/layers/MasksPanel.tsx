@@ -47,7 +47,10 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { editDocumentLayersV2Schema } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
+import {
+  editDocumentLayersV2Schema,
+  readLayerStackSidecarsFromSidecar,
+} from '../../../../../packages/rawengine-schema/src';
 import { useContextMenu } from '../../../../context/ContextMenuContext';
 import { useAiMasking } from '../../../../hooks/ai/useAiMasking';
 import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
@@ -85,11 +88,14 @@ import { createDefaultEditDocumentV2 } from '../../../../utils/editDocumentV2';
 import { createEditorSubMaskFallback, createEditorSubMaskForImage } from '../../../../utils/editorSubMaskFactory';
 import { readBrushLocalAdjustmentReceipt } from '../../../../utils/layers/brushLocalAdjustmentCommandFlow';
 import { readColorRangeLocalAdjustmentReceipt } from '../../../../utils/layers/colorRangeLocalAdjustmentCommandFlow';
+import { buildLayerEditTransactionRequest } from '../../../../utils/layers/layerEditTransaction';
 import {
   deriveLayerMaskProvenanceView,
   type LayerMaskProvenanceInvalidationReason,
   type LayerMaskProvenanceView,
 } from '../../../../utils/layers/layerMaskProvenance';
+import { updateLayerStackSidecarToneColorFromMasks } from '../../../../utils/layers/layerStackCommandBridge';
+import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../../utils/layers/layerStackSidecarAdjustments';
 import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
@@ -161,6 +167,7 @@ import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
 import { BrushMaskControls, type BrushSettingsUpdater } from '../../editor/BrushMaskControls';
 import Waveform from '../../editor/Waveform';
+import { type MaskLocalAdjustmentSection, MaskLocalAdjustmentStack } from './MaskLocalAdjustmentStack';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
 import {
   formatMaskTypeName,
@@ -1521,7 +1528,10 @@ export function MasksPanel() {
   const collapsibleState = useMemo<CollapsibleState>(
     () =>
       Object.fromEntries(
-        Object.keys(ADJUSTMENT_SECTIONS).map((section) => [section, maskExpandedSections.includes(section)]),
+        [...Object.keys(ADJUSTMENT_SECTIONS), 'advanced'].map((section) => [
+          section,
+          maskExpandedSections.includes(section),
+        ]),
       ),
     [maskExpandedSections],
   );
@@ -1545,21 +1555,40 @@ export function MasksPanel() {
       const result = command([...selectEditDocumentMasks(state.editDocumentV2)]);
       if (result === null) return null;
       const committed = validateMaskGraphCommand(result);
-      applyEditTransaction({
-        transactionId: crypto.randomUUID(),
-        imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
-        baseAdjustmentRevision: state.adjustmentRevision,
-        source: 'layer-command',
-        operations: [
-          {
-            type: 'patch-edit-document-node',
-            nodeType: 'layers',
-            patch: editDocumentLayersV2Schema.parse({ masks: committed.masks }),
-          },
-        ],
-        history: 'single-entry',
-        persistence: 'commit',
-      });
+      const transactionId = crypto.randomUUID();
+      const persistedSidecar =
+        state.selectedImage === null
+          ? undefined
+          : readLayerStackSidecarsFromSidecar(state.editDocumentV2.extensions).find(
+              (sidecar) => sidecar.sourceImagePath === state.selectedImage?.path,
+            );
+      const transaction =
+        persistedSidecar === undefined
+          ? {
+              transactionId,
+              imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+              baseAdjustmentRevision: state.adjustmentRevision,
+              source: 'layer-command' as const,
+              operations: [
+                {
+                  type: 'patch-edit-document-node' as const,
+                  nodeType: 'layers' as const,
+                  patch: editDocumentLayersV2Schema.parse({ masks: committed.masks }),
+                },
+              ],
+              history: 'single-entry' as const,
+              persistence: 'commit' as const,
+            }
+          : buildLayerEditTransactionRequest(
+              state,
+              persistLayerStackSidecarInEditDocumentCandidate(
+                state.editDocumentV2,
+                committed.masks,
+                updateLayerStackSidecarToneColorFromMasks(persistedSidecar, committed.masks),
+              ),
+              transactionId,
+            );
+      applyEditTransaction(transaction);
       setEditor({
         activeMaskContainerId: committed.selection.containerId,
         activeMaskId: committed.selection.subMaskId,
@@ -3800,7 +3829,8 @@ function SettingsPanel({
   const isComponentMode = !!activeSubMask;
 
   const setMaskContainerAdjustments = (updater: MaskAdjustmentUpdater) => {
-    if (!isActive) return;
+    if (!isActive || container === undefined || useEditorStore.getState().activeMaskContainerId !== container.id)
+      return;
     const currentAdjustments: Adjustments = { ...INITIAL_ADJUSTMENTS, ...container.adjustments };
     const newAdjustments =
       typeof updater === 'function' ? updater(currentAdjustments) : { ...currentAdjustments, ...updater };
@@ -3833,7 +3863,8 @@ function SettingsPanel({
   };
 
   const handleToggleVisibility = (sectionName: string) => {
-    if (!isActive) return;
+    if (!isActive || container === undefined || useEditorStore.getState().activeMaskContainerId !== container.id)
+      return;
     const cur = container.adjustments;
     if (sectionName === 'effects') {
       updateContainer(container.id, { adjustments: { ...cur, effectsEnabled: !cur.effectsEnabled } });
@@ -3851,7 +3882,8 @@ function SettingsPanel({
   };
 
   const handleSectionContextMenu = (event: ReactMouseEvent, sectionName: string) => {
-    if (!isActive) return;
+    if (!isActive || container === undefined || useEditorStore.getState().activeMaskContainerId !== container.id)
+      return;
     event.preventDefault();
     event.stopPropagation();
 
@@ -3915,7 +3947,7 @@ function SettingsPanel({
     ]);
   };
 
-  const renderAdjustmentSection = (sectionName: string) => {
+  const renderAdjustmentSection = (sectionName: MaskLocalAdjustmentSection) => {
     const defaults = createDefaultEditDocumentV2();
     const basicDefaults: BasicAdjustmentView = {
       ...selectEditDocumentNode(defaults, 'scene_global_color_tone').params,
@@ -4375,41 +4407,35 @@ function SettingsPanel({
         onMouseLeave={() => {
           setIsMaskControlHovered(false);
         }}
-        className="flex flex-col gap-1.5"
       >
-        {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName) => {
-          const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
-          return (
-            <CollapsibleSection
-              canToggleVisibility
-              key={sectionName}
-              title={title}
-              isOpen={collapsibleState[sectionName] ?? false}
-              isContentVisible={
-                sectionName === 'effects'
-                  ? displayContainer.adjustments.effectsEnabled
-                  : (displayEditNodes[sectionName as 'basic' | 'color' | 'curves' | 'details']?.enabled ?? true)
-              }
-              isDirty={hasAdjustmentValueChanges(
-                ADJUSTMENT_SECTIONS[sectionName] ?? [],
-                displayAdjustments,
-                INITIAL_MASK_ADJUSTMENTS,
-              )}
-              onToggle={() => {
-                handleToggleSection(sectionName);
-              }}
-              onToggleVisibility={() => {
-                handleToggleVisibility(sectionName);
-              }}
-              onContextMenu={(e: ReactMouseEvent) => {
-                handleSectionContextMenu(e, sectionName);
-              }}
-              testId={`mask-adjustments-section-${sectionName}`}
-            >
-              {renderAdjustmentSection(sectionName)}
-            </CollapsibleSection>
-          );
-        })}
+        <MaskLocalAdjustmentStack
+          collapsibleState={collapsibleState}
+          displayEditNodes={displayEditNodes}
+          isAdvancedOpen={collapsibleState['advanced'] ?? false}
+          isContentVisible={(section) =>
+            section === 'effects'
+              ? displayContainer.adjustments.effectsEnabled
+              : section === 'curves'
+                ? (displayEditNodes.curves?.enabled ?? true)
+                : (displayEditNodes[section]?.enabled ?? true)
+          }
+          isDirty={(section) =>
+            hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[section] ?? [], displayAdjustments, INITIAL_MASK_ADJUSTMENTS)
+          }
+          onContextMenu={(event, section) => {
+            handleSectionContextMenu(event, section);
+          }}
+          onToggleAdvanced={() => {
+            handleToggleSection('advanced');
+          }}
+          onToggleSection={(section) => {
+            handleToggleSection(section);
+          }}
+          onToggleVisibility={(section) => {
+            handleToggleVisibility(section);
+          }}
+          renderSection={renderAdjustmentSection}
+        />
       </div>
     </div>
   );

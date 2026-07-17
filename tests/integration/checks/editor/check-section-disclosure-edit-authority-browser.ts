@@ -296,6 +296,8 @@ try {
   await page.getByRole('heading', { name: 'Mask Adjustments' }).waitFor({ timeout: 10_000 });
   await page.getByTestId('mask-adjustments-section-basic-toggle').waitFor({ state: 'attached', timeout: 10_000 });
   await waitForEditIdle(page, 12);
+  await assertDisclosureOnly(page, 'mask-adjustments-advanced-toggle');
+  await page.getByTestId('mask-adjustments-advanced-toggle').click();
   for (const section of ['basic', 'color', 'curves', 'details'] as const) {
     await assertDisclosureOnly(page, `mask-adjustments-section-${section}-toggle`);
   }

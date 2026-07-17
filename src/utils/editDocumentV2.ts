@@ -36,6 +36,57 @@ const currentRetouchRemoveSourceV2Schema = z
 
 const retouchRemovePointProjectionSchema = z.object({ x: z.number(), y: z.number() }).passthrough();
 
+/**
+ * Layer adjustments are authored from the broader editor adjustment shape, but
+ * native EditDocumentV2 accepts only the current layer render projection.
+ * Keep this allowlist at the persistence boundary so source artifacts such as
+ * aiPatches never leak into the strict Rust LayerAdjustmentsV2 payload.
+ */
+const CURRENT_LAYER_ADJUSTMENT_KEYS = [
+  'blacks',
+  'brightness',
+  'clarity',
+  'colorGrading',
+  'perceptualGradingV1',
+  'colorNoiseReduction',
+  'contrast',
+  'curves',
+  'pointCurves',
+  'parametricCurve',
+  'curveMode',
+  'dehaze',
+  'effectsEnabled',
+  'exposure',
+  'flareAmount',
+  'glowAmount',
+  'halationAmount',
+  'highlights',
+  'hue',
+  'hsl',
+  'selectiveColorRangeControls',
+  'lumaNoiseReduction',
+  'saturation',
+  'shadows',
+  'sharpness',
+  'sharpnessThreshold',
+  'structure',
+  'temperature',
+  'tint',
+  'toneEqualizer',
+  'vibrance',
+  'whites',
+] as const;
+
+const projectLayerAdjustmentsForPersistence = (
+  adjustments: Record<string, EditDocumentJsonValue>,
+): Record<string, EditDocumentJsonValue> =>
+  Object.fromEntries(
+    CURRENT_LAYER_ADJUSTMENT_KEYS.flatMap((key) => {
+      const value = adjustments[key];
+      return value === undefined ? [] : [[key, structuredClone(value)]];
+    }),
+  );
+
 const projectRetouchRemoveSourceForPersistence = (
   source: EditDocumentV2['layers']['masks'][number]['retouchRemoveSource'],
 ): NonNullable<EditDocumentV2['layers']['masks'][number]['retouchRemoveSource']> => {
@@ -64,14 +115,13 @@ const projectRetouchRemoveSourceForPersistence = (
 
 const projectLayersForPersistence = (layers: EditDocumentV2['layers']): EditDocumentV2['layers'] =>
   editDocumentLayersV2Schema.parse({
-    masks: layers.masks.map((layer) =>
-      layer.retouchRemoveSource === undefined
-        ? layer
-        : {
-            ...layer,
-            retouchRemoveSource: projectRetouchRemoveSourceForPersistence(layer.retouchRemoveSource),
-          },
-    ),
+    masks: layers.masks.map((layer) => ({
+      ...layer,
+      adjustments: projectLayerAdjustmentsForPersistence(layer.adjustments),
+      ...(layer.retouchRemoveSource === undefined
+        ? {}
+        : { retouchRemoveSource: projectRetouchRemoveSourceForPersistence(layer.retouchRemoveSource) }),
+    })),
   });
 
 /** Build the editor's current document authority directly from node descriptors. */
