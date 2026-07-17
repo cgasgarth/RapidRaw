@@ -3633,6 +3633,9 @@ function SettingsPanel({
   const isActive = !!container;
   const presetButtonRef = useRef<HTMLButtonElement>(null);
   const selectedImage = useEditorStore((state) => state.selectedImage);
+  const editorDocument = useEditorStore((state) => state.editDocumentV2);
+  const editorGeometry = selectEditDocumentGeometry(editorDocument);
+  const editorLensCorrection = selectEditDocumentNode(editorDocument, 'lens_correction').params;
   const [isGeneratingObjectProposal, setIsGeneratingObjectProposal] = useState(false);
   const [pendingObjectProposal, setPendingObjectProposal] = useState<{
     maskId: string;
@@ -3773,11 +3776,17 @@ function SettingsPanel({
   const objectPromptCommandInput =
     objectPromptState !== null && selectedImage !== null
       ? buildObjectMaskProposalCommandInput(objectPromptState, {
+          crop: editorGeometry.crop,
           height: selectedImage.height,
-          orientationSteps: displayAdjustments.orientationSteps,
+          orientationSteps: editorGeometry.orientationSteps,
           width: selectedImage.width,
         })
       : null;
+  const objectPromptRuntimeAdjustments: Adjustments = {
+    ...displayAdjustments,
+    ...editorGeometry,
+    ...editorLensCorrection,
+  };
   const objectPromptProviderStatus = toMaskParameterRecord(activeSubMask?.parameters)['providerStatus'];
   const objectPromptProviderStatusText =
     typeof objectPromptProviderStatus === 'string' ? objectPromptProviderStatus : 'empty';
@@ -3870,7 +3879,10 @@ function SettingsPanel({
     objectPromptRequestRef.current = requestId;
     const maskId = activeSubMask.id;
     const sourcePath = selectedImage.path;
-    const sourceSessionId = useEditorStore.getState().imageSession?.id ?? null;
+    const sourceState = useEditorStore.getState();
+    const sourceSessionId = sourceState.imageSession?.id ?? null;
+    const sourceAdjustmentRevision = sourceState.adjustmentRevision;
+    const sourceGeometryIdentity = JSON.stringify(selectEditDocumentGeometry(sourceState.editDocumentV2));
     setObjectPromptError(null);
     setPendingObjectProposal(null);
     setObjectPromptCancelled(false);
@@ -3879,12 +3891,12 @@ function SettingsPanel({
     try {
       const proposal = await invoke<AiObjectMaskProposal>(Invokes.GenerateAiObjectMaskProposal, {
         endPoint: objectPromptCommandInput.endPoint,
-        flipHorizontal: displayAdjustments.flipHorizontal,
-        flipVertical: displayAdjustments.flipVertical,
-        jsAdjustments: getObjectMaskTransformAdjustments(displayAdjustments),
-        orientationSteps: displayAdjustments.orientationSteps,
+        flipHorizontal: editorGeometry.flipHorizontal,
+        flipVertical: editorGeometry.flipVertical,
+        jsAdjustments: getObjectMaskTransformAdjustments(objectPromptRuntimeAdjustments),
+        orientationSteps: editorGeometry.orientationSteps,
         path: selectedImage.path,
-        rotation: displayAdjustments.rotation,
+        rotation: editorGeometry.rotation,
         startPoint: objectPromptCommandInput.startPoint,
       });
       if (requestId !== objectPromptRequestRef.current) return;
@@ -3892,7 +3904,9 @@ function SettingsPanel({
       if (
         currentEditor.activeMaskId !== maskId ||
         currentEditor.selectedImage?.path !== sourcePath ||
-        (currentEditor.imageSession?.id ?? null) !== sourceSessionId
+        (currentEditor.imageSession?.id ?? null) !== sourceSessionId ||
+        currentEditor.adjustmentRevision !== sourceAdjustmentRevision ||
+        JSON.stringify(selectEditDocumentGeometry(currentEditor.editDocumentV2)) !== sourceGeometryIdentity
       )
         return;
       setPendingObjectProposal({ maskId, proposal });

@@ -1,3 +1,6 @@
+import { describe, expect, test } from 'bun:test';
+
+import { getAiPeopleMaskPartCapability } from '../../../src/utils/ai/aiPeopleMaskContracts';
 import {
   acceptObjectSelection,
   beginObjectSelection,
@@ -31,6 +34,11 @@ describe('Lightroom AI People/Object selection lifecycle', () => {
     expect(cancelObjectSelection(review).hasProposal).toBe(false);
     expect(failObjectSelection(pending, 'provider offline').status).toBe('error');
   });
-});
 
-import { describe, expect, test } from 'bun:test';
+  test('keeps People runtime provider tiers aligned with the capability contract', () => {
+    expect(getAiPeopleMaskPartCapability('full_person').providerTier).toBe('macos_person');
+    expect(getAiPeopleMaskPartCapability('face').providerTier).toBe('macos_face');
+    expect(getAiPeopleMaskPartCapability('clothing').providerTier).toBe('person_parser');
+    expect(getAiPeopleMaskPartCapability('hair').providerTier).toBe('person_parser');
+  });
+});

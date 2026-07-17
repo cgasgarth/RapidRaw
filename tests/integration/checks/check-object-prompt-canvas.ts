@@ -72,6 +72,31 @@ const boxCommand = buildObjectMaskProposalCommandInput(state, { height: 4000, or
 if (boxCommand?.promptKind !== 'box' || boxCommand.startPoint[0] !== 1500 || boxCommand.endPoint[1] !== 2800) {
   throw new Error('Object prompt canvas did not build the expected box SAM command payload.');
 }
+const croppedBoxCommand = buildObjectMaskProposalCommandInput(state, {
+  crop: { height: 0.5, width: 0.5, x: 0.2, y: 0.1 },
+  height: 4000,
+  orientationSteps: 0,
+  width: 6000,
+});
+if (
+  croppedBoxCommand?.promptKind !== 'box' ||
+  croppedBoxCommand.startPoint[0] !== 1950 ||
+  croppedBoxCommand.startPoint[1] !== 1000 ||
+  croppedBoxCommand.endPoint[0] !== 2850 ||
+  croppedBoxCommand.endPoint[1] !== 1800
+) {
+  throw new Error('Object prompt canvas did not map crop-relative prompts into full-image SAM coordinates.');
+}
+if (
+  buildObjectMaskProposalCommandInput(state, {
+    crop: { height: 0.5, width: 0.5, x: 0.6, y: 0.1 },
+    height: 4000,
+    orientationSteps: 0,
+    width: 6000,
+  }) !== null
+) {
+  throw new Error('Object prompt canvas accepted an invalid crop geometry contract.');
+}
 const rotatedBoxCommand = buildObjectMaskProposalCommandInput(state, {
   height: 4000,
   orientationSteps: 1,
