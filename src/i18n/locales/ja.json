@@ -1385,6 +1385,15 @@
         "summary": "{{generator}} - {{status}}",
         "title": "Remove"
       },
+      "removeWorkflow": {
+        "cancel": "",
+        "canvasReady": "",
+        "complete": "",
+        "hideSpots": "",
+        "inProgress": "",
+        "showSpots": "",
+        "title": ""
+      },
       "retouchSource": {
         "feather": "",
         "modes": {

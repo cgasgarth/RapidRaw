@@ -65,6 +65,11 @@ import {
 } from '../../../../utils/layers/layerStackCommandBridge';
 import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../../utils/layers/layerStackSidecarAdjustments';
 import { reconcileReferenceMatchLayerReceiptsAfterEdit } from '../../../../utils/referenceMatchTransfer';
+import {
+  createRetouchRemoveWorkflowState,
+  type RetouchRemoveTool,
+  reduceRetouchRemoveWorkflow,
+} from '../../../../utils/retouchRemoveWorkflow';
 import { editorChromeStatusChipClassName, editorChromeTokens } from '../../../ui/editorChromeTokens';
 import { professionalInspectorDensityTokens } from '../../../ui/inspectorTokens';
 import Slider, { type SliderChangeEvent } from '../../../ui/primitives/Slider';
@@ -485,6 +490,7 @@ export function LayerStackPanel({
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(() => new Set());
   const rows = useMemo(() => getLayerRows(masks, collapsedGroupIds), [collapsedGroupIds, masks]);
   const [localSelectedLayerId, setLocalSelectedLayerId] = useState<string>(BASE_LAYER_ID);
+  const [retouchRemoveWorkflow, setRetouchRemoveWorkflow] = useState(createRetouchRemoveWorkflowState);
   const [layerGraphRevision, setLayerGraphRevision] = useState('layer_stack_panel_initial');
   const [lastCommandType, setLastCommandType] = useState('none');
   const [lastChangedLayerCount, setLastChangedLayerCount] = useState(0);
@@ -571,6 +577,17 @@ export function LayerStackPanel({
   const selectRow = (row: LayerRowModel) => {
     setLocalSelectedLayerId(row.id);
     onSelectMaskContainer(row.isBase || row.isGroupHeader ? null : row.id);
+    if (row.isBase || row.isGroupHeader) {
+      setRetouchRemoveWorkflow((state) => reduceRetouchRemoveWorkflow(state, { type: 'deactivate' }));
+    } else if (row.retouchRemoveSource !== null) {
+      setRetouchRemoveWorkflow((state) =>
+        reduceRetouchRemoveWorkflow(state, { layerId: row.id, tool: 'remove', type: 'activate' }),
+      );
+    } else if (row.retouchMode !== null) {
+      setRetouchRemoveWorkflow((state) =>
+        reduceRetouchRemoveWorkflow(state, { layerId: row.id, tool: row.retouchMode ?? 'clone', type: 'activate' }),
+      );
+    }
   };
   const toggleGroupCollapsed = (groupId: string) => {
     setCollapsedGroupIds((currentGroupIds) => {
@@ -655,6 +672,18 @@ export function LayerStackPanel({
     onSelectMaskContainer(
       nextSelectedLayerId === BASE_LAYER_ID || nextSelectedLayerId.startsWith('group:') ? null : nextSelectedLayerId,
     );
+    if (operation.type === 'create') {
+      const tool: RetouchRemoveTool | null =
+        operation.layer.retouchRemoveSource !== undefined
+          ? 'remove'
+          : (operation.layer.retouchCloneSource?.retouchMode ??
+            (operation.layer.retouchCloneSource === undefined ? null : 'clone'));
+      if (tool !== null) {
+        setRetouchRemoveWorkflow((state) =>
+          reduceRetouchRemoveWorkflow(state, { layerId: operation.layer.id, tool, type: 'activate' }),
+        );
+      }
+    }
   };
   const updateLayerVisibility = (layerId: string, visible: boolean) => {
     applyLayerStackCommand({ layerId, type: 'setVisibility', visible }, layerId);
@@ -1037,6 +1066,21 @@ export function LayerStackPanel({
     };
     applyLayerStackCommand({ layer, type: 'create' }, layerId);
   };
+  const activateRetouchTool = (tool: RetouchRemoveTool) => {
+    setRetouchRemoveWorkflow((state) =>
+      reduceRetouchRemoveWorkflow(state, {
+        layerId: activeRow && !activeRow.isBase && !activeRow.isGroupHeader ? activeRow.id : '',
+        tool,
+        type: 'activate',
+      }),
+    );
+    if (tool === 'clone') createCloneLayer();
+    if (tool === 'heal') createHealLayer();
+    if (tool === 'remove') createRemoveLayer();
+  };
+  const toggleRetouchSpots = () => {
+    setRetouchRemoveWorkflow((state) => reduceRetouchRemoveWorkflow(state, { type: 'toggle-spots' }));
+  };
   const moveActiveLayer = (direction: 'down' | 'up') => {
     if (!activeRow || activeRow.isBase) return;
     if (activeRow.isGroupHeader && activeRow.groupId) {
@@ -1277,6 +1321,20 @@ export function LayerStackPanel({
           </button>
         </div>
       </details>
+
+      <RetouchWorkflowToolbar
+        activeTool={retouchRemoveWorkflow.activeTool}
+        sessionActive={retouchRemoveWorkflow.sessionActive}
+        spotsVisible={retouchRemoveWorkflow.spotsVisible}
+        onCancel={() => {
+          setRetouchRemoveWorkflow((state) => reduceRetouchRemoveWorkflow(state, { type: 'cancel-session' }));
+        }}
+        onComplete={() => {
+          setRetouchRemoveWorkflow((state) => reduceRetouchRemoveWorkflow(state, { type: 'complete-session' }));
+        }}
+        onSelectTool={activateRetouchTool}
+        onToggleSpots={toggleRetouchSpots}
+      />
 
       <div className="space-y-1 px-2 py-2">
         {rows.map((row) => {
@@ -2156,6 +2214,103 @@ export function LayerStackPanel({
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+interface RetouchWorkflowToolbarProps {
+  readonly activeTool: RetouchRemoveTool | null;
+  readonly sessionActive: boolean;
+  readonly spotsVisible: boolean;
+  readonly onCancel: () => void;
+  readonly onComplete: () => void;
+  readonly onSelectTool: (tool: RetouchRemoveTool) => void;
+  readonly onToggleSpots: () => void;
+}
+
+function RetouchWorkflowToolbar({
+  activeTool,
+  sessionActive,
+  spotsVisible,
+  onCancel,
+  onComplete,
+  onSelectTool,
+  onToggleSpots,
+}: RetouchWorkflowToolbarProps) {
+  const { t } = useTranslation();
+  const tools: readonly { readonly id: RetouchRemoveTool; readonly label: string }[] = [
+    { id: 'remove', label: t('editor.layers.actions.createRemoveLayer') },
+    { id: 'heal', label: t('editor.layers.actions.createHealLayer') },
+    { id: 'clone', label: t('editor.layers.actions.createCloneLayer') },
+  ];
+
+  return (
+    <section
+      className="mx-2 mt-2 rounded-md border border-editor-border bg-editor-panel-well p-2"
+      data-remove-session-active={String(sessionActive)}
+      data-remove-spots-visible={String(spotsVisible)}
+      data-remove-tool={activeTool ?? 'none'}
+      data-testid="remove-workflow-toolbar"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <UiText variant={TextVariants.small} weight={TextWeights.medium} className="text-text-primary">
+          {t('editor.layers.removeWorkflow.title')}
+        </UiText>
+        <span className="text-[10px] uppercase tracking-wide text-text-tertiary">
+          {sessionActive ? t('editor.layers.removeWorkflow.inProgress') : t('editor.layers.removeWorkflow.canvasReady')}
+        </span>
+      </div>
+      <div
+        className="mt-1.5 grid grid-cols-3 gap-1"
+        role="toolbar"
+        aria-label={t('editor.layers.removeWorkflow.title')}
+      >
+        {tools.map((tool) => (
+          <button
+            aria-pressed={activeTool === tool.id}
+            className={cx(
+              'rounded border px-1.5 py-1 text-[10px] transition-colors',
+              activeTool === tool.id
+                ? 'border-editor-primary-active bg-editor-primary-active text-editor-primary-active-text'
+                : 'border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
+            )}
+            data-remove-tool-option={tool.id}
+            data-testid={`remove-workflow-tool-${tool.id}`}
+            key={tool.id}
+            onClick={() => onSelectTool(tool.id)}
+            type="button"
+          >
+            {tool.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1">
+        <button
+          aria-pressed={spotsVisible}
+          className={layerSecondaryActionClassName}
+          data-testid="remove-workflow-toggle-spots"
+          onClick={onToggleSpots}
+          type="button"
+        >
+          {spotsVisible ? t('editor.layers.removeWorkflow.hideSpots') : t('editor.layers.removeWorkflow.showSpots')}
+        </button>
+        <button
+          className={layerSecondaryActionClassName}
+          data-testid="remove-workflow-cancel"
+          onClick={onCancel}
+          type="button"
+        >
+          {t('editor.layers.removeWorkflow.cancel')}
+        </button>
+        <button
+          className={layerSecondaryActionClassName}
+          data-testid="remove-workflow-complete"
+          onClick={onComplete}
+          type="button"
+        >
+          {t('editor.layers.removeWorkflow.complete')}
+        </button>
+      </div>
     </section>
   );
 }
