@@ -161,6 +161,7 @@ import UiText from '../../../ui/primitives/Text';
 import Resizer from '../../../ui/Resizer';
 import { BrushMaskControls, type BrushSettingsUpdater } from '../../editor/BrushMaskControls';
 import Waveform from '../../editor/Waveform';
+import { type MaskLocalAdjustmentSection, MaskLocalAdjustmentStack } from './MaskLocalAdjustmentStack';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
 import {
   formatMaskTypeName,
@@ -1521,7 +1522,10 @@ export function MasksPanel() {
   const collapsibleState = useMemo<CollapsibleState>(
     () =>
       Object.fromEntries(
-        Object.keys(ADJUSTMENT_SECTIONS).map((section) => [section, maskExpandedSections.includes(section)]),
+        [...Object.keys(ADJUSTMENT_SECTIONS), 'advanced'].map((section) => [
+          section,
+          maskExpandedSections.includes(section),
+        ]),
       ),
     [maskExpandedSections],
   );
@@ -3915,7 +3919,7 @@ function SettingsPanel({
     ]);
   };
 
-  const renderAdjustmentSection = (sectionName: string) => {
+  const renderAdjustmentSection = (sectionName: MaskLocalAdjustmentSection) => {
     const defaults = createDefaultEditDocumentV2();
     const basicDefaults: BasicAdjustmentView = {
       ...selectEditDocumentNode(defaults, 'scene_global_color_tone').params,
@@ -4375,41 +4379,35 @@ function SettingsPanel({
         onMouseLeave={() => {
           setIsMaskControlHovered(false);
         }}
-        className="flex flex-col gap-1.5"
       >
-        {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName) => {
-          const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
-          return (
-            <CollapsibleSection
-              canToggleVisibility
-              key={sectionName}
-              title={title}
-              isOpen={collapsibleState[sectionName] ?? false}
-              isContentVisible={
-                sectionName === 'effects'
-                  ? displayContainer.adjustments.effectsEnabled
-                  : (displayEditNodes[sectionName as 'basic' | 'color' | 'curves' | 'details']?.enabled ?? true)
-              }
-              isDirty={hasAdjustmentValueChanges(
-                ADJUSTMENT_SECTIONS[sectionName] ?? [],
-                displayAdjustments,
-                INITIAL_MASK_ADJUSTMENTS,
-              )}
-              onToggle={() => {
-                handleToggleSection(sectionName);
-              }}
-              onToggleVisibility={() => {
-                handleToggleVisibility(sectionName);
-              }}
-              onContextMenu={(e: ReactMouseEvent) => {
-                handleSectionContextMenu(e, sectionName);
-              }}
-              testId={`mask-adjustments-section-${sectionName}`}
-            >
-              {renderAdjustmentSection(sectionName)}
-            </CollapsibleSection>
-          );
-        })}
+        <MaskLocalAdjustmentStack
+          collapsibleState={collapsibleState}
+          displayEditNodes={displayEditNodes}
+          isAdvancedOpen={collapsibleState['advanced'] ?? false}
+          isContentVisible={(section) =>
+            section === 'effects'
+              ? displayContainer.adjustments.effectsEnabled
+              : section === 'curves'
+                ? (displayEditNodes.curves?.enabled ?? true)
+                : (displayEditNodes[section]?.enabled ?? true)
+          }
+          isDirty={(section) =>
+            hasAdjustmentValueChanges(ADJUSTMENT_SECTIONS[section] ?? [], displayAdjustments, INITIAL_MASK_ADJUSTMENTS)
+          }
+          onContextMenu={(event, section) => {
+            handleSectionContextMenu(event, section);
+          }}
+          onToggleAdvanced={() => {
+            handleToggleSection('advanced');
+          }}
+          onToggleSection={(section) => {
+            handleToggleSection(section);
+          }}
+          onToggleVisibility={(section) => {
+            handleToggleVisibility(section);
+          }}
+          renderSection={renderAdjustmentSection}
+        />
       </div>
     </div>
   );
