@@ -15,10 +15,26 @@ test('left-rail preset browser persists bounded favorites and recent usage separ
   writePresetBrowserMemory({ favorites: ['look-a', 'look-a', 'look-b'], recent: { 'look-a': 10, 'look-b': 20 } });
 
   expect(readPresetBrowserMemory()).toEqual({
-    favorites: ['look-a', 'look-a', 'look-b'],
+    favorites: ['look-a', 'look-b'],
     recent: { 'look-a': 10, 'look-b': 20 },
   });
   expect(localStorage.getItem(PRESET_BROWSER_MEMORY_KEY)).toContain('look-a');
+});
+
+test('left-rail browser memory quarantines malformed fields and bounds recent entries', () => {
+  localStorage.setItem(
+    PRESET_BROWSER_MEMORY_KEY,
+    JSON.stringify({
+      favorites: ['first', null, '', 'second'],
+      recent: { first: 1, second: Number.NaN, third: 3 },
+      ignored: true,
+    }),
+  );
+
+  expect(readPresetBrowserMemory()).toEqual({
+    favorites: ['first', 'second'],
+    recent: { first: 1, third: 3 },
+  });
 });
 
 test('left-rail apply lowers only strict current-node preset payloads into one transaction', () => {

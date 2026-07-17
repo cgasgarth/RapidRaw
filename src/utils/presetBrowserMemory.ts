@@ -1,4 +1,13 @@
+import { z } from 'zod';
+
 export const PRESET_BROWSER_MEMORY_KEY = 'rapidraw.editor.presets.browser.v1';
+
+const presetBrowserMemoryEnvelopeSchema = z
+  .object({
+    favorites: z.array(z.unknown()).optional(),
+    recent: z.record(z.string(), z.unknown()).optional(),
+  })
+  .loose();
 
 export interface PresetBrowserMemory {
   favorites: string[];
@@ -8,24 +17,22 @@ export interface PresetBrowserMemory {
 export const readPresetBrowserMemory = (): PresetBrowserMemory => {
   if (typeof localStorage === 'undefined') return { favorites: [], recent: {} };
   try {
-    const value: unknown = JSON.parse(localStorage.getItem(PRESET_BROWSER_MEMORY_KEY) ?? 'null');
-    if (typeof value !== 'object' || value === null) return { favorites: [], recent: {} };
-    const candidate = value as Partial<PresetBrowserMemory>;
+    const parsed = presetBrowserMemoryEnvelopeSchema.safeParse(
+      JSON.parse(localStorage.getItem(PRESET_BROWSER_MEMORY_KEY) ?? 'null'),
+    );
+    if (!parsed.success) return { favorites: [], recent: {} };
+    const favorites = [
+      ...new Set(
+        (parsed.data.favorites ?? []).filter((id): id is string => typeof id === 'string' && id.trim().length > 0),
+      ),
+    ].slice(0, 256);
+    const recent = Object.entries(parsed.data.recent ?? {}).reduce<Record<string, number>>((entries, [id, usedAt]) => {
+      if (id.trim().length > 0 && typeof usedAt === 'number' && Number.isFinite(usedAt)) entries[id] = usedAt;
+      return entries;
+    }, {});
     return {
-      favorites: Array.isArray(candidate.favorites)
-        ? candidate.favorites.filter((id): id is string => typeof id === 'string').slice(0, 256)
-        : [],
-      recent:
-        typeof candidate.recent === 'object' && candidate.recent !== null
-          ? Object.fromEntries(
-              Object.entries(candidate.recent)
-                .filter(
-                  (entry): entry is [string, number] =>
-                    typeof entry[0] === 'string' && typeof entry[1] === 'number' && Number.isFinite(entry[1]),
-                )
-                .slice(0, 256),
-            )
-          : {},
+      favorites,
+      recent: Object.fromEntries(Object.entries(recent).slice(-256)),
     };
   } catch {
     return { favorites: [], recent: {} };
@@ -33,14 +40,23 @@ export const readPresetBrowserMemory = (): PresetBrowserMemory => {
 };
 
 export const writePresetBrowserMemory = (memory: PresetBrowserMemory): void => {
-  if (typeof localStorage !== 'undefined') localStorage.setItem(PRESET_BROWSER_MEMORY_KEY, JSON.stringify(memory));
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(PRESET_BROWSER_MEMORY_KEY, JSON.stringify(memory));
+  } catch {
+    // Browser memory is opportunistic; storage failures must not block edits.
+  }
 };
 
-export const recordPresetUse = (memory: PresetBrowserMemory, id: string, usedAt = Date.now()): PresetBrowserMemory => ({
-  ...memory,
-  recent: Object.fromEntries(
-    [...Object.entries(memory.recent), [id, usedAt] as [string, number]]
-      .sort((first, second) => first[1] - second[1])
-      .slice(-256),
-  ),
-});
+export const recordPresetUse = (memory: PresetBrowserMemory, id: string, usedAt = Date.now()): PresetBrowserMemory => {
+  if (id.trim().length === 0) return memory;
+  const timestamp = Number.isFinite(usedAt) ? usedAt : Date.now();
+  return {
+    ...memory,
+    recent: Object.fromEntries(
+      [...Object.entries(memory.recent), [id, timestamp] as [string, number]]
+        .sort((first, second) => first[1] - second[1])
+        .slice(-256),
+    ),
+  };
+};

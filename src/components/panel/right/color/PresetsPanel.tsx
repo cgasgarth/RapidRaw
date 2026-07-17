@@ -641,9 +641,11 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         const request = buildPresetEditTransaction(state, payload, crypto.randomUUID());
         if (request === null) throw new Error('Preset has no applicable edit nodes.');
         const result = applyEditTransaction(request);
-        const nextMemory = recordPresetUse(browserMemory, preset.id);
-        setBrowserMemory(nextMemory);
-        writePresetBrowserMemory(nextMemory);
+        setBrowserMemory((current) => {
+          const next = recordPresetUse(current, preset.id);
+          writePresetBrowserMemory(next);
+          return next;
+        });
         setActionError(null);
         setSelectedPresetId(preset.id);
         if (result.noOp) return;
@@ -659,7 +661,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         setActionError(t('editor.presets.errors.applyFailed'));
       }
     },
-    [applyEditTransaction, browserMemory, selectedImage?.path, setAppliedPreset, t],
+    [applyEditTransaction, selectedImage?.path, setAppliedPreset, t],
   );
 
   const applyColorStyle = useCallback(
@@ -674,9 +676,11 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         const request = buildPresetEditTransaction(state, payload, crypto.randomUUID());
         if (request === null) throw new Error('Color style has no applicable edit nodes.');
         const result = applyEditTransaction(request);
-        const nextMemory = recordPresetUse(browserMemory, preset.id);
-        setBrowserMemory(nextMemory);
-        writePresetBrowserMemory(nextMemory);
+        setBrowserMemory((current) => {
+          const next = recordPresetUse(current, preset.id);
+          writePresetBrowserMemory(next);
+          return next;
+        });
         setActionError(null);
         if (result.noOp) return;
         setAppliedPreset({
@@ -691,7 +695,7 @@ export function PresetsPanel({ onNavigateToCommunity, placement = 'right-panel' 
         setActionError(t('editor.presets.errors.applyFailed'));
       }
     },
-    [applyEditTransaction, browserMemory, selectedImage?.path, setAppliedPreset, t],
+    [applyEditTransaction, selectedImage?.path, setAppliedPreset, t],
   );
 
   const toggleFavorite = useCallback((id: string) => {
