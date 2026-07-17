@@ -235,11 +235,12 @@ jobs:
           # Reproduce main's generated rust-test cache identity byte-for-byte.
           shared-key: v1-${{ runner.os }}-${{ runner.arch }}-rust-test-main-long-rust-test
           cache-on-failure: false
-      - name: Compile the optimized app validation feature surface
+      - name: Compile the app validation feature surface with the fast profile
         working-directory: src-tauri
         run: >-
           cargo check --quiet --locked --lib
           --no-default-features --features required-ci,validation-harness
+          --profile rapid-dev-fast
 
   fast-workflow:
     name: 'pr fast: workflow contracts'
