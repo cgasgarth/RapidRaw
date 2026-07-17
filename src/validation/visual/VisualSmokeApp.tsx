@@ -2131,6 +2131,18 @@ function ProfessionalEditorShellFixture({ state }: { state: 'collapsed' | 'defau
                   <span>{copy.professionalEditorOneToOne}</span>
                 </div>
               </div>
+              <div
+                className="border-b border-editor-divider px-2 py-1.5"
+                data-testid="professional-editor-collections"
+                data-visual-smoke-section="professional-editor-collections"
+              >
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-text-secondary">
+                  {copy.professionalEditorCollections}
+                </div>
+                <div className="rounded bg-surface px-1.5 py-1 text-[11px]">
+                  {copy.professionalEditorCollectionAlbum}
+                </div>
+              </div>
               {['Presets', 'Snapshots', 'History'].map((label) => (
                 <div className="flex h-7 items-center border-b border-editor-divider px-2 text-[11px]" key={label}>
                   {label}
@@ -4196,6 +4208,8 @@ const copy = {
   professionalEditorShellCollapsed: 'Professional editor shell · collapsed',
   professionalEditorShellFullscreen: 'Professional editor shell · fullscreen',
   professionalEditorDevelop: 'Develop',
+  professionalEditorCollections: 'Collections',
+  professionalEditorCollectionAlbum: 'Alaska · 24 photos',
   professionalEditorFit: 'Fit',
   professionalEditorOneToOne: '1:1',
   professionalEditorSelectionCount: '1 of 12',

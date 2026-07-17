@@ -1374,6 +1374,19 @@ export async function prepareScenario(page, mode) {
     return;
   }
 
+  if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalEditorShell) {
+    const collections = page.getByTestId('professional-editor-collections');
+    await collections.waitFor({ timeout: 10_000 });
+    const bounds = await collections.boundingBox();
+    if (!bounds || bounds.width < 120 || bounds.height < 28) {
+      throw new Error(`Develop Collections smoke surface is not visible: ${JSON.stringify(bounds)}`);
+    }
+    if ((await collections.getByText('Alaska · 24 photos').count()) !== 1) {
+      throw new Error('Develop Collections smoke surface did not expose its album row.');
+    }
+    return;
+  }
+
   if (mode === VISUAL_SMOKE_SCENARIO_IDS.ProfessionalFilmstripContext) {
     await assertProfessionalFilmstripContext(page);
     return;

@@ -42,7 +42,7 @@ export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePrefer
   compact: { drawerState: 'expanded', toolsExpanded: true, toolsHeight: null },
   filmstrip: { height: DEVELOP_SHELL_DEFAULT_FILMSTRIP_HEIGHT, visible: true },
   leftSidebar: {
-    expandedSections: ['navigator', 'presets'],
+    expandedSections: ['collections', 'navigator', 'presets'],
     visible: true,
     width: DEVELOP_SHELL_DEFAULT_LEFT_PANEL_WIDTH,
   },
