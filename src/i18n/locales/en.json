@@ -1896,11 +1896,18 @@
         "rapidRawPreset": "RapidRAW Preset"
       },
       "discovery": {
+        "categories": {
+          "all": "All categories"
+        },
+        "categoryLabel": "Filter preset categories",
         "dismiss": "Dismiss",
         "dismissError": "Dismiss preset error",
+        "favorite": "Favorite {{name}}",
         "filterLabel": "Filter presets",
         "filters": {
           "all": "All looks",
+          "favorites": "Favorites",
+          "recent": "Recently used",
           "styles": "Styles",
           "tools": "Tools"
         },
@@ -1919,7 +1926,8 @@
           "name": "Name"
         },
         "sortLabel": "Sort preset results",
-        "toggleFolder": "Toggle folder {{name}}"
+        "toggleFolder": "Toggle folder {{name}}",
+        "unfavorite": "Remove {{name}} from favorites"
       },
       "errors": {
         "applyFailed": "The preset could not be applied. Your current edits are unchanged.",
