@@ -33,6 +33,17 @@ test('routes every compact zoom mode through the canonical zoom command callback
   expect(commands).toEqual([{ kind: 'fit' }, { kind: 'fill' }, { kind: 'one-to-one' }, { kind: 'two-to-one' }]);
 });
 
+test('routes preset and custom Navigator zoom selections through the canonical zoom command callback', async () => {
+  const commands: EditorZoomCommand[] = [];
+  const { container } = await renderNavigator({ onZoomChange: (command) => commands.push(command) });
+  const select = required<HTMLSelectElement>(container, '[data-testid="editor-navigator-zoom-select"]');
+
+  fireEvent.change(select, { target: { value: 'fill' } });
+  fireEvent.change(select, { target: { value: '0.5' } });
+
+  expect(commands).toEqual([{ kind: 'fill' }, { devicePixelsPerImagePixel: 0.5, kind: 'ratio' }]);
+});
+
 test('keyboard pan updates only the canonical viewer transform', async () => {
   const transforms: number[][] = [];
   const adjustments = useEditorStore.getState().editDocumentV2;

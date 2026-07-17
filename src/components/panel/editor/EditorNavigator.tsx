@@ -381,6 +381,37 @@ function EditorNavigatorSession({ artifact, onZoomChange, transformControllerRef
           </button>
         ))}
       </div>
+      <label className="sr-only" htmlFor="editor-navigator-zoom-select">
+        {t('editor.viewerFooter.zoom.label')}
+      </label>
+      <select
+        aria-label={t('editor.viewerFooter.zoom.label')}
+        className="h-7 w-full rounded border border-editor-border bg-editor-panel-well px-1 text-[10px] text-text-primary"
+        data-testid="editor-navigator-zoom-select"
+        id="editor-navigator-zoom-select"
+        onChange={(event) => {
+          const value = event.currentTarget.value;
+          if (value === 'fit' || value === 'fill' || value === 'one-to-one' || value === 'two-to-one') {
+            onZoomChange({ kind: value });
+          } else {
+            onZoomChange({ devicePixelsPerImagePixel: Number(value), kind: 'ratio' });
+          }
+          event.currentTarget.value = '';
+        }}
+        value=""
+      >
+        <option disabled value="">
+          {zoomLabel}
+        </option>
+        <option value="fit">{t('editor.viewerFooter.zoom.fit')}</option>
+        <option value="fill">{t('editor.viewerFooter.zoom.fill')}</option>
+        <option value="one-to-one">{t('editor.viewerFooter.zoom.oneToOne')}</option>
+        <option value="two-to-one">{t('editor.viewerFooter.zoom.twoToOne')}</option>
+        <option value="0.25">{t('editor.viewerFooter.zoom.percent', { value: 25 })}</option>
+        <option value="0.5">{t('editor.viewerFooter.zoom.percent', { value: 50 })}</option>
+        <option value="1">{t('editor.viewerFooter.zoom.percent', { value: 100 })}</option>
+        <option value="2">{t('editor.viewerFooter.zoom.percent', { value: 200 })}</option>
+      </select>
       <div
         className="text-center text-[10px] tabular-nums text-text-secondary"
         data-testid="editor-navigator-zoom-readout"
