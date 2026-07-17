@@ -76,6 +76,7 @@ export function CropOverlaySurface({
       data-controller-tool={descriptor?.tool}
       data-crop-view-visible={String(isCropViewVisible)}
       data-crop-input-suspended={String(isTemporaryHand)}
+      data-crop-selection-active={String(Boolean(crop && crop.width > 0 && crop.height > 0))}
       data-overlay-geometry-epoch={descriptor?.geometryEpoch}
       data-overlay-geometry-space="oriented-pixels"
       data-testid="crop-overlay-surface"
@@ -116,14 +117,53 @@ export function CropOverlaySurface({
               if (width <= 0 || height <= 0) return null;
               const denseVisible = Boolean(isRotationActive && !isStraightenActive);
               const mode = isRotationActive || isStraightenActive ? 'none' : overlayMode || 'none';
+              const handles = [
+                [0, 0],
+                [0.5, 0],
+                [1, 0],
+                [0, 0.5],
+                [1, 0.5],
+                [0, 1],
+                [0.5, 1],
+                [1, 1],
+              ] as const;
               return (
-                <CompositionOverlays
-                  denseVisible={denseVisible}
-                  height={height}
-                  mode={mode}
-                  rotation={overlayRotation || 0}
-                  width={width}
-                />
+                <>
+                  <CompositionOverlays
+                    denseVisible={denseVisible}
+                    height={height}
+                    mode={mode}
+                    rotation={overlayRotation || 0}
+                    width={width}
+                  />
+                  <svg
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 h-full w-full"
+                    data-testid="crop-canvas-handles"
+                    viewBox={`0 0 ${String(width)} ${String(height)}`}
+                  >
+                    <rect
+                      fill="none"
+                      height={Math.max(0, height - 2)}
+                      stroke="var(--editor-accent)"
+                      strokeWidth="2"
+                      width={Math.max(0, width - 2)}
+                      x="1"
+                      y="1"
+                    />
+                    {handles.map(([x, y]) => (
+                      <circle
+                        cx={width * x}
+                        cy={height * y}
+                        fill="var(--editor-panel)"
+                        key={`${String(x)}-${String(y)}`}
+                        r="4"
+                        stroke="var(--editor-accent)"
+                        strokeWidth="1.5"
+                      />
+                    ))}
+                  </svg>
+                </>
               );
             }}
           >
