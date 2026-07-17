@@ -1631,6 +1631,19 @@
       "quickAddComplete": "Ready",
       "quickAddGradient": "Add gradient",
       "quickAddRange": "Add color range",
+      "rangeMask": {
+        "apply": "Apply",
+        "cancel": "Cancel",
+        "feather": "Feather",
+        "hueCenter": "Hue center",
+        "hueTolerance": "Hue tolerance",
+        "preview": "Preview",
+        "previewHint": "Preview before apply",
+        "refine": "Refine",
+        "saturation": "Saturation",
+        "smooth": "Smooth",
+        "title": "editor.masks.rangeMask.title"
+      },
       "refinement": {
         "density": "Density",
         "edgeContrast": "Edge Contrast",

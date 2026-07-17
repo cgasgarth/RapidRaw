@@ -1520,6 +1520,19 @@
       "quickAddComplete": "",
       "quickAddGradient": "",
       "quickAddRange": "",
+      "rangeMask": {
+        "apply": "",
+        "cancel": "",
+        "feather": "",
+        "hueCenter": "",
+        "hueTolerance": "",
+        "preview": "",
+        "previewHint": "",
+        "refine": "",
+        "saturation": "",
+        "smooth": "",
+        "title": ""
+      },
       "refinement": {
         "density": "Density",
         "edgeContrast": "Edge Contrast",
