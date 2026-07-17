@@ -121,7 +121,15 @@ import InspectorPanelFrame, {
   type InspectorPanelStatus,
 } from '../inspector/InspectorPanelFrame';
 
-const ADJUSTMENT_SECTION_NAMES = ['basic', 'curves', 'transform', 'lensCorrection', 'details', 'effects', 'calibration'] as const;
+const ADJUSTMENT_SECTION_NAMES = [
+  'basic',
+  'curves',
+  'transform',
+  'lensCorrection',
+  'details',
+  'effects',
+  'calibration',
+] as const;
 type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
 type CollapsibleSectionsUpdater =
   | CollapsibleSectionsState
@@ -1379,6 +1387,7 @@ export default function Controls() {
       deriveEffectiveDisclosureState(
         {
           basic: collapsibleSectionsState.basic,
+          calibration: collapsibleSectionsState.calibration ?? false,
           curves: collapsibleSectionsState.curves,
           details: collapsibleSectionsState.details,
           effects: collapsibleSectionsState.effects,

@@ -306,9 +306,9 @@ export async function assertAdjustmentsPanelRetune(page) {
     throw new Error('Every primary Adjust inspector section should remain mounted.');
   }
   if (sectionBounds.some((bounds, index) => index > 0 && (bounds?.y ?? 0) <= (sectionBounds[index - 1]?.y ?? 0))) {
-      throw new Error(
-        'Adjust inspector sections should follow the Light, Curve, Transform, Lens Corrections, Detail, Effects, Calibration order.',
-      );
+    throw new Error(
+      'Adjust inspector sections should follow the Light, Curve, Transform, Lens Corrections, Detail, Effects, Calibration order.',
+    );
   }
 
   for (const sectionName of sectionNames) {
