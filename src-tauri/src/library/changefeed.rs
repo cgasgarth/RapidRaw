@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use notify::event::{ModifyKind, RenameMode};
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -79,10 +79,56 @@ struct ChangefeedInner {
     revision: u64,
     report: LibraryChangefeedReport,
     authored_paths: HashMap<PathBuf, Instant>,
+    prior_epoch_revisions: HashMap<PathBuf, LibraryFileRevision>,
 }
 
 #[derive(Clone, Default)]
 pub struct LibraryFilesystemChangefeed(Arc<Mutex<ChangefeedInner>>);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct LibraryFileRevision {
+    byte_size: u64,
+    modified: SystemTime,
+}
+
+fn file_revision(path: &Path) -> Option<LibraryFileRevision> {
+    let metadata = path.metadata().ok()?;
+    if !metadata.is_file() {
+        return None;
+    }
+    Some(LibraryFileRevision {
+        byte_size: metadata.len(),
+        modified: metadata.modified().ok()?,
+    })
+}
+
+fn suppress_stable_prior_epoch_modifications(
+    event: &mut Event,
+    prior_epoch_revisions: &mut HashMap<PathBuf, LibraryFileRevision>,
+) {
+    let stable_read_noise = match &event.kind {
+        EventKind::Access(_) => true,
+        EventKind::Modify(kind) => !matches!(kind, ModifyKind::Data(_) | ModifyKind::Name(_)),
+        _ => false,
+    };
+    if !stable_read_noise {
+        for path in &event.paths {
+            prior_epoch_revisions.remove(&normalize_changefeed_path(path));
+        }
+        return;
+    }
+    event.paths.retain(|path| {
+        let normalized = normalize_changefeed_path(path);
+        let Some(expected) = prior_epoch_revisions.get(&normalized).cloned() else {
+            return true;
+        };
+        if file_revision(&normalized).as_ref() == Some(&expected) {
+            return false;
+        }
+        prior_epoch_revisions.remove(&normalized);
+        true
+    });
+}
 
 fn supported_source(path: &Path) -> bool {
     path.file_name()
@@ -290,6 +336,20 @@ fn normalize_changefeed_path(path: &Path) -> PathBuf {
 }
 
 impl LibraryFilesystemChangefeed {
+    pub(crate) fn register_prior_epoch_paths(&self, paths: impl IntoIterator<Item = PathBuf>) {
+        let revisions = paths
+            .into_iter()
+            .filter_map(|path| {
+                let normalized = normalize_changefeed_path(&path);
+                file_revision(&normalized).map(|revision| (normalized, revision))
+            })
+            .collect::<Vec<_>>();
+        let Ok(mut inner) = self.0.lock() else {
+            return;
+        };
+        inner.prior_epoch_revisions.extend(revisions);
+    }
+
     pub(crate) fn register_authored_paths(&self, paths: impl IntoIterator<Item = PathBuf>) {
         let Ok(mut inner) = self.0.lock() else {
             return;
@@ -398,6 +458,7 @@ impl LibraryFilesystemChangefeed {
             return Ok(inner.generation);
         }
         inner.generation = inner.generation.saturating_add(1);
+        inner.prior_epoch_revisions.clear();
         let generation = inner.generation;
         let (sender, receiver) = mpsc::channel::<notify::Result<Event>>();
         let mut watcher = notify::recommended_watcher(move |result| {
@@ -429,19 +490,26 @@ impl LibraryFilesystemChangefeed {
                     deadline.saturating_duration_since(Instant::now())
                 });
                 match receiver.recv_timeout(timeout) {
-                    Ok(Ok(event)) => {
-                        let mut changes = normalize_event(event);
+                    Ok(Ok(mut event)) => {
+                        let mut changes;
                         if let Ok(mut inner) = state.0.lock() {
                             if inner.generation != generation {
                                 break;
                             }
                             inner.report.raw_events = inner.report.raw_events.saturating_add(1);
+                            suppress_stable_prior_epoch_modifications(
+                                &mut event,
+                                &mut inner.prior_epoch_revisions,
+                            );
+                            changes = normalize_event(event);
                             inner.report.queue_peak =
                                 inner.report.queue_peak.max(pending.len() + changes.len());
                             let now = Instant::now();
                             inner.authored_paths.retain(|_, expires| *expires > now);
                             changes
                                 .retain(|change| !is_authored_echo(change, &inner.authored_paths));
+                        } else {
+                            changes = normalize_event(event);
                         }
                         for change in changes {
                             let key = change_key(&change);
@@ -639,6 +707,94 @@ mod tests {
             },
             &inner.authored_paths,
         ));
+    }
+
+    #[test]
+    fn prior_epoch_validation_metadata_is_suppressed_until_data_changes() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("imported.raw");
+        std::fs::write(&destination, b"committed image bytes").unwrap();
+        let normalized = normalize_changefeed_path(&destination);
+        let feed = LibraryFilesystemChangefeed::default();
+        feed.register_prior_epoch_paths([destination.clone()]);
+        let mut inner = feed.0.lock().unwrap();
+        let revisions = &mut inner.prior_epoch_revisions;
+
+        let stable_read_schedule = [
+            EventKind::Access(notify::event::AccessKind::Any),
+            EventKind::Modify(ModifyKind::Metadata(notify::event::MetadataKind::Any)),
+            EventKind::Modify(ModifyKind::Any),
+            EventKind::Modify(ModifyKind::Other),
+        ];
+        for _ in 0..4 {
+            for kind in stable_read_schedule.iter().cloned() {
+                let mut validation_echo = Event::new(kind).add_path(destination.clone());
+                suppress_stable_prior_epoch_modifications(&mut validation_echo, revisions);
+                assert!(validation_echo.paths.is_empty());
+                assert!(revisions.contains_key(&normalized));
+            }
+        }
+
+        let mut external_change = Event::new(EventKind::Modify(ModifyKind::Data(
+            notify::event::DataChange::Content,
+        )))
+        .add_path(destination.clone());
+        suppress_stable_prior_epoch_modifications(&mut external_change, revisions);
+        assert_eq!(external_change.paths, vec![destination]);
+        assert!(!revisions.contains_key(&normalized));
+    }
+
+    #[test]
+    fn changed_prior_epoch_revision_publishes_and_ends_suppression() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("imported.raw");
+        std::fs::write(&destination, b"committed image bytes").unwrap();
+        let normalized = normalize_changefeed_path(&destination);
+        let mut revisions = HashMap::from([(
+            normalized.clone(),
+            file_revision(&normalized).expect("committed revision"),
+        )]);
+        std::fs::write(&destination, b"changed bytes").unwrap();
+
+        for kind in [
+            EventKind::Modify(ModifyKind::Any),
+            EventKind::Modify(ModifyKind::Metadata(notify::event::MetadataKind::Any)),
+        ] {
+            let mut external_change = Event::new(kind).add_path(destination.clone());
+            suppress_stable_prior_epoch_modifications(&mut external_change, &mut revisions);
+            assert_eq!(external_change.paths, vec![destination.clone()]);
+            assert!(!revisions.contains_key(&normalized));
+        }
+    }
+
+    #[test]
+    fn prior_epoch_identity_never_suppresses_remove_or_rename() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("imported.raw");
+        std::fs::write(&destination, b"committed image bytes").unwrap();
+        let normalized = normalize_changefeed_path(&destination);
+        let mut revisions = HashMap::from([(
+            normalized.clone(),
+            file_revision(&destination).expect("committed revision"),
+        )]);
+
+        let mut remove = Event::new(EventKind::Remove(notify::event::RemoveKind::File))
+            .add_path(destination.clone());
+        suppress_stable_prior_epoch_modifications(&mut remove, &mut revisions);
+        assert_eq!(remove.paths, vec![destination.clone()]);
+        assert!(!revisions.contains_key(&normalized));
+
+        revisions.insert(
+            normalized.clone(),
+            file_revision(&destination).expect("committed revision"),
+        );
+
+        let mut rename = Event::new(EventKind::Modify(ModifyKind::Name(RenameMode::Both)))
+            .add_path(destination)
+            .add_path(directory.path().join("renamed.raw"));
+        suppress_stable_prior_epoch_modifications(&mut rename, &mut revisions);
+        assert_eq!(rename.paths.len(), 2);
+        assert!(!revisions.contains_key(&normalized));
     }
 
     #[test]
