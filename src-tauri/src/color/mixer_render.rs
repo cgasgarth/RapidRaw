@@ -653,12 +653,16 @@ mod gpu_runtime_tests {
         assert_eq!(legacy_error.code, "render_plan.invalid_monochrome_process");
         assert_eq!(legacy_error.field, "blackWhiteMixer.process");
 
+        let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+            plan.adjustments,
+            crate::gpu_processing::gpu_execution_abi_resources(&[], None),
+        );
         let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
             &plan.adjustments,
             &[],
             None,
-            &plan.edit_graph,
+            &bound_graph,
         )
         .expect("CPU neutral monochrome render succeeds");
 
@@ -678,15 +682,13 @@ mod gpu_runtime_tests {
                 &source,
                 "neutral_scene_monochrome_v1",
             ),
-            RenderRequest {
-                adjustments: plan.adjustments,
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                    plan.edit_graph,
-                ),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments,
+                &[],
+                None,
+                None,
+                crate::gpu_processing::EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            ),
             "neutral_scene_monochrome_v1",
         )
         .expect("WGPU neutral monochrome render succeeds");
@@ -738,12 +740,16 @@ mod gpu_runtime_tests {
         )
         .expect("continuous monochrome plan compiles");
         assert_eq!(plan.adjustments.global.black_white_mixer.process, 2);
+        let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+            plan.adjustments,
+            crate::gpu_processing::gpu_execution_abi_resources(&[], None),
+        );
         let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
             &plan.adjustments,
             &[],
             None,
-            &plan.edit_graph,
+            &bound_graph,
         )
         .expect("CPU continuous monochrome render succeeds");
 
@@ -763,15 +769,13 @@ mod gpu_runtime_tests {
                 &source,
                 "continuous_scene_monochrome_v1",
             ),
-            RenderRequest {
-                adjustments: plan.adjustments,
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-                edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                    plan.edit_graph,
-                ),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments,
+                &[],
+                None,
+                None,
+                crate::gpu_processing::EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            ),
             "continuous_scene_monochrome_v1",
         )
         .expect("WGPU continuous monochrome render succeeds");
@@ -834,12 +838,16 @@ mod gpu_runtime_tests {
                 .implementation_version,
             crate::monochrome::MONOCHROME_IMPLEMENTATION_VERSION
         );
+        let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+            plan.adjustments,
+            crate::gpu_processing::gpu_execution_abi_resources(&[], None),
+        );
         let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
             &plan.adjustments,
             &[],
             None,
-            &plan.edit_graph,
+            &bound_graph,
         )
         .expect("CPU toned monochrome render succeeds");
         let _gpu_test_guard = acquire_gpu_test_lock();
@@ -856,15 +864,15 @@ mod gpu_runtime_tests {
                 &state,
                 &source,
                 crate::gpu_processing::PreGpuImageIdentity::for_test_source(&source, consumer),
-                RenderRequest {
-                    adjustments: plan.adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                        Arc::clone(&plan.edit_graph),
-                    ),
-                },
+                RenderRequest::with_bound_execution_abi(
+                    plan.adjustments,
+                    &[],
+                    None,
+                    None,
+                    crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                        &plan.edit_graph,
+                    )),
+                ),
                 consumer,
             )
             .expect("WGPU toned monochrome render succeeds")

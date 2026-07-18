@@ -1114,15 +1114,13 @@ pub(crate) fn render_current_export_preview(
             detail_stage.render_hash,
             render_inputs.pre_gpu_revision,
         ),
-        RenderRequest {
+        RenderRequest::with_bound_execution_abi(
             adjustments,
-            mask_bitmaps: &mask_bitmaps,
-            lut: render_inputs.lut,
-            roi: None,
-            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                render_inputs.edit_graph,
-            ),
-        },
+            &mask_bitmaps,
+            render_inputs.lut,
+            None,
+            crate::gpu_processing::EditGraphExecutionAuthority::Compiled(render_inputs.edit_graph),
+        ),
         debug_tag,
     )
 }
@@ -1281,15 +1279,13 @@ fn process_image_for_export_pipeline_with_optional_film_tap(
         detail_stage.render_hash,
         render_inputs.pre_gpu_revision,
     );
-    let request = RenderRequest {
-        adjustments: gpu_adjustments,
+    let request = RenderRequest::with_bound_execution_abi(
+        gpu_adjustments,
         mask_bitmaps,
-        lut: render_inputs.lut,
-        roi: None,
-        edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-            render_inputs.edit_graph,
-        ),
-    };
+        render_inputs.lut,
+        None,
+        crate::gpu_processing::EditGraphExecutionAuthority::Compiled(render_inputs.edit_graph),
+    );
     if capture_film_tap {
         crate::gpu_processing::process_and_get_unclamped_dynamic_image_with_film_tap(
             context,
@@ -1697,15 +1693,15 @@ fn export_masks_for_image(
                     pre_gpu_revision,
                     pre_gpu_revision,
                 ),
-                RenderRequest {
-                    adjustments: render_inputs.adjustments,
-                    mask_bitmaps: &single_bitmaps,
-                    lut: render_inputs.lut,
-                    roi: None,
-                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
+                RenderRequest::with_bound_execution_abi(
+                    render_inputs.adjustments,
+                    &single_bitmaps,
+                    render_inputs.lut,
+                    None,
+                    crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
                         render_inputs.edit_graph,
                     ),
-                },
+                ),
                 "export_mask_image",
             )?;
 
@@ -1823,15 +1819,13 @@ fn export_adjustments_as_lut(
             0,
             0,
         ),
-        RenderRequest {
-            adjustments: lut_adjustments,
-            mask_bitmaps: &[],
-            lut: render_inputs.lut,
-            roi: None,
-            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                render_inputs.edit_graph,
-            ),
-        },
+        RenderRequest::with_bound_execution_abi(
+            lut_adjustments,
+            &[],
+            render_inputs.lut,
+            None,
+            crate::gpu_processing::EditGraphExecutionAuthority::Compiled(render_inputs.edit_graph),
+        ),
         "export_lut",
     )?;
 
@@ -3358,15 +3352,13 @@ mod tests {
                 &state,
                 &source,
                 PreGpuImageIdentity::for_source(&source, source_id),
-                RenderRequest {
+                RenderRequest::with_bound_execution_abi(
                     adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                        edit_graph,
-                    ),
-                },
+                    &[],
+                    None,
+                    None,
+                    crate::gpu_processing::EditGraphExecutionAuthority::Compiled(edit_graph),
+                ),
                 "edit_graph_preview_export_parity",
             )
             .expect("graph-authoritative GPU render succeeds")

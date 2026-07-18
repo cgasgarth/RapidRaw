@@ -73,7 +73,10 @@ pub(crate) fn execute_cpu_edit_graph(
     graph: &CompiledEditGraph,
 ) -> Result<DynamicImage, &'static str> {
     graph.validate_contract()?;
-    graph.validate_gpu_execution(adjustments, lut.is_some(), mask_bitmaps.len())?;
+    graph.validate_gpu_execution(
+        adjustments,
+        crate::gpu_processing::gpu_execution_abi_resources(mask_bitmaps, lut),
+    )?;
     let node_runtime = CpuNodeRuntime::from_graph(graph)?;
     let mut authoritative_adjustments = graph.shader_abi();
     prepare_cpu_dehaze(base_image, &mut authoritative_adjustments);
