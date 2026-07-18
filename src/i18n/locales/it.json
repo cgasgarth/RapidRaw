@@ -4,8 +4,10 @@
       "blackAndWhite": "",
       "blacks": "Neri",
       "brightness": "Luminosità",
+      "clarity": "",
       "color": "",
       "contrast": "Contrasto",
+      "dehaze": "",
       "evShift": "Compensazione EV",
       "exposure": "Esposizione",
       "highlightRolloff": "Rolloff alte luci",
@@ -17,9 +19,12 @@
         "basicDesc": "Tonemapping Standard",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "Ripristina",
+      "saturation": "",
       "shadowRolloff": "Rolloff ombre",
       "shadows": "Ombre",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -44,6 +49,7 @@
       },
       "toneMapper": "Tone Mapper",
       "treatment": "",
+      "vibrance": "",
       "viewContrast": "Contrasto vista",
       "whites": "Bianchi"
     },
@@ -194,9 +200,18 @@
       },
       "pointColor": {
         "addPoint": "",
+        "addPointHint": "",
         "deletePoint": "",
         "empty": "",
+        "name": "",
+        "nameInput": "",
+        "pickerHint": "",
+        "pickerReceipt": "",
         "pickFromImage": "",
+        "reset": "",
+        "resetAction": "",
+        "sampleConfidence": "",
+        "sampledRange": "",
         "samples": "",
         "visualize": ""
       },
@@ -272,6 +287,7 @@
         "title": "",
         "warning": ""
       },
+      "targetedAdjustment": "",
       "temperature": "Temperatura",
       "tint": "Tinta",
       "toggleSliders": "Attiva/Disattiva Cursori",
@@ -296,6 +312,7 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "",
         "quick": "Quick"
       }
     },
@@ -328,6 +345,7 @@
       "resetAllPoint": "Ripristina Tutte le Curve per Punti",
       "resetParametric": "Ripristina Curva Parametrica {{channel}}",
       "resetPoint": "Ripristina Curva per Punti {{channel}}",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
@@ -344,6 +362,7 @@
       }
     },
     "details": {
+      "advanced": "Advanced",
       "altPreviewNoiseReduction": "",
       "altPreviewSharpening": "",
       "amount": "",
@@ -353,6 +372,7 @@
       "chromaticAberration": "Aberrazione Cromatica",
       "clarity": "Chiarezza",
       "color": "Colore",
+      "colorNoiseReduction": "Color Noise Reduction",
       "contrastProtection": "Protezione contrasto",
       "deblur": "",
       "deblurStatus": "",
@@ -366,18 +386,21 @@
       "localContrastStatus": "",
       "loupe": "",
       "luminance": "Luminanza",
+      "masking": "Masking",
       "midtoneMask": "",
       "minSpotRadius": "",
       "moveLoupeTarget": "",
       "naturalGrain": "Grana naturale",
       "noiseReduction": "Riduzione Rumore",
       "presence": "Presenza",
+      "radius": "Radius",
       "redCyan": "Rosso/Ciano",
       "sensitivity": "",
       "shadowBias": "Priorità ombre",
       "sharpening": "Aumento Nitidezza",
       "sharpness": "Nitidezza",
       "showDustOverlay": "",
+      "smoothness": "Smoothness",
       "structure": "Struttura",
       "threshold": "Soglia"
     },
@@ -389,8 +412,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Quantità",
       "creative": "Creativo",
+      "disabled": "",
+      "enabled": "",
       "feather": "Sfumatura",
       "filmLookBrowser": {
         "activeLook": "",
@@ -456,6 +482,7 @@
       "roughness": "Ruvidezza",
       "roundness": "Rotondità",
       "size": "Dimensione",
+      "title": "",
       "vignette": "Vignettatura"
     },
     "perspective": {
@@ -716,6 +743,21 @@
         "action": "Ripristina estremi",
         "title": "Rischio clipping"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Fissati",
         "unpin": "Rimuovi {{control}}"
@@ -776,9 +818,13 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Calibrazione",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
@@ -800,7 +846,13 @@
         "details": "Dettagli",
         "effects": "Effetti"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_one": "",
         "editedSections_many": "",
         "editedSections_other": "",
@@ -811,6 +863,9 @@
         "autoAdjust": "Regolazione Automatica Immagine",
         "resetAdjustments": "Ripristina Regolazioni",
         "toggleAnalytics": "Attiva/Disattiva Visualizzazione Analitiche"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {

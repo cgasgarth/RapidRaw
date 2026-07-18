@@ -240,7 +240,18 @@ fn packed_membership(color: PerceptualColorCoordinate, point: &PointColorGpuPoin
 pub fn apply_gpu_plan_ap1(rgb: [f32; 3], settings: &PointColorGpuSettings) -> [f32; 3] {
     let mut color = ap1_to_oklch(rgb);
     let mut visualization_weight: f32 = 0.0;
-    for point in settings.points.iter().take(settings.control[0] as usize) {
+    for (point_index, point) in settings
+        .points
+        .iter()
+        .take(settings.control[0] as usize)
+        .enumerate()
+    {
+        if (settings.control[1] == 1 || settings.control[1] == 2)
+            && settings.control[3] > 0
+            && settings.control[3] != point_index.saturating_add(1) as u32
+        {
+            continue;
+        }
         let weight = packed_membership(color, point);
         visualization_weight = visualization_weight.max(weight);
         if weight <= 0.0 {
@@ -467,6 +478,47 @@ mod tests {
                 .zip(actual)
                 .all(|(left, right)| (left - right).abs() < 2e-5)
         );
+    }
+
+    #[test]
+    fn range_visualization_uses_selected_point_only() {
+        let first_rgb = [0.7, 0.2, 0.1];
+        let second_rgb = [0.1, 0.3, 0.8];
+        let first = point(ap1_to_oklch(first_rgb));
+        let second = point(ap1_to_oklch(second_rgb));
+        let pack = |point: &PointColorAdjustmentV1| {
+            let mut packed = PointColorGpuPoint::default();
+            let sample = point.samples[0];
+            packed.samples[0] = [
+                sample.color.lightness,
+                sample.color.chroma,
+                sample.color.hue_degrees,
+                sample.confidence,
+            ];
+            packed.range = [
+                point.hue_radius_degrees,
+                point.chroma_radius,
+                point.lightness_radius,
+                point.variance,
+            ];
+            packed.edit = [
+                point.feather,
+                point.hue_shift_degrees,
+                point.chroma_shift,
+                point.lightness_shift,
+            ];
+            packed.control = [point.saturation_shift, point.opacity, 1.0, 1.0];
+            packed
+        };
+        let mut settings = PointColorGpuSettings {
+            control: [2, 1, 1, 2],
+            ..Default::default()
+        };
+        settings.points[0] = pack(&first);
+        settings.points[1] = pack(&second);
+
+        assert_eq!(apply_gpu_plan_ap1(first_rgb, &settings), [0.0; 3]);
+        assert_eq!(apply_gpu_plan_ap1(second_rgb, &settings), [1.0; 3]);
     }
 
     #[test]

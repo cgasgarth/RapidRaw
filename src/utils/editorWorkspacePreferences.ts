@@ -4,6 +4,11 @@ import {
   editorWorkspacePreferencesSchema,
 } from '../schemas/editorWorkspacePreferencesSchemas';
 import {
+  DEFAULT_DEVELOP_PANEL_ORDER,
+  isValidDevelopPanelHidden,
+  isValidDevelopPanelOrder,
+} from './developPanelCustomization';
+import {
   DEVELOP_SHELL_DEFAULT_FILMSTRIP_HEIGHT,
   DEVELOP_SHELL_DEFAULT_LEFT_PANEL_WIDTH,
   DEVELOP_SHELL_DEFAULT_RIGHT_PANEL_WIDTH,
@@ -38,6 +43,47 @@ const getStorage = (): Storage | null => {
   }
 };
 
+const EDITOR_WORKSPACE_PREFERENCE_KEYS = new Set([
+  'compact',
+  'filmstrip',
+  'leftSidebar',
+  'rightInspector',
+  'version',
+  'viewer',
+]);
+const RIGHT_INSPECTOR_PREFERENCE_KEYS = new Set([
+  'activePanel',
+  'developPanelHidden',
+  'developPanelOrder',
+  'expandedSectionsByPanel',
+  'pinnedControlIds',
+  'recentPanels',
+  'visible',
+  'width',
+]);
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** Preserve unrelated workspace choices when only this feature's bytes are stale. */
+const repairDevelopPanelPreferenceFields = (value: unknown): unknown | null => {
+  if (!isRecord(value) || Object.keys(value).some((key) => !EDITOR_WORKSPACE_PREFERENCE_KEYS.has(key))) return null;
+  const rightInspector = value['rightInspector'];
+  if (!isRecord(rightInspector) || Object.keys(rightInspector).some((key) => !RIGHT_INSPECTOR_PREFERENCE_KEYS.has(key)))
+    return null;
+  const order = rightInspector['developPanelOrder'];
+  const hidden = rightInspector['developPanelHidden'];
+  const hasInvalidOrder = order !== undefined && (!Array.isArray(order) || !isValidDevelopPanelOrder(order));
+  const hasInvalidHidden = hidden !== undefined && (!Array.isArray(hidden) || !isValidDevelopPanelHidden(hidden));
+  if (!hasInvalidOrder && !hasInvalidHidden) return null;
+  const repaired = structuredClone(value);
+  const repairedRightInspector = repaired['rightInspector'];
+  if (!isRecord(repairedRightInspector)) return null;
+  if (hasInvalidOrder) repairedRightInspector['developPanelOrder'] = [...DEFAULT_DEVELOP_PANEL_ORDER];
+  if (hasInvalidHidden) repairedRightInspector['developPanelHidden'] = [];
+  return repaired;
+};
+
 export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePreferences => ({
   compact: { drawerState: 'expanded', toolsExpanded: true, toolsHeight: null },
   filmstrip: { height: DEVELOP_SHELL_DEFAULT_FILMSTRIP_HEIGHT, visible: true },
@@ -48,6 +94,8 @@ export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePrefer
   },
   rightInspector: {
     activePanel: Panel.Color,
+    developPanelHidden: [],
+    developPanelOrder: [...DEFAULT_DEVELOP_PANEL_ORDER],
     expandedSectionsByPanel: { [Panel.Adjustments]: ['basic', 'curves'] },
     pinnedControlIds: [],
     recentPanels: [Panel.Color],
@@ -64,8 +112,14 @@ export const readEditorWorkspacePreferences = (): EditorWorkspacePreferences => 
     try {
       const serialized = storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY);
       if (serialized !== null) {
-        const parsed = editorWorkspacePreferencesSchema.safeParse(JSON.parse(serialized));
+        const raw = JSON.parse(serialized) as unknown;
+        const parsed = editorWorkspacePreferencesSchema.safeParse(raw);
         if (parsed.success) return parsed.data;
+        const repaired = repairDevelopPanelPreferenceFields(raw);
+        if (repaired !== null) {
+          const repairedParsed = editorWorkspacePreferencesSchema.safeParse(repaired);
+          if (repairedParsed.success) return repairedParsed.data;
+        }
       }
     } catch {
       // Startup must remain available when browser storage is unavailable or corrupt.

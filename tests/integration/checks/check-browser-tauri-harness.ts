@@ -3467,6 +3467,10 @@ try {
   await verifySceneCurveTransaction(page);
   await verifyColorCalibrationTransaction(page);
   await verifyViewerPickerControllers(page);
+  // Mixer controls live in the explicit Mixer workspace tab.  Do not rely on
+  // the session's last tab: CI and fresh installs correctly default to
+  // Foundation, which otherwise makes the mixer proof time out.
+  await page.getByTestId('color-workspace-tab-mixer').click();
   await verifyBlackWhiteMixerTransaction(page);
   await verifyChannelMixerTransaction(page);
   await verifyColorRangeLocalAdjustmentTransaction(page);
@@ -4776,7 +4780,7 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
   await tonePicker.click();
 
   await page.getByTestId('right-panel-switcher-button-color').click();
-  await page.getByTestId('color-workspace-tab-mixer').click();
+  await page.getByTestId('color-workspace-tab-point-color').click();
   const pointControls = page.getByTestId('point-color-controls');
   await pointControls.waitFor({ state: 'visible', timeout: 10_000 });
   const pointPicker = page.getByTestId('point-color-picker');

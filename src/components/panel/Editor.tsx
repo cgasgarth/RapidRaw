@@ -90,6 +90,7 @@ import {
   captureOrientationRotateCommitIdentity,
 } from '../../utils/orientationRotateEditTransaction';
 import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
+import { resolvePerceptualGradingSliderRenderSnapshot } from '../../utils/perceptualGradingSliderInteraction';
 import { resolveReferenceMatchRenderDocument } from '../../utils/referenceMatch';
 import { buildRetouchHandleEditTransaction } from '../../utils/retouchHandleEditTransaction';
 import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
@@ -97,6 +98,7 @@ import {
   buildSubMaskInteractionEditTransaction,
   type SubMaskInteractionIdentity,
 } from '../../utils/subMaskInteractionEditTransaction';
+import { buildToneCurveTargetEditTransaction } from '../../utils/toneCurveTargetEditTransaction';
 import { buildViewerBrushEditTransaction } from '../../utils/viewerBrushEditTransaction';
 import { buildViewerPickerEditTransaction } from '../../utils/viewerPickerEditTransaction';
 import {
@@ -112,6 +114,7 @@ import { editorChromeTokens } from '../ui/editorChromeTokens';
 import type { CropStraightenSessionIdentity } from './editor/cropStraightenController';
 import EditorToolbar from './editor/EditorToolbar';
 import { resolveViewerChromeRegionContract } from './editor/imageCanvasContracts';
+import type { ToneCurveTargetCommitResult } from './editor/toneCurveTargetInteractionController';
 import { useViewerMaskOverlayController } from './editor/useViewerMaskOverlayController';
 import ViewerFooter from './editor/ViewerFooter';
 import type { ViewerSamplerState } from './editor/ViewerSamplerHud';
@@ -204,6 +207,10 @@ export default function Editor({
   const isFullScreen = useUIStore((s) => s.isFullScreen);
   const lightsOutLevel = useUIStore((s) => s.editorWorkspacePreferences.viewer.lightsOutLevel);
   const activeRightPanel = useUIStore((s) => s.activeRightPanel);
+  const activeDevelopTool = useUIStore((s) => s.activeDevelopTool);
+  const toneCurveTargetChannel = useUIStore((s) => s.toneCurveTargetChannel);
+  const toneCurveTargetMode = useUIStore((s) => s.toneCurveTargetMode);
+  const toneCurveTargetPointIndex = useUIStore((s) => s.toneCurveTargetPointIndex);
   const isCropping = activeRightPanel === Panel.Crop;
   const setUI = useUIStore((s) => s.setUI);
   const setDefaultEditorCompareMode = useUIStore((s) => s.setDefaultEditorCompareMode);
@@ -235,6 +242,7 @@ export default function Editor({
   const aiPatches = selectEditDocumentSourceArtifacts(editDocumentV2).aiPatches;
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
   const basicToneSliderInteraction = useEditorStore((s) => s.basicToneSliderInteraction);
+  const perceptualGradingSliderInteraction = useEditorStore((s) => s.perceptualGradingSliderInteraction);
   const lastEditApplicationReceipt = useEditorStore((s) => s.lastEditApplicationReceipt);
   const autoEditPreviewSession = useEditorStore((s) => s.autoEditPreviewSession);
   const basicToneRenderSnapshot = resolveBasicToneSliderRenderSnapshot(adjustmentSnapshot, basicToneSliderInteraction, {
@@ -243,10 +251,24 @@ export default function Editor({
     imageSessionId: editorImageSessionGeneration,
     selectedImage,
   });
-  const autoEditRenderSnapshot = resolveAutoEditRenderSnapshot(basicToneRenderSnapshot, autoEditPreviewSession, {
-    imageSessionId: editorImageSession?.id ?? null,
-    path: selectedImage?.path ?? null,
-  });
+  const perceptualGradingRenderSnapshot = resolvePerceptualGradingSliderRenderSnapshot(
+    basicToneRenderSnapshot,
+    perceptualGradingSliderInteraction,
+    {
+      adjustmentRevision: committedAdjustmentRevision,
+      imageSession: editorImageSession,
+      imageSessionId: editorImageSessionGeneration,
+      selectedImage,
+    },
+  );
+  const autoEditRenderSnapshot = resolveAutoEditRenderSnapshot(
+    perceptualGradingRenderSnapshot,
+    autoEditPreviewSession,
+    {
+      imageSessionId: editorImageSession?.id ?? null,
+      path: selectedImage?.path ?? null,
+    },
+  );
   const adjustmentGeometryRevision = autoEditRenderSnapshot.geometryRevision;
   const adjustmentRevision = autoEditRenderSnapshot.renderRevision;
   const referenceMatchPreview = useEditorStore((s) => s.referenceMatchPreview);
@@ -280,6 +302,7 @@ export default function Editor({
     exportSoftProofRecipeId,
     historyIndex: adjustmentsHistoryIndex,
     isExportSoftProofEnabled,
+    perceptualGradingSliderPreviewIdentity: perceptualGradingSliderInteraction?.interactionId ?? null,
     basicToneSliderPreviewIdentity: basicToneSliderInteraction?.interactionId ?? null,
     autoEditPreviewIdentity: autoEditPreviewSession?.previewIdentity ?? null,
     referenceMatchPreview: referenceMatchPreview
@@ -319,6 +342,8 @@ export default function Editor({
   const activeAiPatchContainerId = useEditorStore((s) => s.activeAiPatchContainerId);
   const activeAiSubMaskId = useEditorStore((s) => s.activeAiSubMaskId);
   const isMaskControlHovered = useEditorStore((s) => s.isMaskControlHovered);
+  const maskSelectedPinVisible = useEditorStore((s) => s.maskSelectedPinVisible);
+  const maskHandlesVisible = useEditorStore((s) => s.maskHandlesVisible);
   const hasRenderedFirstFrame = useEditorStore((s) => s.hasRenderedFirstFrame);
   const wgpuFrameSerial = useEditorStore((s) => s.wgpuFrameSerial);
   const wgpuFailureSerial = useEditorStore((s) => s.wgpuFailureSerial);
@@ -923,6 +948,27 @@ export default function Editor({
     },
     [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
   );
+  const handleToneCurveTargetCommit = useCallback(
+    (command: ToneCurveTargetCommitResult) => {
+      const state = useEditorStore.getState();
+      try {
+        applyEditTransaction(
+          buildToneCurveTargetEditTransaction(
+            {
+              ...state,
+              geometryEpoch: overlayGeometry.geometryEpoch,
+              sourceRevision: viewerSampleGraphRevision,
+            },
+            command,
+            `tone-curve-target:${crypto.randomUUID()}`,
+          ),
+        );
+      } catch {
+        // A changed image/session/render is an expected cancellation boundary.
+      }
+    },
+    [applyEditTransaction, overlayGeometry.geometryEpoch, viewerSampleGraphRevision],
+  );
   const presentationDescriptor = useMemo(
     () =>
       createEditorPresentationDescriptor({
@@ -1240,6 +1286,7 @@ export default function Editor({
   const activeViewerTool = useMemo<ViewerActiveTool>(() => {
     if (isWbPickerActive) return 'white-balance';
     if (isCropping) return 'crop';
+    if (activeDevelopTool === 'tone-curve' && activeRightPanel === Panel.Adjustments) return 'tone-curve';
     if (hasActiveRetouchTool) return 'retouch';
     if (isMaskHovered || isMaskTouchInteracting) return 'mask';
     if (isObjectPromptActive || activeSubMask?.type === Mask.AiSubject) return 'object-prompt';
@@ -1261,6 +1308,8 @@ export default function Editor({
   }, [
     activeSubMask?.type,
     activeSubMaskParameters,
+    activeDevelopTool,
+    activeRightPanel,
     hasActiveRetouchTool,
     isCropping,
     isMaskHovered,
@@ -2525,6 +2574,7 @@ export default function Editor({
                     commitInitialMaskDraw: handleInitialMaskDrawCommit,
                     commitParametricMaskTarget: handleParametricMaskTargetCommit,
                     commitPicker: handlePickerCommit,
+                    commitToneCurveTarget: handleToneCurveTargetCommit,
                     commitRetouch: handleRetouchCommand,
                     commitStraighten: handleStraighten,
                     liveMaskPreview: handleLiveMaskPreview,
@@ -2560,8 +2610,16 @@ export default function Editor({
                   },
                   imageSessionId: editorImageSession?.id ?? null,
                   input: { activeTool: activeViewerTool, isTemporaryHand },
+                  toneCurveTarget: {
+                    active: activeViewerTool === 'tone-curve',
+                    channel: toneCurveTargetChannel,
+                    mode: toneCurveTargetMode,
+                    selectedPointIndex: toneCurveTargetPointIndex,
+                  },
                   isAiEditing,
                   isMaskControlHovered,
+                  maskHandlesVisible,
+                  maskSelectedPinVisible,
                   isMasking,
                   isRotationActive: Boolean(isRotationActive),
                   onSamplerStateChange: setViewerSamplerState,

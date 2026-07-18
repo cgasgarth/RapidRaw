@@ -13,10 +13,22 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z
+    editDocumentV2: z
       .object({
-        colorGrading: z.object({ balance: z.number() }).passthrough(),
-        perceptualGradingV1: z.object({ balance: z.number() }).passthrough(),
+        nodes: z
+          .object({
+            perceptual_grading: z
+              .object({
+                params: z
+                  .object({
+                    colorGrading: z.object({ balance: z.number() }).passthrough(),
+                    perceptualGradingV1: z.object({ balance: z.number() }).passthrough(),
+                  })
+                  .passthrough(),
+              })
+              .passthrough(),
+          })
+          .passthrough(),
       })
       .passthrough(),
     path: z.literal(sourcePath),
@@ -173,6 +185,19 @@ try {
   await page.getByTestId('right-panel-switcher-button-color').click();
   await page.getByTestId('color-workspace-tab-grading').click();
   const controls = page.getByTestId('color-grading-controls');
+  await page.getByTestId('color-grading-three-way-summary').waitFor({ state: 'visible' });
+  for (const range of ['shadows', 'midtones', 'highlights']) {
+    await page.getByTestId(`color-grading-wheel-${range}`).waitFor({ state: 'visible' });
+  }
+  if ((await controls.locator('input[aria-label="Luminance"]').count()) !== 3) {
+    throw new Error('Three-Way Color Grading did not expose one numeric luminance target per wheel.');
+  }
+  for (const view of ['shadows', 'midtones', 'highlights', 'global']) {
+    await page.getByTestId(`color-grading-view-${view}`).click();
+    const activeRange = await controls.locator('[data-active-range]').getAttribute('data-active-range');
+    if (activeRange !== view) throw new Error(`Color Grading view ${view} did not expose its authoritative wheel.`);
+  }
+  await page.getByTestId('color-grading-view-3way').click();
   const identity = await controls.evaluate((element) => ({
     adjustmentRevision: element.dataset.commitAdjustmentRevision,
     imageSessionId: element.dataset.commitImageSession,
@@ -210,8 +235,8 @@ try {
     ),
   );
   if (
-    persisted.adjustments.colorGrading.balance !== 8 ||
-    persisted.adjustments.perceptualGradingV1.balance !== 0.08 ||
+    persisted.editDocumentV2.nodes.perceptual_grading.params.colorGrading.balance !== 8 ||
+    persisted.editDocumentV2.nodes.perceptual_grading.params.perceptualGradingV1.balance !== 0.08 ||
     persisted.transaction.imageSessionId !== identity.imageSessionId ||
     persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1

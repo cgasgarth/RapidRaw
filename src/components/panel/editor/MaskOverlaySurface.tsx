@@ -127,6 +127,7 @@ interface MaskOverlay {
   onMaskInteractionStart: (event?: MaskInteractionEvent) => boolean;
   isToolActive: boolean;
   isSelected: boolean;
+  showHandles?: boolean;
   onMaskMouseEnter: () => void;
   onMaskMouseLeave: () => void;
   onPreviewUpdate?: (id: string, subMask: Partial<SubMask>) => boolean;
@@ -187,6 +188,7 @@ export const MaskOverlay = memo(
     onMaskInteractionStart,
     isToolActive,
     isSelected,
+    showHandles = true,
     onMaskMouseEnter,
     onMaskMouseLeave,
     onPreviewUpdate,
@@ -747,7 +749,7 @@ export const MaskOverlay = memo(
 
       return (
         <Group>
-          {isSelected && !isToolActive && (
+          {isSelected && !isToolActive && showHandles && (
             <Ellipse
               x={center.x}
               y={center.y}
@@ -821,7 +823,7 @@ export const MaskOverlay = memo(
               }}
             />
           )}
-          {isSelected && !isToolActive && (
+          {isSelected && !isToolActive && showHandles && (
             <Transformer
               ref={trRef}
               centeredScaling={true}
@@ -913,7 +915,7 @@ export const MaskOverlay = memo(
         hitStrokeWidth: 40,
       };
 
-      const showFeatherLines = isSelected && (!isToolActive || p.isInitialDraw);
+      const showFeatherLines = isSelected && showHandles && (!isToolActive || p.isInitialDraw);
 
       return (
         <Group>
@@ -921,7 +923,7 @@ export const MaskOverlay = memo(
             x={centerX}
             y={centerY}
             rotation={angleDeg}
-            draggable={isSelected && !isToolActive}
+            draggable={isSelected && !isToolActive && showHandles}
             dragBoundFunc={lockDragBoundFunc}
             onDragStart={handleLinearGroupDragStart}
             onDragMove={handleLinearGroupDragMove}
@@ -984,7 +986,7 @@ export const MaskOverlay = memo(
             </>
           )}
 
-          {isSelected && !isToolActive && (
+          {isSelected && !isToolActive && showHandles && (
             <>
               <Circle
                 x={sX}

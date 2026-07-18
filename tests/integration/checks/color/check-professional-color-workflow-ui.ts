@@ -9,14 +9,16 @@ import { act, createElement, useEffect, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { readLayerStackSidecarsFromSidecar } from '../../../../packages/rawengine-schema/src';
+import type { ColorPanelAdjustmentView } from '../../../../src/components/adjustments/color/types';
+import { selectColorPanelAdjustmentView } from '../../../../src/components/panel/right/color/ColorWorkspacePanel';
 import { type AppSettings, Theme } from '../../../../src/components/ui/AppProperties';
 import { createEditorImageSession, useEditorStore } from '../../../../src/store/useEditorStore';
-import { publishAdjustmentSnapshot } from '../../../../src/utils/adjustmentSnapshots';
-import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments';
+import { INITIAL_ADJUSTMENTS } from '../../../../src/utils/adjustments';
 import {
   COLOR_OUTPUT_FOCUS_EVENT,
   COLOR_WORKSPACE_TAB_SESSION_KEY,
 } from '../../../../src/utils/colorWorkspaceNavigation';
+import { selectEditDocumentMasks } from '../../../../src/utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2';
 
 type RenderedPanel = {
@@ -138,15 +140,12 @@ console.log('color inspector compact workflow coverage ok');
 
 async function renderColorPanel(isForMask = false): Promise<RenderedPanel> {
   await act(async () => {
-    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
-      adjustmentSnapshot: publishAdjustmentSnapshot(null, adjustments, editDocumentV2),
-      adjustments,
       editDocumentV2,
       finalPreviewUrl: 'blob:color-foundation-preview',
-      history: [adjustments],
+      history: [editDocumentV2],
       historyCheckpoints: [],
       historyIndex: 0,
       lastEditApplicationReceipt: null,
@@ -192,7 +191,7 @@ async function renderColorPanel(isForMask = false): Promise<RenderedPanel> {
         { i18n },
         createElement(TestColorHarness, {
           appSettings: appSettingsFixture,
-          initialAdjustments: structuredClone(INITIAL_ADJUSTMENTS),
+          initialAdjustments: selectColorPanelAdjustmentView(useEditorStore.getState().editDocumentV2),
           isForMask,
         }),
       ),
@@ -218,14 +217,16 @@ function TestColorHarness({
   isForMask,
 }: {
   appSettings: AppSettings;
-  initialAdjustments: Adjustments;
+  initialAdjustments: ColorPanelAdjustmentView;
   isForMask: boolean;
 }) {
   const [adjustments, setAdjustmentState] = useState(initialAdjustments);
   const [isWbPickerActive, setIsWbPickerActive] = useState(false);
   useEffect(() => {
     if (isForMask) return;
-    return useEditorStore.subscribe((state) => setAdjustmentState(state.adjustments));
+    return useEditorStore.subscribe((state) =>
+      setAdjustmentState(selectColorPanelAdjustmentView(state.editDocumentV2)),
+    );
   }, [isForMask]);
   const setAdjustments = (update: AdjustmentUpdate) => {
     setAdjustmentState((previous) => (typeof update === 'function' ? update(previous) : { ...previous, ...update }));
@@ -251,16 +252,29 @@ async function selectMixerWorkspace(container: Element) {
   );
 }
 
+async function selectPointColorWorkspace(container: Element) {
+  await click(getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-point-color'));
+  assert.equal(
+    getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-point-color').getAttribute('aria-selected'),
+    'true',
+    'Point Color workspace should be selected.',
+  );
+}
+
 async function validateKeyboardWorkspaceNavigation(container: Element) {
   const tablist = getByTestId<HTMLDivElement>(container, 'color-workspace-tabs');
-  const mixer = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-mixer');
+  const pointColor = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-point-color');
 
   await act(async () => {
     tablist.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' }));
     await flushPromises();
   });
-  assert.equal(mixer.getAttribute('aria-selected'), 'true', 'ArrowRight should select Mixer from Foundation.');
-  assert.equal(document.activeElement, mixer, 'ArrowRight should focus the selected workspace.');
+  assert.equal(
+    pointColor.getAttribute('aria-selected'),
+    'true',
+    'ArrowRight should select Point Color from Foundation.',
+  );
+  assert.equal(document.activeElement, pointColor, 'ArrowRight should focus the selected workspace.');
 }
 
 function validateFoundationHierarchy(container: Element) {
@@ -276,7 +290,12 @@ function validateFoundationHierarchy(container: Element) {
     null,
     'Color foundation must not duplicate the standalone Develop Calibration section.',
   );
-  assert.ok(getByTestId(foundation, 'color-quick-presence'));
+  assert.equal(
+    foundation.querySelector('[data-testid="color-quick-presence"]'),
+    null,
+    'Color foundation must not duplicate the Basic Presence section.',
+  );
+  assert.ok(getByTestId(foundation, 'color-quick-hue'));
 }
 
 function validateMaskLocalFiltering(container: Element) {
@@ -296,8 +315,12 @@ function validateMaskLocalFiltering(container: Element) {
   );
 }
 
+function getColorAdjustments(state = useEditorStore.getState()): ColorPanelAdjustmentView {
+  return selectColorPanelAdjustmentView(state.editDocumentV2);
+}
+
 async function validateMaskPointColorAuthority(container: Element) {
-  await selectMixerWorkspace(container);
+  await selectPointColorWorkspace(container);
   const adjustmentRevision = useEditorStore.getState().adjustmentRevision;
   const enable = getByTestId<HTMLButtonElement>(container, 'point-color-enable');
   assert.equal(normalizeText(enable.textContent), 'Enable');
@@ -327,8 +350,8 @@ async function validateMaskHslAuthority(container: Element) {
     'Mask HSL must not redirect its local edit into the global transaction authority.',
   );
   assert.deepEqual(
-    useEditorStore.getState().adjustments.hsl,
-    before.adjustments.hsl,
+    getColorAdjustments().hsl,
+    getColorAdjustments(before).hsl,
     'Mask HSL must not replace the global HSL document.',
   );
 }
@@ -412,7 +435,7 @@ async function validateHslSurfaceInteraction(container: Element) {
   const rangeCommitted = useEditorStore.getState();
   assert.equal(rangeCommitted.adjustmentRevision, beforeRange.adjustmentRevision + 1);
   assert.equal(rangeCommitted.history.length, beforeRange.history.length + 1);
-  assert.equal(rangeCommitted.adjustments.selectiveColorRangeControls.oranges.centerHueDegrees, 42);
+  assert.equal(getColorAdjustments(rangeCommitted).selectiveColorRangeControls.oranges.centerHueDegrees, 42);
   assert.equal(rangeCommitted.lastEditApplicationReceipt?.source, 'manual-control');
   assert.equal(rangeCommitted.finalPreviewUrl, null, 'Global range commit must invalidate rendered output.');
   assert.equal(rangeCommitted.transformedOriginalUrl, null, 'Global range commit must invalidate transformed output.');
@@ -424,9 +447,9 @@ async function validateHslSurfaceInteraction(container: Element) {
   assert.ok(activeHue, 'Active Hue slider was not rendered after the range commit.');
   await changeRange(activeHue, 8);
   assert.equal(useEditorStore.getState().adjustmentRevision, beforeHue.adjustmentRevision + 1);
-  assert.equal(useEditorStore.getState().adjustments.hsl.oranges.hue, 8);
+  assert.equal(getColorAdjustments().hsl.oranges.hue, 8);
   await click(getByTestId<HTMLButtonElement>(container, 'selective-color-reset-active-range'));
-  assert.equal(useEditorStore.getState().adjustments.hsl.oranges.hue, 0);
+  assert.equal(getColorAdjustments().hsl.oranges.hue, 0);
   assert.equal(
     getRangeByLabel(localRangeDisclosure, 'Range center')?.value,
     '42',
@@ -439,8 +462,11 @@ async function validateHslSurfaceInteraction(container: Element) {
   const reset = useEditorStore.getState();
   assert.equal(reset.adjustmentRevision, beforeMixerReset.adjustmentRevision + 1);
   assert.equal(reset.history.length, beforeMixerReset.history.length + 1);
-  assert.deepEqual(reset.adjustments.hsl, INITIAL_ADJUSTMENTS.hsl);
-  assert.deepEqual(reset.adjustments.selectiveColorRangeControls, INITIAL_ADJUSTMENTS.selectiveColorRangeControls);
+  assert.deepEqual(getColorAdjustments(reset).hsl, INITIAL_ADJUSTMENTS.hsl);
+  assert.deepEqual(
+    getColorAdjustments(reset).selectiveColorRangeControls,
+    INITIAL_ADJUSTMENTS.selectiveColorRangeControls,
+  );
   assert.equal(
     getRangeByLabel(localRangeDisclosure, 'Range center')?.value,
     String(INITIAL_ADJUSTMENTS.selectiveColorRangeControls.oranges.centerHueDegrees),
@@ -479,7 +505,7 @@ async function validateColorBalanceRgbTransaction(container: Element) {
   const toggled = useEditorStore.getState();
   assert.equal(toggled.adjustmentRevision, beforeToggle.adjustmentRevision + 1);
   assert.equal(toggled.history.length, beforeToggle.history.length + 1);
-  assert.equal(toggled.adjustments.colorBalanceRgb.enabled, true);
+  assert.equal(getColorAdjustments(toggled).colorBalanceRgb.enabled, true);
   assert.equal(toggled.lastEditApplicationReceipt?.source, 'manual-control');
   assert.equal(toggled.finalPreviewUrl, null, 'Color Balance RGB toggle must invalidate rendered output.');
   assert.equal(toggled.transformedOriginalUrl, null, 'Color Balance RGB toggle must invalidate transformed output.');
@@ -490,29 +516,32 @@ async function validateColorBalanceRgbTransaction(container: Element) {
   const beforeChannel = useEditorStore.getState();
   await changeRange(red, 17);
   assert.equal(useEditorStore.getState().adjustmentRevision, beforeChannel.adjustmentRevision + 1);
-  assert.equal(useEditorStore.getState().adjustments.colorBalanceRgb.midtones.red, 17);
+  assert.equal(getColorAdjustments().colorBalanceRgb.midtones.red, 17);
 
   const preserveLuminance = getByTestId(container, 'color-balance-controls').querySelector<HTMLInputElement>(
     'input[type="checkbox"]',
   );
   assert.ok(preserveLuminance, 'Color Balance RGB preserve-luminance control was not rendered.');
   await click(preserveLuminance);
-  assert.equal(useEditorStore.getState().adjustments.colorBalanceRgb.preserveLuminance, false);
+  assert.equal(getColorAdjustments().colorBalanceRgb.preserveLuminance, false);
 
   const beforeRangeReset = useEditorStore.getState();
   await click(getByTestId<HTMLButtonElement>(container, 'color-balance-reset-range'));
   const rangeReset = useEditorStore.getState();
   assert.equal(rangeReset.adjustmentRevision, beforeRangeReset.adjustmentRevision + 1);
-  assert.deepEqual(rangeReset.adjustments.colorBalanceRgb.midtones, INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones);
-  assert.equal(rangeReset.adjustments.colorBalanceRgb.enabled, false);
-  assert.equal(rangeReset.adjustments.colorBalanceRgb.preserveLuminance, false);
+  assert.deepEqual(
+    getColorAdjustments(rangeReset).colorBalanceRgb.midtones,
+    INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones,
+  );
+  assert.equal(getColorAdjustments(rangeReset).colorBalanceRgb.enabled, false);
+  assert.equal(getColorAdjustments(rangeReset).colorBalanceRgb.preserveLuminance, false);
 
   const beforeFullReset = useEditorStore.getState();
   await click(getByTestId<HTMLButtonElement>(container, 'color-balance-reset'));
   const fullReset = useEditorStore.getState();
   assert.equal(fullReset.adjustmentRevision, beforeFullReset.adjustmentRevision + 1);
   assert.equal(fullReset.history.length, beforeFullReset.history.length + 1);
-  assert.deepEqual(fullReset.adjustments.colorBalanceRgb, INITIAL_ADJUSTMENTS.colorBalanceRgb);
+  assert.deepEqual(getColorAdjustments(fullReset).colorBalanceRgb, INITIAL_ADJUSTMENTS.colorBalanceRgb);
 }
 
 async function validateLevelsTransaction(container: Element) {
@@ -533,12 +562,16 @@ async function validateLevelsTransaction(container: Element) {
   const toggled = useEditorStore.getState();
   assert.equal(toggled.adjustmentRevision, beforeToggle.adjustmentRevision + 1);
   assert.equal(toggled.history.length, beforeToggle.history.length + 1);
-  assert.equal(toggled.adjustments.levels.enabled, true);
+  assert.equal(getColorAdjustments(toggled).levels.enabled, true);
   assert.equal(toggled.lastEditApplicationReceipt?.source, 'manual-control');
   assert.equal(toggled.finalPreviewUrl, null, 'Levels toggle must invalidate rendered output.');
   assert.equal(toggled.transformedOriginalUrl, null, 'Levels toggle must invalidate transformed output.');
 
-  const changeLevel = async (label: string, value: number, key: Exclude<keyof Adjustments['levels'], 'enabled'>) => {
+  const changeLevel = async (
+    label: string,
+    value: number,
+    key: Exclude<keyof ColorPanelAdjustmentView['levels'], 'enabled'>,
+  ) => {
     const control = getRangeByLabel(getByTestId(container, 'color-levels-controls'), label);
     assert.ok(control, `${label} Levels slider was not rendered.`);
     const before = useEditorStore.getState();
@@ -547,7 +580,7 @@ async function validateLevelsTransaction(container: Element) {
     assert.equal(committed.adjustmentRevision, before.adjustmentRevision + 1, `${label} must advance one revision.`);
     assert.equal(committed.history.length, before.history.length + 1, `${label} must append one history entry.`);
     assert.equal(committed.lastEditApplicationReceipt?.source, 'manual-control');
-    assert.equal(Math.round(committed.adjustments.levels[key] * 100), value);
+    assert.equal(Math.round(getColorAdjustments(committed).levels[key] * 100), value);
   };
 
   await changeLevel('Input Black', 8, 'inputBlack');
@@ -557,18 +590,18 @@ async function validateLevelsTransaction(container: Element) {
   await changeLevel('Output White', 97, 'outputWhite');
 
   const beforeReset = useEditorStore.getState();
-  const editedLevels = structuredClone(beforeReset.adjustments.levels);
+  const editedLevels = structuredClone(getColorAdjustments(beforeReset).levels);
   await click(getByTestId<HTMLButtonElement>(container, 'color-levels-reset'));
   const reset = useEditorStore.getState();
   assert.equal(reset.adjustmentRevision, beforeReset.adjustmentRevision + 1);
   assert.equal(reset.history.length, beforeReset.history.length + 1);
-  assert.deepEqual(reset.adjustments.levels, INITIAL_ADJUSTMENTS.levels);
+  assert.deepEqual(getColorAdjustments(reset).levels, INITIAL_ADJUSTMENTS.levels);
 
   await act(async () => {
     useEditorStore.getState().undo();
     await flushPromises();
   });
-  assert.deepEqual(useEditorStore.getState().adjustments.levels, editedLevels);
+  assert.deepEqual(getColorAdjustments().levels, editedLevels);
   assert.equal(
     getRangeByLabel(getByTestId(container, 'color-levels-controls'), 'Gamma')?.value,
     '125',
@@ -597,8 +630,10 @@ async function validateColorRangeLocalAdjustmentTransaction(container: Element) 
   );
   assert.equal(committed.lastEditApplicationReceipt?.source, 'layer-command');
   assert.equal(committed.lastEditApplicationReceipt?.persistence, 'commit');
-  assert.equal(committed.adjustments.masks.length, before.adjustments.masks.length + 1);
-  const createdLayer = committed.adjustments.masks.at(-1);
+  const committedMasks = selectEditDocumentMasks(committed.editDocumentV2);
+  const beforeMasks = selectEditDocumentMasks(before.editDocumentV2);
+  assert.equal(committedMasks.length, beforeMasks.length + 1);
+  const createdLayer = committedMasks.at(-1);
   assert.ok(createdLayer, 'Color-range transaction did not publish its created layer.');
   assert.equal(committed.activeMaskContainerId, createdLayer.id, 'Created layer was not selected after commit.');
   assert.equal(
@@ -607,7 +642,7 @@ async function validateColorRangeLocalAdjustmentTransaction(container: Element) 
     'Created range mask was not selected after commit.',
   );
   assert.equal(
-    readLayerStackSidecarsFromSidecar(committed.adjustments).at(-1)?.sourceImagePath,
+    readLayerStackSidecarsFromSidecar(committed.editDocumentV2.extensions).at(-1)?.sourceImagePath,
     '/fixtures/color-foundation.raw',
     'Color-range transaction did not preserve its replayable layer sidecar artifact.',
   );

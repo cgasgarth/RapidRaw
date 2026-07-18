@@ -85,8 +85,8 @@ test('Detail mask controls keep local denoise values outside the global transact
 test('Alt sharpening diagnostics are transient and publish only during the slider drag', async () => {
   installEditorSession();
   const container = await renderHarness(createElement(DenoiseControlsHarness));
-  const sharpening = findSliderByLabel(container, 'Sharpness');
-  if (sharpening === null) throw new Error('Expected Sharpness slider');
+  const sharpening = findSliderByLabel(container, 'Amount');
+  if (sharpening === null) throw new Error('Expected sharpening Amount slider');
 
   fireEvent.keyDown(window, { altKey: true, key: 'Alt' });
   fireEvent.mouseDown(sharpening, { clientX: 2 });

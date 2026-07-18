@@ -1,5 +1,5 @@
 import { DetailsAdjustment } from './adjustments';
-import type { EditTransactionRequest } from './editTransaction';
+import type { EditTransactionHistory, EditTransactionRequest } from './editTransaction';
 
 export const DETAIL_NUMBER_NODE_ADJUSTMENTS = [
   DetailsAdjustment.Clarity,
@@ -68,6 +68,7 @@ export const buildDetailEditTransaction = <Key extends DetailNodeAdjustment>(
   key: Key,
   value: DetailNodeAdjustmentValue<Key>,
   transactionId: string,
+  history: EditTransactionHistory = 'single-entry',
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== identity.sourceIdentity) {
     throw new Error(
@@ -85,7 +86,7 @@ export const buildDetailEditTransaction = <Key extends DetailNodeAdjustment>(
 
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
-    history: 'single-entry',
+    history,
     imageSessionId: identity.imageSessionId,
     operations: [{ nodeType: 'detail_denoise_dehaze', patch: { [key]: value }, type: 'patch-edit-document-node' }],
     persistence: 'commit',

@@ -1,14 +1,20 @@
 import cx from 'clsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useEditorActions } from '../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { type BasicToneCommitIdentity, buildBasicToneEditTransaction } from '../../utils/basicToneEditTransaction';
+import type { DetailCommitIdentity } from '../../utils/detailEditTransaction';
 import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
+import {
+  type EditNodeOperation,
+  type EditTransactionRequest,
+  reduceEditTransaction,
+} from '../../utils/editTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import {
   buildToneEqualizerEditTransaction,
@@ -25,7 +31,9 @@ import type { ColorPanelAdjustmentView } from './color/types';
 
 export type BasicAdjustmentView = EditDocumentNodeParamsV2<'scene_global_color_tone'> &
   EditDocumentNodeParamsV2<'scene_to_view_transform'> &
-  EditDocumentNodeParamsV2<'tone_equalizer'>;
+  EditDocumentNodeParamsV2<'tone_equalizer'> &
+  Partial<EditDocumentNodeParamsV2<'detail_denoise_dehaze'>> &
+  Partial<EditDocumentNodeParamsV2<'color_presence'>>;
 export type BasicAdjustmentUpdate = Partial<BasicAdjustmentView> | ((prev: BasicAdjustmentView) => BasicAdjustmentView);
 
 interface BasicAdjustmentsProps {
@@ -91,6 +99,72 @@ const TONE_CONTROL_ORDER = [
   BasicAdjustment.Whites,
   BasicAdjustment.Blacks,
 ] as const;
+
+const PRESENCE_CONTROL_ORDER = ['texture', 'clarity', 'dehaze', 'vibrance', 'saturation'] as const;
+type PresenceControl = (typeof PRESENCE_CONTROL_ORDER)[number];
+type PresenceAdjustmentKey = 'structure' | 'clarity' | 'dehaze' | 'vibrance' | 'saturation';
+
+const PRESENCE_CONTROL_KEYS: Record<PresenceControl, PresenceAdjustmentKey> = {
+  texture: 'structure',
+  clarity: 'clarity',
+  dehaze: 'dehaze',
+  vibrance: 'vibrance',
+  saturation: 'saturation',
+};
+
+type PresenceSliderInteraction = {
+  baseEditDocumentV2: EditDocumentV2;
+  identity: DetailCommitIdentity;
+  interactionId: string;
+  key: PresenceAdjustmentKey;
+  latestValue: number;
+};
+
+const isColorPresenceAdjustment = (key: PresenceAdjustmentKey): key is 'vibrance' | 'saturation' =>
+  key === 'vibrance' || key === 'saturation';
+
+const buildPresenceNodeOperation = (key: PresenceAdjustmentKey, value: number): EditNodeOperation =>
+  isColorPresenceAdjustment(key)
+    ? { nodeType: 'color_presence', patch: { [key]: value }, type: 'patch-edit-document-node' }
+    : { nodeType: 'detail_denoise_dehaze', patch: { [key]: value }, type: 'patch-edit-document-node' };
+
+const buildPresenceEditTransaction = (
+  state: {
+    adjustmentRevision: number;
+    editDocumentV2: EditDocumentV2;
+    imageSession: { id: string } | null;
+    imageSessionId: number;
+    selectedImage: { path: string } | null;
+  },
+  identity: DetailCommitIdentity,
+  key: PresenceAdjustmentKey,
+  value: number,
+  transactionId: string,
+  history: EditTransactionRequest['history'],
+  persistence: EditTransactionRequest['persistence'],
+): EditTransactionRequest => {
+  const currentImageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+  if (state.selectedImage?.path !== identity.sourceIdentity) {
+    throw new Error(`basic_presence_transaction.stale_source:${identity.sourceIdentity}`);
+  }
+  if (currentImageSessionId !== identity.imageSessionId) {
+    throw new Error(`basic_presence_transaction.stale_session:${identity.imageSessionId}`);
+  }
+  if (state.adjustmentRevision !== identity.adjustmentRevision) {
+    throw new Error(
+      `basic_presence_transaction.stale_revision:${String(identity.adjustmentRevision)}:${String(state.adjustmentRevision)}`,
+    );
+  }
+  return {
+    baseAdjustmentRevision: identity.adjustmentRevision,
+    history,
+    imageSessionId: identity.imageSessionId,
+    operations: [buildPresenceNodeOperation(key, value)],
+    persistence,
+    source: 'manual-control',
+    transactionId,
+  };
+};
 
 const ToneMapperSwitch = ({ selectedMapper, onMapperChange, onReset, disabled = false }: ToneMapperSwitchProps) => {
   const { t } = useTranslation();
@@ -208,7 +282,17 @@ export default function BasicAdjustments({
   );
   const basicToneCommitIdentityRef = useRef(basicToneCommitIdentity);
   basicToneCommitIdentityRef.current = basicToneCommitIdentity;
+  const detailCommitIdentity = useMemo<DetailCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const detailCommitIdentityRef = useRef(detailCommitIdentity);
+  detailCommitIdentityRef.current = detailCommitIdentity;
   const basicToneSliderInteractionIdsRef = useRef<Partial<Record<BasicAdjustment, string>>>({});
+  const presenceSliderInteractionsRef = useRef<Partial<Record<PresenceControl, PresenceSliderInteraction>>>({});
   const tonePlacementRequestGenerationRef = useRef(0);
   const toneHistogramPath = useMemo(() => {
     if (toneHistogram.length === 0) return '';
@@ -240,6 +324,114 @@ export default function BasicAdjustments({
       return;
     }
     setAdjustments((prev: BasicAdjustmentView) => ({ ...prev, [key]: value }));
+  };
+
+  const beginPresenceSliderInteraction = (control: PresenceControl) => {
+    if (isForMask) {
+      onDragStateChange?.(true);
+      return;
+    }
+    if (presenceSliderInteractionsRef.current[control] !== undefined) return;
+    const identity = detailCommitIdentityRef.current;
+    if (identity === null) return;
+    const key = PRESENCE_CONTROL_KEYS[control];
+    const state = useEditorStore.getState();
+    const currentValue = isColorPresenceAdjustment(key)
+      ? selectEditDocumentNode(state.editDocumentV2, 'color_presence').params[key]
+      : selectEditDocumentNode(state.editDocumentV2, 'detail_denoise_dehaze').params[key];
+    presenceSliderInteractionsRef.current[control] = {
+      baseEditDocumentV2: structuredClone(state.editDocumentV2),
+      identity,
+      interactionId: crypto.randomUUID(),
+      key,
+      latestValue: currentValue,
+    };
+    state.setEditor({ isSliderDragging: true });
+  };
+
+  const updatePresenceSliderInteraction = (control: PresenceControl, value: number) => {
+    const nextValue = Math.trunc(value);
+    const interaction = presenceSliderInteractionsRef.current[control];
+    if (interaction === undefined) {
+      const identity = detailCommitIdentityRef.current;
+      if (identity === null || isForMask) {
+        setAdjustments((prev: BasicAdjustmentView) => ({ ...prev, [PRESENCE_CONTROL_KEYS[control]]: nextValue }));
+        return;
+      }
+      const result = applyEditTransaction(
+        buildPresenceEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          PRESENCE_CONTROL_KEYS[control],
+          nextValue,
+          crypto.randomUUID(),
+          'single-entry',
+          'commit',
+        ),
+      );
+      detailCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+      return;
+    }
+    interaction.latestValue = nextValue;
+    const preview = reduceEditTransaction(
+      interaction.baseEditDocumentV2,
+      interaction.identity.adjustmentRevision,
+      buildPresenceEditTransaction(
+        useEditorStore.getState(),
+        interaction.identity,
+        interaction.key,
+        nextValue,
+        interaction.interactionId,
+        'none',
+        'preview-only',
+      ),
+      interaction.identity.imageSessionId,
+    );
+    useEditorStore.getState().publishWhiteBalancePickerPreview(preview.after);
+  };
+
+  const commitPresenceSliderInteraction = (control: PresenceControl) => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interaction = presenceSliderInteractionsRef.current[control];
+    if (interaction === undefined) return;
+    delete presenceSliderInteractionsRef.current[control];
+    try {
+      useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+      const result = applyEditTransaction(
+        buildPresenceEditTransaction(
+          useEditorStore.getState(),
+          interaction.identity,
+          interaction.key,
+          interaction.latestValue,
+          interaction.interactionId,
+          'single-entry',
+          'commit',
+        ),
+      );
+      detailCommitIdentityRef.current = {
+        ...interaction.identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+    } catch {
+      useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+    } finally {
+      useEditorStore.getState().setEditor({ isSliderDragging: false });
+    }
+  };
+
+  const cancelPresenceSliderInteraction = (control: PresenceControl) => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interaction = presenceSliderInteractionsRef.current[control];
+    if (interaction === undefined) return;
+    delete presenceSliderInteractionsRef.current[control];
+    useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+    useEditorStore.getState().setEditor({ isSliderDragging: false });
   };
 
   const beginBasicSliderInteraction = (key: BasicAdjustment) => {
@@ -289,6 +481,10 @@ export default function BasicAdjustments({
         if (interactionId !== undefined) cancelBasicToneSliderInteraction(interactionId);
       }
       basicToneSliderInteractionIdsRef.current = {};
+      for (const control of Object.keys(presenceSliderInteractionsRef.current) as PresenceControl[]) {
+        cancelPresenceSliderInteraction(control);
+      }
+      presenceSliderInteractionsRef.current = {};
     },
     [adjustmentRevision, cancelBasicToneSliderInteraction, imageSessionId, selectedImagePath],
   );
@@ -454,6 +650,32 @@ export default function BasicAdjustments({
       value={adjustments[key]}
     />
   );
+
+  const renderPresenceSlider = (control: PresenceControl, label: string) => {
+    const key = PRESENCE_CONTROL_KEYS[control];
+    const value = adjustments[key] ?? 0;
+    const isUnavailable = !isForMask && (detailCommitIdentity === null || !selectedImageReady);
+    return (
+      <AdjustmentSlider
+        defaultValue={0}
+        disabled={isUnavailable}
+        density="compact"
+        label={label}
+        max={100}
+        min={-100}
+        onDragStateChange={onDragStateChange}
+        onInteractionCancel={() => cancelPresenceSliderInteraction(control)}
+        onInteractionCommit={() => commitPresenceSliderInteraction(control)}
+        onInteractionStart={() => beginPresenceSliderInteraction(control)}
+        onValueChange={(nextValue) => {
+          updatePresenceSliderInteraction(control, nextValue);
+        }}
+        step={1}
+        testId={`basic-presence-control-${control}`}
+        value={value}
+      />
+    );
+  };
 
   const hideToneMapper = isForMask || appSettings?.tonemapperOverrideEnabled;
   const toneLabels: Record<(typeof TONE_CONTROL_ORDER)[number], string> = {
@@ -766,6 +988,24 @@ export default function BasicAdjustments({
             </div>
           </div>
         ) : null}
+      </section>
+
+      <section className="mt-1 border-t border-editor-divider pt-1" data-testid="basic-presence-section">
+        <div className="flex min-h-6 items-center justify-between gap-2 border-b border-editor-divider pb-0.5">
+          <span className="px-1 text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary">
+            {t('adjustments.basic.presence', { defaultValue: 'Presence' })}
+          </span>
+        </div>
+        {PRESENCE_CONTROL_ORDER.map((control) => (
+          <div key={control}>
+            {renderPresenceSlider(
+              control,
+              t(`adjustments.basic.${control}`, {
+                defaultValue: control.charAt(0).toUpperCase() + control.slice(1),
+              }),
+            )}
+          </div>
+        ))}
       </section>
     </div>
   );

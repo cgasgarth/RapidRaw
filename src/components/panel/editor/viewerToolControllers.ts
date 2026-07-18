@@ -13,6 +13,7 @@ export interface ViewerToolPointerSample {
 
 export type ViewerToolId =
   | 'brush'
+  | 'color-mixer'
   | 'compare-divider'
   | 'crop'
   | 'focus-retouch'
@@ -21,6 +22,7 @@ export type ViewerToolId =
   | 'point-color'
   | 'retouch'
   | 'straighten'
+  | 'tone-curve'
   | 'tone-equalizer'
   | 'viewer-sampler'
   | 'white-balance';
@@ -101,6 +103,7 @@ const createController = (id: ViewerToolId): ViewerToolController => ({
 
 const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>> = {
   brush: createController('brush'),
+  'color-mixer': createController('color-mixer'),
   'compare-divider': createController('compare-divider'),
   crop: createController('crop'),
   'focus-retouch': createController('focus-retouch'),
@@ -109,6 +112,7 @@ const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>
   'point-color': createController('point-color'),
   retouch: createController('retouch'),
   straighten: createController('straighten'),
+  'tone-curve': createController('tone-curve'),
   'tone-equalizer': createController('tone-equalizer'),
   'viewer-sampler': createController('viewer-sampler'),
   'white-balance': createController('white-balance'),
@@ -117,12 +121,14 @@ const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>
 export const resolveViewerToolId = (tool: string): ViewerToolId => {
   if (
     tool === 'brush' ||
+    tool === 'color-mixer' ||
     tool === 'compare-divider' ||
     tool === 'crop' ||
     tool === 'mask' ||
     tool === 'point-color' ||
     tool === 'retouch' ||
     tool === 'straighten' ||
+    tool === 'tone-curve' ||
     tool === 'tone-equalizer' ||
     tool === 'white-balance'
   )

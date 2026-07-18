@@ -75,6 +75,14 @@ import {
 } from '../utils/editTransaction';
 import { buildHistoryNavigationEditTransaction } from '../utils/historyNavigationEditTransaction';
 import { loadMaskOverlaySettingsPreference } from '../utils/mask/maskOverlayPreferences';
+import type { PerceptualGradingCommitIdentity } from '../utils/perceptualGradingEditTransaction';
+import {
+  beginPerceptualGradingSliderInteraction,
+  buildPerceptualGradingSliderInteractionRequest,
+  isCurrentPerceptualGradingSliderInteraction,
+  type PerceptualGradingSliderInteraction,
+  reducePerceptualGradingSliderInteractionPreview,
+} from '../utils/perceptualGradingSliderInteraction';
 import type { PreviewArtifact, PreviewViewportTransformSnapshot } from '../utils/previewCoordinator';
 import type { ReferenceMatchGroup, ReferenceMatchReference, ReferenceSpatialAnalysis } from '../utils/referenceMatch';
 import { PANEL_SCOPES_HEIGHT } from '../utils/waveformSizing';
@@ -198,6 +206,7 @@ interface EditorState {
   proofRevision: number;
   lastBasicToneCommand: BasicToneCommandEnvelope | null;
   basicToneSliderInteraction: BasicToneSliderInteraction | null;
+  perceptualGradingSliderInteraction: PerceptualGradingSliderInteraction | null;
 
   // History State
   history: EditDocumentV2[];
@@ -258,6 +267,8 @@ interface EditorState {
   overlayMode: OverlayMode;
   overlayRotation: number;
   maskOverlaySettings: MaskOverlaySettings;
+  maskSelectedPinVisible: boolean;
+  maskHandlesVisible: boolean;
   isStraightenActive: boolean;
   isWbPickerActive: boolean;
   lastWhiteBalancePickerReceipt: WhiteBalancePickerRuntimeReceipt | null;
@@ -300,6 +311,13 @@ interface EditorState {
   updateBasicToneSliderInteraction: (interactionId: string, value: number) => void;
   commitBasicToneSliderInteraction: (interactionId: string) => EditTransactionResult | null;
   cancelBasicToneSliderInteraction: (interactionId: string) => void;
+  beginPerceptualGradingSliderInteraction: (
+    identity: PerceptualGradingCommitIdentity,
+    interactionId: string,
+  ) => boolean;
+  updatePerceptualGradingSliderInteraction: (interactionId: string, colorGrading: Adjustments['colorGrading']) => void;
+  commitPerceptualGradingSliderInteraction: (interactionId: string) => EditTransactionResult | null;
+  cancelPerceptualGradingSliderInteraction: (interactionId: string) => void;
   applyEditorTeardownTransaction: (request: EditorTeardownTransactionRequest) => EditorTeardownTransactionResult;
   applyAiEditCommand: (command: AiEditCommand) => AiEditSelection | null;
   dispatchCompare: (command: EditorCompareCommand) => void;
@@ -483,7 +501,7 @@ const applyEditorStateUpdate = (
     const update: Partial<EditorState> = { ...rawUpdate };
 
     if (
-      state.basicToneSliderInteraction !== null &&
+      (state.basicToneSliderInteraction !== null || state.perceptualGradingSliderInteraction !== null) &&
       (('selectedImage' in update && update.selectedImage?.path !== state.selectedImage?.path) ||
         ('imageSession' in update && update.imageSession?.id !== state.imageSession?.id) ||
         ('imageSessionId' in update && update.imageSessionId !== state.imageSessionId) ||
@@ -491,6 +509,7 @@ const applyEditorStateUpdate = (
         ('adjustmentRevision' in update && update.adjustmentRevision !== state.adjustmentRevision))
     ) {
       update.basicToneSliderInteraction = null;
+      update.perceptualGradingSliderInteraction = null;
       update.isSliderDragging = false;
     }
 
@@ -635,6 +654,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   proofRevision: 1,
   lastBasicToneCommand: null,
   basicToneSliderInteraction: null,
+  perceptualGradingSliderInteraction: null,
   history: [initialEditDocumentV2],
   historyCheckpoints: [],
   historyIndex: 0,
@@ -691,6 +711,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   overlayMode: 'thirds',
   overlayRotation: 0,
   maskOverlaySettings: loadMaskOverlaySettingsPreference(),
+  maskSelectedPinVisible: true,
+  maskHandlesVisible: true,
   transformedOriginalUrl: null,
   isStraightenActive: false,
   isWbPickerActive: false,
@@ -762,6 +784,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         adjustmentRevision,
         autoEditPreviewSession: null,
         basicToneSliderInteraction: null,
+        perceptualGradingSliderInteraction: null,
         compare: DEFAULT_EDITOR_COMPARE_STATE,
         gamutWarningOverlay: null,
         hasRenderedFirstFrame: false,
@@ -772,6 +795,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         imageSession: null,
         imageSessionId,
         isMaskControlHovered: false,
+        maskSelectedPinVisible: true,
+        maskHandlesVisible: true,
         isWbPickerActive: false,
         isSliderDragging: false,
         detailModifierPreview: null,
@@ -950,6 +975,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...publishEditDocumentState(state, nextResult.after),
         adjustmentRevision: nextResult.nextAdjustmentRevision,
         basicToneSliderInteraction: null,
+        perceptualGradingSliderInteraction: null,
         isSliderDragging: false,
         lastEditApplicationReceipt: publishedResult.applicationReceipt,
         history: nextHistory.history,
@@ -1016,6 +1042,63 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) =>
       state.basicToneSliderInteraction?.interactionId === interactionId
         ? { basicToneSliderInteraction: null, isSliderDragging: false }
+        : {},
+    );
+  },
+
+  beginPerceptualGradingSliderInteraction: (identity, interactionId) => {
+    try {
+      if (get().perceptualGradingSliderInteraction !== null) return false;
+      const interaction = beginPerceptualGradingSliderInteraction(get(), identity, interactionId);
+      set({ perceptualGradingSliderInteraction: interaction, isSliderDragging: true });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  updatePerceptualGradingSliderInteraction: (interactionId, colorGrading) => {
+    set((state) => {
+      const interaction = state.perceptualGradingSliderInteraction;
+      if (interaction?.interactionId !== interactionId) return {};
+      if (!isCurrentPerceptualGradingSliderInteraction(state, interaction)) {
+        return { perceptualGradingSliderInteraction: null, isSliderDragging: false };
+      }
+      const result = reducePerceptualGradingSliderInteractionPreview(interaction, colorGrading);
+      return {
+        perceptualGradingSliderInteraction: {
+          ...interaction,
+          latestColorGrading: structuredClone(colorGrading),
+          previewSnapshot: publishAdjustmentSnapshot(
+            interaction.previewSnapshot ?? state.adjustmentSnapshot,
+            result.after,
+          ),
+        },
+      };
+    });
+  },
+
+  commitPerceptualGradingSliderInteraction: (interactionId) => {
+    const interaction = get().perceptualGradingSliderInteraction;
+    if (interaction?.interactionId !== interactionId) return null;
+    if (!isCurrentPerceptualGradingSliderInteraction(get(), interaction)) {
+      set({ perceptualGradingSliderInteraction: null, isSliderDragging: false });
+      return null;
+    }
+    set({ perceptualGradingSliderInteraction: null });
+    try {
+      return get().applyEditTransaction(
+        buildPerceptualGradingSliderInteractionRequest(interaction, interaction.latestColorGrading, 'commit'),
+      );
+    } finally {
+      set({ isSliderDragging: false });
+    }
+  },
+
+  cancelPerceptualGradingSliderInteraction: (interactionId) => {
+    set((state) =>
+      state.perceptualGradingSliderInteraction?.interactionId === interactionId
+        ? { perceptualGradingSliderInteraction: null, isSliderDragging: false }
         : {},
     );
   },

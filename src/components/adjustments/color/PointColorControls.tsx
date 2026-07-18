@@ -1,13 +1,20 @@
-import { Crosshair, Plus, Trash2 } from 'lucide-react';
-import { useMemo, useRef } from 'react';
+import { Crosshair, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { POINT_COLOR_MAX_POINTS_V1 } from '../../../../packages/rawengine-schema/src/color/pointColorSchemas';
+import {
+  POINT_COLOR_MAX_POINTS_V1,
+  type PointColorPlanV1,
+  pointColorPlanV1Schema,
+} from '../../../../packages/rawengine-schema/src/color/pointColorSchemas';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useUIStore } from '../../../store/useUIStore';
-import type { Adjustments } from '../../../utils/adjustments';
+import { type Adjustments, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { selectEditDocumentNode } from '../../../utils/editDocumentSelectors';
+import { reduceEditTransaction } from '../../../utils/editTransaction';
 import {
   buildPointColorEditTransaction,
   type PointColorCommitIdentity,
+  type PointColorPatch,
 } from '../../../utils/pointColorEditTransaction';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -17,34 +24,14 @@ interface PointColorControlsProps extends ColorPanelGroupProps {
   isForMask?: boolean;
 }
 
-const createPoint = (index: number): Adjustments['pointColor']['points'][number] => {
-  const id = crypto.randomUUID();
-  return {
-    chromaRadius: 0.08,
-    chromaShift: 0,
-    enabled: true,
-    feather: 0.4,
-    hueRadiusDegrees: 25,
-    hueShiftDegrees: 0,
-    id,
-    lightnessRadius: 0.2,
-    lightnessShift: 0,
-    name: `Point ${index + 1}`,
-    opacity: 1,
-    samples: [
-      {
-        confidence: 1,
-        graphRevision: 'manual_pending_picker',
-        id: crypto.randomUUID(),
-        sampleRadiusPx: 5,
-        sourceColor: { chroma: 0.12, hueDegrees: 30, lightness: 0.6 },
-        sourceSceneRevision: 'manual_pending_picker',
-      },
-    ],
-    saturationShift: 0,
-    variance: 1,
-  };
+type PointColorSliderInteraction = {
+  baseEditDocumentV2: ReturnType<typeof useEditorStore.getState>['editDocumentV2'];
+  identity: PointColorCommitIdentity;
+  interactionId: string;
+  latestPlan: PointColorPlanV1;
 };
+
+const clampPointName = (value: string): string => value.trim().slice(0, 80);
 
 export const PointColorControls = ({
   adjustments,
@@ -54,6 +41,7 @@ export const PointColorControls = ({
 }: PointColorControlsProps) => {
   const { t } = useTranslation();
   const pointColorPickerActive = useUIStore((state) => state.pointColorPickerActive);
+  const pointColorPickerReceipt = useUIStore((state) => state.pointColorPickerReceipt);
   const setUI = useUIStore((state) => state.setUI);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
@@ -70,14 +58,34 @@ export const PointColorControls = ({
   );
   const commitIdentityRef = useRef(commitIdentity);
   commitIdentityRef.current = commitIdentity;
+  const pointColorSliderInteractionsRef = useRef<Partial<Record<string, PointColorSliderInteraction>>>({});
   const plan = adjustments.pointColor;
+  const pointLimitReached = plan.points.length >= POINT_COLOR_MAX_POINTS_V1;
+  const canSampleFromImage = !isForMask && selectedImagePath !== null && !pointLimitReached;
   const selected = useMemo(
     () => plan.points.find((point) => point.id === plan.selectedPointId) ?? plan.points[0] ?? null,
     [plan.points, plan.selectedPointId],
   );
   const sample = selected?.samples[0] ?? null;
+  const currentPointColorPickerReceipt =
+    pointColorPickerReceipt?.sourceIdentity === selectedImagePath ? pointColorPickerReceipt : null;
 
-  const updatePlan = (update: Partial<Adjustments['pointColor']>) => {
+  useEffect(
+    () => () => {
+      setUI({ pointColorPickerActive: false, pointColorPickerReceipt: null });
+    },
+    [setUI],
+  );
+  const [nameDraft, setNameDraft] = useState(selected?.name ?? '');
+  const nameDraftPointId = useRef<string | null>(selected?.id ?? null);
+
+  useEffect(() => {
+    if (nameDraftPointId.current === selected?.id) return;
+    nameDraftPointId.current = selected?.id ?? null;
+    setNameDraft(selected?.name ?? '');
+  }, [selected?.id, selected?.name]);
+
+  const updatePlan = (update: PointColorPatch) => {
     const identity = commitIdentityRef.current;
     if (identity === null) {
       setAdjustments((previous) => ({ ...previous, pointColor: { ...previous.pointColor, ...update } }));
@@ -88,20 +96,203 @@ export const PointColorControls = ({
     );
     commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
   };
-  const updateSelected = (update: Partial<NonNullable<typeof selected>>) => {
-    if (selected === null) return;
-    updatePlan({ points: plan.points.map((point) => (point.id === selected.id ? { ...point, ...update } : point)) });
+
+  const beginPointColorSliderInteraction = (key: string) => {
+    if (isForMask) {
+      onDragStateChange?.(true);
+      return;
+    }
+    if (pointColorSliderInteractionsRef.current[key] !== undefined) return;
+    const identity = commitIdentityRef.current;
+    if (identity === null) return;
+    const state = useEditorStore.getState();
+    pointColorSliderInteractionsRef.current[key] = {
+      baseEditDocumentV2: structuredClone(state.editDocumentV2),
+      identity,
+      interactionId: crypto.randomUUID(),
+      latestPlan: structuredClone(selectEditDocumentNode(state.editDocumentV2, 'point_color').params.pointColor),
+    };
+    state.setEditor({ isSliderDragging: true });
   };
-  const updateSourceColor = (update: Partial<NonNullable<typeof sample>['sourceColor']>) => {
-    if (selected === null || sample === null) return;
-    updateSelected({
-      samples: selected.samples.map((entry, index) =>
-        index === 0 ? { ...entry, sourceColor: { ...entry.sourceColor, ...update } } : entry,
+
+  const updatePointColorSliderInteraction = (key: string, patch: PointColorPatch) => {
+    if (isForMask) {
+      updatePlan(patch);
+      return;
+    }
+    const interaction = pointColorSliderInteractionsRef.current[key];
+    if (interaction === undefined) {
+      updatePlan(patch);
+      return;
+    }
+    const latestPlan = pointColorPlanV1Schema.parse({ ...interaction.latestPlan, ...structuredClone(patch) });
+    interaction.latestPlan = latestPlan;
+    const state = useEditorStore.getState();
+    const preview = reduceEditTransaction(
+      interaction.baseEditDocumentV2,
+      interaction.identity.adjustmentRevision,
+      buildPointColorEditTransaction(
+        state,
+        interaction.identity,
+        latestPlan,
+        interaction.interactionId,
+        'none',
+        'preview-only',
       ),
-    });
+      interaction.identity.imageSessionId,
+    );
+    state.publishWhiteBalancePickerPreview(preview.after);
   };
-  const updateSkin = (update: Partial<Adjustments['pointColor']['skinUniformity']>) => {
-    updatePlan({ skinUniformity: { ...plan.skinUniformity, ...update } });
+
+  const commitPointColorSliderInteraction = (key: string) => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interaction = pointColorSliderInteractionsRef.current[key];
+    if (interaction === undefined) return;
+    delete pointColorSliderInteractionsRef.current[key];
+    try {
+      const state = useEditorStore.getState();
+      state.publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+      const result = state.applyEditTransaction(
+        buildPointColorEditTransaction(
+          useEditorStore.getState(),
+          interaction.identity,
+          interaction.latestPlan,
+          interaction.interactionId,
+        ),
+      );
+      commitIdentityRef.current = {
+        ...interaction.identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+    } catch {
+      useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+    } finally {
+      useEditorStore.getState().setEditor({ isSliderDragging: false });
+    }
+  };
+
+  const cancelPointColorSliderInteraction = (key: string) => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interaction = pointColorSliderInteractionsRef.current[key];
+    if (interaction === undefined) return;
+    delete pointColorSliderInteractionsRef.current[key];
+    useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+    useEditorStore.getState().setEditor({ isSliderDragging: false });
+  };
+
+  useEffect(() => {
+    return () => {
+      for (const key of Object.keys(pointColorSliderInteractionsRef.current)) {
+        cancelPointColorSliderInteraction(key);
+      }
+    };
+  }, [adjustmentRevision, imageSessionId, selectedImagePath]);
+
+  const pointColorSliderInteractionProps = (key: string) => ({
+    onInteractionCancel: () => cancelPointColorSliderInteraction(key),
+    onInteractionCommit: () => commitPointColorSliderInteraction(key),
+    onInteractionStart: () => beginPointColorSliderInteraction(key),
+  });
+
+  const updateSelected = (update: Partial<NonNullable<typeof selected>>, sliderKey?: string) => {
+    if (selected === null) return;
+    const interaction = sliderKey === undefined ? undefined : pointColorSliderInteractionsRef.current[sliderKey];
+    const currentPlan = interaction?.latestPlan ?? plan;
+    const currentSelected = currentPlan.points.find((point) => point.id === selected.id);
+    if (currentSelected === undefined) return;
+    const points = currentPlan.points.map((point) => (point.id === selected.id ? { ...point, ...update } : point));
+    if (sliderKey === undefined) updatePlan({ points });
+    else updatePointColorSliderInteraction(sliderKey, { points });
+  };
+
+  const updateSourceColor = (update: Partial<NonNullable<typeof sample>['sourceColor']>, sliderKey?: string) => {
+    if (selected === null || sample === null) return;
+    updateSelected(
+      {
+        samples: (
+          pointColorSliderInteractionsRef.current[sliderKey ?? '']?.latestPlan.points.find(
+            (point) => point.id === selected.id,
+          ) ?? selected
+        ).samples.map((entry, index) =>
+          index === 0 ? { ...entry, sourceColor: { ...entry.sourceColor, ...update } } : entry,
+        ),
+      },
+      sliderKey,
+    );
+  };
+
+  const updateSkin = (update: Partial<Adjustments['pointColor']['skinUniformity']>, sliderKey?: string) => {
+    const interaction = sliderKey === undefined ? undefined : pointColorSliderInteractionsRef.current[sliderKey];
+    const currentPlan = interaction?.latestPlan ?? plan;
+    const skinUniformity = { ...currentPlan.skinUniformity, ...update };
+    if (sliderKey === undefined) updatePlan({ skinUniformity });
+    else updatePointColorSliderInteraction(sliderKey, { skinUniformity });
+  };
+
+  const commitName = (draft = nameDraft) => {
+    if (selected === null) return;
+    const nextName = clampPointName(draft);
+    if (nextName.length === 0 || nextName === selected.name) {
+      setNameDraft(selected.name);
+      return;
+    }
+    updateSelected({ name: nextName });
+    setNameDraft(nextName);
+  };
+
+  const togglePicker = () => {
+    if (!canSampleFromImage && !pointColorPickerActive) return;
+    const nextActive = !pointColorPickerActive;
+    setUI({ pointColorPickerActive: nextActive, pointColorPickerReceipt: null });
+    // Range visualization is a canvas tool state; starting/cancelling a sample
+    // must never leave an old range overlay active.
+    if (nextActive && plan.visualizeMode !== 'image') updatePlan({ visualizeMode: 'image' });
+  };
+
+  const resetPointColor = () => {
+    updatePlan({
+      enabled: INITIAL_ADJUSTMENTS.pointColor.enabled,
+      points: structuredClone(INITIAL_ADJUSTMENTS.pointColor.points),
+      selectedPointId: INITIAL_ADJUSTMENTS.pointColor.selectedPointId,
+      skinUniformity: structuredClone(INITIAL_ADJUSTMENTS.pointColor.skinUniformity),
+      visualizeMode: INITIAL_ADJUSTMENTS.pointColor.visualizeMode,
+    });
+    setUI({ pointColorPickerActive: false, pointColorPickerReceipt: null });
+  };
+
+  const selectPointByOffset = (offset: number) => {
+    if (plan.points.length === 0) return;
+    const selectedIndex = Math.max(
+      0,
+      plan.points.findIndex((point) => point.id === selected?.id),
+    );
+    const nextIndex = Math.min(plan.points.length - 1, Math.max(0, selectedIndex + offset));
+    const nextPoint = plan.points[nextIndex];
+    if (nextPoint !== undefined && nextPoint.id !== selected?.id) updatePlan({ selectedPointId: nextPoint.id });
+  };
+
+  const handlePointListKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      selectPointByOffset(1);
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      event.preventDefault();
+      selectPointByOffset(-1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      const first = plan.points[0];
+      if (first !== undefined) updatePlan({ selectedPointId: first.id });
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      const last = plan.points.at(-1);
+      if (last !== undefined) updatePlan({ selectedPointId: last.id });
+    }
   };
 
   return (
@@ -110,6 +301,7 @@ export const PointColorControls = ({
       data-commit-adjustment-revision={commitIdentity?.adjustmentRevision}
       data-commit-image-session={commitIdentity?.imageSessionId}
       data-commit-source-identity={commitIdentity?.sourceIdentity}
+      data-point-color-receipt-source={currentPointColorPickerReceipt?.sourceIdentity}
       data-testid="point-color-controls"
       open
     >
@@ -121,8 +313,16 @@ export const PointColorControls = ({
           title="Point Color"
         />
       </summary>
-      <div className="space-y-1 border-t border-editor-border p-1.5">
-        <div className="flex gap-1">
+      <div
+        className="space-y-1 border-t border-editor-border p-1.5"
+        data-point-color-visualize-mode={plan.visualizeMode}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && pointColorPickerActive) {
+            setUI({ pointColorPickerActive: false, pointColorPickerReceipt: null });
+          }
+        }}
+      >
+        <div className="flex flex-wrap gap-1">
           <button
             aria-pressed={plan.enabled}
             className="rounded border border-editor-border px-2 py-1 text-xs"
@@ -133,41 +333,79 @@ export const PointColorControls = ({
             {plan.enabled ? 'Enabled' : 'Enable'}
           </button>
           <button
-            className="flex items-center gap-1 rounded border border-editor-border px-2 py-1 text-xs"
-            disabled={plan.points.length >= POINT_COLOR_MAX_POINTS_V1}
-            onClick={() => {
-              const point = createPoint(plan.points.length);
-              updatePlan({ enabled: true, points: [...plan.points, point], selectedPointId: point.id });
-            }}
-            type="button"
-          >
-            <Plus size={12} /> {t('adjustments.color.pointColor.addPoint')}
-          </button>
-          <button
             aria-pressed={pointColorPickerActive}
             className="flex items-center gap-1 rounded border border-editor-border px-2 py-1 text-xs"
             data-testid="point-color-picker"
-            onClick={() => setUI({ pointColorPickerActive: !pointColorPickerActive, pointColorPickerReceipt: null })}
+            disabled={!canSampleFromImage && !pointColorPickerActive}
+            onClick={togglePicker}
             type="button"
           >
             <Crosshair size={12} /> {t('adjustments.color.pointColor.pickFromImage')}
           </button>
           <button
-            aria-pressed={plan.visualizeMode !== 'image'}
+            aria-label={t('adjustments.color.pointColor.addPoint')}
             className="flex items-center gap-1 rounded border border-editor-border px-2 py-1 text-xs"
+            data-testid="point-color-add-point"
+            disabled={pointLimitReached || !canSampleFromImage || pointColorPickerActive}
+            onClick={togglePicker}
+            title={t('adjustments.color.pointColor.addPointHint', {
+              defaultValue: 'Sample a rendered pixel to add a point',
+            })}
+            type="button"
+          >
+            <Plus size={12} /> {t('adjustments.color.pointColor.addPoint')}
+          </button>
+          <button
+            aria-pressed={plan.visualizeMode === 'range'}
+            className="flex items-center gap-1 rounded border border-editor-border px-2 py-1 text-xs"
+            data-testid="point-color-visualize-range"
             disabled={selected === null}
-            onClick={() => updatePlan({ visualizeMode: plan.visualizeMode === 'image' ? 'range' : 'image' })}
+            onClick={() => updatePlan({ visualizeMode: plan.visualizeMode === 'range' ? 'image' : 'range' })}
             type="button"
           >
             <Crosshair size={12} /> {t('adjustments.color.pointColor.visualize')}
           </button>
+          <button
+            aria-label={t('adjustments.color.pointColor.reset', { defaultValue: 'Reset Point Color' })}
+            className="flex items-center gap-1 rounded border border-editor-border px-2 py-1 text-xs text-text-secondary"
+            data-testid="point-color-reset"
+            disabled={!plan.enabled && plan.points.length === 0 && !plan.skinUniformity.enabled}
+            onClick={resetPointColor}
+            type="button"
+          >
+            <RotateCcw size={12} /> {t('adjustments.color.pointColor.resetAction', { defaultValue: 'Reset' })}
+          </button>
         </div>
+        {pointColorPickerActive ? (
+          <p className="text-xs text-text-secondary" data-testid="point-color-picker-hint">
+            {t('adjustments.color.pointColor.pickerHint', {
+              defaultValue: 'Click a rendered pixel to add a sampled point. Escape cancels.',
+            })}
+          </p>
+        ) : null}
+        {currentPointColorPickerReceipt ? (
+          <p className="text-[10px] text-text-secondary" data-testid="point-color-picker-receipt">
+            {t('adjustments.color.pointColor.pickerReceipt', {
+              confidence: (currentPointColorPickerReceipt.confidence * 100).toFixed(0),
+              defaultValue: 'Sampled {{confidence}}% confidence · {{revision}}',
+              revision: currentPointColorPickerReceipt.graphRevision,
+            })}
+          </p>
+        ) : null}
         {plan.points.length > 0 ? (
-          <div aria-label={t('adjustments.color.pointColor.samples')} className="flex flex-wrap gap-1" role="listbox">
+          <div
+            aria-label={t('adjustments.color.pointColor.samples')}
+            className="flex flex-wrap gap-1"
+            data-testid="point-color-sample-list"
+            onKeyDown={handlePointListKeyDown}
+            role="listbox"
+            tabIndex={0}
+          >
             {plan.points.map((point) => (
               <button
                 aria-selected={point.id === selected?.id}
                 className="rounded border border-editor-border px-2 py-1 text-xs"
+                data-testid={`point-color-sample-${point.id}`}
                 key={point.id}
                 onClick={() => updatePlan({ selectedPointId: point.id })}
                 role="option"
@@ -182,9 +420,36 @@ export const PointColorControls = ({
         )}
         {selected !== null && sample !== null ? (
           <div className="space-y-1" data-testid="point-color-selected-controls">
+            <div className="flex items-center gap-1">
+              <label className="min-w-0 flex-1 text-xs text-text-secondary" htmlFor="point-color-name">
+                {t('adjustments.color.pointColor.name', { defaultValue: 'Name' })}
+              </label>
+              <input
+                aria-label={t('adjustments.color.pointColor.nameInput', { defaultValue: 'Point name' })}
+                className="min-w-0 flex-1 rounded border border-editor-border bg-transparent px-1 py-0.5 text-xs"
+                data-testid="point-color-name"
+                id="point-color-name"
+                maxLength={80}
+                onBlur={(event) => commitName(event.currentTarget.value)}
+                onChange={(event) => setNameDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    commitName(event.currentTarget.value);
+                    event.currentTarget.blur();
+                  } else if (event.key === 'Escape') {
+                    event.preventDefault();
+                    setNameDraft(selected.name);
+                    event.currentTarget.blur();
+                  }
+                }}
+                value={nameDraft}
+              />
+            </div>
             <button
               aria-label={`Delete ${selected.name}`}
               className="flex items-center gap-1 text-xs text-text-secondary"
+              data-testid="point-color-delete-point"
               onClick={() => {
                 const points = plan.points.filter((point) => point.id !== selected.id);
                 updatePlan({ points, selectedPointId: points[0]?.id ?? null });
@@ -193,106 +458,154 @@ export const PointColorControls = ({
             >
               <Trash2 size={12} /> {t('adjustments.color.pointColor.deletePoint')}
             </button>
-            <AdjustmentSlider
-              density="compact"
-              label="Picked hue"
-              max={360}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSourceColor({ hueDegrees: value })}
-              step={1}
-              value={sample.sourceColor.hueDegrees}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Picked chroma"
-              max={0.5}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSourceColor({ chroma: value })}
-              step={0.005}
-              value={sample.sourceColor.chroma}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Picked lightness"
-              max={1.5}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSourceColor({ lightness: value })}
-              step={0.01}
-              value={sample.sourceColor.lightness}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Hue range"
-              max={180}
-              min={1}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSelected({ hueRadiusDegrees: value })}
-              step={1}
-              value={selected.hueRadiusDegrees}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Variance"
-              max={4}
-              min={0.25}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSelected({ variance: value })}
-              step={0.05}
-              value={selected.variance}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Feather"
-              max={1}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSelected({ feather: value })}
-              step={0.01}
-              value={selected.feather}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Hue shift"
-              max={180}
-              min={-180}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSelected({ hueShiftDegrees: value })}
-              step={1}
-              value={selected.hueShiftDegrees}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Chroma shift"
-              max={1}
-              min={-1}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSelected({ chromaShift: value })}
-              step={0.01}
-              value={selected.chromaShift}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Saturation shift"
-              max={4}
-              min={-1}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSelected({ saturationShift: value })}
-              step={0.01}
-              value={selected.saturationShift}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label="Lightness shift"
-              max={1}
-              min={-1}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => updateSelected({ lightnessShift: value })}
-              step={0.01}
-              value={selected.lightnessShift}
-            />
+            <div className="grid grid-cols-2 gap-x-2">
+              <AdjustmentSlider
+                density="compact"
+                label="Hue shift"
+                max={180}
+                min={-180}
+                onDragStateChange={onDragStateChange}
+                {...pointColorSliderInteractionProps('hue-shift')}
+                onValueChange={(value) => updateSelected({ hueShiftDegrees: value }, 'hue-shift')}
+                step={1}
+                testId="point-color-hue-shift"
+                value={selected.hueShiftDegrees}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label="Saturation shift"
+                max={4}
+                min={-1}
+                onDragStateChange={onDragStateChange}
+                {...pointColorSliderInteractionProps('saturation-shift')}
+                onValueChange={(value) => updateSelected({ saturationShift: value }, 'saturation-shift')}
+                step={0.01}
+                testId="point-color-saturation-shift"
+                value={selected.saturationShift}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label="Luminance shift"
+                max={1}
+                min={-1}
+                onDragStateChange={onDragStateChange}
+                {...pointColorSliderInteractionProps('luminance-shift')}
+                onValueChange={(value) => updateSelected({ lightnessShift: value }, 'luminance-shift')}
+                step={0.01}
+                testId="point-color-luminance-shift"
+                value={selected.lightnessShift}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label="Hue range"
+                max={180}
+                min={0.1}
+                onDragStateChange={onDragStateChange}
+                {...pointColorSliderInteractionProps('hue-range')}
+                onValueChange={(value) => updateSelected({ hueRadiusDegrees: value }, 'hue-range')}
+                step={1}
+                testId="point-color-hue-range"
+                value={selected.hueRadiusDegrees}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label="Saturation range"
+                max={1}
+                min={0.001}
+                onDragStateChange={onDragStateChange}
+                {...pointColorSliderInteractionProps('saturation-range')}
+                onValueChange={(value) => updateSelected({ chromaRadius: value }, 'saturation-range')}
+                step={0.005}
+                testId="point-color-saturation-range"
+                value={selected.chromaRadius}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label="Luminance range"
+                max={2}
+                min={0.001}
+                onDragStateChange={onDragStateChange}
+                {...pointColorSliderInteractionProps('luminance-range')}
+                onValueChange={(value) => updateSelected({ lightnessRadius: value }, 'luminance-range')}
+                step={0.01}
+                testId="point-color-luminance-range"
+                value={selected.lightnessRadius}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label="Variance"
+                max={4}
+                min={0.25}
+                onDragStateChange={onDragStateChange}
+                {...pointColorSliderInteractionProps('variance')}
+                onValueChange={(value) => updateSelected({ variance: value }, 'variance')}
+                step={0.05}
+                testId="point-color-variance"
+                value={selected.variance}
+              />
+              <AdjustmentSlider
+                density="compact"
+                label="Feather"
+                max={1}
+                min={0}
+                onDragStateChange={onDragStateChange}
+                {...pointColorSliderInteractionProps('feather')}
+                onValueChange={(value) => updateSelected({ feather: value }, 'feather')}
+                step={0.01}
+                testId="point-color-feather"
+                value={selected.feather}
+              />
+            </div>
+            <div className="border-t border-editor-border pt-1" data-testid="point-color-sampled-source">
+              <p className="text-[10px] uppercase tracking-wide text-text-secondary">
+                {t('adjustments.color.pointColor.sampledRange', { defaultValue: 'Sampled range' })}
+              </p>
+              <div className="grid grid-cols-3 gap-x-2">
+                <AdjustmentSlider
+                  density="compact"
+                  label="Hue"
+                  max={360}
+                  min={0}
+                  onDragStateChange={onDragStateChange}
+                  {...pointColorSliderInteractionProps('sampled-hue')}
+                  onValueChange={(value) => updateSourceColor({ hueDegrees: value }, 'sampled-hue')}
+                  step={1}
+                  testId="point-color-sampled-hue"
+                  value={sample.sourceColor.hueDegrees}
+                />
+                <AdjustmentSlider
+                  density="compact"
+                  label="Saturation"
+                  max={2}
+                  min={0}
+                  onDragStateChange={onDragStateChange}
+                  {...pointColorSliderInteractionProps('sampled-saturation')}
+                  onValueChange={(value) => updateSourceColor({ chroma: value }, 'sampled-saturation')}
+                  step={0.005}
+                  testId="point-color-sampled-saturation"
+                  value={sample.sourceColor.chroma}
+                />
+                <AdjustmentSlider
+                  density="compact"
+                  label="Luminance"
+                  max={4}
+                  min={-1}
+                  onDragStateChange={onDragStateChange}
+                  {...pointColorSliderInteractionProps('sampled-luminance')}
+                  onValueChange={(value) => updateSourceColor({ lightness: value }, 'sampled-luminance')}
+                  step={0.01}
+                  testId="point-color-sampled-luminance"
+                  value={sample.sourceColor.lightness}
+                />
+              </div>
+              <p className="text-[10px] text-text-secondary">
+                {t('adjustments.color.pointColor.sampleConfidence', {
+                  confidence: (sample.confidence * 100).toFixed(0),
+                  defaultValue: 'Sample confidence {{confidence}}% · {{revision}}',
+                  revision: sample.graphRevision,
+                })}
+              </p>
+            </div>
             <div className="border-t border-editor-border pt-1" data-testid="point-color-skin-uniformity">
               <button
                 aria-pressed={plan.skinUniformity.enabled}
@@ -314,7 +627,8 @@ export const PointColorControls = ({
                 max={1}
                 min={0}
                 onDragStateChange={onDragStateChange}
-                onValueChange={(value) => updateSkin({ hueUniformity: value })}
+                {...pointColorSliderInteractionProps('skin-hue')}
+                onValueChange={(value) => updateSkin({ hueUniformity: value }, 'skin-hue')}
                 step={0.01}
                 value={plan.skinUniformity.hueUniformity}
               />
@@ -324,7 +638,8 @@ export const PointColorControls = ({
                 max={1}
                 min={0}
                 onDragStateChange={onDragStateChange}
-                onValueChange={(value) => updateSkin({ chromaUniformity: value })}
+                {...pointColorSliderInteractionProps('skin-saturation')}
+                onValueChange={(value) => updateSkin({ chromaUniformity: value }, 'skin-saturation')}
                 step={0.01}
                 value={plan.skinUniformity.chromaUniformity}
               />
@@ -334,7 +649,8 @@ export const PointColorControls = ({
                 max={1}
                 min={0}
                 onDragStateChange={onDragStateChange}
-                onValueChange={(value) => updateSkin({ lightnessUniformity: value })}
+                {...pointColorSliderInteractionProps('skin-luminance')}
+                onValueChange={(value) => updateSkin({ lightnessUniformity: value }, 'skin-luminance')}
                 step={0.01}
                 value={plan.skinUniformity.lightnessUniformity}
               />

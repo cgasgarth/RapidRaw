@@ -17,28 +17,32 @@ const defaultColorView = (): ColorPanelAdjustmentView => selectColorPanelAdjustm
 
 beforeEach(() => useEditorStore.getState().setEditor({ selectedImage: null }));
 
-test('three-way navigation keeps one active wheel and does not mutate adjustment history', async () => {
+test('three-way navigation exposes three compact wheels and does not mutate adjustment history', async () => {
   const rendered = await renderColorGrading();
 
-  expect(rendered.container.querySelectorAll('[data-active-range]')).toHaveLength(1);
-  expect(rendered.container.querySelector('[data-active-range]')?.getAttribute('data-active-range')).toBe('midtones');
-  expect(rendered.container.querySelectorAll('input[type="range"][aria-label="Hue"]')).toHaveLength(1);
+  expect(rendered.container.querySelectorAll('[data-testid^="color-grading-wheel-"]')).toHaveLength(3);
+  expect(rendered.container.querySelectorAll('input[type="range"][aria-label="Luminance"]')).toHaveLength(3);
   expect(rendered.container.querySelectorAll('[data-testid^="color-grading-summary-"]')).toHaveLength(3);
 
-  await click(rendered.container, '[data-testid="color-grading-summary-shadows"]');
-  expect(rendered.container.querySelector('[data-active-range]')?.getAttribute('data-active-range')).toBe('shadows');
+  await click(rendered.container, '[data-testid="color-grading-summary-shadows"] button');
+  expect(
+    rendered.container
+      .querySelector<HTMLButtonElement>('[data-testid="color-grading-summary-shadows"] button')
+      ?.getAttribute('aria-pressed'),
+  ).toBe('true');
 
   await click(rendered.container, '[data-testid="color-grading-view-global"]');
   expect(rendered.container.querySelector('[data-active-range]')?.getAttribute('data-active-range')).toBe('global');
   expect(rendered.container.querySelector('[data-testid="color-grading-three-way-summary"]')).toBeNull();
 
   await click(rendered.container, '[data-testid="color-grading-view-3way"]');
-  expect(rendered.container.querySelector('[data-active-range]')?.getAttribute('data-active-range')).toBe('shadows');
+  expect(rendered.container.querySelector('[data-active-range]')).toBeNull();
   expect(rendered.getChangeCount()).toBe(0);
 });
 
 test('active numeric sliders update the selected range and its three-way summary', async () => {
   const rendered = await renderColorGrading();
+  await click(rendered.container, '[data-testid="color-grading-view-midtones"]');
   const hueInput = getRequiredElement<HTMLInputElement>(rendered.container, 'input[type="range"][aria-label="Hue"]');
   const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
   valueSetter?.call(hueInput, '125');
@@ -49,7 +53,8 @@ test('active numeric sliders update the selected range and its three-way summary
   });
 
   expect(rendered.getAdjustments().colorGrading.midtones).toEqual({ hue: 125, luminance: 0, saturation: 0 });
-  expect(rendered.container.querySelector('[data-testid="color-grading-summary-midtones"]')?.textContent).toContain(
+  await click(rendered.container, '[data-testid="color-grading-view-3way"]');
+  expect(rendered.container.querySelector('[data-testid="color-grading-values-midtones"]')?.textContent).toContain(
     'H125 S0 L0',
   );
   expect(

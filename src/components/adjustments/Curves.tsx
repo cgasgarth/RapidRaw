@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { ClipboardPaste, Copy, RotateCcw, Settings2, Spline } from 'lucide-react';
+import { ClipboardPaste, Copy, RotateCcw, Settings2, Spline, Target } from 'lucide-react';
 import {
   type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useContextMenu } from '../../context/ContextMenuContext';
+import { useUIStore } from '../../store/useUIStore';
 import { ActiveChannel, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
 import { OPTION_SEPARATOR, Theme } from '../ui/AppProperties';
 import AdjustmentSlider from './AdjustmentSlider';
@@ -464,6 +465,7 @@ export default function CurveGraph(props: CurveGraphProps) {
 
 function LegacyCurveGraph({
   adjustments,
+  isForMask = false,
   onInteractionCancel,
   onInteractionCommit,
   onInteractionStart,
@@ -477,12 +479,21 @@ function LegacyCurveGraph({
   const [activeChannel, setActiveChannel] = useState<ActiveChannel>(ActiveChannel.Luma);
   const [interaction, dispatchInteraction] = useReducer(curveInteractionReducer, { kind: 'idle' });
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+  const isParametricMode = (adjustments.curveMode || 'point') === 'parametric';
+  const activeDevelopTool = useUIStore((state) => state.activeDevelopTool);
+  const setUI = useUIStore((state) => state.setUI);
+  useEffect(() => {
+    setUI({
+      toneCurveTargetChannel: activeChannel,
+      toneCurveTargetMode: isParametricMode ? 'parametric' : 'point',
+      toneCurveTargetPointIndex: selectedPointIndex,
+    });
+  }, [activeChannel, isParametricMode, selectedPointIndex, setUI]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const splitterContainerRef = useRef<HTMLDivElement>(null);
   const interactionRef = useRef<CurveInteraction>(interaction);
-  const isParametricMode = (adjustments.curveMode || 'point') === 'parametric';
   const curvesRef = useRef(adjustments.curves);
 
   const parametricCurves: Record<ActiveChannel, ParametricCurveSettings> =
@@ -1112,6 +1123,26 @@ function LegacyCurveGraph({
         >
           <RotateCcw aria-hidden="true" size={14} />
         </button>
+        {!isForMask && (
+          <button
+            aria-label={t('adjustments.curves.targetTool', { defaultValue: 'Targeted adjustment tool' })}
+            aria-pressed={activeDevelopTool === 'tone-curve'}
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors ${
+              activeDevelopTool === 'tone-curve'
+                ? 'bg-accent text-white shadow-sm'
+                : 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
+            }`}
+            data-testid="tone-curve-target-tool"
+            data-tone-curve-target-active={String(activeDevelopTool === 'tone-curve')}
+            data-tooltip={t('adjustments.curves.targetTool', { defaultValue: 'Targeted adjustment tool' })}
+            onClick={() => {
+              setUI({ activeDevelopTool: activeDevelopTool === 'tone-curve' ? null : 'tone-curve' });
+            }}
+            type="button"
+          >
+            <Target aria-hidden="true" size={14} />
+          </button>
+        )}
         <button
           aria-label={`${activeModeLabel} - ${t('settings.title')}`}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"

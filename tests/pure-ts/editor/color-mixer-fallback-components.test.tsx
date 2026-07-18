@@ -8,6 +8,7 @@ import type { ColorPanelAdjustmentView } from '../../../src/components/adjustmen
 import { selectColorPanelAdjustmentView } from '../../../src/components/panel/right/color/ColorWorkspacePanel';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
+import { useUIStore } from '../../../src/store/useUIStore';
 import { COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../../src/utils/colorWorkspaceNavigation';
 import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
@@ -105,6 +106,32 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
     imageSessionId: 'editor-image-session:91',
   });
   expect(genericSetter).not.toHaveBeenCalled();
+});
+
+test('Color Mixer exposes mutually exclusive targeted HSL tools with keyboard focus semantics', () => {
+  window.sessionStorage.setItem(COLOR_WORKSPACE_TAB_SESSION_KEY, 'mixer');
+  const adjustments = initializeFallbackStore(94);
+  const Harness = () => {
+    const [current, setCurrent] = useState(adjustments);
+    return createElement(ColorPanel, {
+      adjustments: current,
+      appSettings: null,
+      setAdjustments: (update) =>
+        setCurrent((previous) => (typeof update === 'function' ? update(previous) : { ...previous, ...update })),
+    });
+  };
+  const container = render(createElement(Harness));
+  const hue = getButton(container, 'color-mixer-target-hue');
+  const saturation = getButton(container, 'color-mixer-target-saturation');
+  act(() => hue.click());
+  expect(hue.getAttribute('aria-pressed')).toBe('true');
+  expect(useUIStore.getState().colorMixerTargetedMode).toBe('hue');
+  act(() => saturation.click());
+  expect(hue.getAttribute('aria-pressed')).toBe('false');
+  expect(saturation.getAttribute('aria-pressed')).toBe('true');
+  expect(useUIStore.getState().colorMixerTargetedMode).toBe('saturation');
+  act(() => saturation.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(useUIStore.getState().colorMixerTargetedMode).toBeNull();
 });
 
 test('ColorAdvancedControls slider commits calibration through fallback authority', () => {

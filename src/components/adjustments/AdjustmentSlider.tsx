@@ -3,6 +3,7 @@ import Slider from '../ui/primitives/Slider';
 import { getSliderEventNumber } from './adjustmentSliderValue';
 
 export interface AdjustmentSliderProps {
+  ariaLabel?: string;
   label: ReactNode;
   max: number;
   min: number;
