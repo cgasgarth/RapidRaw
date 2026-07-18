@@ -1,4 +1,10 @@
 import type { LibraryLayoutIndex } from '../../../library/buildLibraryLayoutIndex';
+import type {
+  LibrarySemanticStack,
+  LibraryVisibleItem,
+  LibraryVisibleSemanticIndex,
+} from '../../../library/buildLibrarySemanticIndex';
+import { LibraryViewMode } from '../../ui/AppProperties';
 
 export type LibraryLayoutChange = 'dimensions-only' | 'row-heights' | 'order-or-membership' | 'session-replaced';
 
@@ -17,6 +23,46 @@ export interface LibraryLayoutSnapshot {
   contentRevision: unknown;
   sessionId: string | null;
 }
+
+type StackRevision =
+  | Pick<LibrarySemanticStack, 'id' | 'count' | 'coverPath' | 'kind'>
+  | Pick<NonNullable<LibraryVisibleItem['stack']>, 'id' | 'count' | 'isCover' | 'isExpanded' | 'kind'>;
+
+const stackRevision = (stack: LibrarySemanticStack | LibraryVisibleItem['stack'] | null): StackRevision | null => {
+  if (!stack) return null;
+  if ('coverPath' in stack) {
+    return { id: stack.id, count: stack.count, coverPath: stack.coverPath, kind: stack.kind };
+  }
+  return { id: stack.id, count: stack.count, isCover: stack.isCover, isExpanded: stack.isExpanded, kind: stack.kind };
+};
+
+/**
+ * Returns the structural identity of a library viewport.
+ *
+ * Catalog refreshes replace ImageFile objects while preview/thumbnail work
+ * completes. Object identity is therefore not a safe signal for a layout
+ * change: using it as one makes the restore effect anchor to the active image
+ * and can jump a user who is browsing elsewhere back to that image. This
+ * revision intentionally includes only paths, folders, and stack membership,
+ * which are the inputs that can move rows. Metadata and preview completion do
+ * not change it.
+ */
+export const buildLibraryContentRevision = (
+  visible: LibraryVisibleSemanticIndex,
+  collapsedFolderPaths: ReadonlySet<string>,
+  viewMode: LibraryViewMode,
+): string =>
+  JSON.stringify({
+    collapsedFolderPaths: [...collapsedFolderPaths].sort(),
+    folders: visible.folders.map((folder) => [folder.path, folder.itemStart, folder.itemCount]),
+    items: visible.items.map((item) => [item.path, item.imageIndex, stackRevision(item.stack)]),
+    sourceItems: visible.semantic.sourceItems.map((item) => [
+      item.path,
+      item.imageIndex,
+      stackRevision(viewMode === LibraryViewMode.Recursive ? item.recursiveStack : item.flatStack),
+    ]),
+    viewMode,
+  });
 
 export const getLibraryRowHeight = (layout: LibraryLayoutSnapshot, index: number): number => {
   return layout.layoutIndex.getRowHeight(index);
