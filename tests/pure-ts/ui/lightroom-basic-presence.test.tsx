@@ -120,6 +120,48 @@ test('global Basic Clarity uses the typed detail transaction and Undo restores t
   expect(useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']?.params['clarity']).toBe(0);
 });
 
+test('global Basic Presence numeric edit commits one history entry after preview', async () => {
+  const imageSession = createEditorImageSession({ generation: 8, path: sourcePath, source: 'cache' });
+  const selectedImage: SelectedImage = {
+    exif: null,
+    height: 8,
+    isRaw: true,
+    isReady: true,
+    originalUrl: null,
+    path: sourcePath,
+    rawDevelopmentReport: null,
+    thumbnailUrl: '',
+    width: 8,
+  };
+  const editDocumentV2 = createDefaultEditDocumentV2();
+  act(() => {
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      adjustmentRevision: 0,
+      editDocumentV2,
+      history: [editDocumentV2],
+      historyCheckpoints: [],
+      historyIndex: 0,
+      imageSession,
+      selectedImage,
+    });
+  });
+
+  const { container } = await renderBasic({ initialAdjustments: defaultBasicView() });
+  const clarityValue = required<HTMLButtonElement>(container, '[data-testid="basic-presence-control-clarity-value"]');
+  await act(async () => {
+    fireEvent.click(clarityValue);
+    await flushPromises();
+    const clarityInput = required<HTMLInputElement>(container, '[data-testid="basic-presence-control-clarity-input"]');
+    fireEvent.change(clarityInput, { target: { value: '24' } });
+    await flushPromises();
+    fireEvent.keyDown(clarityInput, { key: 'Enter' });
+    await flushPromises();
+  });
+
+  expect(useEditorStore.getState().editDocumentV2.nodes['detail_denoise_dehaze']?.params['clarity']).toBe(24);
+  expect(useEditorStore.getState().history).toHaveLength(2);
+});
+
 function BasicHarness({
   initialAdjustments,
   isForMask,
