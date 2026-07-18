@@ -38,7 +38,7 @@ describe('Develop tool strip', () => {
 
     const { container, rerender } = renderStrip();
     const buttons = [...container.querySelectorAll<HTMLButtonElement>('[data-develop-tool-id]')];
-    expect(buttons).toHaveLength(3);
+    expect(buttons).toHaveLength(4);
     expect(buttons.every((button) => button.disabled)).toBe(true);
     expect(container.querySelector('[data-develop-tool-state="unavailable"]')).not.toBeNull();
 
