@@ -391,8 +391,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "適用量",
       "creative": "クリエイティブ",
+      "disabled": "",
+      "enabled": "",
       "feather": "ぼかし",
       "filmLookBrowser": {
         "activeLook": "",
@@ -452,6 +455,7 @@
       "roughness": "粗さ",
       "roundness": "丸み",
       "size": "サイズ",
+      "title": "",
       "vignette": "周辺光量補正"
     },
     "perspective": {

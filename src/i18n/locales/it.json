@@ -391,8 +391,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Quantità",
       "creative": "Creativo",
+      "disabled": "",
+      "enabled": "",
       "feather": "Sfumatura",
       "filmLookBrowser": {
         "activeLook": "",
@@ -458,6 +461,7 @@
       "roughness": "Ruvidezza",
       "roundness": "Rotondità",
       "size": "Dimensione",
+      "title": "",
       "vignette": "Vignettatura"
     },
     "perspective": {
