@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import {
+  DEVELOP_TOOL_PANEL_BY_ID,
   getRightPanelHostDescriptor,
   isEditingRightPanel,
   isRightPanel,
@@ -128,6 +129,20 @@ export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
 
 export type DevelopToolId = 'crop' | 'masking' | 'remove' | 'tone-curve';
+
+const DEVELOP_TOOL_TRANSIENT_EDITOR_STATE = {
+  activeAiPatchContainerId: null,
+  activeAiSubMaskId: null,
+  activeMaskContainerId: null,
+  activeMaskId: null,
+  isMaskControlHovered: false,
+  isStraightenActive: false,
+  isWbPickerActive: false,
+} as const;
+
+const clearDevelopToolTransientState = (): void => {
+  useEditorStore.getState().setEditor(DEVELOP_TOOL_TRANSIENT_EDITOR_STATE);
+};
 
 const LAZY_COMPUTATIONAL_MODAL_IDS = ['panorama', 'hdr', 'superResolution', 'focusStack', 'negativeLab'] as const;
 export type LazyComputationalModalId = (typeof LAZY_COMPUTATIONAL_MODAL_IDS)[number];
@@ -557,6 +572,8 @@ export interface UIState {
   recordRecentRightPanel: (panel: Panel) => void;
   setUI: (updater: Partial<UIState> | ((state: UIState) => Partial<UIState>)) => void;
   setRightPanel: (panel: Panel | null) => void;
+  activateDevelopTool: (tool: DevelopToolId) => void;
+  deactivateDevelopTool: () => void;
   setActiveDevelopTool: (tool: DevelopToolId | null) => void;
   upsertDerivedOutputReceipt: (receipt: DerivedOutputReceipt) => void;
   customEscapeHandler: (() => void) | null;
@@ -1107,6 +1124,28 @@ export const useUIStore = create<UIState>((set, get) => {
           };
         });
       }
+    },
+
+    activateDevelopTool: (tool) => {
+      const panel = tool === 'tone-curve' ? DEVELOP_TOOL_PANEL_BY_ID.toneCurve : DEVELOP_TOOL_PANEL_BY_ID[tool];
+      if (get().activeRightPanel !== panel) get().setRightPanel(panel);
+      clearDevelopToolTransientState();
+      set((state) => ({
+        activeDevelopTool: tool,
+        activeDevelopToolRequestId: state.activeDevelopToolRequestId + 1,
+      }));
+    },
+
+    deactivateDevelopTool: () => {
+      const activeTool = get().activeDevelopTool;
+      if (activeTool === null) return;
+      clearDevelopToolTransientState();
+      const activePanel = get().activeRightPanel;
+      if (activePanel === Panel.Crop || activePanel === Panel.Masks) get().setRightPanel(Panel.Adjustments);
+      set((state) => ({
+        activeDevelopTool: null,
+        activeDevelopToolRequestId: state.activeDevelopToolRequestId + 1,
+      }));
     },
 
     setActiveDevelopTool: (tool) => {

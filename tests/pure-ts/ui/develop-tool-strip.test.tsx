@@ -71,7 +71,45 @@ describe('Develop tool strip', () => {
     masking.focus();
     fireEvent.keyDown(masking, { key: 'Escape' });
     expect(useUIStore.getState().activeDevelopTool).toBeNull();
+    expect(useUIStore.getState().activeRightPanel).toBe(Panel.Adjustments);
+    expect(useEditorStore.getState()).toMatchObject({
+      activeAiPatchContainerId: null,
+      activeAiSubMaskId: null,
+      activeMaskContainerId: null,
+      activeMaskId: null,
+      isMaskControlHovered: false,
+      isStraightenActive: false,
+      isWbPickerActive: false,
+    });
     expect(document.activeElement).toBe(masking);
+  });
+
+  test('switching tools cancels transient editor selections before activating the next tool', async () => {
+    const user = userEvent.setup();
+    useEditorStore.getState().setEditor({
+      activeAiPatchContainerId: 'ai-patch',
+      activeAiSubMaskId: 'ai-submask',
+      activeMaskContainerId: 'mask',
+      activeMaskId: 'submask',
+      isMaskControlHovered: true,
+      isStraightenActive: true,
+      isWbPickerActive: true,
+      selectedImage: selectedImage(),
+    });
+    const { container } = renderStrip();
+
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="develop-tool-strip-crop"]'));
+
+    expect(useUIStore.getState()).toMatchObject({ activeDevelopTool: 'crop', activeRightPanel: Panel.Crop });
+    expect(useEditorStore.getState()).toMatchObject({
+      activeAiPatchContainerId: null,
+      activeAiSubMaskId: null,
+      activeMaskContainerId: null,
+      activeMaskId: null,
+      isMaskControlHovered: false,
+      isStraightenActive: false,
+      isWbPickerActive: false,
+    });
   });
 
   test('keeps RapidRaw-only workspaces in the secondary switcher group', () => {
