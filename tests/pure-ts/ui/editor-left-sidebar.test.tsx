@@ -48,6 +48,35 @@ test('persists section disclosure changes through the typed callback', async () 
   expect(presets.getAttribute('aria-expanded')).toBe('false');
 });
 
+test('supports optional solo disclosure without losing persisted section order', async () => {
+  const user = userEvent.setup();
+  const soloChanges: Array<EditorLeftSectionId | null> = [];
+  const { container } = await renderSidebar({ soloChanges });
+
+  await user.click(getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-navigator-solo"]'));
+
+  expect(soloChanges).toEqual(['navigator']);
+  expect(
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-navigator-toggle"]').getAttribute(
+      'aria-expanded',
+    ),
+  ).toBe('true');
+  expect(
+    getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-toggle"]').getAttribute(
+      'aria-expanded',
+    ),
+  ).toBe('false');
+  expect(
+    getRequiredElement(container, '[data-editor-left-slot="navigator"]').getAttribute('data-editor-left-solo'),
+  ).toBe('true');
+
+  await user.click(getRequiredElement<HTMLButtonElement>(container, '[data-testid="editor-left-presets-solo"]'));
+  expect(soloChanges).toEqual(['navigator', 'presets']);
+  expect(getRequiredElement(container, '[data-editor-left-slot="presets"]').getAttribute('data-editor-left-solo')).toBe(
+    'true',
+  );
+});
+
 test('collapse restores focus to the stable expand control and preserves geometry', async () => {
   const user = userEvent.setup();
   const { container } = await renderSidebar();
@@ -120,12 +149,15 @@ function SidebarHarness({
   changes = [],
   isFullScreen = false,
   lifecycle,
+  soloChanges,
 }: {
   changes?: Array<[EditorLeftSectionId, boolean]>;
   isFullScreen?: boolean;
   lifecycle?: string[];
+  soloChanges?: Array<EditorLeftSectionId | null>;
 }) {
   const [expandedSections, setExpandedSections] = useState<EditorLeftSectionId[]>(['navigator', 'presets']);
+  const [soloSectionId, setSoloSectionId] = useState<EditorLeftSectionId | null>(null);
   const [isVisible, setIsVisible] = useState(true);
 
   return createElement(EditorLeftSidebar, {
@@ -140,6 +172,15 @@ function SidebarHarness({
         expanded ? [...new Set([...current, sectionId])] : current.filter((currentId) => currentId !== sectionId),
       );
     },
+    ...(soloChanges === undefined
+      ? {}
+      : {
+          onSectionSoloChange: (sectionId: EditorLeftSectionId | null) => {
+            soloChanges.push(sectionId);
+            setSoloSectionId(sectionId);
+          },
+          soloSectionId,
+        }),
     onVisibleChange: setIsVisible,
     ...(lifecycle === undefined ? {} : { slots: { presets: createElement(PresetsLifecycleProbe, { lifecycle }) } }),
     width: 288,
@@ -150,10 +191,12 @@ async function renderSidebar({
   changes = [],
   isFullScreen = false,
   lifecycle,
+  soloChanges,
 }: {
   changes?: Array<[EditorLeftSectionId, boolean]>;
   isFullScreen?: boolean;
   lifecycle?: string[];
+  soloChanges?: Array<EditorLeftSectionId | null>;
 } = {}) {
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', react: { useSuspense: false } });
@@ -165,6 +208,7 @@ async function renderSidebar({
         changes,
         isFullScreen,
         ...(lifecycle === undefined ? {} : { lifecycle }),
+        ...(soloChanges === undefined ? {} : { soloChanges }),
       }),
     ),
   );

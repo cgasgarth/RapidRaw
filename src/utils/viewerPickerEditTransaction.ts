@@ -1,12 +1,12 @@
 import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerPickerCommitResult } from '../components/panel/editor/viewerPickerInteractionControllers';
+import { applyColorMixerTargetedDelta } from './colorMixerTargetedAdjustment';
 import { selectEditDocumentNode } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 import { buildPointColorEditTransaction } from './pointColorEditTransaction';
+import { buildSelectiveColorEditTransaction } from './selectiveColorEditTransaction';
 import { buildToneEqualizerEditTransaction } from './toneEqualizerEditTransaction';
 import { applyToneEqualizerPickerSelection, applyToneEqualizerTargetedDelta } from './toneEqualizerPicker';
-import { applyColorMixerTargetedDelta } from './colorMixerTargetedAdjustment';
-import { buildSelectiveColorEditTransaction } from './selectiveColorEditTransaction';
 
 export interface ViewerPickerEditTransactionState {
   readonly adjustmentRevision: number;

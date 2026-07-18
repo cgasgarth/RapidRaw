@@ -2,7 +2,10 @@ import { afterEach, expect, test } from 'bun:test';
 
 import { Panel } from '../../../src/components/ui/AppProperties';
 import { useUIStore } from '../../../src/store/useUIStore';
-import { createDefaultEditorWorkspacePreferences } from '../../../src/utils/editorWorkspacePreferences';
+import {
+  createDefaultEditorWorkspacePreferences,
+  EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
+} from '../../../src/utils/editorWorkspacePreferences';
 import {
   createDefaultLibraryWorkspacePreferences,
   LIBRARY_WORKSPACE_PREFERENCES_STORAGE_KEY,
@@ -49,13 +52,18 @@ test('persists Library and Develop geometry, visibility, and sections independen
   useUIStore.getState().setEditorRegionSize('leftSidebar', 304);
   useUIStore.getState().setEditorRegionVisibility('leftSidebar', true);
   useUIStore.getState().setEditorLeftSectionExpanded('history', true);
+  useUIStore.getState().setEditorLeftSoloSection('history');
 
   const state = useUIStore.getState();
   const persistedLibrary = JSON.parse(storage.getItem(LIBRARY_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}');
   expect(state.libraryWorkspacePreferences.folderTree).toEqual({ visible: false, width: 344 });
   expect(state.editorWorkspacePreferences.leftSidebar).toMatchObject({ visible: true, width: 304 });
   expect(state.editorWorkspacePreferences.leftSidebar.expandedSections).toContain('history');
+  expect(state.editorWorkspacePreferences.leftSidebar.soloSectionId).toBe('history');
   expect(persistedLibrary.folderTree).toEqual({ visible: false, width: 344 });
+  expect(JSON.parse(storage.getItem(EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY) ?? '{}').leftSidebar.soloSectionId).toBe(
+    'history',
+  );
 
   useUIStore.setState({
     libraryLeftPanelWidth: 256,

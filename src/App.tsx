@@ -104,6 +104,7 @@ function App() {
     setEditorRegionSize,
     setEditorRegionVisibility,
     setEditorLeftSectionExpanded,
+    setEditorLeftSoloSection,
     setLibraryFolderTreeVisibility,
     setLibraryFolderTreeWidth,
     selectEditorPanel,
@@ -124,6 +125,7 @@ function App() {
       setEditorRegionSize: state.setEditorRegionSize,
       setEditorRegionVisibility: state.setEditorRegionVisibility,
       setEditorLeftSectionExpanded: state.setEditorLeftSectionExpanded,
+      setEditorLeftSoloSection: state.setEditorLeftSoloSection,
       setLibraryFolderTreeVisibility: state.setLibraryFolderTreeVisibility,
       setLibraryFolderTreeWidth: state.setLibraryFolderTreeWidth,
       selectEditorPanel: state.selectEditorPanel,
@@ -627,9 +629,11 @@ function App() {
                 onSectionExpandedChange={(sectionId: EditorLeftSectionId, expanded: boolean) => {
                   setEditorLeftSectionExpanded(sectionId, expanded);
                 }}
+                onSectionSoloChange={setEditorLeftSoloSection}
                 onVisibleChange={(visible: boolean) => {
                   setEditorRegionVisibility('leftSidebar', visible);
                 }}
+                soloSectionId={editorLeftSidebarPreferences.soloSectionId}
                 slots={{
                   collections: <EditorCollectionsSection onSelectAlbum={handleSelectAlbumVoid} />,
                   focusSources: <FocusStackRetouchPanel packagePath={selectedImage?.path ?? ''} />,

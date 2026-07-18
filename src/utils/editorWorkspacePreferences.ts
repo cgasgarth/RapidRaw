@@ -89,6 +89,7 @@ export const createDefaultEditorWorkspacePreferences = (): EditorWorkspacePrefer
   filmstrip: { height: DEVELOP_SHELL_DEFAULT_FILMSTRIP_HEIGHT, visible: true },
   leftSidebar: {
     expandedSections: ['navigator', 'presets'],
+    soloSectionId: null,
     visible: true,
     width: DEVELOP_SHELL_DEFAULT_LEFT_PANEL_WIDTH,
   },

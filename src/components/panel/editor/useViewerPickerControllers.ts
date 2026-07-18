@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { useUIStore } from '../../../store/useUIStore';
-import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
-import type { EditorPresentationDescriptor } from '../../../utils/editorPresentationDescriptor';
 import type { PointColorPickerResponse } from '../../../utils/color/pointColorPicker';
 import {
   resolveChromaFromDisplayRgb,
   resolveHueFromDisplayRgb,
   resolveLightnessFromDisplayRgb,
 } from '../../../utils/colorMixerTargetedAdjustment';
+import type { EditorOverlayGeometry } from '../../../utils/editorOverlayGeometry';
+import type { EditorPresentationDescriptor } from '../../../utils/editorPresentationDescriptor';
 import { createViewerSampleRequest, mapViewerPointToImage } from '../../../utils/viewerSampler';
 import type { ViewerSurfaceInputEvent } from './viewerInputRouter';
 import { createViewerPickerCommandServices } from './viewerPickerCommandServices';
-import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 import {
   createViewerPickerContextSynchronizer,
   createViewerPickerInteractionController,
@@ -24,6 +23,7 @@ import {
   type ViewerPickerSessionKey,
   type ViewerPickerToolId,
 } from './viewerPickerInteractionControllers';
+import { createViewerSamplerCommandService } from './viewerSamplerCommandService';
 
 interface UseViewerPickerControllersInput {
   readonly adjustmentRevision: number;

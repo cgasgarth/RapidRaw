@@ -33,6 +33,7 @@ import {
 import type { DenoiseOperationHandle } from '../schemas/denoiseWorkflowSchemas';
 import type {
   CompactEditorDrawerState,
+  EditorLeftSectionId,
   EditorWorkspaceCompareMode,
   EditorWorkspaceLightsOutLevel,
   EditorWorkspacePreferences,
@@ -547,7 +548,8 @@ export interface UIState {
   ) => void;
   setEditorRegionVisibility: (region: 'filmstrip' | 'leftSidebar' | 'rightInspector', visible: boolean) => void;
   setEditorSectionExpanded: (panel: Panel, sectionId: string, expanded: boolean) => void;
-  setEditorLeftSectionExpanded: (sectionId: string, expanded: boolean) => void;
+  setEditorLeftSectionExpanded: (sectionId: EditorLeftSectionId, expanded: boolean) => void;
+  setEditorLeftSoloSection: (sectionId: EditorLeftSectionId | null) => void;
   setEditorWorkspaceViewport: (viewport: EditorWorkspaceViewport) => void;
   selectEditorPanel: (panel: Panel, viewport?: EditorWorkspaceViewport) => void;
   setLibraryFolderTreeVisibility: (visible: boolean) => void;
@@ -946,16 +948,27 @@ export const useUIStore = create<UIState>((set, get) => {
     },
 
     setEditorLeftSectionExpanded: (sectionId, expanded) => {
-      if (sectionId.trim().length === 0) return;
       set((state) => {
         const currentSections = state.editorWorkspacePreferences.leftSidebar.expandedSections;
         const expandedSections = expanded
-          ? [...new Set([...currentSections, sectionId])]
+          ? Array.from(new Set<EditorLeftSectionId>([...currentSections, sectionId]))
           : currentSections.filter((currentSection) => currentSection !== sectionId);
         const preferences = {
           ...state.editorWorkspacePreferences,
           leftSidebar: { ...state.editorWorkspacePreferences.leftSidebar, expandedSections },
         };
+        saveEditorWorkspacePreferences(preferences);
+        return { editorWorkspacePreferences: preferences };
+      });
+    },
+
+    setEditorLeftSoloSection: (sectionId) => {
+      set((state) => {
+        const preferences = structuredClone(state.editorWorkspacePreferences);
+        preferences.leftSidebar.soloSectionId = sectionId;
+        if (sectionId !== null && !preferences.leftSidebar.expandedSections.includes(sectionId)) {
+          preferences.leftSidebar.expandedSections = [...preferences.leftSidebar.expandedSections, sectionId];
+        }
         saveEditorWorkspacePreferences(preferences);
         return { editorWorkspacePreferences: preferences };
       });
@@ -975,7 +988,7 @@ export const useUIStore = create<UIState>((set, get) => {
           const preferences = structuredClone(state.editorWorkspacePreferences);
           preferences.leftSidebar.visible = true;
           preferences.leftSidebar.expandedSections = [
-            ...new Set([...preferences.leftSidebar.expandedSections, 'presets']),
+            ...new Set<EditorLeftSectionId>([...preferences.leftSidebar.expandedSections, 'presets']),
           ];
           saveEditorWorkspacePreferences(preferences);
           return {
@@ -994,7 +1007,7 @@ export const useUIStore = create<UIState>((set, get) => {
           const preferences = structuredClone(state.editorWorkspacePreferences);
           preferences.leftSidebar.visible = true;
           preferences.leftSidebar.expandedSections = [
-            ...new Set([...preferences.leftSidebar.expandedSections, 'presets']),
+            ...new Set<EditorLeftSectionId>([...preferences.leftSidebar.expandedSections, 'presets']),
           ];
           saveEditorWorkspacePreferences(preferences);
           return {
