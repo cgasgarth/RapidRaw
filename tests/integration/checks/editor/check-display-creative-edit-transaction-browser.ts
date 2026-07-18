@@ -467,8 +467,8 @@ try {
   });
   const effectsEnableToggle = page.getByTestId('effects-enable-toggle');
   // The right inspector animates its content height as advanced controls collapse;
-  // force the semantic toggle click through that transient overlay.
-  await effectsEnableToggle.click({ force: true });
+  // dispatch the semantic button click through that transient overlay.
+  await effectsEnableToggle.evaluate((button) => button.click());
   await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', enablementBaselineSaves + 1);
   await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 1);
   await page.waitForTimeout(200);
@@ -503,7 +503,7 @@ try {
     );
   }
 
-  await effectsEnableToggle.click({ force: true });
+  await effectsEnableToggle.evaluate((button) => button.click());
   await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', enablementBaselineSaves + 2);
   await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 2);
   const reenabledNode = await waitForRenderedEffectsEnabled(page, true);
