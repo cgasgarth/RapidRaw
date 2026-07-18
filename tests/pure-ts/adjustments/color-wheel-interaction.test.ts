@@ -60,6 +60,24 @@ describe('ColorWheel interaction ownership', () => {
     expect(controller.getState()).toEqual({ sliderCount: 0, wheel: false });
   });
 
+  test('cancellation emits one cancelled aggregate edge and clears every owned control', () => {
+    const aggregate: Array<{ active: boolean; cancelled: boolean }> = [];
+    const controller = createColorWheelInteractionController(
+      () => {},
+      (active, cancelled = false) => aggregate.push({ active, cancelled }),
+    );
+    controller.startWheel();
+    controller.setSlider('luminance', true);
+    controller.cancel();
+    controller.cancel();
+    controller.finish();
+    expect(aggregate).toEqual([
+      { active: true, cancelled: false },
+      { active: false, cancelled: true },
+    ]);
+    expect(controller.getState()).toEqual({ sliderCount: 0, wheel: false });
+  });
+
   test('reactivates after a development lifecycle cleanup without reviving stale activity', () => {
     const { aggregate, controller } = setup();
     controller.startWheel();

@@ -1357,6 +1357,16 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
       ],
     },
     {
+      label: 'modals.copyPaste.groups.presence',
+      keys: [
+        DetailsAdjustment.Structure,
+        DetailsAdjustment.Clarity,
+        DetailsAdjustment.Dehaze,
+        ColorAdjustment.Vibrance,
+        ColorAdjustment.Saturation,
+      ],
+    },
+    {
       label: 'modals.copyPaste.groups.curves',
       keys: ['curves', 'pointCurves', 'parametricCurve', 'curveMode', 'sceneCurveV1', 'outputCurveV1'],
     },
@@ -1384,9 +1394,6 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
     {
       label: 'modals.copyPaste.groups.clarityDehaze',
       keys: [
-        DetailsAdjustment.Clarity,
-        DetailsAdjustment.Structure,
-        DetailsAdjustment.Dehaze,
         DetailsAdjustment.Centré,
         DetailsAdjustment.LocalContrastRadiusPx,
         DetailsAdjustment.LocalContrastHaloGuard,
@@ -1531,15 +1538,18 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     BasicAdjustment.Whites,
     BasicAdjustment.Blacks,
     BasicAdjustment.Exposure,
+    DetailsAdjustment.Structure,
+    DetailsAdjustment.Clarity,
+    DetailsAdjustment.Dehaze,
+    ColorAdjustment.Vibrance,
+    ColorAdjustment.Saturation,
     'toneMapper',
   ],
   curves: ['curves', 'pointCurves', 'parametricCurve', 'curveMode', 'sceneCurveV1', 'outputCurveV1'],
   color: [
-    ColorAdjustment.Saturation,
     ColorAdjustment.CameraProfile,
     ColorAdjustment.ToneCurve,
     'whiteBalanceTechnical',
-    ColorAdjustment.Vibrance,
     ColorAdjustment.Hue,
     ColorAdjustment.BlackWhiteMixer,
     ColorAdjustment.ColorBalanceRgb,

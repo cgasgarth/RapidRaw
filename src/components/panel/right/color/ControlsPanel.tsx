@@ -4,6 +4,7 @@ import {
   Aperture,
   ClipboardPaste,
   Copy,
+  MoreHorizontal,
   Pin,
   PinOff,
   RotateCcw,
@@ -27,6 +28,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import {
   type EditDocumentNodeTypeV2,
+  type EditDocumentV2,
   type EditDocumentV2CopyPayload,
   getEditDocumentNodeTypesForEditorSection,
 } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
@@ -52,6 +54,7 @@ import {
   ActiveChannel,
   type Adjustments,
   BasicAdjustment,
+  ColorAdjustment,
   CreativeAdjustment,
   DetailsAdjustment,
   Effect,
@@ -86,6 +89,14 @@ import {
   isDetailNumberNodeAdjustment,
 } from '../../../../utils/detailEditTransaction';
 import {
+  DEVELOP_INSPECTOR_SECTION_ORDER,
+  DEVELOP_INSPECTOR_STACK_ORDER,
+  type DevelopInspectorSectionId,
+  readDevelopInspectorSoloMode,
+  saveDevelopInspectorSoloMode,
+} from '../../../../utils/developInspectorStack';
+import { type DevelopPanelId, normalizeDevelopPanelOrder } from '../../../../utils/developPanelCustomization';
+import {
   selectEditDocumentControlValue,
   selectEditDocumentGeometry,
   selectEditDocumentNode,
@@ -99,16 +110,16 @@ import { getLensCorrectionAvailability } from '../../../../utils/transformLensCo
 import AdjustmentSlider from '../../../adjustments/AdjustmentSlider';
 import { AutoEditReviewPopover } from '../../../adjustments/AutoEditReviewPopover';
 import BasicAdjustments, { type BasicAdjustmentUpdate, type BasicAdjustmentView } from '../../../adjustments/Basic';
+import ColorPanel from '../../../adjustments/Color';
 import CurveGraph, { type CurveAdjustmentUpdater, type CurveAdjustmentView } from '../../../adjustments/Curves';
 import CalibrationPanel from '../../../adjustments/color/CalibrationPanel';
+import type { AdjustmentUpdate } from '../../../adjustments/color/types';
 import DetailsPanel, { type DetailAdjustmentUpdate, type DetailAdjustmentView } from '../../../adjustments/Details';
 import EffectsPanel, { type EffectAdjustmentUpdate, type EffectAdjustmentView } from '../../../adjustments/Effects';
 import LensCorrections from '../../../adjustments/LensCorrections';
 import ReferenceMatchPanel from '../../../adjustments/ReferenceMatchPanel';
-import TransformLens, {
-  type TransformLensAdjustmentUpdate,
-  type TransformLensAdjustmentView,
-} from '../../../adjustments/TransformLens';
+import TransformPanel from '../../../adjustments/Transform';
+import type { TransformLensAdjustmentUpdate, TransformLensAdjustmentView } from '../../../adjustments/TransformLens';
 import { OPTION_SEPARATOR, type Option, Panel } from '../../../ui/AppProperties';
 import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
 import { editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
@@ -121,18 +132,15 @@ import InspectorPanelFrame, {
   type InspectorPanelNotice,
   type InspectorPanelStatus,
 } from '../inspector/InspectorPanelFrame';
-import { selectColorPanelAdjustmentView } from './ColorWorkspacePanel';
+import {
+  buildColorPanelOperations,
+  selectColorPanelAdjustmentView,
+  useColorPanelAdjustmentView,
+} from './ColorWorkspacePanel';
+import DevelopPanelCustomization from './DevelopPanelCustomization';
 
-const ADJUSTMENT_SECTION_NAMES = [
-  'basic',
-  'curves',
-  'transform',
-  'lensCorrection',
-  'details',
-  'effects',
-  'calibration',
-] as const;
-type AdjustmentSectionName = (typeof ADJUSTMENT_SECTION_NAMES)[number];
+const ADJUSTMENT_SECTION_NAMES = DEVELOP_INSPECTOR_SECTION_ORDER;
+type AdjustmentSectionName = DevelopInspectorSectionId;
 type CollapsibleSectionsUpdater =
   | CollapsibleSectionsState
   | ((prev: CollapsibleSectionsState) => CollapsibleSectionsState);
@@ -157,14 +165,26 @@ const projectOwnedParams = <Params extends object>(current: Params, next: object
 
 const hasViewChanged = (current: object, next: object): boolean => JSON.stringify(current) !== JSON.stringify(next);
 
-const getAdjustmentSectionNodeTypes = (sectionName: AdjustmentSectionName): readonly EditDocumentNodeTypeV2[] =>
-  sectionName === 'transform'
-    ? ['geometry']
-    : sectionName === 'lensCorrection'
-      ? ['lens_correction']
-      : sectionName === 'calibration'
-        ? ['color_calibration']
-        : getEditDocumentNodeTypesForEditorSection(sectionName);
+const getAdjustmentSectionNodeTypes = (sectionName: AdjustmentSectionName): readonly EditDocumentNodeTypeV2[] => {
+  switch (sectionName) {
+    case 'transform':
+      return ['geometry'];
+    case 'lensCorrection':
+      return ['lens_correction'];
+    case 'calibration':
+      return ['color_calibration'];
+    case 'colorMixer':
+      return ['black_white_mixer', 'channel_mixer', 'color_balance_rgb', 'point_color', 'selective_color_mixer'];
+    case 'colorGrading':
+      return ['perceptual_grading'];
+    case 'basic':
+      return [...getEditDocumentNodeTypesForEditorSection('basic'), 'detail_denoise_dehaze', 'color_presence'];
+    case 'curves':
+    case 'details':
+    case 'effects':
+      return getEditDocumentNodeTypesForEditorSection(sectionName);
+  }
+};
 
 const copyPayloadToReplaceOperations = (payload: EditDocumentV2CopyPayload): EditNodeOperation[] =>
   Object.entries(payload.nodes).flatMap(([nodeType, node]) =>
@@ -186,6 +206,8 @@ type NumericAdjustmentKey = keyof {
 const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> = {
   basic: 'Light',
   calibration: 'Calibration',
+  colorGrading: 'Color Grading',
+  colorMixer: 'Color Mixer',
   curves: 'Curve',
   details: 'Detail',
   effects: 'Effects',
@@ -193,6 +215,7 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   lensCorrection: 'Lens Corrections',
 };
 const TRANSFORM_LENS_CONTROL_LABELS = {
+  aspect: 'Aspect',
   correctionAmount: 'Correction amount',
   distortionAmount: 'Distortion amount',
   horizontal: 'Horizontal perspective',
@@ -209,6 +232,13 @@ const PINNED_CONTROLS_LIMIT = 8;
 const DEVELOP_PANEL_SEARCH_NORMALIZER = /\s+/g;
 const DEVELOP_PANEL_FOCUSABLE_SELECTOR =
   'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+interface CurveInteractionSession {
+  baseline: EditDocumentV2;
+  historyIndex: number;
+  imageSessionId: string;
+  transactionId: string;
+}
 
 const normalizeDevelopPanelSearchText = (value: string) =>
   value.trim().toLowerCase().replace(DEVELOP_PANEL_SEARCH_NORMALIZER, ' ');
@@ -241,9 +271,21 @@ const getAdjustmentSectionLabel = (t: TFunction, sectionName: AdjustmentSectionN
           defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.calibration,
         }),
       );
+    case 'colorMixer':
+      return String(
+        t('editor.adjustments.scopedSections.colorMixer', {
+          defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.colorMixer,
+        }),
+      );
+    case 'colorGrading':
+      return String(
+        t('editor.adjustments.scopedSections.colorGrading', {
+          defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.colorGrading,
+        }),
+      );
     case 'curves':
       return String(
-        t('editor.adjustments.scopedSections.curves', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.curves }),
+        t('editor.adjustments.scopedSections.toneCurve', { defaultValue: ADJUSTMENT_SECTION_LABEL_FALLBACKS.curves }),
       );
     case 'details':
       return String(
@@ -282,16 +324,13 @@ const toHeaderAction = (option: Option, testId: string): CollapsibleSectionHeade
   };
 };
 
-interface ControlsProps {
-  embeddedHeader?: boolean;
-}
-
-export default function Controls({ embeddedHeader = false }: ControlsProps = {}) {
+export default function Controls() {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const { showContextMenu } = useContextMenu();
   const { commitEditNodeOperations, setEditorSectionEnabled, handleLutSelect } = useEditorActions();
   const [developPanelSearchQuery, setDevelopPanelSearchQuery] = useState('');
+  const [isDevelopPanelCustomizationOpen, setIsDevelopPanelCustomizationOpen] = useState(false);
   const [autoEditProposal, setAutoEditProposal] = useState<AutoEditProposalV1 | null>(null);
   const [autoEditSelectedGroups, setAutoEditSelectedGroups] = useState<Set<AutoEditGroup>>(new Set());
   const [autoEditImpact, setAutoEditImpact] = useState(1);
@@ -299,10 +338,13 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
   const [isAutoEditOpen, setIsAutoEditOpen] = useState(false);
   const [isAutoEditAnalyzing, setIsAutoEditAnalyzing] = useState(false);
   const [isAutoEditApplying, setIsAutoEditApplying] = useState(false);
+  const [isDevelopSoloMode, setIsDevelopSoloMode] = useState(readDevelopInspectorSoloMode);
+  const [isUtilitiesOpen, setIsUtilitiesOpen] = useState(false);
   const autoEditRequestSerial = useRef(0);
   const autoEditPreviewKeyRef = useRef<string | null>(null);
   const autoEditBaseRef = useRef<AutoEditProposalBase | null>(null);
   const developPanelScrollRootRef = useRef<HTMLDivElement | null>(null);
+  const curveInteractionRef = useRef<CurveInteractionSession | null>(null);
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -314,15 +356,24 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
   const {
     collapsibleSectionsState,
     developPanelPinnedControlIds,
+    developPanelOrder,
+    hiddenDevelopPanelIds,
     setDevelopPanelPinnedControlIds,
     setEditorSectionExpanded,
   } = useUIStore(
     useShallow((state) => ({
       collapsibleSectionsState: state.collapsibleSectionsState,
       developPanelPinnedControlIds: state.developPanelPinnedControlIds,
+      developPanelOrder: state.developPanelOrder,
+      hiddenDevelopPanelIds: state.hiddenDevelopPanelIds,
       setDevelopPanelPinnedControlIds: state.setDevelopPanelPinnedControlIds,
       setEditorSectionExpanded: state.setEditorSectionExpanded,
     })),
+  );
+
+  const orderedAdjustmentSectionNames = useMemo<AdjustmentSectionName[]>(
+    () => ['basic', ...normalizeDevelopPanelOrder(developPanelOrder)] as AdjustmentSectionName[],
+    [developPanelOrder],
   );
 
   const {
@@ -348,6 +399,17 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
       setEditor: state.setEditor,
     })),
   );
+  const colorPanelAdjustments = useColorPanelAdjustmentView();
+
+  const setColorPanelAdjustments = useCallback(
+    (update: AdjustmentUpdate) => {
+      const current = selectColorPanelAdjustmentView(useEditorStore.getState().editDocumentV2);
+      const next = typeof update === 'function' ? update(current) : { ...current, ...update };
+      const operations = buildColorPanelOperations(current, next);
+      if (operations.length > 0) commitEditNodeOperations(operations);
+    },
+    [commitEditNodeOperations],
+  );
 
   const setBasicAdjustments = useCallback(
     (update: BasicAdjustmentUpdate) => {
@@ -355,12 +417,22 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
       const global = selectEditDocumentNode(document, 'scene_global_color_tone').params;
       const viewTransform = selectEditDocumentNode(document, 'scene_to_view_transform').params;
       const toneEqualizer = selectEditDocumentNode(document, 'tone_equalizer').params;
-      const current: BasicAdjustmentView = { ...global, ...viewTransform, ...toneEqualizer };
+      const detail = selectEditDocumentNode(document, 'detail_denoise_dehaze').params;
+      const colorPresence = selectEditDocumentNode(document, 'color_presence').params;
+      const current: BasicAdjustmentView = {
+        ...global,
+        ...viewTransform,
+        ...toneEqualizer,
+        ...detail,
+        ...colorPresence,
+      };
       const next = typeof update === 'function' ? update(current) : { ...current, ...update };
       const operations: EditNodeOperation[] = [];
       const nextGlobal = projectOwnedParams(global, next);
       const nextViewTransform = projectOwnedParams(viewTransform, next);
       const nextToneEqualizer = projectOwnedParams(toneEqualizer, next);
+      const nextDetail = projectOwnedParams(detail, next);
+      const nextColorPresence = projectOwnedParams(colorPresence, next);
       if (hasViewChanged(global, nextGlobal)) {
         operations.push({ nodeType: 'scene_global_color_tone', patch: nextGlobal, type: 'patch-edit-document-node' });
       }
@@ -374,21 +446,71 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
       if (hasViewChanged(toneEqualizer, nextToneEqualizer)) {
         operations.push({ nodeType: 'tone_equalizer', patch: nextToneEqualizer, type: 'patch-edit-document-node' });
       }
+      if (hasViewChanged(detail, nextDetail)) {
+        operations.push({ nodeType: 'detail_denoise_dehaze', patch: nextDetail, type: 'patch-edit-document-node' });
+      }
+      if (hasViewChanged(colorPresence, nextColorPresence)) {
+        operations.push({ nodeType: 'color_presence', patch: nextColorPresence, type: 'patch-edit-document-node' });
+      }
       if (operations.length > 0) commitEditNodeOperations(operations);
     },
     [commitEditNodeOperations],
   );
 
-  const setCurveAdjustments = useCallback(
-    (update: CurveAdjustmentUpdater) => {
-      const current = selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_curve').params;
-      const next: CurveAdjustmentView = update(current);
-      if (hasViewChanged(current, next)) {
-        commitEditNodeOperations([{ nodeType: 'scene_curve', patch: next, type: 'patch-edit-document-node' }]);
-      }
-    },
-    [commitEditNodeOperations],
-  );
+  const beginCurveInteraction = useCallback(() => {
+    if (curveInteractionRef.current !== null) return;
+    const state = useEditorStore.getState();
+    curveInteractionRef.current = {
+      baseline: structuredClone(state.editDocumentV2),
+      historyIndex: state.historyIndex,
+      imageSessionId: currentAutoEditImageSessionId(state),
+      transactionId: crypto.randomUUID(),
+    };
+  }, []);
+
+  const commitCurveInteraction = useCallback(() => {
+    curveInteractionRef.current = null;
+  }, []);
+
+  const cancelCurveInteraction = useCallback(() => {
+    const interaction = curveInteractionRef.current;
+    curveInteractionRef.current = null;
+    if (interaction === null) return;
+    const state = useEditorStore.getState();
+    if (state.historyIndex === interaction.historyIndex) return;
+    try {
+      state.applyEditTransaction({
+        baseAdjustmentRevision: state.adjustmentRevision,
+        history: 'navigation',
+        historyTargetIndex: interaction.historyIndex,
+        imageSessionId: currentAutoEditImageSessionId(state),
+        operations: [{ editDocumentV2: interaction.baseline, type: 'replace-edit-document' }],
+        persistence: 'commit',
+        source: 'manual-control',
+        transactionId: crypto.randomUUID(),
+      });
+    } catch {
+      // A session/revision switch already invalidated the interaction. The
+      // current editor authority is safer than replaying a stale baseline.
+    }
+  }, []);
+
+  const setCurveAdjustments = useCallback((update: CurveAdjustmentUpdater) => {
+    const state = useEditorStore.getState();
+    const current = selectEditDocumentNode(state.editDocumentV2, 'scene_curve').params;
+    const next: CurveAdjustmentView = update(current);
+    if (!hasViewChanged(current, next)) return;
+    const interaction = curveInteractionRef.current;
+    state.applyEditTransaction({
+      baseAdjustmentRevision: state.adjustmentRevision,
+      history: interaction === null ? 'single-entry' : 'coalesced-interaction',
+      imageSessionId: interaction?.imageSessionId ?? currentAutoEditImageSessionId(state),
+      operations: [{ nodeType: 'scene_curve', patch: next, type: 'patch-edit-document-node' }],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: interaction?.transactionId ?? crypto.randomUUID(),
+    });
+  }, []);
 
   const setTransformLensAdjustments = useCallback(
     (update: TransformLensAdjustmentUpdate) => {
@@ -410,6 +532,27 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
     },
     [commitEditNodeOperations],
   );
+
+  const resetTransform = useCallback(() => {
+    const defaults = createDefaultEditDocumentV2().geometry;
+    commitEditNodeOperations([
+      {
+        nodeType: 'geometry',
+        patch: {
+          perspectiveCorrection: structuredClone(defaults.perspectiveCorrection),
+          transformAspect: defaults.transformAspect,
+          transformDistortion: defaults.transformDistortion,
+          transformHorizontal: defaults.transformHorizontal,
+          transformRotate: defaults.transformRotate,
+          transformScale: defaults.transformScale,
+          transformVertical: defaults.transformVertical,
+          transformXOffset: defaults.transformXOffset,
+          transformYOffset: defaults.transformYOffset,
+        },
+        type: 'patch-edit-document-node',
+      },
+    ]);
+  }, [commitEditNodeOperations]);
 
   const setDetailAdjustments = useCallback(
     (update: DetailAdjustmentUpdate) => {
@@ -950,6 +1093,56 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
         step: 1,
         truncate: true,
       }),
+      sliderControl({
+        id: 'texture',
+        key: DetailsAdjustment.Structure,
+        label: t('adjustments.basic.texture', { defaultValue: 'Texture' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.Clarity,
+        key: DetailsAdjustment.Clarity,
+        label: t('adjustments.basic.clarity', { defaultValue: 'Clarity' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.Dehaze,
+        key: DetailsAdjustment.Dehaze,
+        label: t('adjustments.basic.dehaze', { defaultValue: 'Dehaze' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: ColorAdjustment.Vibrance,
+        key: ColorAdjustment.Vibrance,
+        label: t('adjustments.basic.vibrance', { defaultValue: 'Vibrance' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: ColorAdjustment.Saturation,
+        key: ColorAdjustment.Saturation,
+        label: t('adjustments.basic.saturation', { defaultValue: 'Saturation' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
     ];
 
     const curveControls = [
@@ -1033,6 +1226,19 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
         sectionName: 'transform',
         step: 0.1,
         suffix: '°',
+      }),
+      sliderControl({
+        aliases: ['width', 'squeeze'],
+        fillOrigin: 'min',
+        id: TransformAdjustment.TransformAspect,
+        key: TransformAdjustment.TransformAspect,
+        label: TRANSFORM_LENS_CONTROL_LABELS.aspect,
+        max: 100,
+        min: -100,
+        sectionName: 'transform',
+        step: 1,
+        suffix: '%',
+        truncate: true,
       }),
       sliderControl({
         fillOrigin: 'min',
@@ -1218,36 +1424,6 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
         truncate: true,
       }),
       sliderControl({
-        id: DetailsAdjustment.Clarity,
-        key: DetailsAdjustment.Clarity,
-        label: t('adjustments.details.clarity'),
-        max: 100,
-        min: -100,
-        sectionName: 'details',
-        step: 1,
-        truncate: true,
-      }),
-      sliderControl({
-        id: DetailsAdjustment.Dehaze,
-        key: DetailsAdjustment.Dehaze,
-        label: t('adjustments.details.dehaze'),
-        max: 100,
-        min: -100,
-        sectionName: 'details',
-        step: 1,
-        truncate: true,
-      }),
-      sliderControl({
-        id: DetailsAdjustment.Structure,
-        key: DetailsAdjustment.Structure,
-        label: t('adjustments.details.structure'),
-        max: 100,
-        min: -100,
-        sectionName: 'details',
-        step: 1,
-        truncate: true,
-      }),
-      sliderControl({
         aliases: ['center'],
         id: DetailsAdjustment.Centré,
         key: DetailsAdjustment.Centré,
@@ -1409,8 +1585,13 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
     [developPanelControls, isDevelopPanelSearching, normalizedDevelopPanelSearchQuery],
   );
   const matchingDevelopPanelSections = useMemo(
-    () => new Set(filteredDevelopPanelControls.map((control) => control.sectionName)),
-    [filteredDevelopPanelControls],
+    () =>
+      new Set(
+        filteredDevelopPanelControls
+          .filter((control) => !hiddenDevelopPanelIds.includes(control.sectionName as DevelopPanelId))
+          .map((control) => control.sectionName),
+      ),
+    [filteredDevelopPanelControls, hiddenDevelopPanelIds],
   );
   const effectiveCollapsibleSectionsState = useMemo(
     () =>
@@ -1418,6 +1599,8 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
         {
           basic: collapsibleSectionsState.basic,
           calibration: collapsibleSectionsState.calibration ?? false,
+          colorGrading: collapsibleSectionsState.colorGrading ?? false,
+          colorMixer: collapsibleSectionsState.colorMixer ?? false,
           curves: collapsibleSectionsState.curves,
           details: collapsibleSectionsState.details,
           effects: collapsibleSectionsState.effects,
@@ -1548,11 +1731,22 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
       ]);
       return;
     }
+    if (sectionName === 'colorMixer' || sectionName === 'colorGrading') {
+      commitEditNodeOperations(
+        nodeTypes.flatMap((nodeType) => {
+          const node = editDocumentV2.nodes[nodeType];
+          return node === undefined
+            ? []
+            : [{ node: { ...node, enabled: !enabled }, nodeType, type: 'replace-edit-document-node' as const }];
+        }),
+      );
+      return;
+    }
     setEditorSectionEnabled(sectionName, !enabled);
   };
 
   const handleResetAdjustments = () => {
-    const nodeTypes = ADJUSTMENT_SECTION_NAMES.flatMap(getAdjustmentSectionNodeTypes);
+    const nodeTypes = [...new Set(ADJUSTMENT_SECTION_NAMES.flatMap(getAdjustmentSectionNodeTypes))];
     commitEditNodeOperations(
       copyPayloadToReplaceOperations(copyEditDocumentV2Nodes(createDefaultEditDocumentV2(), nodeTypes)),
     );
@@ -1580,7 +1774,7 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
   const handleToggleSection = (section: AdjustmentSectionName) => {
     setCollapsibleState((prev) => {
       const isOpening = !prev[section];
-      if (appSettings?.enableFocusMode && isOpening) {
+      if (isDevelopSoloMode && isOpening) {
         const newState = { ...prev };
         ADJUSTMENT_SECTION_NAMES.forEach((key) => {
           newState[key] = false;
@@ -1704,6 +1898,8 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
                 ...selectEditDocumentNode(adjustments, 'scene_global_color_tone').params,
                 ...selectEditDocumentNode(adjustments, 'scene_to_view_transform').params,
                 ...selectEditDocumentNode(adjustments, 'tone_equalizer').params,
+                ...selectEditDocumentNode(adjustments, 'detail_denoise_dehaze').params,
+                ...selectEditDocumentNode(adjustments, 'color_presence').params,
               }}
               setAdjustments={setBasicAdjustments}
               appSettings={appSettings}
@@ -1727,22 +1923,45 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
         return (
           <CurveGraph
             adjustments={selectEditDocumentNode(adjustments, 'scene_curve').params}
+            onInteractionCancel={cancelCurveInteraction}
+            onInteractionCommit={commitCurveInteraction}
+            onInteractionStart={beginCurveInteraction}
             setAdjustments={setCurveAdjustments}
             histogram={histogram}
             theme={theme}
             onDragStateChange={onDragStateChange}
           />
         );
+      case 'colorMixer':
+        return (
+          <ColorPanel
+            adjustments={colorPanelAdjustments}
+            appSettings={appSettings}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setColorPanelAdjustments}
+            workspaceTab="mixer"
+          />
+        );
+      case 'colorGrading':
+        return (
+          <ColorPanel
+            adjustments={colorPanelAdjustments}
+            appSettings={appSettings}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setColorPanelAdjustments}
+            workspaceTab="grading"
+          />
+        );
       case 'transform':
         return (
-          <TransformLens
+          <TransformPanel
             adjustments={{
               ...adjustments.geometry,
               ...selectEditDocumentNode(adjustments, 'lens_correction').params,
             }}
             selectedImage={selectedImage}
-            mode="transform"
             setAdjustments={setTransformLensAdjustments}
+            onReset={resetTransform}
             onDragStateChange={onDragStateChange}
           />
         );
@@ -1795,6 +2014,39 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
     <InspectorPanelFrame
       actions={
         <>
+          <button
+            aria-controls={isDevelopPanelCustomizationOpen ? 'develop-panel-customization' : undefined}
+            aria-expanded={isDevelopPanelCustomizationOpen}
+            aria-haspopup="dialog"
+            aria-label={t('editor.adjustments.customize.open', { defaultValue: 'Customize Develop Panel' })}
+            className={density.frame.actionButton}
+            data-testid="develop-panel-customization-trigger"
+            data-tooltip={t('editor.adjustments.customize.open', { defaultValue: 'Customize Develop Panel' })}
+            onClick={() => {
+              setIsDevelopPanelCustomizationOpen((open) => !open);
+            }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              showContextMenu(event.clientX, event.clientY, [
+                {
+                  label: t('editor.adjustments.customize.open', { defaultValue: 'Customize Develop Panel' }),
+                  onClick: () => {
+                    setIsDevelopPanelCustomizationOpen(true);
+                  },
+                },
+              ]);
+            }}
+            type="button"
+          >
+            <MoreHorizontal size={PANEL_ACTION_ICON_SIZE} />
+          </button>
+          {isDevelopPanelCustomizationOpen && (
+            <DevelopPanelCustomization
+              onClose={() => {
+                setIsDevelopPanelCustomizationOpen(false);
+              }}
+            />
+          )}
           <button
             aria-label={t('editor.adjustments.tooltips.autoAdjust')}
             className={density.frame.actionButton}
@@ -1861,6 +2113,30 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
             />
           )}
           <button
+            aria-label={t('editor.adjustments.soloMode.label', { defaultValue: 'Solo Mode' })}
+            aria-pressed={isDevelopSoloMode}
+            className={cx(
+              density.frame.actionButton,
+              isDevelopSoloMode && 'bg-editor-selected-quiet text-text-primary',
+            )}
+            data-testid="develop-panel-solo-mode"
+            data-tooltip={t('editor.adjustments.soloMode.tooltip', {
+              defaultValue: 'Keep one panel open at a time',
+            })}
+            onClick={() => {
+              setIsDevelopSoloMode((enabled) => {
+                const next = !enabled;
+                saveDevelopInspectorSoloMode(next);
+                return next;
+              });
+            }}
+            type="button"
+          >
+            <span aria-hidden="true" className="text-[10px] font-bold leading-none">
+              S
+            </span>
+          </button>
+          <button
             aria-label={t('editor.adjustments.tooltips.resetAdjustments')}
             className={density.frame.actionButton}
             disabled={!selectedImage}
@@ -1880,157 +2156,19 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
       status={panelStatus}
       testId="adjustments-inspector"
     >
-      {!embeddedHeader && <InspectorAnalyticsHeader includeDevelopToolStrip testId="adjustments-analytics-header" />}
-      <ReferenceMatchPanel />
-
-      <div
-        className="shrink-0 border-b border-editor-border bg-editor-panel px-2 py-1"
-        data-testid="develop-panel-search-shelf"
-      >
-        <div className="relative">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary"
-            size={13}
-          />
-          <Input
-            aria-label={t('editor.adjustments.search.label', { defaultValue: 'Search adjustment controls' })}
-            chrome="editor"
-            className="pl-7 pr-7 text-[11px]"
-            density="compact"
-            onChange={(event) => {
-              setDevelopPanelSearchQuery(event.currentTarget.value);
-            }}
-            placeholder={t('editor.adjustments.search.placeholder', { defaultValue: 'Search controls' })}
-            type="search"
-            value={developPanelSearchQuery}
-          />
-          {developPanelSearchQuery.length > 0 && (
-            <button
-              aria-label={t('editor.adjustments.search.clear', { defaultValue: 'Clear search' })}
-              className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
-              onClick={() => {
-                setDevelopPanelSearchQuery('');
-              }}
-              type="button"
-            >
-              <X size={13} />
-            </button>
-          )}
-        </div>
-
-        {isDevelopPanelSearching && (
-          <div
-            aria-live="polite"
-            className="mt-1 flex max-h-20 flex-wrap gap-1 overflow-y-auto"
-            data-testid="develop-panel-search-results"
-          >
-            {filteredDevelopPanelControls.length > 0 ? (
-              filteredDevelopPanelControls.map((control) => {
-                const isPinned = isDevelopPanelControlPinned(control.id);
-                const PinIcon = isPinned ? PinOff : Pin;
-                return (
-                  <button
-                    aria-pressed={isPinned}
-                    className={cx(
-                      'inline-flex min-h-6 max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium leading-4 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
-                      isPinned
-                        ? 'border-editor-focus-ring bg-editor-selected-quiet text-editor-selected-quiet-text'
-                        : 'border-editor-border bg-editor-panel-well text-text-secondary hover:border-editor-focus-ring hover:text-text-primary',
-                    )}
-                    data-testid={`develop-panel-search-result-${control.id}`}
-                    key={control.id}
-                    onClick={() => {
-                      activateDevelopPanelSearchResult(control);
-                    }}
-                    onKeyDown={(event) => {
-                      handleDevelopPanelSearchResultKeyDown(event, control);
-                    }}
-                    type="button"
-                  >
-                    <PinIcon className="shrink-0" size={12} />
-                    <span className="truncate">{control.label}</span>
-                    {control.isDirty && (
-                      <span className={cx(editorChromeStatusChipClassName('info'), 'ml-0.5 px-1 text-[9px] leading-3')}>
-                        {t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
-                      </span>
-                    )}
-                  </button>
-                );
-              })
-            ) : (
-              <UiText
-                as="div"
-                variant={TextVariants.small}
-                className="px-0.5 text-[11px] leading-5 text-text-secondary"
-              >
-                {t('editor.adjustments.search.noResults', { defaultValue: 'No matching controls' })}
-              </UiText>
-            )}
-          </div>
-        )}
-
-        {pinnedDevelopPanelControls.length > 0 && (
-          <div
-            className="mt-1 max-h-44 min-w-0 space-y-0.5 overflow-y-auto overscroll-contain pr-0.5"
-            data-testid="develop-panel-pinned-controls"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <UiText
-                as="div"
-                variant={TextVariants.small}
-                className="text-[10px] font-semibold uppercase leading-4 text-text-secondary"
-              >
-                {t('editor.adjustments.pinnedControls.title', { defaultValue: 'Pinned' })}
-              </UiText>
-              <UiText
-                as="div"
-                variant={TextVariants.small}
-                className="font-mono text-[10px] leading-4 text-text-tertiary"
-              >
-                {pinnedDevelopPanelControls.length}/{PINNED_CONTROLS_LIMIT}
-              </UiText>
-            </div>
-            {pinnedDevelopPanelControls.map((control) => (
-              <div
-                className={cx(
-                  'grid min-w-0 grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-1 border-l border-editor-border bg-editor-panel-well px-1 py-0.5',
-                  control.isDirty && 'border-l-editor-info',
-                )}
-                data-dirty={control.isDirty}
-                data-testid={`develop-panel-pinned-control-row-${control.id}`}
-                key={control.id}
-              >
-                <div className="min-w-0">{control.render()}</div>
-                <button
-                  aria-label={t('editor.adjustments.pinnedControls.unpin', {
-                    control: control.label,
-                    defaultValue: `Unpin ${control.label}`,
-                  })}
-                  className="flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
-                  data-tooltip={t('editor.adjustments.pinnedControls.unpin', {
-                    control: control.label,
-                    defaultValue: `Unpin ${control.label}`,
-                  })}
-                  onClick={() => {
-                    toggleDevelopPanelPinnedControl(control.id);
-                  }}
-                  type="button"
-                >
-                  <PinOff size={13} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
+      <InspectorAnalyticsHeader includeDevelopToolStrip testId="adjustments-analytics-header" />
       <div
         className="grow flex flex-col gap-0 overflow-y-auto px-2 py-1"
+        data-develop-inspector-stack="canonical"
+        data-develop-inspector-stack-order={DEVELOP_INSPECTOR_STACK_ORDER.join(',')}
         data-right-panel-scroll-root="true"
+        data-testid="develop-panel-stack"
         ref={developPanelScrollRootRef}
       >
-        {ADJUSTMENT_SECTION_NAMES.map((sectionName) => {
+        {orderedAdjustmentSectionNames.map((sectionName) => {
+          if (sectionName !== 'basic' && hiddenDevelopPanelIds.includes(sectionName as DevelopPanelId)) {
+            return null;
+          }
           if (isDevelopPanelSearching && !matchingDevelopPanelSections.has(sectionName)) {
             return null;
           }
@@ -2075,6 +2213,164 @@ export default function Controls({ embeddedHeader = false }: ControlsProps = {})
             </div>
           );
         })}
+
+        <div className="shrink-0 group" data-testid="develop-panel-utilities">
+          <CollapsibleSection
+            isContentVisible
+            isOpen={isUtilitiesOpen || isDevelopPanelSearching}
+            onToggle={() => {
+              setIsUtilitiesOpen((open) => !open);
+            }}
+            title={t('editor.adjustments.utilities.title', { defaultValue: 'Utilities / Advanced' })}
+            testId="develop-panel-utilities-section"
+          >
+            <ReferenceMatchPanel />
+            <div
+              className="border-t border-editor-border bg-editor-panel px-2 py-1"
+              data-testid="develop-panel-search-shelf"
+            >
+              <div className="relative">
+                <Search
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-text-secondary"
+                  size={13}
+                />
+                <Input
+                  aria-label={t('editor.adjustments.search.label', { defaultValue: 'Search adjustment controls' })}
+                  chrome="editor"
+                  className="pl-7 pr-7 text-[11px]"
+                  density="compact"
+                  onChange={(event) => {
+                    setDevelopPanelSearchQuery(event.currentTarget.value);
+                  }}
+                  placeholder={t('editor.adjustments.search.placeholder', { defaultValue: 'Search controls' })}
+                  type="search"
+                  value={developPanelSearchQuery}
+                />
+                {developPanelSearchQuery.length > 0 && (
+                  <button
+                    aria-label={t('editor.adjustments.search.clear', { defaultValue: 'Clear search' })}
+                    className="absolute right-1 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                    onClick={() => {
+                      setDevelopPanelSearchQuery('');
+                    }}
+                    type="button"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+              {isDevelopPanelSearching && (
+                <div
+                  aria-live="polite"
+                  className="mt-1 flex max-h-20 flex-wrap gap-1 overflow-y-auto"
+                  data-testid="develop-panel-search-results"
+                >
+                  {filteredDevelopPanelControls.length > 0 ? (
+                    filteredDevelopPanelControls.map((control) => {
+                      const isPinned = isDevelopPanelControlPinned(control.id);
+                      const PinIcon = isPinned ? PinOff : Pin;
+                      return (
+                        <button
+                          aria-pressed={isPinned}
+                          className={cx(
+                            'inline-flex min-h-6 max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium leading-4 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+                            isPinned
+                              ? 'border-editor-focus-ring bg-editor-selected-quiet text-editor-selected-quiet-text'
+                              : 'border-editor-border bg-editor-panel-well text-text-secondary hover:border-editor-focus-ring hover:text-text-primary',
+                          )}
+                          data-testid={`develop-panel-search-result-${control.id}`}
+                          key={control.id}
+                          onClick={() => {
+                            activateDevelopPanelSearchResult(control);
+                          }}
+                          onKeyDown={(event) => {
+                            handleDevelopPanelSearchResultKeyDown(event, control);
+                          }}
+                          type="button"
+                        >
+                          <PinIcon className="shrink-0" size={12} />
+                          <span className="truncate">{control.label}</span>
+                          {control.isDirty && (
+                            <span
+                              className={cx(
+                                editorChromeStatusChipClassName('info'),
+                                'ml-0.5 px-1 text-[9px] leading-3',
+                              )}
+                            >
+                              {t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' })}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <UiText
+                      as="div"
+                      variant={TextVariants.small}
+                      className="px-0.5 text-[11px] leading-5 text-text-secondary"
+                    >
+                      {t('editor.adjustments.search.noResults', { defaultValue: 'No matching controls' })}
+                    </UiText>
+                  )}
+                </div>
+              )}
+              {pinnedDevelopPanelControls.length > 0 && (
+                <div
+                  className="mt-1 max-h-44 min-w-0 space-y-0.5 overflow-y-auto overscroll-contain pr-0.5"
+                  data-testid="develop-panel-pinned-controls"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <UiText
+                      as="div"
+                      variant={TextVariants.small}
+                      className="text-[10px] font-semibold uppercase leading-4 text-text-secondary"
+                    >
+                      {t('editor.adjustments.pinnedControls.title', { defaultValue: 'Pinned' })}
+                    </UiText>
+                    <UiText
+                      as="div"
+                      variant={TextVariants.small}
+                      className="font-mono text-[10px] leading-4 text-text-tertiary"
+                    >
+                      {pinnedDevelopPanelControls.length}/{PINNED_CONTROLS_LIMIT}
+                    </UiText>
+                  </div>
+                  {pinnedDevelopPanelControls.map((control) => (
+                    <div
+                      className={cx(
+                        'grid min-w-0 grid-cols-[minmax(0,1fr)_1.25rem] items-center gap-1 border-l border-editor-border bg-editor-panel-well px-1 py-0.5',
+                        control.isDirty && 'border-l-editor-info',
+                      )}
+                      data-dirty={control.isDirty}
+                      data-testid={`develop-panel-pinned-control-row-${control.id}`}
+                      key={control.id}
+                    >
+                      <div className="min-w-0">{control.render()}</div>
+                      <button
+                        aria-label={t('editor.adjustments.pinnedControls.unpin', {
+                          control: control.label,
+                          defaultValue: `Unpin ${control.label}`,
+                        })}
+                        className="flex h-5 w-5 items-center justify-center rounded text-text-secondary transition-colors hover:bg-editor-selected-quiet hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                        data-tooltip={t('editor.adjustments.pinnedControls.unpin', {
+                          control: control.label,
+                          defaultValue: `Unpin ${control.label}`,
+                        })}
+                        onClick={() => {
+                          toggleDevelopPanelPinnedControl(control.id);
+                        }}
+                        type="button"
+                      >
+                        <PinOff size={13} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+        </div>
       </div>
     </InspectorPanelFrame>
   );

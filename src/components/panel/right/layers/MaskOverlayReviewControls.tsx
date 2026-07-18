@@ -17,16 +17,28 @@ const MASK_OVERLAY_REVIEW_MODES = [
 ] as const satisfies ReadonlyArray<{ color: string; mode: Exclude<MaskOverlayMode, 'hidden'> }>;
 
 interface MaskOverlayReviewControlsProps {
+  authorityIdentity?: string;
+  autoHidden?: boolean;
+  handlesVisible?: boolean;
   hotkeyHint?: string;
   onChange: (settings: MaskOverlaySettings) => void;
   onDragStateChange: (isDragging: boolean) => void;
+  onHandlesVisibleChange?: (visible: boolean) => void;
+  onSelectedPinVisibleChange?: (visible: boolean) => void;
+  selectedPinVisible?: boolean;
   settings: MaskOverlaySettings;
 }
 
 export function MaskOverlayReviewControls({
+  autoHidden = false,
+  authorityIdentity,
+  handlesVisible = true,
   hotkeyHint,
   onChange,
   onDragStateChange,
+  onHandlesVisibleChange,
+  onSelectedPinVisibleChange,
+  selectedPinVisible = true,
   settings,
 }: MaskOverlayReviewControlsProps) {
   const { t } = useTranslation();
@@ -40,83 +52,105 @@ export function MaskOverlayReviewControls({
       data-mask-overlay-hotkey={hotkeyHint}
       data-mask-overlay-mode={settings.mode}
       data-mask-overlay-opacity={settings.opacity.toFixed(2)}
+      data-mask-overlay-auto-hidden={String(autoHidden)}
+      data-mask-overlay-authority={authorityIdentity}
+      data-mask-overlay-selected-pin={String(selectedPinVisible)}
+      data-mask-overlay-handles={String(handlesVisible)}
       data-testid="mask-overlay-review-controls"
       onPointerDown={(event) => {
         event.stopPropagation();
       }}
     >
       <Switch
-        checked={isEnabled}
+        checked={isEnabled && !autoHidden}
         label={t('editor.masks.overlay.enabled')}
         onChange={(checked) => {
           onChange({ ...settings, mode: checked ? 'rubylith' : 'hidden' });
         }}
       />
 
-      {isEnabled && (
+      {!autoHidden && (
         <>
-          <div className="grid grid-cols-8 gap-0.5" role="group" aria-label={t('editor.masks.overlay.modeGroup')}>
-            {MASK_OVERLAY_REVIEW_MODES.map((option) => {
-              const isActive = activeMode === option.mode;
-              return (
-                <button
-                  key={option.mode}
-                  type="button"
-                  aria-label={option.mode}
-                  aria-pressed={isActive}
-                  data-mask-overlay-mode-option={option.mode}
-                  data-testid={`mask-overlay-mode-${option.mode}`}
-                  data-tooltip={option.mode}
-                  className={cx(
-                    'h-5 rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
-                    isActive
-                      ? 'border-editor-primary-active ring-1 ring-editor-primary-active'
-                      : 'border-editor-border hover:border-text-secondary',
-                  )}
-                  style={{ backgroundColor: option.color }}
-                  onClick={() => {
-                    onChange({ ...settings, mode: option.mode });
+          {isEnabled && (
+            <>
+              <div className="grid grid-cols-8 gap-0.5" role="group" aria-label={t('editor.masks.overlay.modeGroup')}>
+                {MASK_OVERLAY_REVIEW_MODES.map((option) => {
+                  const isActive = activeMode === option.mode;
+                  return (
+                    <button
+                      key={option.mode}
+                      type="button"
+                      aria-label={option.mode}
+                      aria-pressed={isActive}
+                      data-mask-overlay-mode-option={option.mode}
+                      data-testid={`mask-overlay-mode-${option.mode}`}
+                      data-tooltip={option.mode}
+                      className={cx(
+                        'h-5 rounded-sm border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring',
+                        isActive
+                          ? 'border-editor-primary-active ring-1 ring-editor-primary-active'
+                          : 'border-editor-border hover:border-text-secondary',
+                      )}
+                      style={{ backgroundColor: option.color }}
+                      onClick={() => {
+                        onChange({ ...settings, mode: option.mode });
+                      }}
+                    />
+                  );
+                })}
+              </div>
+
+              <div data-testid="mask-overlay-opacity-control">
+                <AdjustmentSlider
+                  defaultValue={50}
+                  disabled={!isEnabled}
+                  fillOrigin="min"
+                  label={t('editor.masks.overlay.opacity')}
+                  max={100}
+                  min={0}
+                  onDragStateChange={onDragStateChange}
+                  onValueChange={(value) => {
+                    onChange({ ...settings, opacity: value / 100 });
                   }}
+                  step={1}
+                  suffix="%"
+                  value={Math.round(settings.opacity * 100)}
+                  density="compact"
                 />
-              );
-            })}
-          </div>
+              </div>
 
-          <div data-testid="mask-overlay-opacity-control">
-            <AdjustmentSlider
-              defaultValue={50}
-              disabled={!isEnabled}
-              fillOrigin="min"
-              label={t('editor.masks.overlay.opacity')}
-              max={100}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => {
-                onChange({ ...settings, opacity: value / 100 });
-              }}
-              step={1}
-              suffix="%"
-              value={Math.round(settings.opacity * 100)}
-              density="compact"
+              <div data-testid="mask-overlay-edge-threshold-control">
+                <AdjustmentSlider
+                  defaultValue={50}
+                  disabled={!isEnabled || activeMode !== 'edges'}
+                  fillOrigin="min"
+                  label={t('editor.masks.overlay.edgeThreshold')}
+                  max={100}
+                  min={0}
+                  onDragStateChange={onDragStateChange}
+                  onValueChange={(value) => {
+                    onChange({ ...settings, edgeThreshold: value / 100 });
+                  }}
+                  step={1}
+                  suffix="%"
+                  value={Math.round(settings.edgeThreshold * 100)}
+                  density="compact"
+                />
+              </div>
+            </>
+          )}
+          <div className="grid grid-cols-2 gap-1" data-testid="mask-overlay-visibility-controls">
+            <Switch
+              checked={selectedPinVisible}
+              id="mask-overlay-selected-pin"
+              label={t('editor.masks.actions.showComponent')}
+              onChange={(checked) => onSelectedPinVisibleChange?.(checked)}
             />
-          </div>
-
-          <div data-testid="mask-overlay-edge-threshold-control">
-            <AdjustmentSlider
-              defaultValue={50}
-              disabled={!isEnabled || activeMode !== 'edges'}
-              fillOrigin="min"
-              label={t('editor.masks.overlay.edgeThreshold')}
-              max={100}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => {
-                onChange({ ...settings, edgeThreshold: value / 100 });
-              }}
-              step={1}
-              suffix="%"
-              value={Math.round(settings.edgeThreshold * 100)}
-              density="compact"
+            <Switch
+              checked={handlesVisible}
+              id="mask-overlay-handles"
+              label={t('editor.masks.actions.showMask')}
+              onChange={(checked) => onHandlesVisibleChange?.(checked)}
             />
           </div>
         </>

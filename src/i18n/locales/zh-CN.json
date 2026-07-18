@@ -4,8 +4,10 @@
       "blackAndWhite": "",
       "blacks": "黑色",
       "brightness": "亮度",
+      "clarity": "",
       "color": "",
       "contrast": "对比度",
+      "dehaze": "",
       "evShift": "EV 偏移",
       "exposure": "曝光",
       "highlightRolloff": "高光滚降",
@@ -17,9 +19,12 @@
         "basicDesc": "标准色调映射",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "重置",
+      "saturation": "",
       "shadowRolloff": "阴影滚降",
       "shadows": "阴影",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -44,6 +49,7 @@
       },
       "toneMapper": "色调映射",
       "treatment": "",
+      "vibrance": "",
       "viewContrast": "视图对比度",
       "whites": "白色"
     },
@@ -200,9 +206,18 @@
       },
       "pointColor": {
         "addPoint": "",
+        "addPointHint": "",
         "deletePoint": "",
         "empty": "",
+        "name": "",
+        "nameInput": "",
+        "pickerHint": "",
+        "pickerReceipt": "",
         "pickFromImage": "",
+        "reset": "",
+        "resetAction": "",
+        "sampleConfidence": "",
+        "sampledRange": "",
         "samples": "",
         "visualize": ""
       },
@@ -287,6 +302,7 @@
         "title": "Skin tone - sampled uniformity (Experimental)",
         "warning": "May affect other orange-range colors; not skin detection or Capture One equivalence."
       },
+      "targetedAdjustment": "",
       "temperature": "色温",
       "tint": "色调",
       "toggleSliders": "切换滑块",
@@ -317,10 +333,12 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "",
         "quick": "Quick"
       }
     },
     "curves": {
+      "advancedDomains": "",
       "channels": {
         "blue": "蓝色",
         "green": "绿色",
@@ -348,6 +366,7 @@
       "resetAllPoint": "重置所有点曲线",
       "resetParametric": "重置 {{channel}} 参数曲线",
       "resetPoint": "重置 {{channel}} 点曲线",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
@@ -359,7 +378,8 @@
         "outputTitle": "",
         "sceneAxis": "",
         "sceneTab": "",
-        "sceneTitle": ""
+        "sceneTitle": "",
+        "toneCurveTab": ""
       }
     },
     "details": {
@@ -408,8 +428,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "数量",
       "creative": "创意",
+      "disabled": "",
+      "enabled": "",
       "feather": "羽化",
       "filmLookBrowser": {
         "activeLook": "Active look",
@@ -477,6 +500,7 @@
       "roughness": "粗糙度",
       "roundness": "圆度",
       "size": "大小",
+      "title": "",
       "vignette": "暗角"
     },
     "perspective": {
@@ -719,6 +743,21 @@
         "action": "重置端点",
         "title": "裁剪风险"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "已固定",
         "unpin": "取消固定 {{control}}"
@@ -779,13 +818,18 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "校准",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
         "lensCorrection": "Lens Corrections",
+        "toneCurve": "",
         "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
@@ -802,7 +846,13 @@
         "details": "细节",
         "effects": "效果"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_other": "",
         "loadingImage": ""
       },
@@ -811,6 +861,9 @@
         "autoAdjust": "自动调整图像",
         "resetAdjustments": "重置调整",
         "toggleAnalytics": "切换分析显示"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {
@@ -1314,6 +1367,7 @@
         "flipHoriz": "水平翻转图像",
         "flipVert": "垂直翻转图像",
         "lens": "镜头畸变校正",
+        "lockAspect": "",
         "overlayDetails": "叠加：{{name}}{{rotateHint}}",
         "resetFineRotation": "重置精细旋转",
         "rotateHint": "（Shift+O 旋转）",
@@ -1323,7 +1377,8 @@
         "switchOrientation": "切换方向",
         "switchToLandscape": "切换为横向",
         "switchToPortrait": "切换为纵向",
-        "transform": "透视和梯形校正"
+        "transform": "透视和梯形校正",
+        "unlockAspect": ""
       }
     },
     "developTools": {

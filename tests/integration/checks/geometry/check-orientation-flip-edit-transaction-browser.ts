@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import { z } from 'zod';
 
+import { editDocumentV2Schema } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort } from '../../../../scripts/lib/dev-server-port';
 
 const host = '127.0.0.1';
@@ -13,7 +14,7 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z.object({ flipHorizontal: z.literal(true), flipVertical: z.boolean() }).passthrough(),
+    editDocumentV2: editDocumentV2Schema,
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -96,9 +97,11 @@ try {
 
   const cropPanelButton = page.getByTestId('right-panel-switcher-button-crop');
   if ((await cropPanelButton.getAttribute('aria-pressed')) !== 'true') await cropPanelButton.click();
+  await page.getByTestId('crop-panel-status').waitFor({ timeout: 10_000 });
+  await page.getByTestId('crop-canvas-mode-strip').waitFor({ timeout: 10_000 });
+  await page.getByTestId('crop-panel-ratio-section').waitFor({ timeout: 10_000 });
   const flip = page.getByTestId('crop-panel-flip-horizontal');
   await flip.waitFor({ timeout: 10_000 });
-  await flip.scrollIntoViewIfNeeded();
   const identity = await flip.evaluate((element) => ({
     adjustmentRevision: element.dataset.commitAdjustmentRevision,
     imageSessionId: element.dataset.commitImageSession,
@@ -120,17 +123,16 @@ try {
   );
 
   await flip.click();
-  await page.waitForFunction(
-    (expected) =>
-      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+  if ((await flip.getAttribute('aria-pressed')) !== 'true') throw new Error('Horizontal flip was not visibly drafted.');
+  await page.getByRole('button', { name: /^Apply$/u }).click();
+  await page.waitForTimeout(500);
+  const savesAfterApply = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
         ({ command }) => command === 'save_metadata_and_update_thumbnail',
-      ).length ?? 0) === expected,
-    baselineSaves + 1,
-    { timeout: 10_000 },
+      ).length ?? 0,
   );
-  if ((await flip.getAttribute('aria-pressed')) !== 'true')
-    throw new Error('Horizontal flip was not visibly committed.');
-
+  if (savesAfterApply !== baselineSaves + 1) throw new Error('Flip draft did not persist on Done.');
   const persisted = persistenceSchema.parse(
     await page.evaluate(
       () =>
@@ -140,6 +142,7 @@ try {
     ),
   );
   if (
+    persisted.editDocumentV2.geometry.flipHorizontal !== true ||
     persisted.transaction.imageSessionId !== identity.imageSessionId ||
     persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
@@ -150,6 +153,7 @@ try {
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
   if (!(await undo.isEnabled())) throw new Error('Flip commit did not create an undo boundary.');
   await undo.click();
+  if ((await cropPanelButton.getAttribute('aria-pressed')) !== 'true') await cropPanelButton.click();
   await page.waitForFunction(
     () =>
       document.querySelector('[data-testid="crop-panel-flip-horizontal"]')?.getAttribute('aria-pressed') === 'false',

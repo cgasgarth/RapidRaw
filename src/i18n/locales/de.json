@@ -4,8 +4,10 @@
       "blackAndWhite": "",
       "blacks": "Schwarz",
       "brightness": "Helligkeit",
+      "clarity": "",
       "color": "",
       "contrast": "Kontrast",
+      "dehaze": "",
       "evShift": "EV-Korrektur",
       "exposure": "Belichtung",
       "highlightRolloff": "Lichter-Rolloff",
@@ -17,9 +19,12 @@
         "basicDesc": "Standard-Tonemapping",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "Zurücksetzen",
+      "saturation": "",
       "shadowRolloff": "Schatten-Rolloff",
       "shadows": "Tiefen",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -44,6 +49,7 @@
       },
       "toneMapper": "Tonemapper",
       "treatment": "",
+      "vibrance": "",
       "viewContrast": "Ansichtskontrast",
       "whites": "Weiß"
     },
@@ -200,9 +206,18 @@
       },
       "pointColor": {
         "addPoint": "",
+        "addPointHint": "",
         "deletePoint": "",
         "empty": "",
+        "name": "",
+        "nameInput": "",
+        "pickerHint": "",
+        "pickerReceipt": "",
         "pickFromImage": "",
+        "reset": "",
+        "resetAction": "",
+        "sampleConfidence": "",
+        "sampledRange": "",
         "samples": "",
         "visualize": ""
       },
@@ -287,6 +302,7 @@
         "title": "Skin tone - sampled uniformity (Experimental)",
         "warning": "May affect other orange-range colors; not skin detection or Capture One equivalence."
       },
+      "targetedAdjustment": "",
       "temperature": "Temperatur",
       "tint": "Tonung",
       "toggleSliders": "Regler umschalten",
@@ -317,10 +333,12 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "",
         "quick": "Quick"
       }
     },
     "curves": {
+      "advancedDomains": "",
       "channels": {
         "blue": "Blau",
         "green": "Grün",
@@ -348,6 +366,7 @@
       "resetAllPoint": "Alle Punktkurven zurücksetzen",
       "resetParametric": "Parametrische {{channel}}-Kurve zurücksetzen",
       "resetPoint": "Punktkurve ({{channel}}) zurücksetzen",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
@@ -359,7 +378,8 @@
         "outputTitle": "",
         "sceneAxis": "",
         "sceneTab": "",
-        "sceneTitle": ""
+        "sceneTitle": "",
+        "toneCurveTab": ""
       }
     },
     "details": {
@@ -408,8 +428,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Betrag",
       "creative": "Kreativ",
+      "disabled": "",
+      "enabled": "",
       "feather": "Weiche Kante",
       "filmLookBrowser": {
         "activeLook": "Active look",
@@ -478,6 +501,7 @@
       "roughness": "Rauheit",
       "roundness": "Rundheit",
       "size": "Größe",
+      "title": "",
       "vignette": "Vignettierung"
     },
     "perspective": {
@@ -721,6 +745,21 @@
         "action": "Endpunkte zurücksetzen",
         "title": "Clipping-Risiko"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Angeheftet",
         "unpin": "{{control}} lösen"
@@ -781,13 +820,18 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Kalibrierung",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
         "lensCorrection": "Lens Corrections",
+        "toneCurve": "",
         "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
@@ -804,7 +848,13 @@
         "details": "Details",
         "effects": "Effekte"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_one": "",
         "editedSections_other": "",
         "loadingImage": ""
@@ -814,6 +864,9 @@
         "autoAdjust": "Bild autom. anpassen",
         "resetAdjustments": "Anpassungen zurücksetzen",
         "toggleAnalytics": "Analyseanzeige umschalten"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {
@@ -1321,6 +1374,7 @@
         "flipHoriz": "Bild horizontal spiegeln",
         "flipVert": "Bild vertikal spiegeln",
         "lens": "Objektivverzerrung korrigieren",
+        "lockAspect": "",
         "overlayDetails": "Überlagerung: {{name}}{{rotateHint}}",
         "resetFineRotation": "Feinrotation zurücksetzen",
         "rotateHint": " (Shift+O zum Drehen)",
@@ -1330,7 +1384,8 @@
         "switchOrientation": "Ausrichtung wechseln",
         "switchToLandscape": "Zum Querformat wechseln",
         "switchToPortrait": "Zum Hochformat wechseln",
-        "transform": "Perspektiv- und Trapezkorrektur"
+        "transform": "Perspektiv- und Trapezkorrektur",
+        "unlockAspect": ""
       }
     },
     "developTools": {

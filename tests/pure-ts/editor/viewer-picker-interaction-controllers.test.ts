@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  POINT_COLOR_MAX_POINTS_V1,
+  type PointColorAdjustmentV1,
+} from '../../../packages/rawengine-schema/src/color/pointColorSchemas';
+import {
   createViewerPickerContextSynchronizer,
   createViewerPickerInteractionController,
   isViewerPickerSessionCurrent,
@@ -8,7 +12,8 @@ import {
   type ViewerPickerSessionKey,
 } from '../../../src/components/panel/editor/viewerPickerInteractionControllers';
 import type { PointColorPickerResponse } from '../../../src/utils/color/pointColorPicker';
-import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
+import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 import type { ToneEqualizerPickerResponse } from '../../../src/utils/toneEqualizerPicker';
 
 const editDocumentV2 = createDefaultEditDocumentV2();
@@ -26,7 +31,9 @@ const pointKey = (operationGeneration = 1): ViewerPickerSessionKey & { toolId: '
   ...toneKey(operationGeneration),
   toolId: 'point-color',
 });
-const current = (tool: 'point-color' | 'tone-equalizer' | null = 'tone-equalizer'): ViewerPickerCurrentContext => ({
+const current = (
+  tool: 'color-mixer' | 'point-color' | 'tone-equalizer' | null = 'tone-equalizer',
+): ViewerPickerCurrentContext => ({
   activeTool: tool,
   adjustmentRevision: 2,
   geometryEpoch: 4,
@@ -54,7 +61,36 @@ const pointResult: PointColorPickerResponse = {
   sourceFingerprint: 'source-fingerprint',
   sourceIdentity: '/private/image-a.arw',
 };
+const colorMixerKey = (operationGeneration = 1): ViewerPickerSessionKey & { toolId: 'color-mixer' } => ({
+  ...toneKey(operationGeneration),
+  toolId: 'color-mixer',
+});
 const point = resolveViewerPickerPoint({ x: 0.25, y: 0.75 }, { height: 400, width: 800, x: 20, y: 10 });
+const pointColorAdjustment = (id: string): PointColorAdjustmentV1 => ({
+  chromaRadius: 0.08,
+  chromaShift: 0,
+  enabled: true,
+  feather: 0.4,
+  hueRadiusDegrees: 25,
+  hueShiftDegrees: 0,
+  id,
+  lightnessRadius: 0.2,
+  lightnessShift: 0,
+  name: id,
+  opacity: 1,
+  samples: [
+    {
+      confidence: 1,
+      graphRevision: 'graph:9',
+      id: `${id}:sample`,
+      sampleRadiusPx: 2,
+      sourceColor: { chroma: 0.2, hueDegrees: 120, lightness: 0.5 },
+      sourceSceneRevision: 'scene:9',
+    },
+  ],
+  saturationShift: 0,
+  variance: 1,
+});
 
 describe('viewer picker interaction controllers', () => {
   test('owns one picker session and commits a result that arrives before tone release', () => {
@@ -140,6 +176,45 @@ describe('viewer picker interaction controllers', () => {
       { key: pointKey(), kind: 'commit-point-color', ordinal: 1, result: pointResult },
       { kind: 'deactivate-point-color' },
       { kind: 'publish-point-color-receipt', result: pointResult },
+    ]);
+    expect(controller.overlays()).toEqual([]);
+  });
+
+  test('rejects point-color sampling at the typed maximum without creating an overlay session', () => {
+    const fullDocument = patchEditDocumentV2Node(editDocumentV2, 'point_color', {
+      pointColor: {
+        ...selectEditDocumentNode(editDocumentV2, 'point_color').params.pointColor,
+        points: Array.from({ length: POINT_COLOR_MAX_POINTS_V1 }, (_, index) =>
+          pointColorAdjustment(`point-${String(index + 1)}`),
+        ),
+      },
+    });
+    const controller = createViewerPickerInteractionController();
+
+    expect(controller.beginPointColor({ editDocumentV2: fullDocument, key: pointKey(), point, pointerId: 9 })).toEqual(
+      [],
+    );
+    expect(controller.overlays()).toEqual([]);
+  });
+
+  test('samples rendered color, highlights weighted bands, and commits one vertical gesture', () => {
+    const controller = createViewerPickerInteractionController();
+    expect(
+      controller.beginColorMixer({
+        clientY: 200,
+        editDocumentV2,
+        key: colorMixerKey(),
+        mode: 'saturation',
+        point,
+        pointerId: 12,
+      }),
+    ).toMatchObject([{ kind: 'sample-color-mixer' }]);
+    expect(controller.receiveColorMixer(colorMixerKey(), pointResult, current('color-mixer'))).toMatchObject([
+      { bands: [{ key: 'greens' }], kind: 'publish-color-mixer-receipt', mode: 'saturation' },
+    ]);
+    controller.move(12, 100);
+    expect(controller.release(12, 100)).toMatchObject([
+      { delta: 50, kind: 'commit-color-mixer', mode: 'saturation', result: pointResult },
     ]);
     expect(controller.overlays()).toEqual([]);
   });

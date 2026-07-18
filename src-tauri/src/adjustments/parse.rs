@@ -386,6 +386,15 @@ fn parse_point_color(value: &impl CurrentAdjustmentSource) -> PointColorGpuSetti
         packed.control[3] = point["enabled"].as_bool().unwrap_or(false) as u8 as f32;
         output.points[index] = packed;
     }
+    let selected_point_index = plan["selectedPointId"]
+        .as_str()
+        .and_then(|selected_id| {
+            points
+                .iter()
+                .position(|point| point["id"].as_str() == Some(selected_id))
+        })
+        .map(|index| index.saturating_add(1) as u32)
+        .unwrap_or(0);
     output.control = [
         points.len().min(MAX_POINT_COLOR_POINTS) as u32,
         match plan["visualizeMode"].as_str() {
@@ -394,7 +403,7 @@ fn parse_point_color(value: &impl CurrentAdjustmentSource) -> PointColorGpuSetti
             _ => 0,
         },
         1,
-        0,
+        selected_point_index,
     ];
     let skin = &plan["skinUniformity"];
     if skin["enabled"].as_bool() == Some(true)
@@ -1291,7 +1300,7 @@ mod tests {
             true,
             None,
         );
-        assert_eq!(parsed.global.point_color.control, [1, 1, 1, 0]);
+        assert_eq!(parsed.global.point_color.control, [1, 1, 1, 1]);
         assert_eq!(
             parsed.global.point_color.points[0].samples[0],
             [0.61, 0.13, 32.0, 0.9]

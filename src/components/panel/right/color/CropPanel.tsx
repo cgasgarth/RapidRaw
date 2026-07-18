@@ -7,12 +7,14 @@ import {
   FlipHorizontal,
   FlipVertical,
   Grid3x3,
+  Lock,
   RectangleHorizontal,
   RectangleVertical,
   RotateCcw,
   RotateCw,
   Ruler,
   Scan,
+  Unlock,
   X,
 } from 'lucide-react';
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -24,6 +26,7 @@ import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
 import { INITIAL_ADJUSTMENTS } from '../../../../utils/adjustments';
+import { type CropOverlayMode, isCropEditDraftCurrent } from '../../../../utils/cropEditSession';
 import {
   buildLensModalEditTransaction,
   buildTransformModalEditTransaction,
@@ -37,10 +40,9 @@ import {
   selectEditDocumentMasks,
   selectEditDocumentNode,
 } from '../../../../utils/editDocumentSelectors';
-import {
-  buildOrientationFlipEditTransaction,
-  type OrientationFlipAxis,
-  type OrientationFlipCommitIdentity,
+import type {
+  OrientationFlipAxis,
+  OrientationFlipCommitIdentity,
 } from '../../../../utils/orientationFlipEditTransaction';
 import LensCorrectionModal from '../../../modals/editing/LensCorrectionModal';
 import TransformModal from '../../../modals/editing/TransformModal';
@@ -53,7 +55,7 @@ const BASE_RATIO = 1.618;
 const ORIGINAL_RATIO = 0;
 const RATIO_TOLERANCE = 0.01;
 
-export type OverlayMode = 'none' | 'thirds' | 'goldenTriangle' | 'goldenSpiral' | 'phiGrid' | 'armature' | 'diagonal';
+export type OverlayMode = CropOverlayMode;
 
 interface CropPreset {
   name: string;
@@ -152,30 +154,95 @@ export default function CropPanel() {
 function CropEditSession() {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((s) => s.selectedImage);
-  const adjustments = useEditorStore((s) => selectEditDocumentGeometry(s.editDocumentV2));
+  const committedAdjustments = useEditorStore((s) => selectEditDocumentGeometry(s.editDocumentV2));
+  const cropDraft = useEditorStore((s) => s.cropDraft);
   const lensAdjustments = useEditorStore((s) => selectEditDocumentNode(s.editDocumentV2, 'lens_correction').params);
   const masks = useEditorStore((s) => selectEditDocumentMasks(s.editDocumentV2));
   const modalAdjustments = useMemo(
-    () => ({ ...adjustments, ...lensAdjustments, masks }),
-    [adjustments, lensAdjustments, masks],
+    () => ({ ...committedAdjustments, ...lensAdjustments, masks }),
+    [committedAdjustments, lensAdjustments, masks],
   );
   const isStraightenActive = useEditorStore((s) => s.isStraightenActive);
-  const activeOverlay = useEditorStore((s) => s.overlayMode);
-  const overlayRotation = useEditorStore((s) => s.overlayRotation);
+  const committedOverlay = useEditorStore((s) => s.overlayMode);
+  const committedOverlayRotation = useEditorStore((s) => s.overlayRotation);
   const compare = useEditorStore((s) => s.compare);
   const adjustmentRevision = useEditorStore((s) => s.adjustmentRevision);
   const applyEditTransaction = useEditorStore((s) => s.applyEditTransaction);
-  const imageSessionId = useEditorStore((s) => s.imageSession?.id ?? null);
+  const imageSessionId = useEditorStore(
+    (s) => s.imageSession?.id ?? `editor-image-session:${String(s.imageSessionId)}`,
+  );
   const showOriginal = compare.isOriginalHeld || compare.mode === 'hold-original';
   const dispatchCompare = useEditorStore((s) => s.dispatchCompare);
   const setEditor = useEditorStore((s) => s.setEditor);
   const isLensModalOpen = useUIStore((s) => s.isLensCorrectionModalOpen);
   const isTransformModalOpen = useUIStore((s) => s.isTransformModalOpen);
+  const activeRightPanel = useUIStore((s) => s.activeRightPanel);
   const setUI = useUIStore((s) => s.setUI);
   const setRightPanel = useUIStore((s) => s.setRightPanel);
   const { commitEditNodeOperations } = useEditorActions();
+  const draftClosedRef = useRef(false);
+  const wasCropActiveRef = useRef(false);
+  const draftIdentity = useMemo(
+    () =>
+      selectedImage !== null && imageSessionId !== null
+        ? {
+            baseAdjustmentRevision: adjustmentRevision,
+            imageSessionId,
+            sourceIdentity: selectedImage.path,
+          }
+        : null,
+    [adjustmentRevision, imageSessionId, selectedImage],
+  );
+  const isDraftCurrent = draftIdentity !== null && isCropEditDraftCurrent(cropDraft, draftIdentity);
+  const adjustments = isDraftCurrent && cropDraft !== null ? cropDraft.geometry : committedAdjustments;
+  const activeOverlay = isDraftCurrent && cropDraft !== null ? cropDraft.overlayMode : committedOverlay;
+  const overlayRotation = isDraftCurrent && cropDraft !== null ? cropDraft.overlayRotation : committedOverlayRotation;
+
+  useEffect(() => {
+    if (activeRightPanel === Panel.Crop) {
+      wasCropActiveRef.current = true;
+      draftClosedRef.current = false;
+      return;
+    }
+    if (!wasCropActiveRef.current) return;
+    wasCropActiveRef.current = false;
+    if (cropDraft !== null) {
+      draftClosedRef.current = true;
+      setEditor({ cropDraft: null });
+    }
+  }, [activeRightPanel, cropDraft, setEditor]);
+
+  useEffect(() => {
+    if (draftClosedRef.current) return;
+    if (activeRightPanel !== Panel.Crop) return;
+    if (draftIdentity === null) {
+      if (cropDraft !== null) setEditor({ cropDraft: null });
+      return;
+    }
+    if (cropDraft !== null && cropDraft.baseAdjustmentRevision === draftIdentity.baseAdjustmentRevision) return;
+    setEditor({
+      cropDraft: {
+        baseAdjustmentRevision: draftIdentity.baseAdjustmentRevision,
+        geometry: structuredClone(committedAdjustments),
+        imageSessionId: draftIdentity.imageSessionId,
+        overlayMode: committedOverlay,
+        overlayRotation: committedOverlayRotation,
+        sourceIdentity: draftIdentity.sourceIdentity,
+      },
+    });
+  }, [
+    activeRightPanel,
+    committedAdjustments,
+    committedOverlay,
+    committedOverlayRotation,
+    cropDraft,
+    draftIdentity,
+    setEditor,
+  ]);
   const [customDraft, setCustomDraft] = useState<{ height: string; width: string } | null>(null);
   const [isRotationActive, setIsRotationActive] = useState(false);
+  const [isRatioLocked, setIsRatioLocked] = useState(() => adjustments.aspectRatio !== null);
+  const lastLockedAspectRatioRef = useRef(adjustments.aspectRatio ?? BASE_RATIO);
   const [preferredPresetOrientation, setPreferredPresetOrientation] = useState<Orientation>(() =>
     adjustments.aspectRatio !== null && adjustments.aspectRatio < 1 ? Orientation.Vertical : Orientation.Horizontal,
   );
@@ -258,7 +325,11 @@ function CropEditSession() {
 
   const setOverlay = useCallback(
     (mode: OverlayMode) => {
-      setEditor({ overlayMode: mode });
+      setEditor((state) =>
+        state.cropDraft === null
+          ? { overlayMode: mode }
+          : { cropDraft: { ...state.cropDraft, overlayMode: mode }, overlayMode: mode },
+      );
     },
     [setEditor],
   );
@@ -266,6 +337,13 @@ function CropEditSession() {
   const setOverlayRotation = useCallback(
     (updater: React.SetStateAction<number>) => {
       setEditor((state) => ({
+        cropDraft:
+          state.cropDraft === null
+            ? state.cropDraft
+            : {
+                ...state.cropDraft,
+                overlayRotation: typeof updater === 'function' ? updater(state.cropDraft.overlayRotation) : updater,
+              },
         overlayRotation: typeof updater === 'function' ? updater(state.overlayRotation) : updater,
       }));
     },
@@ -282,23 +360,46 @@ function CropEditSession() {
   );
   const commitOrientationFlip = useCallback(
     (axis: OrientationFlipAxis, enabled: boolean) => {
-      if (flipCommitIdentity === null) return;
-      applyEditTransaction(
-        buildOrientationFlipEditTransaction(
-          useEditorStore.getState(),
-          flipCommitIdentity,
-          axis,
-          enabled,
-          crypto.randomUUID(),
-        ),
-      );
+      const state = useEditorStore.getState();
+      const identity = {
+        baseAdjustmentRevision: state.adjustmentRevision,
+        imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+        sourceIdentity: state.selectedImage?.path ?? '',
+      };
+      const draft = isCropEditDraftCurrent(state.cropDraft, identity)
+        ? state.cropDraft
+        : {
+            baseAdjustmentRevision: identity.baseAdjustmentRevision,
+            geometry: structuredClone(selectEditDocumentGeometry(state.editDocumentV2)),
+            imageSessionId: identity.imageSessionId,
+            overlayMode: state.overlayMode,
+            overlayRotation: state.overlayRotation,
+            sourceIdentity: identity.sourceIdentity,
+          };
+      setEditor({
+        cropDraft: {
+          ...draft,
+          geometry: {
+            ...draft.geometry,
+            flipHorizontal: axis === 'horizontal' ? enabled : draft.geometry.flipHorizontal,
+            flipVertical: axis === 'vertical' ? enabled : draft.geometry.flipVertical,
+          },
+        },
+      });
     },
-    [applyEditTransaction, flipCommitIdentity],
+    [setEditor],
   );
 
   const setGeometryAdjustments = useCallback(
     (update: (previous: EditDocumentNodeParamsV2<'geometry'>) => EditDocumentNodeParamsV2<'geometry'>) => {
-      const previous = selectEditDocumentGeometry(useEditorStore.getState().editDocumentV2);
+      const state = useEditorStore.getState();
+      const currentIdentity = {
+        baseAdjustmentRevision: state.adjustmentRevision,
+        imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
+        sourceIdentity: state.selectedImage?.path ?? '',
+      };
+      const currentDraft = isCropEditDraftCurrent(state.cropDraft, currentIdentity) ? state.cropDraft : null;
+      const previous = currentDraft?.geometry ?? selectEditDocumentGeometry(state.editDocumentV2);
       const next = update(previous);
       let resolved = next;
       if (selectedImage?.width && selectedImage.height) {
@@ -331,9 +432,26 @@ function CropEditSession() {
           };
         }
       }
-      commitEditNodeOperations([{ nodeType: 'geometry', patch: resolved, type: 'patch-edit-document-node' }]);
+      setEditor((current) => {
+        const identity = {
+          baseAdjustmentRevision: current.adjustmentRevision,
+          imageSessionId: current.imageSession?.id ?? `editor-image-session:${String(current.imageSessionId)}`,
+          sourceIdentity: current.selectedImage?.path ?? '',
+        };
+        const draft = isCropEditDraftCurrent(current.cropDraft, identity)
+          ? current.cropDraft
+          : {
+              baseAdjustmentRevision: identity.baseAdjustmentRevision,
+              geometry: structuredClone(selectEditDocumentGeometry(current.editDocumentV2)),
+              imageSessionId: identity.imageSessionId,
+              overlayMode: current.overlayMode,
+              overlayRotation: current.overlayRotation,
+              sourceIdentity: identity.sourceIdentity,
+            };
+        return { cropDraft: { ...draft, geometry: resolved } };
+      });
     },
-    [commitEditNodeOperations, selectedImage],
+    [selectedImage, setEditor],
   );
 
   useEffect(() => {
@@ -345,6 +463,23 @@ function CropEditSession() {
   const getEffectiveOriginalRatio = useCallback(() => {
     return getOrientedOriginalRatio(selectedImage?.width, selectedImage?.height, orientationSteps);
   }, [selectedImage, orientationSteps]);
+
+  const handleRatioLockToggle = () => {
+    const nextLocked = !isRatioLocked;
+    setIsRatioLocked(nextLocked);
+    if (nextLocked) {
+      setGeometryAdjustments((previous) => ({
+        ...previous,
+        aspectRatio: previous.aspectRatio ?? lastLockedAspectRatioRef.current,
+      }));
+    } else {
+      setGeometryAdjustments((previous) => ({ ...previous, aspectRatio: null }));
+    }
+  };
+
+  useEffect(() => {
+    if (adjustments.aspectRatio !== null) lastLockedAspectRatioRef.current = adjustments.aspectRatio;
+  }, [adjustments.aspectRatio]);
 
   const activePreset = useMemo(() => {
     if (aspectRatio === null) {
@@ -448,6 +583,7 @@ function CropEditSession() {
   };
 
   const handlePresetClick = (preset: CropPreset) => {
+    setIsRatioLocked(preset.value !== null);
     if (preset.value === ORIGINAL_RATIO) {
       setGeometryAdjustments((prev) => ({
         ...prev,
@@ -488,6 +624,7 @@ function CropEditSession() {
       selectedImage?.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
 
     setPreferredPresetOrientation(Orientation.Horizontal);
+    setIsRatioLocked(true);
     setIsEditingCustom(false);
     setCustomDraft(null);
     setCustomRatioError(false);
@@ -635,28 +772,41 @@ function CropEditSession() {
 
   const handleApply = () => {
     finalizeLiveRotation();
+    draftClosedRef.current = true;
+    const state = useEditorStore.getState();
+    const draft = state.cropDraft;
+    const identity =
+      state.selectedImage !== null && state.imageSession !== null
+        ? {
+            baseAdjustmentRevision: state.adjustmentRevision,
+            imageSessionId: state.imageSession.id,
+            sourceIdentity: state.selectedImage.path,
+          }
+        : null;
+    if (identity !== null && isCropEditDraftCurrent(draft, identity)) {
+      const committed = selectEditDocumentGeometry(state.editDocumentV2);
+      if (JSON.stringify(committed) !== JSON.stringify(draft.geometry)) {
+        commitEditNodeOperations([
+          { nodeType: 'geometry', patch: structuredClone(draft.geometry), type: 'patch-edit-document-node' },
+        ]);
+      }
+    }
     setEditor({ isRotationActive: false, isStraightenActive: false, liveRotation: null });
+    setEditor({ cropDraft: null });
     setRightPanel(Panel.Adjustments);
   };
 
   const handleCancel = () => {
     updateLocalRotation(null);
+    draftClosedRef.current = true;
     setEditor({
       isRotationActive: false,
       isStraightenActive: false,
       liveRotation: null,
       overlayMode: sessionSnapshot.overlayMode,
       overlayRotation: sessionSnapshot.overlayRotation,
+      cropDraft: null,
     });
-    if (JSON.stringify(sessionSnapshot.adjustments) !== JSON.stringify(adjustments)) {
-      commitEditNodeOperations([
-        {
-          nodeType: 'geometry',
-          patch: structuredClone(sessionSnapshot.adjustments),
-          type: 'patch-edit-document-node',
-        },
-      ]);
-    }
     setRightPanel(Panel.Adjustments);
   };
 
@@ -747,6 +897,25 @@ function CropEditSession() {
                 <div className="flex shrink-0 items-center gap-1">
                   <span className={utilityLabelClassName}>{orientationLabel}</span>
                   <button
+                    aria-label={t(
+                      isRatioLocked ? 'editor.crop.tooltips.unlockAspect' : 'editor.crop.tooltips.lockAspect',
+                      {
+                        defaultValue: isRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio',
+                      },
+                    )}
+                    aria-pressed={isRatioLocked}
+                    className={cx(iconButtonClassName, isRatioLocked && selectedControlClassName)}
+                    data-testid="crop-panel-ratio-lock-toggle"
+                    data-tooltip={t(
+                      isRatioLocked ? 'editor.crop.tooltips.unlockAspect' : 'editor.crop.tooltips.lockAspect',
+                      { defaultValue: isRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio' },
+                    )}
+                    onClick={handleRatioLockToggle}
+                    type="button"
+                  >
+                    {isRatioLocked ? <Lock size={14} /> : <Unlock size={14} />}
+                  </button>
+                  <button
                     aria-label={getOrientationTooltip()}
                     className={iconButtonClassName}
                     disabled={isOrientationToggleDisabled}
@@ -791,6 +960,7 @@ function CropEditSession() {
                     isCustomActive ? selectedControlClassName : quietControlClassName,
                   )}
                   onClick={() => {
+                    setIsRatioLocked(true);
                     let newAspectRatio = BASE_RATIO;
                     if (preferredPresetOrientation === Orientation.Vertical) {
                       newAspectRatio = 1 / BASE_RATIO;

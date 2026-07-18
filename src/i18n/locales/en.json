@@ -4,8 +4,10 @@
       "blackAndWhite": "B&W",
       "blacks": "Blacks",
       "brightness": "Brightness",
+      "clarity": "Clarity",
       "color": "Color",
       "contrast": "Contrast",
+      "dehaze": "Dehaze",
       "evShift": "EV Shift",
       "exposure": "Exposure",
       "highlightRolloff": "Highlight roll-off",
@@ -18,9 +20,12 @@
         "rapidView": "Rapid View",
         "rapidViewDesc": "Natural scene-to-display rendering"
       },
+      "presence": "Presence",
       "reset": "Reset",
+      "saturation": "Saturation",
       "shadowRolloff": "Shadow roll-off",
       "shadows": "Shadows",
+      "texture": "Texture",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -45,6 +50,7 @@
       },
       "toneMapper": "Tone Mapper",
       "treatment": "Treatment",
+      "vibrance": "Vibrance",
       "viewContrast": "View contrast",
       "whites": "Whites"
     },
@@ -201,9 +207,18 @@
       },
       "pointColor": {
         "addPoint": "Add point",
+        "addPointHint": "Sample a rendered pixel to add a point",
         "deletePoint": "Delete point",
         "empty": "Add a perceptual color point, then refine its H/C/L range.",
+        "name": "Name",
+        "nameInput": "Point name",
+        "pickerHint": "Click a rendered pixel to add a sampled point. Escape cancels.",
+        "pickerReceipt": "Sampled {{confidence}}% confidence · {{revision}}",
         "pickFromImage": "Pick from image",
+        "reset": "Reset Point Color",
+        "resetAction": "Reset",
+        "sampleConfidence": "Sample confidence {{confidence}}% · {{revision}}",
+        "sampledRange": "Sampled range",
         "samples": "Point Color samples",
         "visualize": "Visualize"
       },
@@ -288,6 +303,7 @@
         "title": "Skin tone - sampled uniformity (Experimental)",
         "warning": "Uses the selected manual color range; it does not detect skin automatically or smooth spatial texture."
       },
+      "targetedAdjustment": "Target",
       "temperature": "Temperature",
       "tint": "Tint",
       "toggleSliders": "Toggle Sliders",
@@ -318,10 +334,12 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "Point Color",
         "quick": "Quick"
       }
     },
     "curves": {
+      "advancedDomains": "Curve domains",
       "channels": {
         "blue": "Blue",
         "green": "Green",
@@ -349,6 +367,7 @@
       "resetAllPoint": "Reset All Point Curves",
       "resetParametric": "Reset {{channel}} Parametric Curve",
       "resetPoint": "Reset {{channel}} Point Curve",
+      "targetTool": "Targeted adjustment tool",
       "typed": {
         "addPoint": "Add point",
         "channelMode": "Channel mode",
@@ -360,7 +379,8 @@
         "outputTitle": "Output Curve",
         "sceneAxis": "EV relative to middle grey",
         "sceneTab": "Scene",
-        "sceneTitle": "Scene Curve"
+        "sceneTitle": "Scene Curve",
+        "toneCurveTab": "Tone Curve"
       }
     },
     "details": {
@@ -409,8 +429,11 @@
       "activeSummaryCount_other": "{{count}} active",
       "activeSummaryEmpty": "None active",
       "activeSummaryNoScroll": "Creative, LUT, vignette, and grain controls are currently neutral.",
+      "advanced": "Creative and advanced",
       "amount": "Amount",
       "creative": "Creative",
+      "disabled": "Off",
+      "enabled": "On",
       "feather": "Feather",
       "filmLookBrowser": {
         "activeLook": "Active look",
@@ -481,6 +504,7 @@
       "roughness": "Roughness",
       "roundness": "Roundness",
       "size": "Size",
+      "title": "Effects",
       "vignette": "Vignette"
     },
     "perspective": {
@@ -724,6 +748,21 @@
         "action": "Reset endpoints",
         "title": "Clipping risk"
       },
+      "customize": {
+        "close": "Close customization",
+        "description": "Basic, Histogram, and tools stay fixed. Utilities remain available separately.",
+        "fixed": "Fixed",
+        "hide": "Hide",
+        "keyboardHint": "↑ ↓ reorder",
+        "list": "Develop panels",
+        "moveDown": "Move panel down",
+        "moveUp": "Move panel up",
+        "open": "Customize Develop Panel",
+        "restore": "Restore Default Order",
+        "show": "Show",
+        "title": "Customize Develop Panel",
+        "visibility": "Show or hide panel"
+      },
       "pinnedControls": {
         "title": "Pinned",
         "unpin": "Unpin {{control}}"
@@ -784,13 +823,18 @@
         "virtualCopyState": "Virtual copy · {{copy}}",
         "weight": "Weight"
       },
+      "reset": "Reset",
+      "resetTransform": "Reset Transform",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Calibration",
+        "colorGrading": "Color Grading",
+        "colorMixer": "Color Mixer",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
         "lensCorrection": "Lens Corrections",
+        "toneCurve": "Tone Curve",
         "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
@@ -807,7 +851,13 @@
         "details": "Details",
         "effects": "Effects"
       },
+      "soloMode": {
+        "label": "Solo Mode",
+        "tooltip": "Keep one panel open at a time"
+      },
       "status": {
+        "default": "Default",
+        "edited": "Edited",
         "editedSections_one": "{{count}} edited",
         "editedSections_other": "{{count}} edited",
         "loadingImage": "Loading image preview"
@@ -817,6 +867,9 @@
         "autoAdjust": "Auto Adjust Image",
         "resetAdjustments": "Reset Adjustments",
         "toggleAnalytics": "Toggle Analytics Display"
+      },
+      "utilities": {
+        "title": "Utilities / Advanced"
       }
     },
     "ai": {
@@ -1356,6 +1409,7 @@
         "flipHoriz": "Flip image horizontally",
         "flipVert": "Flip image vertically",
         "lens": "Lens distortion correction",
+        "lockAspect": "editor.crop.tooltips.lockAspect",
         "overlayDetails": "Overlay: {{name}}{{rotateHint}}",
         "resetFineRotation": "Reset Fine Rotation",
         "rotateHint": " (Shift+O to rotate)",
@@ -1365,7 +1419,8 @@
         "switchOrientation": "Switch orientation",
         "switchToLandscape": "Switch to landscape",
         "switchToPortrait": "Switch to portrait",
-        "transform": "Perspective and keystone correction"
+        "transform": "Perspective and keystone correction",
+        "unlockAspect": "editor.crop.tooltips.unlockAspect"
       }
     },
     "developTools": {

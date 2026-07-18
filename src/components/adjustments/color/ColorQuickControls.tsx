@@ -24,6 +24,8 @@ interface ColorQuickControlsProps extends ColorPanelGroupProps {
   inputSemantics: 'raw_scene_linear' | 'rendered_scene_linear_approximation';
   /** Keep the same authoritative controls while allowing Basic to own the camera-input presentation. */
   showPresence?: boolean;
+  /** Hue remains a Color workspace control after Presence moves to Basic. */
+  showHue?: boolean;
   showWhiteBalance?: boolean;
   toggleWbPicker?: () => void;
 }
@@ -37,6 +39,7 @@ export const ColorQuickControls = ({
   onDragStateChange,
   setAdjustments,
   showPresence = true,
+  showHue = true,
   showWhiteBalance = true,
   toggleWbPicker,
 }: ColorQuickControlsProps) => {
@@ -53,9 +56,8 @@ export const ColorQuickControls = ({
       adjustments.tint !== INITIAL_MASK_ADJUSTMENTS.tint
     : adjustments.whiteBalanceTechnical.mode !== 'as_shot';
   const isPresenceModified =
-    adjustments.vibrance !== INITIAL_ADJUSTMENTS.vibrance ||
-    adjustments.saturation !== INITIAL_ADJUSTMENTS.saturation ||
-    adjustments.hue !== INITIAL_ADJUSTMENTS.hue;
+    adjustments.vibrance !== INITIAL_ADJUSTMENTS.vibrance || adjustments.saturation !== INITIAL_ADJUSTMENTS.saturation;
+  const isHueModified = adjustments.hue !== INITIAL_ADJUSTMENTS.hue;
 
   const handleGlobalChange = (key: ColorAdjustment, value: number) => {
     setAdjustments((prev) => ({ ...prev, [key]: value }));
@@ -366,22 +368,31 @@ export const ColorQuickControls = ({
             value={adjustments.saturation || 0}
             onDragStateChange={onDragStateChange}
           />
-          {!isForMask ? (
-            <AdjustmentSlider
-              defaultValue={0}
-              density="compact"
-              label={t('adjustments.color.hue')}
-              max={180}
-              min={-180}
-              onValueChange={(value) => {
-                handleGlobalChange(ColorAdjustment.Hue, value);
-              }}
-              step={1}
-              value={adjustments.hue || 0}
-              trackClassName="hue-range-track"
-              onDragStateChange={onDragStateChange}
-            />
-          ) : null}
+        </section>
+      ) : null}
+
+      {showHue && !isForMask ? (
+        <section className="border-b border-editor-border pb-1.5 pt-0.5" data-testid="color-quick-hue">
+          <CompactInspectorSectionHeader
+            modified={isHueModified}
+            modifiedLabel={modifiedLabel}
+            summary={<span data-testid="color-quick-hue-summary">{adjustments.hue || 0}</span>}
+            title={t('adjustments.color.hue')}
+          />
+          <AdjustmentSlider
+            defaultValue={0}
+            density="compact"
+            label={t('adjustments.color.hue')}
+            max={180}
+            min={-180}
+            onValueChange={(value) => {
+              handleGlobalChange(ColorAdjustment.Hue, value);
+            }}
+            step={1}
+            value={adjustments.hue || 0}
+            trackClassName="hue-range-track"
+            onDragStateChange={onDragStateChange}
+          />
         </section>
       ) : null}
     </div>

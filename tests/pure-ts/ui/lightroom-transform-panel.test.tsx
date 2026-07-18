@@ -3,6 +3,7 @@ import { fireEvent, render } from '@testing-library/react';
 import i18next from 'i18next';
 import { createElement } from 'react';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
+import TransformPanel from '../../../src/components/adjustments/Transform';
 import TransformLens from '../../../src/components/adjustments/TransformLens';
 import en from '../../../src/i18n/locales/en.json';
 import { INITIAL_ADJUSTMENTS } from '../../../src/utils/adjustments';
@@ -77,4 +78,35 @@ test('Transform and Lens Corrections render as isolated Develop surfaces', () =>
   fireEvent.click(distortionSwitch);
   expect(distortionSwitch.checked).toBeFalse();
   lens.unmount();
+});
+
+test('Transform owns the complete geometry surface and exposes typed-control hooks', () => {
+  const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
+  const setAdjustments = mock(() => undefined);
+  const onReset = mock(() => undefined);
+  const view = render(
+    createElement(
+      I18nextProvider,
+      { i18n },
+      createElement(TransformPanel, {
+        adjustments,
+        onReset,
+        selectedImage,
+        setAdjustments,
+      }),
+    ),
+  );
+
+  expect(view.container.querySelector('[data-testid="transform-panel"]')).not.toBeNull();
+  expect(view.container.querySelector('[data-testid="transform-mode-row"]')).not.toBeNull();
+  expect(view.container.querySelector('[data-testid="transform-aspect-range"]')).not.toBeNull();
+  const reset = view.container.querySelector<HTMLButtonElement>('[data-testid="transform-reset"]');
+  if (reset === null) throw new Error('Expected Transform reset control.');
+  expect(reset.disabled).toBe(true);
+
+  const aspect = view.container.querySelector<HTMLInputElement>('[data-testid="transform-aspect-range"]');
+  if (aspect === null) throw new Error('Expected Transform aspect control.');
+  fireEvent.input(aspect, { target: { value: '12' } });
+  expect(setAdjustments).toHaveBeenCalled();
+  view.unmount();
 });

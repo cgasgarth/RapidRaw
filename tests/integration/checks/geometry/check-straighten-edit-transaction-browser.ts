@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import { z } from 'zod';
 
+import { editDocumentV2Schema } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import { allocateFreeTcpPort } from '../../../../scripts/lib/dev-server-port';
 
 const host = '127.0.0.1';
@@ -13,7 +14,7 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z.object({ crop: z.unknown().nullable(), rotation: z.number().finite() }).passthrough(),
+    editDocumentV2: editDocumentV2Schema,
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -154,13 +155,25 @@ try {
       (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
         ({ command }) => command === 'save_metadata_and_update_thumbnail',
       ).length ?? 0) === expected,
-    baselineSaves + 1,
+    baselineSaves,
     { timeout: 10_000 },
   );
   await input.waitFor({ state: 'detached', timeout: 10_000 });
   if ((await straightenToggle.getAttribute('aria-pressed')) !== 'false') {
     throw new Error('Straighten tool did not deactivate after its one-shot commit.');
   }
+  const resetRotation = page.getByTestId('crop-panel-reset-fine-rotation');
+  if (!(await resetRotation.isEnabled())) throw new Error('Straighten rotation was not visibly drafted.');
+  await page.getByRole('button', { name: /^Apply$/u }).click();
+  await page.waitForTimeout(1_000);
+  await page.waitForFunction(
+    (expected) =>
+      (window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls.filter(
+        ({ command }) => command === 'save_metadata_and_update_thumbnail',
+      ).length ?? 0) === expected,
+    baselineSaves + 1,
+    { timeout: 10_000 },
+  );
 
   const persisted = persistenceSchema.parse(
     await page.evaluate(
@@ -171,19 +184,17 @@ try {
     ),
   );
   if (
-    Math.abs(persisted.adjustments.rotation) < 1 ||
-    persisted.adjustments.crop === null ||
+    Math.abs(persisted.editDocumentV2.geometry.rotation) < 1 ||
+    persisted.editDocumentV2.geometry.crop === null ||
     persisted.transaction.imageSessionId !== inputIdentity.imageSessionId ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
   ) {
     throw new Error(`Straighten did not persist one source-bound geometry revision: ${JSON.stringify(persisted)}`);
   }
-  const resetRotation = page.getByTestId('crop-panel-reset-fine-rotation');
-  if (!(await resetRotation.isEnabled())) throw new Error('Straighten rotation was not visibly committed.');
-
   const undo = page.locator('button[data-command-id="undo"]:visible').first();
   if (!(await undo.isEnabled())) throw new Error('Straighten commit did not create an undo boundary.');
   await undo.click();
+  if ((await cropPanelButton.getAttribute('aria-pressed')) !== 'true') await cropPanelButton.click();
   await page.waitForFunction(
     () => (document.querySelector('[data-testid="crop-panel-reset-fine-rotation"]') as HTMLButtonElement)?.disabled,
     undefined,

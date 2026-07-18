@@ -99,6 +99,12 @@ import {
 import { buildLayerStackSidecarFromMasks } from '../../../../utils/layers/layerStackCommandBridge';
 import { persistLayerStackSidecarInEditDocumentCandidate } from '../../../../utils/layers/layerStackSidecarAdjustments';
 import {
+  buildMaskShellListItems,
+  type MaskCompositionMode,
+  type MaskShellListItem,
+  readMaskShellStatus,
+} from '../../../../utils/mask/lightroomMaskShell';
+import {
   cloneMaskContainerForPaste,
   cloneSubMaskForPaste,
   createMaskLikeClipboardActions,
@@ -171,8 +177,11 @@ import Resizer from '../../../ui/Resizer';
 import { BrushMaskControls, type BrushSettingsUpdater } from '../../editor/BrushMaskControls';
 import Waveform from '../../editor/Waveform';
 import { LightroomAiSceneMaskChooser } from './LightroomAiSceneMaskChooser';
+import { MaskCompositionMenu } from './MaskCompositionMenu';
+import { MaskListShell } from './MaskListShell';
 import { type MaskLocalAdjustmentSection, MaskLocalAdjustmentStack } from './MaskLocalAdjustmentStack';
 import { MaskOverlayReviewControls } from './MaskOverlayReviewControls';
+import { MaskOverlayShell } from './MaskOverlayShell';
 import {
   formatMaskTypeName,
   getMaskTypeName,
@@ -464,7 +473,10 @@ interface ContainerRowProps {
   isExpanded: boolean;
   isSelected: boolean;
   layerMaskProvenanceView: LayerMaskProvenanceView | undefined;
+  maskShellStatus: MaskShellListItem['status'];
   onAddComponent: (event: ReactMouseEvent<HTMLElement>) => void;
+  onComposeComponent: (mode: MaskCompositionMode) => void;
+  onNavigate: (currentId: string, direction: 'next' | 'previous') => void;
   onSelect: () => void;
   onSelectContainer: (containerId: string | null) => void;
   onSelectMask: (subMaskId: string | null) => void;
@@ -501,13 +513,16 @@ interface MaskListProps {
   handlePasteSubMask: (containerId: string, insertIndex?: number) => void;
   isRootOver: boolean;
   layerMaskProvenanceViews: Record<string, LayerMaskProvenanceView>;
+  maskShellItems: readonly MaskShellListItem[];
   onAddComponent: (
     event: ReactMouseEvent<HTMLElement> | ReactKeyboardEvent<HTMLElement>,
     containerId: string | null,
   ) => void;
+  onComposeComponent: (containerId: string, mode: MaskCompositionMode) => void;
   onCreateMask: (type: Mask) => void;
   onExitComplete: () => void;
   onOpenCreationMenu: (event: ReactMouseEvent<HTMLElement>) => void;
+  onNavigate: (currentId: string, direction: 'next' | 'previous') => void;
   onRootClick: () => void;
   onSelectContainer: (containerId: string | null) => void;
   onSelectMask: (subMaskId: string | null) => void;
@@ -537,6 +552,7 @@ interface SubMaskRowProps {
   index: number;
   isActive: boolean;
   onSelect: () => void;
+  onNavigate: (direction: 'next' | 'previous') => void;
   parentVisible: boolean;
   renamingId: string | null;
   setIsMaskControlHovered: (isHovered: boolean) => void;
@@ -1696,6 +1712,7 @@ export function MasksPanel() {
   const {
     activeMaskContainerId,
     activeMaskId,
+    adjustmentRevision,
     adjustments,
     editDocumentV2,
     brushSettings,
@@ -1716,6 +1733,7 @@ export function MasksPanel() {
     useShallow((state) => ({
       activeMaskContainerId: state.activeMaskContainerId,
       activeMaskId: state.activeMaskId,
+      adjustmentRevision: state.adjustmentRevision,
       adjustments: selectEditDocumentMasks(state.editDocumentV2),
       editDocumentV2: state.editDocumentV2,
       brushSettings: state.brushSettings,
@@ -1855,6 +1873,8 @@ export function MasksPanel() {
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [analyzingSubMaskId, setAnalyzingSubMaskId] = useState<string | null>(null);
+  const [selectedPinVisible, setSelectedPinVisible] = useState(true);
+  const [handlesVisible, setHandlesVisible] = useState(true);
 
   const commitMaskGraphCommand = useCallback(
     (command: (masks: Array<MaskContainer>) => MaskGraphCommandResult | null): MaskGraphCommandResult | null => {
@@ -1934,6 +1954,20 @@ export function MasksPanel() {
 
   const activeContainer = adjustments.find((m) => m.id === activeMaskContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeMaskId);
+  const maskShellAuthorityIdentity = useMemo(
+    () =>
+      JSON.stringify({
+        adjustmentRevision,
+        componentId: activeMaskId,
+        imagePath: selectedImage?.path ?? null,
+        maskId: activeMaskContainerId,
+      }),
+    [activeMaskContainerId, activeMaskId, adjustmentRevision, selectedImage?.path],
+  );
+  const maskShellItems = useMemo(
+    () => buildMaskShellListItems(adjustments, analyzingSubMaskId),
+    [adjustments, analyzingSubMaskId],
+  );
   const layerMaskProvenanceViews = useMemo(
     () =>
       Object.fromEntries(
@@ -1969,6 +2003,29 @@ export function MasksPanel() {
     new Set<Mask>([Mask.AiSubject, Mask.AiForeground, Mask.AiPerson, Mask.AiSky, Mask.AiDepth]).has(
       activeSubMaskData.type,
     );
+
+  useEffect(() => {
+    setSelectedPinVisible(true);
+    setHandlesVisible(true);
+    setEditor({ maskSelectedPinVisible: true, maskHandlesVisible: true });
+  }, [activeMaskContainerId, activeMaskId, adjustmentRevision, selectedImage?.path, setEditor]);
+
+  const handleMaskNavigate = useCallback(
+    (currentId: string, direction: 'next' | 'previous') => {
+      const entries = adjustments.flatMap((container) => [
+        { containerId: container.id, id: container.id, subMaskId: null as string | null },
+        ...container.subMasks.map((subMask) => ({ containerId: container.id, id: subMask.id, subMaskId: subMask.id })),
+      ]);
+      const currentIndex = entries.findIndex((entry) => entry.id === currentId);
+      if (currentIndex < 0 || entries.length === 0) return;
+      const nextIndex = Math.max(0, Math.min(entries.length - 1, currentIndex + (direction === 'next' ? 1 : -1)));
+      const next = entries[nextIndex];
+      if (next === undefined) return;
+      onSelectContainer(next.containerId);
+      onSelectMask(next.subMaskId);
+    },
+    [adjustments, onSelectContainer, onSelectMask],
+  );
 
   useEffect(() => {
     const timer = setTimeout(
@@ -2096,6 +2153,22 @@ export function MasksPanel() {
     else if (type === Mask.AiDepth)
       void handleGenerateAiDepthMask(subMask.id, aiDepthMaskParametersSchema.parse(subMask.parameters));
   };
+
+  const handleComposeComponent = useCallback(
+    (containerId: string, mode: MaskCompositionMode) => {
+      const compositionMode =
+        mode === 'subtract'
+          ? SubMaskMode.Subtractive
+          : mode === 'intersect'
+            ? SubMaskMode.Intersect
+            : SubMaskMode.Additive;
+      // Brush is the neutral, always-available component for the explicit
+      // composition grammar. The full creation menu remains available for
+      // choosing a different tool.
+      handleAddSubMask(containerId, Mask.Brush, compositionMode);
+    },
+    [handleAddSubMask],
+  );
 
   const handleGridClick = (maskTypeOrType: MaskType | Mask, forceNewMaskContainer: boolean = false) => {
     if (!forceNewMaskContainer && activeMaskContainerId) handleAddSubMask(activeMaskContainerId, maskTypeOrType);
@@ -2620,105 +2693,110 @@ export function MasksPanel() {
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-2">
           <LightroomAiSceneMaskChooser />
-          <AnimatePresence mode="wait">
-            {adjustments.length === 0 ? (
-              <motion.div
-                key="empty-masks-grid"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="z-10 shrink-0"
-                onClick={handleDeselect}
-              >
-                <UiText
-                  variant={TextVariants.heading}
-                  className={professionalInspectorDensityTokens.sectionHeader.title}
+          <MaskListShell count={adjustments.length}>
+            <AnimatePresence mode="wait">
+              {adjustments.length === 0 ? (
+                <motion.div
+                  key="empty-masks-grid"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="z-10 shrink-0"
+                  onClick={handleDeselect}
                 >
-                  {t('editor.masks.createNewTitle')}
-                </UiText>
-                <div
-                  className="mt-1 grid grid-cols-2 gap-1"
-                  role="presentation"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  <UiText
+                    variant={TextVariants.heading}
+                    className={professionalInspectorDensityTokens.sectionHeader.title}
+                  >
+                    {t('editor.masks.createNewTitle')}
+                  </UiText>
+                  <div
+                    className="mt-1 grid grid-cols-2 gap-1"
+                    role="presentation"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
+                      <DraggableGridItem
+                        key={maskType.id ?? maskType.type}
+                        maskType={maskType}
+                        onClick={(e) => {
+                          if (maskType.id === 'others') {
+                            handleAddOthersMask(e);
+                          } else {
+                            handleGridClick(maskType);
+                          }
+                        }}
+                        onRightClick={(e: ReactMouseEvent<HTMLElement>) => {
+                          handleGridRightClick(e, maskType);
+                        }}
+                        isDraggable={maskType.id !== 'others' && maskType.personPart === undefined}
+                        activeMaskContainerId={activeMaskContainerId}
+                      />
+                    ))}
+                  </div>
+                </motion.div>
+              ) : (
+                <MaskList
+                  activeDragItem={activeDragItem}
+                  activeMaskContainerId={activeMaskContainerId}
+                  activeMaskId={activeMaskId}
+                  analyzingSubMaskId={analyzingSubMaskId}
+                  containers={mutableAdjustments}
+                  copiedMask={copiedMask}
+                  copiedSubMask={copiedSubMask}
+                  copyMaskToClipboard={copyMaskToClipboard}
+                  copySubMaskToClipboard={copySubMaskToClipboard}
+                  expandedContainers={expandedContainers}
+                  handleDeleteContainer={handleDeleteContainer}
+                  handleDeleteSubMask={handleDeleteSubMask}
+                  handleDuplicateAndInvertContainer={handleDuplicateAndInvertContainer}
+                  handleDuplicateAndInvertSubMask={handleDuplicateAndInvertSubMask}
+                  handleDuplicateContainer={handleDuplicateContainer}
+                  handleDuplicateSubMask={handleDuplicateSubMask}
+                  handlePasteMask={handlePasteMask}
+                  handlePasteSubMask={handlePasteSubMask}
+                  isRootOver={isRootOver}
+                  maskShellItems={maskShellItems}
+                  layerMaskProvenanceViews={layerMaskProvenanceViews}
+                  onAddComponent={handleAddMaskContextMenu}
+                  onCreateMask={handleGridClick}
+                  onExitComplete={() => {
+                    if (pendingAction) {
+                      pendingAction();
+                      setPendingAction(null);
+                    }
                   }}
-                >
-                  {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
-                    <DraggableGridItem
-                      key={maskType.id ?? maskType.type}
-                      maskType={maskType}
-                      onClick={(e) => {
-                        if (maskType.id === 'others') {
-                          handleAddOthersMask(e);
-                        } else {
-                          handleGridClick(maskType);
-                        }
-                      }}
-                      onRightClick={(e: ReactMouseEvent<HTMLElement>) => {
-                        handleGridRightClick(e, maskType);
-                      }}
-                      isDraggable={maskType.id !== 'others' && maskType.personPart === undefined}
-                      activeMaskContainerId={activeMaskContainerId}
-                    />
-                  ))}
-                </div>
-              </motion.div>
-            ) : (
-              <MaskList
-                activeDragItem={activeDragItem}
-                activeMaskContainerId={activeMaskContainerId}
-                activeMaskId={activeMaskId}
-                analyzingSubMaskId={analyzingSubMaskId}
-                containers={mutableAdjustments}
-                copiedMask={copiedMask}
-                copiedSubMask={copiedSubMask}
-                copyMaskToClipboard={copyMaskToClipboard}
-                copySubMaskToClipboard={copySubMaskToClipboard}
-                expandedContainers={expandedContainers}
-                handleDeleteContainer={handleDeleteContainer}
-                handleDeleteSubMask={handleDeleteSubMask}
-                handleDuplicateAndInvertContainer={handleDuplicateAndInvertContainer}
-                handleDuplicateAndInvertSubMask={handleDuplicateAndInvertSubMask}
-                handleDuplicateContainer={handleDuplicateContainer}
-                handleDuplicateSubMask={handleDuplicateSubMask}
-                handlePasteMask={handlePasteMask}
-                handlePasteSubMask={handlePasteSubMask}
-                isRootOver={isRootOver}
-                layerMaskProvenanceViews={layerMaskProvenanceViews}
-                onAddComponent={handleAddMaskContextMenu}
-                onCreateMask={handleGridClick}
-                onExitComplete={() => {
-                  if (pendingAction) {
-                    pendingAction();
-                    setPendingAction(null);
-                  }
-                }}
-                onOpenCreationMenu={(event) => {
-                  handleAddMaskContextMenu(event, activeMaskContainerId);
-                }}
-                onRootClick={handleDeselect}
-                onSelectContainer={onSelectContainer}
-                onSelectMask={onSelectMask}
-                onToggleContainer={handleToggleExpand}
-                presets={presets}
-                renamingId={renamingId}
-                rootDroppableRef={setRootDroppableRef}
-                setMaskContainers={(updater) => {
-                  commitMaskGraphCommand((masks) => ({
-                    masks: updater(masks),
-                    selection: { containerId: activeMaskContainerId, subMaskId: activeMaskId },
-                  }));
-                }}
-                setIsMaskControlHovered={setIsMaskControlHovered}
-                setRenamingId={setRenamingId}
-                setTempName={setTempName}
-                tempName={tempName}
-                updateContainer={updateContainer}
-                updateSubMask={updateSubMask}
-              />
-            )}
-          </AnimatePresence>
+                  onOpenCreationMenu={(event) => {
+                    handleAddMaskContextMenu(event, activeMaskContainerId);
+                  }}
+                  onComposeComponent={handleComposeComponent}
+                  onNavigate={handleMaskNavigate}
+                  onRootClick={handleDeselect}
+                  onSelectContainer={onSelectContainer}
+                  onSelectMask={onSelectMask}
+                  onToggleContainer={handleToggleExpand}
+                  presets={presets}
+                  renamingId={renamingId}
+                  rootDroppableRef={setRootDroppableRef}
+                  setMaskContainers={(updater) => {
+                    commitMaskGraphCommand((masks) => ({
+                      masks: updater(masks),
+                      selection: { containerId: activeMaskContainerId, subMaskId: activeMaskId },
+                    }));
+                  }}
+                  setIsMaskControlHovered={setIsMaskControlHovered}
+                  setRenamingId={setRenamingId}
+                  setTempName={setTempName}
+                  tempName={tempName}
+                  updateContainer={updateContainer}
+                  updateSubMask={updateSubMask}
+                />
+              )}
+            </AnimatePresence>
+          </MaskListShell>
 
           <div className="h-4 shrink-0 w-full" role="presentation" onClick={handleDeselect} />
 
@@ -2888,14 +2966,26 @@ export function MasksPanel() {
             )}
           </AnimatePresence>
 
-          <div className="mt-2 shrink-0 border-t border-editor-border pt-2" data-testid="mask-overlay-utility">
+          <MaskOverlayShell authorityIdentity={maskShellAuthorityIdentity} autoHidden={activeMaskContainerId === null}>
             <MaskOverlayReviewControls
+              authorityIdentity={maskShellAuthorityIdentity}
+              autoHidden={activeMaskContainerId === null}
+              handlesVisible={handlesVisible}
               settings={maskOverlaySettings}
               onChange={setMaskOverlaySettings}
               onDragStateChange={onDragStateChange}
+              onHandlesVisibleChange={(visible) => {
+                setHandlesVisible(visible);
+                setEditor({ maskHandlesVisible: visible });
+              }}
+              onSelectedPinVisibleChange={(visible) => {
+                setSelectedPinVisible(visible);
+                setEditor({ maskSelectedPinVisible: visible });
+              }}
+              selectedPinVisible={selectedPinVisible}
               hotkeyHint="Shift+O"
             />
-          </div>
+          </MaskOverlayShell>
         </div>
       </div>
 
@@ -3122,11 +3212,14 @@ function MaskList({
   handlePasteMask,
   handlePasteSubMask,
   isRootOver,
+  maskShellItems,
   layerMaskProvenanceViews,
   onAddComponent,
+  onComposeComponent,
   onCreateMask,
   onExitComplete,
   onOpenCreationMenu,
+  onNavigate,
   onRootClick,
   onSelectContainer,
   onSelectMask,
@@ -3184,6 +3277,7 @@ function MaskList({
             hasActiveChild={activeMaskContainerId === container.id && activeMaskId !== null}
             isExpanded={expandedContainers.has(container.id)}
             layerMaskProvenanceView={layerMaskProvenanceViews[container.id]}
+            maskShellStatus={maskShellItems.find((item) => item.id === container.id)?.status ?? 'current'}
             onToggle={() => {
               onToggleContainer(container.id);
             }}
@@ -3220,6 +3314,8 @@ function MaskList({
             onAddComponent={(event: ReactMouseEvent<HTMLElement>) => {
               onAddComponent(event, container.id);
             }}
+            onComposeComponent={(mode) => onComposeComponent(container.id, mode)}
+            onNavigate={onNavigate}
           />
         ))}
       </AnimatePresence>
@@ -3249,6 +3345,7 @@ function ContainerRow({
   hasActiveChild,
   isExpanded,
   layerMaskProvenanceView,
+  maskShellStatus,
   onToggle,
   onSelect,
   renamingId,
@@ -3278,6 +3375,8 @@ function ContainerRow({
   analyzingSubMaskId,
   setIsMaskControlHovered,
   onAddComponent,
+  onComposeComponent,
+  onNavigate,
 }: ContainerRowProps) {
   const { t } = useTranslation();
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -3414,6 +3513,11 @@ function ContainerRow({
   const borderClass = getMaskLikeContainerDropClass({ activeDragItem, containerId: container.id, isOver });
   const containerLabel = `${container.name}, ${isExpanded ? 'expanded' : 'collapsed'}`;
   const handleContainerKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      onNavigate(container.id, event.key === 'ArrowDown' ? 'next' : 'previous');
+      return;
+    }
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
     onSelect();
@@ -3439,6 +3543,7 @@ function ContainerRow({
              ${isSelected ? 'bg-editor-selected-quiet text-editor-selected-quiet-text before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-editor-primary-active' : hasActiveChild ? 'bg-editor-panel-well text-text-primary before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-editor-primary-active/60' : 'text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary'}
              ${borderClass}`}
         data-component-count={container.subMasks.length}
+        data-mask-status={maskShellStatus}
         data-mask-container-active={String(isSelected || hasActiveChild)}
         data-mask-container-visible={String(container.visible)}
         data-testid={`mask-container-row-${container.id}`}
@@ -3573,6 +3678,7 @@ function ContainerRow({
                     onSelectContainer(container.id);
                     onSelectMask(subMask.id);
                   }}
+                  onNavigate={(direction) => onNavigate(subMask.id, direction)}
                   updateSubMask={updateSubMask}
                   handleDelete={() => {
                     handleDeleteSubMask(container.id, subMask.id);
@@ -3610,6 +3716,12 @@ function ContainerRow({
                   exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
                   transition={{ duration: 0.2 }}
                 >
+                  <div
+                    className="mb-1 flex items-center justify-end"
+                    data-testid={`mask-composition-shell-${container.id}`}
+                  >
+                    <MaskCompositionMenu onSelect={onComposeComponent} />
+                  </div>
                   <motion.button
                     aria-label={t('editor.masks.actions.addNewComponent')}
                     className="flex min-h-8 w-full cursor-pointer items-center gap-2 rounded bg-transparent px-2 py-1 text-left text-[12px] font-medium text-text-secondary opacity-80 transition-colors transition-opacity hover:bg-editor-panel-raised hover:text-text-primary hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-editor-focus-ring"
@@ -3642,6 +3754,7 @@ function SubMaskRow({
   isActive,
   parentVisible,
   onSelect,
+  onNavigate,
   updateSubMask,
   handleDelete,
   handleDuplicate,
@@ -3723,6 +3836,11 @@ function SubMaskRow({
   const showNumber = isHovered && totalCount > 1;
   const subMaskLabel = `${getSubMaskName(subMask)}, ${formatMaskTypeName(maskType)}`;
   const handleSubMaskKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      onNavigate(event.key === 'ArrowDown' ? 'next' : 'previous');
+      return;
+    }
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
     onSelect();
@@ -3751,6 +3869,7 @@ function SubMaskRow({
             transition-opacity duration-300`}
       data-mask-submask-active={String(isActive)}
       data-mask-submask-mode={subMask.mode}
+      data-mask-status={isAnalyzing ? 'pending' : readMaskShellStatus(subMask.parameters)}
       data-mask-submask-visible={String(subMask.visible)}
       data-testid={`mask-submask-row-${subMask.id}`}
       onClick={(e) => {
@@ -4223,6 +4342,8 @@ function SettingsPanel({
       ...selectEditDocumentNode(defaults, 'scene_global_color_tone').params,
       ...selectEditDocumentNode(defaults, 'scene_to_view_transform').params,
       ...selectEditDocumentNode(defaults, 'tone_equalizer').params,
+      ...selectEditDocumentNode(defaults, 'detail_denoise_dehaze').params,
+      ...selectEditDocumentNode(defaults, 'color_presence').params,
     };
     const curveDefaults = selectEditDocumentNode(defaults, 'scene_curve').params;
     const detailDefaults: DetailAdjustmentView = {

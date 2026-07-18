@@ -54,7 +54,14 @@ import {
   readNegativeLabWorkspaceLayout,
   saveNegativeLabWorkspaceLayout,
 } from '../schemas/negative-lab/negativeLabWorkspaceLayout';
-import type { MaskContainer } from '../utils/adjustments';
+import { ActiveChannel, type MaskContainer } from '../utils/adjustments';
+import type { ColorMixerTargetedBandWeight, ColorMixerTargetedMode } from '../utils/colorMixerTargetedAdjustment';
+import {
+  DEFAULT_DEVELOP_PANEL_ORDER,
+  type DevelopPanelId,
+  normalizeDevelopPanelHidden,
+  normalizeDevelopPanelOrder,
+} from '../utils/developPanelCustomization';
 import {
   EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
   type EditorWorkspaceViewport,
@@ -82,6 +89,8 @@ export interface CollapsibleSectionsState {
   basic: boolean;
   calibration: boolean;
   color: boolean;
+  colorGrading?: boolean;
+  colorMixer?: boolean;
   curves: boolean;
   details: boolean;
   effects: boolean;
@@ -105,10 +114,19 @@ export interface PointColorPickerUiReceipt {
   sourceFingerprint: string;
 }
 
+export interface ColorMixerTargetedUiReceipt {
+  bands: readonly ColorMixerTargetedBandWeight[];
+  delta: number;
+  graphRevision: string;
+  hueDegrees: number;
+  mode: ColorMixerTargetedMode;
+  sourceIdentity: string;
+}
+
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
 export const MAX_RECENT_RIGHT_PANELS = 5;
 
-export type DevelopToolId = 'crop' | 'masking' | 'remove';
+export type DevelopToolId = 'crop' | 'masking' | 'remove' | 'tone-curve';
 
 const LAZY_COMPUTATIONAL_MODAL_IDS = ['panorama', 'hdr', 'superResolution', 'focusStack', 'negativeLab'] as const;
 export type LazyComputationalModalId = (typeof LAZY_COMPUTATIONAL_MODAL_IDS)[number];
@@ -159,6 +177,9 @@ const createCollapsibleSectionsState = (preferences: EditorWorkspacePreferences)
   basic: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('basic') ?? false,
   calibration: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('calibration') ?? false,
   color: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('color') ?? false,
+  colorGrading:
+    preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('colorGrading') ?? false,
+  colorMixer: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('colorMixer') ?? false,
   curves: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('curves') ?? false,
   details: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('details') ?? false,
   effects: preferences.rightInspector.expandedSectionsByPanel[Panel.Adjustments]?.includes('effects') ?? false,
@@ -454,10 +475,17 @@ export interface UIState {
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
   developPanelPinnedControlIds: string[];
+  developPanelOrder: DevelopPanelId[];
+  hiddenDevelopPanelIds: DevelopPanelId[];
   toneEqualizerPickerActive: boolean;
   toneEqualizerPickerReceipt: ToneEqualizerPickerUiReceipt | null;
   pointColorPickerActive: boolean;
   pointColorPickerReceipt: PointColorPickerUiReceipt | null;
+  colorMixerTargetedMode: ColorMixerTargetedMode | null;
+  colorMixerTargetedReceipt: ColorMixerTargetedUiReceipt | null;
+  toneCurveTargetChannel: ActiveChannel;
+  toneCurveTargetMode: 'point' | 'parametric';
+  toneCurveTargetPointIndex: number | null;
 
   // Modals & Dialogs
   isCreateFolderModalOpen: boolean;
@@ -502,6 +530,9 @@ export interface UIState {
   markLayerMaskProvenanceStale: (input: { layerIds?: string[]; reason: LayerMaskProvenanceInvalidationReason }) => void;
   recordLayerMaskPreviewReceipt: (input: { appliedCommandId: string; masks: Array<MaskContainer> }) => void;
   setDevelopPanelPinnedControlIds: (controlIds: string[]) => void;
+  setDevelopPanelOrder: (order: readonly DevelopPanelId[]) => void;
+  setDevelopPanelVisibility: (panelId: DevelopPanelId, visible: boolean) => void;
+  resetDevelopPanelCustomization: () => void;
   hydrateEditorWorkspacePreferences: () => void;
   hydrateLibraryWorkspacePreferences: () => void;
   setDefaultEditorCompareMode: (mode: EditorWorkspaceCompareMode) => void;
@@ -591,10 +622,17 @@ export const useUIStore = create<UIState>((set, get) => {
     slideDirection: 1,
     collapsibleSectionsState: createCollapsibleSectionsState(initialPreferences),
     developPanelPinnedControlIds: initialPreferences.rightInspector.pinnedControlIds,
+    developPanelOrder: normalizeDevelopPanelOrder(initialPreferences.rightInspector.developPanelOrder),
+    hiddenDevelopPanelIds: normalizeDevelopPanelHidden(initialPreferences.rightInspector.developPanelHidden),
     toneEqualizerPickerActive: false,
     toneEqualizerPickerReceipt: null,
     pointColorPickerActive: false,
     pointColorPickerReceipt: null,
+    colorMixerTargetedMode: null,
+    colorMixerTargetedReceipt: null,
+    toneCurveTargetChannel: ActiveChannel.Luma,
+    toneCurveTargetMode: 'point',
+    toneCurveTargetPointIndex: null,
 
     isCreateFolderModalOpen: false,
     isRenameFolderModalOpen: false,
@@ -716,6 +754,58 @@ export const useUIStore = create<UIState>((set, get) => {
       });
     },
 
+    setDevelopPanelOrder: (order) => {
+      const normalizedOrder = normalizeDevelopPanelOrder(order);
+      set((state) => {
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          rightInspector: {
+            ...state.editorWorkspacePreferences.rightInspector,
+            developPanelOrder: normalizedOrder,
+          },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { developPanelOrder: normalizedOrder, editorWorkspacePreferences: preferences };
+      });
+    },
+
+    setDevelopPanelVisibility: (panelId, visible) => {
+      set((state) => {
+        const currentHidden = normalizeDevelopPanelHidden(state.hiddenDevelopPanelIds);
+        const nextHidden = visible
+          ? currentHidden.filter((id) => id !== panelId)
+          : [...new Set([...currentHidden, panelId])];
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          rightInspector: {
+            ...state.editorWorkspacePreferences.rightInspector,
+            developPanelHidden: nextHidden,
+          },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return { hiddenDevelopPanelIds: nextHidden, editorWorkspacePreferences: preferences };
+      });
+    },
+
+    resetDevelopPanelCustomization: () => {
+      set((state) => {
+        const preferences = {
+          ...state.editorWorkspacePreferences,
+          rightInspector: {
+            ...state.editorWorkspacePreferences.rightInspector,
+            developPanelHidden: [],
+            developPanelOrder: [...DEFAULT_DEVELOP_PANEL_ORDER],
+          },
+        };
+        saveEditorWorkspacePreferences(preferences);
+        return {
+          developPanelOrder: [...DEFAULT_DEVELOP_PANEL_ORDER],
+          hiddenDevelopPanelIds: [],
+          editorWorkspacePreferences: preferences,
+        };
+      });
+    },
+
     hydrateEditorWorkspacePreferences: () => {
       const preferences = readEditorWorkspacePreferences();
       saveEditorWorkspacePreferences(preferences);
@@ -727,6 +817,8 @@ export const useUIStore = create<UIState>((set, get) => {
           activeRightPanel === Panel.Crop ? 'crop' : activeRightPanel === Panel.Masks ? 'masking' : null,
         collapsibleSectionsState: createCollapsibleSectionsState(preferences),
         developPanelPinnedControlIds: preferences.rightInspector.pinnedControlIds,
+        developPanelOrder: normalizeDevelopPanelOrder(preferences.rightInspector.developPanelOrder),
+        hiddenDevelopPanelIds: normalizeDevelopPanelHidden(preferences.rightInspector.developPanelHidden),
         recentRightPanels: preferences.rightInspector.recentPanels,
         renderedRightPanel: preferences.rightInspector.activePanel,
       });
