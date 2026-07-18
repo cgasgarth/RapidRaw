@@ -41,11 +41,11 @@ interface DevelopToolStripProps {
 export default function DevelopToolStrip({ testId = 'develop-tool-strip' }: DevelopToolStripProps) {
   const { t } = useTranslation();
   const selectedImage = useEditorStore((state) => state.selectedImage);
-  const { activeDevelopTool, setActiveDevelopTool, setRightPanel } = useUIStore(
+  const { activateDevelopTool, activeDevelopTool, deactivateDevelopTool } = useUIStore(
     useShallow((state) => ({
+      activateDevelopTool: state.activateDevelopTool,
       activeDevelopTool: state.activeDevelopTool,
-      setActiveDevelopTool: state.setActiveDevelopTool,
-      setRightPanel: state.setRightPanel,
+      deactivateDevelopTool: state.deactivateDevelopTool,
     })),
   );
   const availability = resolveDevelopToolAvailability(selectedImage);
@@ -53,20 +53,24 @@ export default function DevelopToolStrip({ testId = 'develop-tool-strip' }: Deve
   const selectTool = useCallback(
     (tool: DevelopToolDefinition) => {
       if (availability.disabled) return;
-      // setRightPanel intentionally runs first: direct panel navigation maps Masks to
-      // the canonical Masking entry; the explicit second write preserves Remove.
-      const currentPanel = useUIStore.getState().activeRightPanel;
-      if (currentPanel !== tool.panel) setRightPanel(tool.panel);
-      setActiveDevelopTool(tool.id);
+      activateDevelopTool(tool.id);
     },
-    [availability.disabled, setActiveDevelopTool, setRightPanel],
+    [activateDevelopTool, availability.disabled],
   );
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== 'Escape' || activeDevelopTool === null) return;
     event.preventDefault();
     event.stopPropagation();
-    setActiveDevelopTool(null);
+    const toolId = activeDevelopTool;
+    deactivateDevelopTool();
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => {
+        const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-develop-tool-id]')];
+        const nextFocus = buttons.find((button) => button.dataset['developToolId'] === toolId && !button.disabled);
+        nextFocus?.focus();
+      });
+    }
   };
 
   return (

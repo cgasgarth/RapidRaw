@@ -511,6 +511,7 @@ export const useKeyboardShortcuts = ({
           else if (s.editor.activeMaskId) s.editor.setEditor({ activeMaskId: null });
           else if (s.editor.activeMaskContainerId)
             s.editor.setEditor({ activeMaskContainerId: null, isMaskControlHovered: false });
+          else if (s.ui.activeDevelopTool) s.ui.deactivateDevelopTool();
           else if (s.ui.activeRightPanel === Panel.Crop) s.ui.selectEditorPanel(Panel.Adjustments);
           else if (s.ui.editorWorkspacePreferences.viewer.lightsOutLevel !== 'off') s.ui.setEditorLightsOutLevel('off');
           else if (s.ui.isFullScreen) handleToggleFullScreen();
