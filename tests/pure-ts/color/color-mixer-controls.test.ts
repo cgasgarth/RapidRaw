@@ -102,6 +102,18 @@ describe('Advanced mixer view models', () => {
     expect(resetMixer.blue.constant).toBe(-5);
   });
 
+  test('disables Color Balance when resetting its last non-zero range', () => {
+    const balance = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb),
+      enabled: true,
+      midtones: { red: 10, green: 0, blue: 0 },
+    };
+    const resetBalance = resetColorBalanceRange(balance, 'midtones');
+
+    expect(resetBalance.enabled).toBe(false);
+    expect(resetBalance.midtones).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones);
+  });
+
   test('enables an identity channel mixer with a visible non-identity active row', () => {
     const enabled = enableChannelMixer(structuredClone(INITIAL_ADJUSTMENTS.channelMixer), 'red');
     expect(enabled.enabled).toBe(true);

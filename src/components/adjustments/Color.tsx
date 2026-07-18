@@ -65,7 +65,7 @@ interface ColorPanelProps {
   workspaceTab?: ColorWorkspaceTabId;
 }
 
-const COLOR_WORKSPACE_TAB_IDS = ['foundation', 'mixer', 'grading', 'output'] as const;
+const COLOR_WORKSPACE_TAB_IDS = ['foundation', 'point-color', 'mixer', 'grading', 'output'] as const;
 type ColorWorkspaceTabId = (typeof COLOR_WORKSPACE_TAB_IDS)[number];
 let sessionColorWorkspaceTab: ColorWorkspaceTabId = 'foundation';
 const COLOR_WORKSPACE_TAB_BASE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.tab;
@@ -480,17 +480,23 @@ export default function ColorPanel({
         ),
       },
       {
+        id: 'point-color',
+        label: t('adjustments.color.workspaceTabs.pointColor'),
+        panel: (
+          <PointColorControls
+            adjustments={adjustments}
+            appSettings={appSettings}
+            isForMask={isForMask}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setAdjustments}
+          />
+        ),
+      },
+      {
         id: 'mixer',
         label: t('adjustments.color.workspaceTabs.mixer'),
         panel: (
           <div className="space-y-1">
-            <PointColorControls
-              adjustments={adjustments}
-              appSettings={appSettings}
-              isForMask={isForMask}
-              onDragStateChange={onDragStateChange}
-              setAdjustments={setAdjustments}
-            />
             <ColorMixerControls
               activeChannelMixerOutput={activeChannelMixerOutput}
               activeColor={activeColor}
@@ -717,19 +723,20 @@ export default function ColorPanel({
         </div>
       </div>
 
-      {workspaceTabs.map((tab) => (
-        <div
-          aria-labelledby={`${tablistId}-${tab.id}-tab`}
-          className="pb-0.5"
-          hidden={effectiveWorkspaceTab !== tab.id}
-          id={`${tablistId}-${tab.id}-panel`}
-          key={tab.id}
-          role="tabpanel"
-          data-testid={`color-workspace-tab-panel-${tab.id}`}
-        >
-          {tab.panel}
-        </div>
-      ))}
+      {workspaceTabs.map((tab) =>
+        effectiveWorkspaceTab === tab.id ? (
+          <div
+            aria-labelledby={`${tablistId}-${tab.id}-tab`}
+            className="pb-0.5"
+            id={`${tablistId}-${tab.id}-panel`}
+            key={tab.id}
+            role="tabpanel"
+            data-testid={`color-workspace-tab-panel-${tab.id}`}
+          >
+            {tab.panel}
+          </div>
+        ) : null,
+      )}
     </div>
   );
 }

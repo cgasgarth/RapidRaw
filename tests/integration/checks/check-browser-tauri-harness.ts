@@ -4776,7 +4776,7 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
   await tonePicker.click();
 
   await page.getByTestId('right-panel-switcher-button-color').click();
-  await page.getByTestId('color-workspace-tab-mixer').click();
+  await page.getByTestId('color-workspace-tab-point-color').click();
   const pointControls = page.getByTestId('point-color-controls');
   await pointControls.waitFor({ state: 'visible', timeout: 10_000 });
   const pointPicker = page.getByTestId('point-color-picker');

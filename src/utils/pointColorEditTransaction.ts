@@ -1,5 +1,8 @@
+import {
+  type PointColorPlanV1,
+  pointColorPlanV1Schema,
+} from '../../packages/rawengine-schema/src/color/pointColorSchemas';
 import type { EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
-import type { Adjustments } from './adjustments';
 import { selectEditDocumentNode } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 
@@ -17,6 +20,13 @@ export interface PointColorEditTransactionState {
   selectedImage: { path: string } | null;
 }
 
+/**
+ * Point Color edits are intentionally restricted to the plan's own fields. The
+ * schema parse below is the runtime boundary that keeps slider/picker patches
+ * from leaking unbounded or unknown values into the edit document.
+ */
+export type PointColorPatch = Partial<PointColorPlanV1>;
+
 const currentImageSessionId = (state: PointColorEditTransactionState): string =>
   state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
 
@@ -31,7 +41,7 @@ export const isCurrentPointColorIdentity = (
 export const buildPointColorEditTransaction = (
   state: PointColorEditTransactionState,
   identity: PointColorCommitIdentity,
-  patch: Partial<Adjustments['pointColor']>,
+  patch: PointColorPatch,
   transactionId: string,
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== identity.sourceIdentity) {
@@ -48,6 +58,9 @@ export const buildPointColorEditTransaction = (
     );
   }
 
+  const currentPlan = selectEditDocumentNode(state.editDocumentV2, 'point_color').params.pointColor;
+  const nextPlan = pointColorPlanV1Schema.parse({ ...structuredClone(currentPlan), ...structuredClone(patch) });
+
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
     history: 'single-entry',
@@ -56,10 +69,7 @@ export const buildPointColorEditTransaction = (
       {
         nodeType: 'point_color',
         patch: {
-          pointColor: {
-            ...structuredClone(selectEditDocumentNode(state.editDocumentV2, 'point_color').params['pointColor']),
-            ...structuredClone(patch),
-          },
+          pointColor: nextPlan,
         },
         type: 'patch-edit-document-node',
       },

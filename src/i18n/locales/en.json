@@ -207,9 +207,18 @@
       },
       "pointColor": {
         "addPoint": "Add point",
+        "addPointHint": "Sample a rendered pixel to add a point",
         "deletePoint": "Delete point",
         "empty": "Add a perceptual color point, then refine its H/C/L range.",
+        "name": "Name",
+        "nameInput": "Point name",
+        "pickerHint": "Click a rendered pixel to add a sampled point. Escape cancels.",
+        "pickerReceipt": "Sampled {{confidence}}% confidence · {{revision}}",
         "pickFromImage": "Pick from image",
+        "reset": "Reset Point Color",
+        "resetAction": "Reset",
+        "sampleConfidence": "Sample confidence {{confidence}}% · {{revision}}",
+        "sampledRange": "Sampled range",
         "samples": "Point Color samples",
         "visualize": "Visualize"
       },
@@ -325,6 +334,7 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "Point Color",
         "quick": "Quick"
       }
     },

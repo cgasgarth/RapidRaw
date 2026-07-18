@@ -1,12 +1,13 @@
+import { POINT_COLOR_MAX_POINTS_V1 } from '../../../../packages/rawengine-schema/src/color/pointColorSchemas';
 import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/editDocumentV2';
 import type { PointColorPickerResponse } from '../../../utils/color/pointColorPicker';
-import { selectEditDocumentNode } from '../../../utils/editDocumentSelectors';
-import type { ToneEqualizerPickerResponse } from '../../../utils/toneEqualizerPicker';
 import {
   type ColorMixerTargetedBandWeight,
   type ColorMixerTargetedMode,
   resolveColorMixerBandWeights,
 } from '../../../utils/colorMixerTargetedAdjustment';
+import { selectEditDocumentNode } from '../../../utils/editDocumentSelectors';
+import type { ToneEqualizerPickerResponse } from '../../../utils/toneEqualizerPicker';
 
 export type ViewerPickerToolId = 'color-mixer' | 'point-color' | 'tone-equalizer';
 
@@ -318,6 +319,11 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
     },
     beginPointColor: ({ editDocumentV2, key, point, pointerId }) => {
       if (session !== null) return [];
+      if (
+        selectEditDocumentNode(editDocumentV2, 'point_color').params.pointColor.points.length >=
+        POINT_COLOR_MAX_POINTS_V1
+      )
+        return [];
       session = {
         ...point,
         key,

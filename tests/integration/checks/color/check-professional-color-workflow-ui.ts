@@ -18,6 +18,7 @@ import {
   COLOR_OUTPUT_FOCUS_EVENT,
   COLOR_WORKSPACE_TAB_SESSION_KEY,
 } from '../../../../src/utils/colorWorkspaceNavigation';
+import { selectEditDocumentMasks } from '../../../../src/utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2 } from '../../../../src/utils/editDocumentV2';
 
 type RenderedPanel = {
@@ -251,16 +252,29 @@ async function selectMixerWorkspace(container: Element) {
   );
 }
 
+async function selectPointColorWorkspace(container: Element) {
+  await click(getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-point-color'));
+  assert.equal(
+    getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-point-color').getAttribute('aria-selected'),
+    'true',
+    'Point Color workspace should be selected.',
+  );
+}
+
 async function validateKeyboardWorkspaceNavigation(container: Element) {
   const tablist = getByTestId<HTMLDivElement>(container, 'color-workspace-tabs');
-  const mixer = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-mixer');
+  const pointColor = getByTestId<HTMLButtonElement>(container, 'color-workspace-tab-point-color');
 
   await act(async () => {
     tablist.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' }));
     await flushPromises();
   });
-  assert.equal(mixer.getAttribute('aria-selected'), 'true', 'ArrowRight should select Mixer from Foundation.');
-  assert.equal(document.activeElement, mixer, 'ArrowRight should focus the selected workspace.');
+  assert.equal(
+    pointColor.getAttribute('aria-selected'),
+    'true',
+    'ArrowRight should select Point Color from Foundation.',
+  );
+  assert.equal(document.activeElement, pointColor, 'ArrowRight should focus the selected workspace.');
 }
 
 function validateFoundationHierarchy(container: Element) {
@@ -306,7 +320,7 @@ function getColorAdjustments(state = useEditorStore.getState()): ColorPanelAdjus
 }
 
 async function validateMaskPointColorAuthority(container: Element) {
-  await selectMixerWorkspace(container);
+  await selectPointColorWorkspace(container);
   const adjustmentRevision = useEditorStore.getState().adjustmentRevision;
   const enable = getByTestId<HTMLButtonElement>(container, 'point-color-enable');
   assert.equal(normalizeText(enable.textContent), 'Enable');
@@ -616,8 +630,10 @@ async function validateColorRangeLocalAdjustmentTransaction(container: Element) 
   );
   assert.equal(committed.lastEditApplicationReceipt?.source, 'layer-command');
   assert.equal(committed.lastEditApplicationReceipt?.persistence, 'commit');
-  assert.equal(committed.editDocumentV2.layers.masks.length, before.editDocumentV2.layers.masks.length + 1);
-  const createdLayer = committed.editDocumentV2.layers.masks.at(-1);
+  const committedMasks = selectEditDocumentMasks(committed.editDocumentV2);
+  const beforeMasks = selectEditDocumentMasks(before.editDocumentV2);
+  assert.equal(committedMasks.length, beforeMasks.length + 1);
+  const createdLayer = committedMasks.at(-1);
   assert.ok(createdLayer, 'Color-range transaction did not publish its created layer.');
   assert.equal(committed.activeMaskContainerId, createdLayer.id, 'Created layer was not selected after commit.');
   assert.equal(
