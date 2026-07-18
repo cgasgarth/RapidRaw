@@ -43,6 +43,8 @@ export const buildPointColorEditTransaction = (
   identity: PointColorCommitIdentity,
   patch: PointColorPatch,
   transactionId: string,
+  history: EditTransactionRequest['history'] = 'single-entry',
+  persistence: EditTransactionRequest['persistence'] = 'commit',
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== identity.sourceIdentity) {
     throw new Error(
@@ -63,7 +65,7 @@ export const buildPointColorEditTransaction = (
 
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
-    history: 'single-entry',
+    history,
     imageSessionId: identity.imageSessionId,
     operations: [
       {
@@ -74,7 +76,7 @@ export const buildPointColorEditTransaction = (
         type: 'patch-edit-document-node',
       },
     ],
-    persistence: 'commit',
+    persistence,
     source: 'manual-control',
     transactionId,
   };
