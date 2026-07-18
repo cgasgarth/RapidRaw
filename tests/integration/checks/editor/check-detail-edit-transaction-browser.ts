@@ -13,9 +13,7 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z
-      .object({ deblurEnabled: z.literal(true), deblurSigmaPx: z.literal(1.1), deblurStrength: z.literal(32) })
-      .passthrough(),
+    editDocumentV2: z.object({ nodes: z.record(z.string(), z.unknown()) }).passthrough(),
     path: z.literal(sourcePath),
     transaction: z
       .object({
@@ -57,6 +55,13 @@ const renderCallSchema = z.object({
     .passthrough(),
   endedAtMs: z.number().nullable(),
 });
+const primaryDocumentSchema = z
+  .object({
+    nodes: z.object({
+      detail_denoise_dehaze: z.object({ params: z.record(z.string(), z.unknown()) }).passthrough(),
+    }),
+  })
+  .passthrough();
 
 const server = spawn('bun', ['run', 'dev', '--', '--host', host, '--port', String(port)], {
   env: {
@@ -190,6 +195,13 @@ try {
   if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click();
   const controls = page.getByTestId('detail-controls');
   await controls.waitFor({ timeout: 10_000 });
+  for (const testId of [
+    'detail-section-sharpening',
+    'detail-section-noise-reduction',
+    'detail-section-color-noise-reduction',
+  ]) {
+    await controls.getByTestId(testId).waitFor({ state: 'visible', timeout: 10_000 });
+  }
   const identity = await controls.evaluate((element) => ({
     adjustmentRevision: element.dataset.commitAdjustmentRevision,
     imageSessionId: element.dataset.commitImageSession,
@@ -202,6 +214,33 @@ try {
   ) {
     throw new Error(`Detail controls did not expose complete commit identity: ${JSON.stringify(identity)}`);
   }
+  const primaryBaselineSaves = await saveCount(page);
+  const primaryBaselineApplies = await applyCount(page);
+  await controls.getByTestId('detail-control-sharpening-radius-value').click();
+  await controls.getByTestId('detail-control-sharpening-radius-input').fill('42');
+  await controls.getByTestId('detail-control-sharpening-radius-input').press('Enter');
+  await waitForSaveCount(page, primaryBaselineSaves + 1);
+  await waitForApplyCount(page, primaryBaselineApplies + 1);
+  await controls.getByTestId('detail-control-sharpening-masking-value').click();
+  await controls.getByTestId('detail-control-sharpening-masking-input').fill('67');
+  await controls.getByTestId('detail-control-sharpening-masking-input').press('Enter');
+  await waitForSaveCount(page, primaryBaselineSaves + 2);
+  await waitForApplyCount(page, primaryBaselineApplies + 2);
+  const primarySaveArgs = await page.evaluate(
+    () =>
+      window.__RAWENGINE_BROWSER_TAURI_HARNESS__?.calls
+        .filter(({ command }) => command === 'save_metadata_and_update_thumbnail')
+        .at(-1)?.args ?? null,
+  );
+  const primaryPersisted = persistenceSchema.parse(primarySaveArgs);
+  const primaryParams = primaryDocumentSchema.parse(primaryPersisted['editDocumentV2']).nodes.detail_denoise_dehaze
+    .params;
+  if (primaryParams?.['localContrastRadiusPx'] !== 42 || primaryParams?.['localContrastMidtoneMask'] !== 67) {
+    throw new Error(`Primary Detail controls did not persist typed values: ${JSON.stringify(primaryParams)}`);
+  }
+
+  const advanced = controls.getByTestId('detail-advanced').locator('summary');
+  await advanced.click();
   const baselineSaves = await saveCount(page);
   const baselineApplies = await applyCount(page);
   await page.evaluate(() => {
@@ -245,11 +284,11 @@ try {
   );
   if (
     persisted.transaction.imageSessionId !== identity.imageSessionId ||
-    persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) + 2 ||
+    persisted.transaction.baseAdjustmentRevision !== primaryPersisted.transaction.nextAdjustmentRevision + 2 ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
   ) {
     throw new Error(
-      `Deblur did not persist three sequential source-bound Detail revisions: ${JSON.stringify(persisted)}`,
+      `Deblur revision mismatch: primary=${JSON.stringify(primaryPersisted.transaction)} transaction=${JSON.stringify(persisted.transaction)}`,
     );
   }
 
