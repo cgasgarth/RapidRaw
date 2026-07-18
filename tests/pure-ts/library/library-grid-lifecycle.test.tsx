@@ -117,6 +117,16 @@ test('keeps the virtual list and surviving thumbnails mounted through ordinary l
   });
   list.scrollTop = 50;
 
+  // Preview/index completion can replace ImageFile objects without changing
+  // the catalog order. The user's browse position must survive that refresh.
+  const previewCompletedImages = images.map((source, index) => ({
+    ...source,
+    modified: source.modified + index + 1,
+  }));
+  await render(previewCompletedImages, ThumbnailSize.Small, ThumbnailAspectRatio.Cover);
+  expect(container.querySelector('.custom-scrollbar')).toBe(list);
+  expect(list.scrollTop).toBe(50);
+
   await resize(610, 400);
   expect(container.querySelector('.custom-scrollbar')).toBe(list);
   expect(container.querySelector('[data-image-path="/a.raw"]')).toBe(thumbnail);
