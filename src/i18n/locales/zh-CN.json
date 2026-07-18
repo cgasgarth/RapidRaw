@@ -287,6 +287,7 @@
         "title": "Skin tone - sampled uniformity (Experimental)",
         "warning": "May affect other orange-range colors; not skin detection or Capture One equivalence."
       },
+      "targetedAdjustment": "",
       "temperature": "色温",
       "tint": "色调",
       "toggleSliders": "切换滑块",

@@ -13,6 +13,7 @@ export interface ViewerToolPointerSample {
 
 export type ViewerToolId =
   | 'brush'
+  | 'color-mixer'
   | 'compare-divider'
   | 'crop'
   | 'focus-retouch'
@@ -101,6 +102,7 @@ const createController = (id: ViewerToolId): ViewerToolController => ({
 
 const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>> = {
   brush: createController('brush'),
+  'color-mixer': createController('color-mixer'),
   'compare-divider': createController('compare-divider'),
   crop: createController('crop'),
   'focus-retouch': createController('focus-retouch'),
@@ -117,6 +119,7 @@ const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>
 export const resolveViewerToolId = (tool: string): ViewerToolId => {
   if (
     tool === 'brush' ||
+    tool === 'color-mixer' ||
     tool === 'compare-divider' ||
     tool === 'crop' ||
     tool === 'mask' ||

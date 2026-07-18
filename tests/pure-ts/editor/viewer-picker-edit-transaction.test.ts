@@ -88,6 +88,28 @@ const toneCommand = (
   result: toneResult,
 });
 
+const colorMixerCommand = (): Extract<ViewerPickerCommitResult, { kind: 'color-mixer' }> => ({
+  baseline: createDefaultEditDocumentV2(),
+  bands: [
+    { key: 'blues', weight: 1 },
+    { key: 'aquas', weight: 0.25 },
+  ],
+  delta: 40,
+  key: {
+    adjustmentRevision: 0,
+    geometryEpoch: 9,
+    imageSessionId: session.id,
+    normalizedImagePoint: { x: 0.5, y: 0.5 },
+    operationGeneration: 5,
+    sourceIdentity: sourcePath,
+    sourceRevision,
+    toolId: 'color-mixer',
+  },
+  kind: 'color-mixer',
+  mode: 'saturation',
+  result: pointResult,
+});
+
 describe('viewer picker edit transaction', () => {
   beforeEach(() => {
     const editDocumentV2 = createDefaultEditDocumentV2();
@@ -191,6 +213,31 @@ describe('viewer picker edit transaction', () => {
     expect(useEditorStore.getState()).toMatchObject({ adjustmentRevision: 1, historyIndex: 1 });
     expect(useEditorStore.getState().history).toHaveLength(2);
     expect(useEditorStore.getState().lastEditApplicationReceipt?.transactionId).toBe('viewer-picker:tone:1');
+  });
+
+  test('commits one weighted Color Mixer gesture and restores it through Undo/Redo', () => {
+    const result = useEditorStore
+      .getState()
+      .applyEditTransaction(
+        buildViewerPickerEditTransaction(currentTransactionState(), colorMixerCommand(), 'viewer-picker:mixer:1'),
+      );
+    expect(result).toMatchObject({
+      changedKeys: ['nodes.selective_color_mixer.params.hsl'],
+      nextAdjustmentRevision: 1,
+      noOp: false,
+    });
+    expect(selectEditDocumentNode(result.after, 'selective_color_mixer').params.hsl.blues.saturation).toBe(40);
+    expect(selectEditDocumentNode(result.after, 'selective_color_mixer').params.hsl.aquas.saturation).toBe(10);
+    useEditorStore.getState().undo();
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params.hsl.blues
+        .saturation,
+    ).toBe(0);
+    useEditorStore.getState().redo();
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params.hsl.blues
+        .saturation,
+    ).toBe(40);
   });
 
   test('fails closed across every authoritative identity and native-receipt dimension', () => {

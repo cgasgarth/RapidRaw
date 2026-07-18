@@ -180,6 +180,7 @@ export const useViewerToolRuntimeController = (input: ViewerToolRuntimeControlle
       observers: [sampler.handleInputEvent],
       tools: {
         'compare-divider': compareDivider.handleInputEvent,
+        'color-mixer': picker.handleInputEvent,
         crop: cropStraighten.handleInputEvent,
         'focus-retouch': focusRetouch.handleInputEvent,
         'point-color': picker.handleInputEvent,
