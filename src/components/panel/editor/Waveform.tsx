@@ -3,7 +3,7 @@ import { AlertOctagon } from 'lucide-react';
 import { type KeyboardEvent, type PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PreviewScopeStatus } from '../../../store/useEditorStore';
-import { DisplayMode } from '../../../utils/adjustments';
+import { BasicAdjustment, DisplayMode } from '../../../utils/adjustments';
 import type { ChannelConfig } from '../../adjustments/Curves';
 import type { WaveformData } from '../../ui/AppProperties';
 
@@ -67,12 +67,46 @@ export interface HistogramHoverSample {
   zone: 'blacks' | 'exposure' | 'highlights' | 'shadows' | 'whites';
 }
 
+/** The five editable tonal regions exposed by the compact histogram. */
+export type HistogramTonalZone = HistogramHoverSample['zone'];
+
+export interface HistogramTonalZoneConfig {
+  adjustment: BasicAdjustment;
+  key: HistogramTonalZone;
+  label: string;
+  max: number;
+  min: number;
+  step: number;
+}
+
+export const HISTOGRAM_TONAL_ZONES: ReadonlyArray<HistogramTonalZoneConfig> = [
+  { adjustment: BasicAdjustment.Blacks, key: 'blacks', label: 'Blacks', max: 100, min: -100, step: 1 },
+  { adjustment: BasicAdjustment.Shadows, key: 'shadows', label: 'Shadows', max: 100, min: -100, step: 1 },
+  { adjustment: BasicAdjustment.Exposure, key: 'exposure', label: 'Exposure', max: 5, min: -5, step: 0.01 },
+  { adjustment: BasicAdjustment.Highlights, key: 'highlights', label: 'Highlights', max: 100, min: -100, step: 1 },
+  { adjustment: BasicAdjustment.Whites, key: 'whites', label: 'Whites', max: 100, min: -100, step: 1 },
+] as const;
+
+export const getHistogramTonalZoneConfig = (zone: HistogramTonalZone): HistogramTonalZoneConfig =>
+  HISTOGRAM_TONAL_ZONES.find((candidate) => candidate.key === zone) ?? HISTOGRAM_TONAL_ZONES[2]!;
+
+export interface HistogramTonalZoneEditor {
+  enabled: boolean;
+  values: Partial<Record<BasicAdjustment, number>>;
+  onInteractionStart: (zone: HistogramTonalZone) => void;
+  onInteractionChange: (zone: HistogramTonalZone, value: number) => void;
+  onInteractionCommit: (zone: HistogramTonalZone) => void;
+  onInteractionCancel: (zone: HistogramTonalZone) => void;
+  onInteractionReset: (zone: HistogramTonalZone) => void;
+}
+
 interface HistogramViewProps {
   histogram: ChannelConfig | null | undefined;
   interactive?: boolean;
   onHoverSample?: (sample: HistogramHoverSample | null) => void;
   showClippingReadouts?: boolean;
   testId?: string;
+  tonalZoneEditor?: HistogramTonalZoneEditor;
 }
 
 const modeButtons: ReadonlyArray<ModeButton> = [
@@ -192,6 +226,7 @@ export const HistogramView = ({
   onHoverSample,
   showClippingReadouts = true,
   testId = 'histogram-clipping-readouts',
+  tonalZoneEditor,
 }: HistogramViewProps) => {
   const { t } = useTranslation();
   const redData = getHistogramChannelData(histogram?.red);
@@ -199,6 +234,146 @@ export const HistogramView = ({
   const blueData = getHistogramChannelData(histogram?.blue);
   const lumaData = getHistogramChannelData(histogram?.luma);
   const [keyboardBin, setKeyboardBin] = useState<number | null>(null);
+  const pointerZoneRef = useRef<HistogramTonalZone | null>(null);
+  const pointerStartXRef = useRef<number | null>(null);
+  const pointerValueRef = useRef<number | null>(null);
+  const pointerWidthRef = useRef<number>(1);
+  const keyboardZoneRef = useRef<HistogramTonalZone | null>(null);
+  const tonalZoneEditorRef = useRef(tonalZoneEditor);
+  tonalZoneEditorRef.current = tonalZoneEditor;
+
+  useEffect(() => {
+    const cancelInteractionOnWindowBlur = () => {
+      const editor = tonalZoneEditorRef.current;
+      if (pointerZoneRef.current !== null) {
+        editor?.onInteractionCancel(pointerZoneRef.current);
+        pointerZoneRef.current = null;
+        pointerStartXRef.current = null;
+        pointerValueRef.current = null;
+      }
+      if (keyboardZoneRef.current !== null) {
+        editor?.onInteractionCancel(keyboardZoneRef.current);
+        keyboardZoneRef.current = null;
+      }
+    };
+    window.addEventListener('blur', cancelInteractionOnWindowBlur);
+    return () => {
+      window.removeEventListener('blur', cancelInteractionOnWindowBlur);
+      cancelInteractionOnWindowBlur();
+    };
+  }, []);
+
+  const resolvePointerZone = (
+    event: Pick<PointerEvent<HTMLElement>, 'clientX' | 'currentTarget'>,
+  ): HistogramTonalZone => {
+    const targetZone = event.currentTarget.dataset['histogramTonalZone'] as HistogramTonalZone | undefined;
+    if (targetZone !== undefined && HISTOGRAM_TONAL_ZONES.some((candidate) => candidate.key === targetZone)) {
+      return targetZone;
+    }
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position = bounds.width <= 0 ? 0 : Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+    const index = Math.min(HISTOGRAM_TONAL_ZONES.length - 1, Math.floor(position * HISTOGRAM_TONAL_ZONES.length));
+    return HISTOGRAM_TONAL_ZONES[index]?.key ?? 'exposure';
+  };
+
+  const snapTonalValue = (zone: HistogramTonalZone, value: number): number => {
+    const config = getHistogramTonalZoneConfig(zone);
+    const decimals = config.step.toString().split('.')[1]?.length ?? 0;
+    const snapped = Math.round((value - config.min) / config.step) * config.step + config.min;
+    return Number(Math.max(config.min, Math.min(config.max, snapped)).toFixed(decimals));
+  };
+
+  const clampTonalValue = (zone: HistogramTonalZone, value: number, precision: number): number => {
+    const config = getHistogramTonalZoneConfig(zone);
+    return Number(Math.max(config.min, Math.min(config.max, value)).toFixed(precision));
+  };
+
+  const beginPointerInteraction = (event: PointerEvent<HTMLElement>) => {
+    if (!interactive || !tonalZoneEditor?.enabled) return;
+    const zone = resolvePointerZone(event);
+    const config = getHistogramTonalZoneConfig(zone);
+    const value = tonalZoneEditor.values[config.adjustment] ?? 0;
+    pointerZoneRef.current = zone;
+    pointerStartXRef.current = event.clientX;
+    pointerValueRef.current = value;
+    pointerWidthRef.current = Math.max(
+      1,
+      (event.currentTarget.parentElement ?? event.currentTarget).getBoundingClientRect().width,
+    );
+    tonalZoneEditor.onInteractionStart(zone);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  };
+
+  const updatePointerInteraction = (event: PointerEvent<HTMLElement>) => {
+    const zone = pointerZoneRef.current;
+    const startX = pointerStartXRef.current;
+    const startValue = pointerValueRef.current;
+    if (!zone || startX === null || startValue === null || !tonalZoneEditor?.enabled) return;
+    const config = getHistogramTonalZoneConfig(zone);
+    const next = snapTonalValue(
+      zone,
+      startValue + ((event.clientX - startX) / pointerWidthRef.current) * (config.max - config.min),
+    );
+    tonalZoneEditor.onInteractionChange(zone, next);
+  };
+
+  const finishPointerInteraction = (cancelled: boolean) => {
+    const zone = pointerZoneRef.current;
+    if (zone !== null && tonalZoneEditor !== undefined) {
+      if (cancelled) tonalZoneEditor.onInteractionCancel(zone);
+      else tonalZoneEditor.onInteractionCommit(zone);
+    }
+    pointerZoneRef.current = null;
+    pointerStartXRef.current = null;
+    pointerValueRef.current = null;
+    pointerWidthRef.current = 1;
+  };
+
+  const handleTonalZoneKeyDown = (event: KeyboardEvent<HTMLButtonElement>, zone: HistogramTonalZone) => {
+    if (!interactive || !tonalZoneEditor?.enabled) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      tonalZoneEditor.onInteractionCancel(zone);
+      keyboardZoneRef.current = null;
+      return;
+    }
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      const config = getHistogramTonalZoneConfig(zone);
+      tonalZoneEditor.onInteractionStart(zone);
+      tonalZoneEditor.onInteractionChange(zone, event.key === 'Home' ? config.min : config.max);
+      keyboardZoneRef.current = zone;
+      return;
+    }
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(event.key)) return;
+    event.preventDefault();
+    const config = getHistogramTonalZoneConfig(zone);
+    const current = tonalZoneEditor.values[config.adjustment] ?? 0;
+    const direction = event.key === 'ArrowLeft' || event.key === 'ArrowDown' || event.key === 'PageDown' ? -1 : 1;
+    const multiplier =
+      event.key === 'PageUp' || event.key === 'PageDown' ? 10 : event.shiftKey || event.altKey ? 0.2 : 1;
+    if (keyboardZoneRef.current !== zone) {
+      tonalZoneEditor.onInteractionStart(zone);
+      keyboardZoneRef.current = zone;
+    }
+    const baseDecimals = config.step.toString().split('.')[1]?.length ?? 0;
+    const precision = multiplier < 1 ? Math.max(1, baseDecimals) : baseDecimals;
+    tonalZoneEditor.onInteractionChange(
+      zone,
+      multiplier < 1
+        ? clampTonalValue(zone, current + direction * config.step * multiplier, precision)
+        : snapTonalValue(zone, current + direction * config.step * multiplier),
+    );
+  };
+
+  const handleTonalZoneKeyUp = (event: KeyboardEvent<HTMLButtonElement>, zone: HistogramTonalZone) => {
+    if (keyboardZoneRef.current !== zone) return;
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
+      tonalZoneEditor?.onInteractionCommit(zone);
+      keyboardZoneRef.current = null;
+    }
+  };
 
   if (redData.length === 0 || greenData.length === 0 || blueData.length === 0 || lumaData.length === 0) return null;
 
@@ -237,6 +412,7 @@ export const HistogramView = ({
     const bounds = event.currentTarget.getBoundingClientRect();
     const position = bounds.width <= 0 ? 0 : (event.clientX - bounds.left) / bounds.width;
     publishSample(position * (Math.min(redData.length, greenData.length, blueData.length, lumaData.length) - 1));
+    updatePointerInteraction(event);
   };
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!interactive) return;
@@ -274,11 +450,19 @@ export const HistogramView = ({
       onBlur={() => {
         setKeyboardBin(null);
         publishSample(null);
+        if (keyboardZoneRef.current !== null) {
+          tonalZoneEditor?.onInteractionCancel(keyboardZoneRef.current);
+          keyboardZoneRef.current = null;
+        }
+        if (pointerZoneRef.current !== null) finishPointerInteraction(true);
       }}
       onKeyDown={handleKeyDown}
+      onPointerCancel={() => finishPointerInteraction(true)}
+      onPointerDown={beginPointerInteraction}
       onPointerLeave={() => publishSample(null)}
       onPointerMove={handlePointerMove}
-      role="img"
+      onPointerUp={() => finishPointerInteraction(false)}
+      role={tonalZoneEditor?.enabled ? 'group' : 'img'}
       tabIndex={interactive ? 0 : undefined}
     >
       <svg
@@ -304,6 +488,51 @@ export const HistogramView = ({
           );
         })}
       </svg>
+      {interactive && tonalZoneEditor?.enabled && (
+        <div className="absolute inset-0 z-10 flex" data-testid={`${testId}-tonal-zones`}>
+          {HISTOGRAM_TONAL_ZONES.map((zone) => {
+            const config = getHistogramTonalZoneConfig(zone.key);
+            const value = tonalZoneEditor.values[config.adjustment] ?? 0;
+            const active = pointerZoneRef.current === zone.key || keyboardZoneRef.current === zone.key;
+            const zoneLabel = t(`ui.waveform.header.zones.${zone.key}`, { defaultValue: zone.label });
+            return (
+              <button
+                aria-label={`${zoneLabel} tonal adjustment`}
+                aria-valuemax={config.max}
+                aria-valuemin={config.min}
+                aria-valuenow={value}
+                aria-valuetext={`${value}${zone.key === 'exposure' ? ' EV' : ''}`}
+                className={`h-full min-w-0 flex-1 cursor-ew-resize border-r border-white/8 bg-transparent transition-colors focus-visible:bg-white/12 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-white/70 ${active ? 'bg-white/12' : 'hover:bg-white/6'}`}
+                data-active={String(active)}
+                data-histogram-tonal-zone={zone.key}
+                data-tonal-value={value}
+                data-testid={`${testId}-tonal-zone-${zone.key}`}
+                key={zone.key}
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  tonalZoneEditor.onInteractionReset(zone.key);
+                }}
+                onKeyDown={(event) => handleTonalZoneKeyDown(event, zone.key)}
+                onKeyUp={(event) => handleTonalZoneKeyUp(event, zone.key)}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  beginPointerInteraction(event);
+                }}
+                onPointerUp={(event) => {
+                  event.stopPropagation();
+                  finishPointerInteraction(false);
+                }}
+                onPointerCancel={(event) => {
+                  event.stopPropagation();
+                  finishPointerInteraction(true);
+                }}
+                role="slider"
+                type="button"
+              />
+            );
+          })}
+        </div>
+      )}
       {showClippingReadouts && (
         <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
           <span
