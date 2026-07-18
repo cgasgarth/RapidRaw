@@ -404,6 +404,8 @@ pub struct GpuExecutionReceipt {
     pub frame_identity: Option<GpuFrameIdentity>,
     pub execution_sequence: u64,
     pub graph_fingerprint: u64,
+    pub compiled_edit_graph_fingerprint: u64,
+    pub execution_abi_fingerprint: u64,
     pub stages: GpuStageFlags,
     pub blur_dispatch_count: u32,
     pub flare_dispatch_count: u32,
@@ -1037,6 +1039,67 @@ pub struct RenderRequest<'a> {
     pub edit_graph: EditGraphExecutionAuthority,
 }
 
+pub(crate) fn gpu_execution_abi_resources(
+    mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+    lut: Option<&Lut>,
+) -> crate::edit_graph::GpuExecutionAbiResources {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"rapidraw.gpu-execution-mask-resources.v1");
+    for mask in mask_bitmaps.iter().take(MAX_MASKS) {
+        hasher.update(&mask.width().to_le_bytes());
+        hasher.update(&mask.height().to_le_bytes());
+        hasher.update(mask.as_raw());
+    }
+    let mask_content_fingerprint = u64::from_le_bytes(
+        hasher.finalize().as_bytes()[..8]
+            .try_into()
+            .expect("BLAKE3 digest has at least eight bytes"),
+    );
+    crate::edit_graph::GpuExecutionAbiResources {
+        mask_layer_count: mask_bitmaps.len().min(MAX_MASKS) as u16,
+        mask_content_fingerprint,
+        lut_content_fingerprint: lut.map(|lut| lut.content_hash),
+    }
+}
+
+pub(crate) fn bind_edit_graph_execution_abi(
+    graph: &Arc<crate::edit_graph::CompiledEditGraph>,
+    adjustments: &AllAdjustments,
+    mask_bitmaps: &[ImageBuffer<Luma<u8>, Vec<u8>>],
+    lut: Option<&Lut>,
+) -> Arc<crate::edit_graph::CompiledEditGraph> {
+    Arc::new(
+        graph.bind_gpu_execution_abi(*adjustments, gpu_execution_abi_resources(mask_bitmaps, lut)),
+    )
+}
+
+impl<'a> RenderRequest<'a> {
+    pub(crate) fn with_bound_execution_abi(
+        adjustments: AllAdjustments,
+        mask_bitmaps: &'a [ImageBuffer<Luma<u8>, Vec<u8>>],
+        lut: Option<Arc<Lut>>,
+        roi: Option<Roi>,
+        edit_graph: EditGraphExecutionAuthority,
+    ) -> Self {
+        let edit_graph = match edit_graph {
+            EditGraphExecutionAuthority::Compiled(graph) => EditGraphExecutionAuthority::Compiled(
+                bind_edit_graph_execution_abi(&graph, &adjustments, mask_bitmaps, lut.as_deref()),
+            ),
+            #[cfg(all(test, feature = "tauri-test"))]
+            EditGraphExecutionAuthority::TestOnlyLegacy => {
+                EditGraphExecutionAuthority::TestOnlyLegacy
+            }
+        };
+        Self {
+            adjustments,
+            mask_bitmaps,
+            lut,
+            roi,
+            edit_graph,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct GpuPostFilmTapReceiptV1 {
@@ -1137,8 +1200,7 @@ fn validate_edit_graph_request(request: &RenderRequest<'_>) -> Result<(), String
             edit_graph
                 .validate_gpu_execution(
                     &request.adjustments,
-                    request.lut.is_some(),
-                    request.mask_bitmaps.len(),
+                    gpu_execution_abi_resources(request.mask_bitmaps, request.lut.as_deref()),
                 )
                 .map_err(str::to_owned)?;
             let runtime = crate::render::wgpu_nodes::WgpuNodeRuntime::from_graph(edit_graph)
@@ -2086,6 +2148,13 @@ impl GpuProcessor {
             .as_ref()
             .map_or(&self.dummy_lut_view, |entry| &entry.view);
 
+        let compiled_graph_identity = match &request.edit_graph {
+            EditGraphExecutionAuthority::Compiled(edit_graph) => {
+                Some((edit_graph.fingerprint, edit_graph.execution_abi_fingerprint))
+            }
+            #[cfg(all(test, feature = "tauri-test"))]
+            EditGraphExecutionAuthority::TestOnlyLegacy => None,
+        };
         let mut adjustments = match &request.edit_graph {
             EditGraphExecutionAuthority::Compiled(edit_graph) => {
                 let mut authoritative = edit_graph.shader_abi();
@@ -2916,6 +2985,10 @@ impl GpuProcessor {
             frame_identity: Some(input.execution_lease.frame()),
             execution_sequence,
             graph_fingerprint: graph.fingerprint,
+            compiled_edit_graph_fingerprint: compiled_graph_identity
+                .map_or(0, |(fingerprint, _)| fingerprint),
+            execution_abi_fingerprint: compiled_graph_identity
+                .map_or(0, |(_, fingerprint)| fingerprint),
             stages: graph.flags,
             blur_dispatch_count: blur_counters.dispatches,
             flare_dispatch_count,
@@ -3253,13 +3326,24 @@ mod blur_pass_tests {
             None,
         )
         .unwrap();
-        let request = RenderRequest {
+        let stale_request = RenderRequest {
             adjustments: plan.adjustments,
             mask_bitmaps: &[],
             lut: None,
             roi: None,
             edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
         };
+        assert_eq!(
+            validate_edit_graph_request(&stale_request),
+            Err("edit_graph.stale_gpu_execution_abi".to_string())
+        );
+        let request = RenderRequest::with_bound_execution_abi(
+            plan.adjustments,
+            &[],
+            None,
+            None,
+            EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
+        );
         assert_eq!(validate_edit_graph_request(&request), Ok(()));
     }
 
@@ -3875,13 +3959,13 @@ mod blur_pass_tests {
             &state,
             &source,
             input_identity,
-            RenderRequest {
-                adjustments: plan.adjustments,
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-                edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments,
+                &[],
+                None,
+                None,
+                EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
+            ),
             "compiled_edit_graph_gpu",
         )
         .expect("real GPU executor accepts the compiled graph contract");
@@ -3903,6 +3987,11 @@ mod blur_pass_tests {
             .expect("compiled GPU render publishes a lease receipt");
         assert_eq!(receipt.execution_sequence, processor.execution_sequence());
         assert_eq!(receipt.runtime_identity, Some(processor.runtime_identity()));
+        assert_eq!(
+            receipt.compiled_edit_graph_fingerprint,
+            plan.edit_graph.fingerprint
+        );
+        assert_ne!(receipt.execution_abi_fingerprint, 0);
         assert_eq!(
             receipt.frame_identity,
             Some(GpuFrameIdentity {
@@ -3974,12 +4063,19 @@ mod blur_pass_tests {
             None,
         )
         .unwrap();
+        let bound_graph = plan
+            .edit_graph
+            .bind_gpu_execution_abi(plan.adjustments, gpu_execution_abi_resources(&[], None));
+        assert_eq!(
+            bytemuck::bytes_of(&bound_graph.shader_abi()),
+            bytemuck::bytes_of(&plan.edit_graph.shader_abi())
+        );
         let expected = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
             &plan.adjustments,
             &[],
             None,
-            &plan.edit_graph,
+            &bound_graph,
         )
         .unwrap()
         .to_rgba32f()
@@ -3989,13 +4085,13 @@ mod blur_pass_tests {
             &state,
             &source,
             PreGpuImageIdentity::for_source(&source, "typed_curve_gpu_route"),
-            RenderRequest {
-                adjustments: plan.adjustments,
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments,
+                &[],
+                None,
+                None,
+                EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            ),
             "typed_curve_gpu_route",
         )
         .unwrap()
@@ -4043,12 +4139,15 @@ mod blur_pass_tests {
             None,
         )
         .expect("raw basic view plan compiles");
+        let bound_graph = plan
+            .edit_graph
+            .bind_gpu_execution_abi(plan.adjustments, gpu_execution_abi_resources(&[], None));
         let rendered = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
             &plan.adjustments,
             &[],
             None,
-            &plan.edit_graph,
+            &bound_graph,
         )
         .expect("CPU raw basic view renders")
         .to_rgba32f()
@@ -4149,12 +4248,15 @@ mod blur_pass_tests {
             )
             .unwrap();
             assert_eq!(plan.adjustments.global.edit_graph_version, version as f32);
+            let bound_graph = plan
+                .edit_graph
+                .bind_gpu_execution_abi(plan.adjustments, gpu_execution_abi_resources(&[], None));
             let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
                 &source,
                 &plan.adjustments,
                 &[],
                 None,
-                &plan.edit_graph,
+                &bound_graph,
             )
             .unwrap()
             .to_rgba32f()
@@ -4165,13 +4267,13 @@ mod blur_pass_tests {
                 &state,
                 &source,
                 PreGpuImageIdentity::for_source(&source, &format!("v{version}")),
-                RenderRequest {
-                    adjustments: plan.adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-                },
+                RenderRequest::with_bound_execution_abi(
+                    plan.adjustments,
+                    &[],
+                    None,
+                    None,
+                    EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                ),
                 "scene_referred_v2_delta",
             )
             .unwrap()
@@ -4238,12 +4340,15 @@ mod blur_pass_tests {
                 None,
             )
             .unwrap();
+            let bound_graph = plan
+                .edit_graph
+                .bind_gpu_execution_abi(plan.adjustments, gpu_execution_abi_resources(&[], None));
             let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
                 &source,
                 &plan.adjustments,
                 &[],
                 None,
-                &plan.edit_graph,
+                &bound_graph,
             )
             .unwrap()
             .to_rgba32f()
@@ -4254,13 +4359,13 @@ mod blur_pass_tests {
                 &state,
                 &source,
                 PreGpuImageIdentity::for_source(&source, &format!("luma-v{version}")),
-                RenderRequest {
-                    adjustments: plan.adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-                },
+                RenderRequest::with_bound_execution_abi(
+                    plan.adjustments,
+                    &[],
+                    None,
+                    None,
+                    EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                ),
                 "scene_luminance_domain",
             )
             .unwrap()
@@ -4355,13 +4460,13 @@ mod blur_pass_tests {
             &state,
             &source,
             PreGpuImageIdentity::for_source(&source, "multi-tile-flare"),
-            RenderRequest {
-                adjustments: plan.adjustments,
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments,
+                &[],
+                None,
+                None,
+                EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            ),
             "multi_tile_flare_prepass",
         )
         .unwrap();
@@ -4477,12 +4582,16 @@ mod blur_pass_tests {
             Some(Arc::clone(&lut)),
         )
         .unwrap();
+        let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+            plan.adjustments,
+            gpu_execution_abi_resources(std::slice::from_ref(&mask), Some(&lut)),
+        );
         let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
             &plan.adjustments,
             std::slice::from_ref(&mask),
             Some(&lut),
-            &plan.edit_graph,
+            &bound_graph,
         )
         .unwrap()
         .to_rgba32f();
@@ -4498,13 +4607,13 @@ mod blur_pass_tests {
             &state,
             &source,
             PreGpuImageIdentity::for_source(&source, "cpu-reference-nonspatial"),
-            RenderRequest {
-                adjustments: plan.adjustments,
-                mask_bitmaps: std::slice::from_ref(&mask),
-                lut: Some(lut),
-                roi: None,
-                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments,
+                std::slice::from_ref(&mask),
+                Some(lut),
+                None,
+                EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            ),
             "cpu_reference_nonspatial",
         )
         .unwrap()
@@ -4786,12 +4895,15 @@ mod blur_pass_tests {
                 None,
             )
             .unwrap();
+            let bound_graph = plan
+                .edit_graph
+                .bind_gpu_execution_abi(plan.adjustments, gpu_execution_abi_resources(&[], None));
             let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
                 &source,
                 &plan.adjustments,
                 &[],
                 None,
-                &plan.edit_graph,
+                &bound_graph,
             )
             .unwrap()
             .to_rgba32f();
@@ -4800,13 +4912,13 @@ mod blur_pass_tests {
                 &state,
                 &source,
                 PreGpuImageIdentity::for_source(&source, label),
-                RenderRequest {
-                    adjustments: plan.adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-                },
+                RenderRequest::with_bound_execution_abi(
+                    plan.adjustments,
+                    &[],
+                    None,
+                    None,
+                    EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                ),
                 label,
             )
             .unwrap()
@@ -4981,13 +5093,13 @@ mod blur_pass_tests {
                 &state,
                 &source,
                 identity,
-                RenderRequest {
-                    adjustments: plan.adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-                },
+                RenderRequest::with_bound_execution_abi(
+                    plan.adjustments,
+                    &[],
+                    None,
+                    None,
+                    EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                ),
                 "dehaze_source_analysis",
             )
             .expect("GPU dehaze render succeeds")
@@ -5025,13 +5137,13 @@ mod blur_pass_tests {
                 &state,
                 &clear,
                 clear_identity,
-                RenderRequest {
-                    adjustments: plan.adjustments,
-                    mask_bitmaps: &[],
-                    lut: None,
-                    roi: None,
-                    edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-                },
+                RenderRequest::with_bound_execution_abi(
+                    plan.adjustments,
+                    &[],
+                    None,
+                    None,
+                    EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+                ),
                 "dehaze_clear_air",
             )
             .expect("GPU clear-air render succeeds")
@@ -5479,12 +5591,15 @@ mod blur_pass_tests {
             None,
         )
         .expect("current technical white-balance plan compiles");
+        let bound_graph = plan
+            .edit_graph
+            .bind_gpu_execution_abi(plan.adjustments, gpu_execution_abi_resources(&[], None));
         let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
             &plan.adjustments,
             &[],
             None,
-            &plan.edit_graph,
+            &bound_graph,
         )
         .expect("CPU render succeeds")
         .to_rgba32f();
@@ -5494,13 +5609,13 @@ mod blur_pass_tests {
             &state,
             &source,
             identity,
-            RenderRequest {
-                adjustments: plan.adjustments,
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments,
+                &[],
+                None,
+                None,
+                EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            ),
             "technical_white_balance",
         )
         .expect("GPU render succeeds")
@@ -6074,6 +6189,7 @@ fn process_and_get_dynamic_image_inner(
     String,
 > {
     let start_time = Instant::now();
+    let mut capture_post_film = capture_post_film;
     let (width, height) = base_image.dimensions();
     let device = &context.device;
     let queue = &context.queue;
@@ -6200,6 +6316,28 @@ fn process_and_get_dynamic_image_inner(
         }
     }
     processor.prepare_dehaze_plan(base_image, pre_gpu_identity, &mut request.adjustments);
+    let bound_graph = match &request.edit_graph {
+        EditGraphExecutionAuthority::Compiled(graph) => Some(bind_edit_graph_execution_abi(
+            graph,
+            &request.adjustments,
+            request.mask_bitmaps,
+            request.lut.as_deref(),
+        )),
+        #[cfg(all(test, feature = "tauri-test"))]
+        EditGraphExecutionAuthority::TestOnlyLegacy => None,
+    };
+    let bound_identity = bound_graph
+        .as_ref()
+        .map(|graph| (graph.fingerprint, graph.execution_abi_fingerprint));
+    if let Some(bound_graph) = bound_graph {
+        request.edit_graph = EditGraphExecutionAuthority::Compiled(bound_graph);
+    }
+    if let Some((graph_fingerprint, execution_abi_fingerprint)) = bound_identity
+        && let Some(capture_identity) = capture_post_film.as_mut()
+    {
+        capture_identity.compiled_edit_graph_fingerprint = graph_fingerprint;
+        capture_identity.execution_abi_fingerprint = execution_abi_fingerprint;
+    }
 
     let cache_matches = |cache: &GpuImageCache| {
         cache.pre_gpu_identity == pre_gpu_identity

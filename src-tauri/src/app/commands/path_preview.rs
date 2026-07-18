@@ -125,15 +125,15 @@ pub(crate) fn generate_preview_for_path(
             detail_stage.render_hash,
             detail_stage.render_hash,
         ),
-        RenderRequest {
-            adjustments: gpu_adjustments,
-            mask_bitmaps: &mask_bitmaps,
-            lut: render_plan.lut.clone(),
-            roi: None,
-            edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+        RenderRequest::with_bound_execution_abi(
+            gpu_adjustments,
+            &mask_bitmaps,
+            render_plan.lut.clone(),
+            None,
+            crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
                 &render_plan.edit_graph,
             )),
-        },
+        ),
         "generate_preview_for_path",
     )?;
     let preview_image = match target_resolution {

@@ -850,6 +850,19 @@ pub struct CompiledEditGraph {
     compiled_shader_abi: AllAdjustments,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct GpuExecutionAbiResources {
+    pub mask_layer_count: u16,
+    pub mask_content_fingerprint: u64,
+    pub lut_content_fingerprint: Option<[u8; 32]>,
+}
+
+impl GpuExecutionAbiResources {
+    pub const fn has_lut(self) -> bool {
+        self.lut_content_fingerprint.is_some()
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct EditGraphCompileInputs<'a> {
     pub pipeline_version: u32,
@@ -1211,10 +1224,9 @@ impl CompiledEditGraph {
             pipeline_version: inputs.pipeline_version,
             nodes: nodes.into(),
             fingerprint,
-            execution_abi_fingerprint: gpu_execution_fingerprint(
-                inputs.adjustments,
-                inputs.has_lut,
-            ),
+            // The graph is semantic until a consumer binds the post-CPU ABI
+            // and the concrete mask/LUT resources immediately before dispatch.
+            execution_abi_fingerprint: 0,
             #[cfg(test)]
             has_user_edits: inputs.has_geometry_or_retouch
                 || inputs.has_detail
@@ -1276,6 +1288,18 @@ impl CompiledEditGraph {
         abi
     }
 
+    pub fn bind_gpu_execution_abi(
+        &self,
+        adjustments: AllAdjustments,
+        resources: GpuExecutionAbiResources,
+    ) -> Self {
+        let mut bound = self.clone();
+        bound.compiled_shader_abi = adjustments;
+        bound.execution_abi_fingerprint =
+            gpu_execution_fingerprint_with_resources(&adjustments, resources);
+        bound
+    }
+
     pub fn scene_curve(&self) -> Option<&CompiledCurvePlanV1> {
         self.nodes.iter().find_map(|node| match &node.payload {
             CompiledNodePayload::SceneCurve(curve) => Some(curve),
@@ -1305,10 +1329,11 @@ impl CompiledEditGraph {
     pub fn validate_gpu_execution(
         &self,
         adjustments: &AllAdjustments,
-        has_lut: bool,
-        mask_count: usize,
+        resources: GpuExecutionAbiResources,
     ) -> Result<(), &'static str> {
         self.validate_contract()?;
+        let has_lut = resources.has_lut();
+        let mask_count = usize::from(resources.mask_layer_count);
         let has_legacy_fused = self
             .nodes
             .iter()
@@ -1327,7 +1352,9 @@ impl CompiledEditGraph {
         if has_lut && !has_legacy_fused && !has_display_creative {
             return Err("edit_graph.missing_display_creative");
         }
-        if self.execution_abi_fingerprint != gpu_execution_fingerprint(adjustments, has_lut) {
+        if self.execution_abi_fingerprint
+            != gpu_execution_fingerprint_with_resources(adjustments, resources)
+        {
             return Err("edit_graph.stale_gpu_execution_abi");
         }
         if self.nodes.first().map(|node| node.input_domain)
@@ -1634,11 +1661,24 @@ fn compile_node_payload(
     }
 }
 
-pub fn gpu_execution_fingerprint(adjustments: &AllAdjustments, has_lut: bool) -> u64 {
+pub fn gpu_execution_fingerprint_with_resources(
+    adjustments: &AllAdjustments,
+    resources: GpuExecutionAbiResources,
+) -> u64 {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"rapidraw.edit-graph.gpu-execution-abi.v1");
+    hasher.update(b"rapidraw.edit-graph.gpu-execution-abi.v2");
     hasher.update(bytes_of(adjustments));
-    hasher.update(&[u8::from(has_lut)]);
+    hasher.update(&resources.mask_layer_count.to_le_bytes());
+    hasher.update(&resources.mask_content_fingerprint.to_le_bytes());
+    match resources.lut_content_fingerprint {
+        Some(fingerprint) => {
+            hasher.update(&[1]);
+            hasher.update(&fingerprint);
+        }
+        None => {
+            hasher.update(&[0]);
+        }
+    }
     u64::from_le_bytes(hasher.finalize().as_bytes()[..8].try_into().unwrap())
 }
 
@@ -1777,6 +1817,94 @@ mod runtime_registry_tests {
             validate_runtime_registry(&[&wrong_resources]),
             Err("edit_graph.wgpu_bind_group_layout_resource_mismatch")
         );
+    }
+
+    #[test]
+    fn post_cpu_binding_preserves_semantic_graph_and_rejects_stale_abi() {
+        let mut pre_cpu = AllAdjustments::default();
+        pre_cpu.global.exposure = 0.25;
+        pre_cpu.global.luma_noise_reduction = 0.7;
+        pre_cpu.global.color_noise_reduction = 0.6;
+        pre_cpu.global.sharpness = 0.8;
+        pre_cpu.mask_count = 1;
+        pre_cpu.mask_adjustments[0].luma_noise_reduction = 0.35;
+        let neutral = AllAdjustments::default();
+        let graph = CompiledEditGraph::compile(EditGraphCompileInputs {
+            pipeline_version: SCENE_REFERRED_PIPELINE_VERSION,
+            version_was_explicit: true,
+            source_fingerprint: 1,
+            geometry_fingerprint: 2,
+            retouch_fingerprint: 3,
+            detail_fingerprint: 4,
+            color_fingerprint: 5,
+            output_fingerprint: 6,
+            adjustments: &pre_cpu,
+            neutral_adjustments: &neutral,
+            scene_curve: None,
+            film_emulation: None,
+            output_curve: None,
+            has_geometry_or_retouch: false,
+            has_detail: true,
+            has_masks: true,
+            has_lut: true,
+            show_clipping: false,
+        });
+        let resources = GpuExecutionAbiResources {
+            mask_layer_count: 1,
+            mask_content_fingerprint: 0x1234,
+            lut_content_fingerprint: Some([7; 32]),
+        };
+        let mut post_cpu = pre_cpu;
+        post_cpu.global.luma_noise_reduction = 0.0;
+        post_cpu.global.color_noise_reduction = 0.0;
+        post_cpu.global.sharpness = 0.0;
+
+        assert_eq!(graph.execution_abi_fingerprint, 0);
+        assert_eq!(
+            graph.validate_gpu_execution(&post_cpu, resources),
+            Err("edit_graph.stale_gpu_execution_abi")
+        );
+
+        let bound = graph.bind_gpu_execution_abi(post_cpu, resources);
+        assert_eq!(bound.fingerprint, graph.fingerprint);
+        assert_ne!(
+            bound.execution_abi_fingerprint,
+            graph.execution_abi_fingerprint
+        );
+        assert_eq!(bound.shader_abi().global.luma_noise_reduction, 0.0);
+        assert_eq!(bound.shader_abi().global.color_noise_reduction, 0.0);
+        assert_eq!(bound.shader_abi().global.sharpness, 0.0);
+        assert_eq!(
+            bound.shader_abi().mask_adjustments[0].luma_noise_reduction,
+            0.35
+        );
+        assert_ne!(
+            bound.execution_abi_fingerprint,
+            graph
+                .bind_gpu_execution_abi(
+                    post_cpu,
+                    GpuExecutionAbiResources {
+                        mask_content_fingerprint: 0x1235,
+                        ..resources
+                    },
+                )
+                .execution_abi_fingerprint
+        );
+        assert_ne!(
+            bound.execution_abi_fingerprint,
+            graph
+                .bind_gpu_execution_abi(
+                    post_cpu,
+                    GpuExecutionAbiResources {
+                        lut_content_fingerprint: Some([8; 32]),
+                        ..resources
+                    },
+                )
+                .execution_abi_fingerprint
+        );
+        bound
+            .validate_gpu_execution(&post_cpu, resources)
+            .expect("post-CPU ABI is accepted after binding");
     }
 
     #[test]

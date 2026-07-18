@@ -525,12 +525,16 @@ fn skin_tone_uniformity_has_cpu_wgpu_and_preview_export_pixel_parity() {
         None,
     )
     .expect("skin-tone render plan compiles");
+    let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+        plan.adjustments,
+        crate::gpu_processing::gpu_execution_abi_resources(&[], None),
+    );
     let cpu = crate::render::cpu_edit_graph::execute_cpu_edit_graph(
         &source,
         &plan.adjustments,
         &[],
         None,
-        &plan.edit_graph,
+        &bound_graph,
     )
     .expect("skin-tone CPU graph executes");
     let app = tauri::test::mock_builder()
@@ -546,13 +550,13 @@ fn skin_tone_uniformity_has_cpu_wgpu_and_preview_export_pixel_parity() {
             &state,
             &source,
             PreGpuImageIdentity::for_source(&source, "skin_tone_uniformity_parity"),
-            RenderRequest {
-                adjustments: plan.adjustments.clone(),
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-                edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments.clone(),
+                &[],
+                None,
+                None,
+                EditGraphExecutionAuthority::Compiled(Arc::clone(&plan.edit_graph)),
+            ),
             consumer,
         )
         .expect("skin-tone WGPU graph executes")

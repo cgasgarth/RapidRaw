@@ -1195,8 +1195,12 @@ mod tests {
             None,
         )
         .unwrap();
+        let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+            plan.adjustments,
+            crate::gpu_processing::gpu_execution_abi_resources(&[], None),
+        );
         let cpu =
-            execute_cpu_edit_graph(&image, &plan.adjustments, &[], None, &plan.edit_graph).unwrap();
+            execute_cpu_edit_graph(&image, &plan.adjustments, &[], None, &bound_graph).unwrap();
         let app = tauri::test::mock_builder()
             .manage(AppState::new())
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
@@ -1208,13 +1212,13 @@ mod tests {
             &state,
             &image,
             PreGpuImageIdentity::for_source(&image, "auto_edit_output_parity"),
-            RenderRequest {
-                adjustments: plan.adjustments,
-                mask_bitmaps: &[],
-                lut: None,
-                roi: None,
-                edit_graph: EditGraphExecutionAuthority::Compiled(plan.edit_graph),
-            },
+            RenderRequest::with_bound_execution_abi(
+                plan.adjustments,
+                &[],
+                None,
+                None,
+                EditGraphExecutionAuthority::Compiled(plan.edit_graph),
+            ),
             "auto_edit_output_parity",
         )
         .unwrap();

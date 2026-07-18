@@ -463,22 +463,24 @@ pub(crate) fn process_preview_job(config: PreviewJobConfig<'_>) -> Result<Vec<u8
         service: Arc::clone(state.render().analytics()),
     });
 
-    let render_request = || RenderRequest {
-        adjustments: {
-            let mut adjustments = render_plan.adjustments;
-            render_pipeline::suppress_legacy_global_denoise(&mut adjustments);
-            render_pipeline::suppress_legacy_global_detail(
-                &mut adjustments,
-                pre_gpu_detail_stage.owns_legacy_global_detail,
-            );
-            adjustments
-        },
-        mask_bitmaps: &mask_bitmaps,
-        lut: render_plan.lut.clone(),
-        roi: pixel_roi,
-        edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
-            &render_plan.edit_graph,
-        )),
+    let render_request = || {
+        RenderRequest::with_bound_execution_abi(
+            {
+                let mut adjustments = render_plan.adjustments;
+                render_pipeline::suppress_legacy_global_denoise(&mut adjustments);
+                render_pipeline::suppress_legacy_global_detail(
+                    &mut adjustments,
+                    pre_gpu_detail_stage.owns_legacy_global_detail,
+                );
+                adjustments
+            },
+            &mask_bitmaps,
+            render_plan.lut.clone(),
+            pixel_roi,
+            crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                &render_plan.edit_graph,
+            )),
+        )
     };
     let presentation_identity =
         use_wgpu_renderer.then_some(crate::gpu_display::NativeFrameIdentity {
