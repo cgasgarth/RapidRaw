@@ -181,15 +181,13 @@ pub(crate) async fn preview_geometry_transform(
                     pre_gpu_revision,
                     pre_gpu_revision,
                 ),
-                RenderRequest {
-                    adjustments: render_plan.adjustments,
-                    mask_bitmaps: &mask_bitmaps,
-                    lut: render_plan.lut.clone(),
-                    roi: None,
-                    edit_graph: EditGraphExecutionAuthority::Compiled(Arc::clone(
-                        &render_plan.edit_graph,
-                    )),
-                },
+                RenderRequest::with_bound_execution_abi(
+                    render_plan.adjustments,
+                    &mask_bitmaps,
+                    render_plan.lut.clone(),
+                    None,
+                    EditGraphExecutionAuthority::Compiled(Arc::clone(&render_plan.edit_graph)),
+                ),
                 "preview_geometry_transform_base_gen",
             )?;
 

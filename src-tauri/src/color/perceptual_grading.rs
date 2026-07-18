@@ -554,12 +554,16 @@ mod gpu_runtime_tests {
         );
 
         let mask: GrayImage = ImageBuffer::from_fn(6, 4, |x, _| Luma([u8::from(x < 3) * 255]));
+        let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+            plan.adjustments,
+            crate::gpu_processing::gpu_execution_abi_resources(std::slice::from_ref(&mask), None),
+        );
         let cpu = crate::cpu_edit_graph::execute_cpu_edit_graph(
             &source,
             &plan.adjustments,
             std::slice::from_ref(&mask),
             None,
-            &plan.edit_graph,
+            &bound_graph,
         )
         .expect("CPU perceptual grading render succeeds");
 
@@ -577,15 +581,15 @@ mod gpu_runtime_tests {
                 &state,
                 &source,
                 crate::gpu_processing::PreGpuImageIdentity::for_test_source(&source, consumer),
-                RenderRequest {
-                    adjustments: plan.adjustments,
-                    mask_bitmaps: std::slice::from_ref(&mask),
-                    lut: None,
-                    roi: None,
-                    edit_graph: crate::gpu_processing::EditGraphExecutionAuthority::Compiled(
-                        Arc::clone(&plan.edit_graph),
-                    ),
-                },
+                RenderRequest::with_bound_execution_abi(
+                    plan.adjustments,
+                    std::slice::from_ref(&mask),
+                    None,
+                    None,
+                    crate::gpu_processing::EditGraphExecutionAuthority::Compiled(Arc::clone(
+                        &plan.edit_graph,
+                    )),
+                ),
                 consumer,
             )
             .expect("WGPU perceptual grading render succeeds")

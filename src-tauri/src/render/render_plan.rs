@@ -1518,16 +1518,21 @@ mod tests {
                 .ordered_node_ids
                 .contains(&"legacy_gpu_scene_view_pass")
         );
-        active
+        let bound_resources = crate::edit_graph::GpuExecutionAbiResources {
+            mask_layer_count: active.masks.len() as u16,
+            mask_content_fingerprint: 0,
+            lut_content_fingerprint: None,
+        };
+        let bound_graph = active
             .edit_graph
-            .validate_gpu_execution(&active.adjustments, false, active.masks.len())
+            .bind_gpu_execution_abi(active.adjustments, bound_resources);
+        bound_graph
+            .validate_gpu_execution(&active.adjustments, bound_resources)
             .unwrap();
         let mut stale_adjustments = active.adjustments;
         stale_adjustments.global.exposure += 0.1;
         assert_eq!(
-            active
-                .edit_graph
-                .validate_gpu_execution(&stale_adjustments, false, active.masks.len()),
+            bound_graph.validate_gpu_execution(&stale_adjustments, bound_resources),
             Err("edit_graph.stale_gpu_execution_abi")
         );
         assert_eq!(active.fingerprints.full, active.edit_graph.fingerprint);
@@ -1612,12 +1617,16 @@ mod tests {
             Rgba([0.18, 0.18, 0.18, 0.75]),
         ));
         let render = |plan: &CompiledRenderPlan| {
+            let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+                plan.adjustments,
+                crate::gpu_processing::gpu_execution_abi_resources(&[], None),
+            );
             crate::cpu_edit_graph::execute_cpu_edit_graph(
                 &source,
                 &plan.adjustments,
                 &[],
                 None,
-                &plan.edit_graph,
+                &bound_graph,
             )
             .unwrap()
             .to_rgba32f()
@@ -1758,12 +1767,16 @@ mod tests {
             Rgba([0.18, 0.12, 0.08, 1.0]),
         ));
         let rendered = |plan: &CompiledRenderPlan| {
+            let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+                plan.adjustments,
+                crate::gpu_processing::gpu_execution_abi_resources(&[], None),
+            );
             crate::cpu_edit_graph::execute_cpu_edit_graph(
                 &source,
                 &plan.adjustments,
                 &[],
                 None,
-                &plan.edit_graph,
+                &bound_graph,
             )
             .unwrap()
             .to_rgba32f()
@@ -1846,12 +1859,16 @@ mod tests {
             let export =
                 compile_render_plan(&adjustments, context(930 + index as u64), None).unwrap();
             let execute = |plan: &CompiledRenderPlan| {
+                let bound_graph = plan.edit_graph.bind_gpu_execution_abi(
+                    plan.adjustments,
+                    crate::gpu_processing::gpu_execution_abi_resources(&[], None),
+                );
                 crate::cpu_edit_graph::execute_cpu_edit_graph(
                     &source,
                     &plan.adjustments,
                     &[],
                     None,
-                    &plan.edit_graph,
+                    &bound_graph,
                 )
                 .unwrap()
                 .to_rgba32f()
