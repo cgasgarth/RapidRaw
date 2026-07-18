@@ -1,6 +1,6 @@
 import cx from 'clsx';
 import { Check, ChevronDown, RotateCcw, SlidersHorizontal } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { TextVariants } from '../../../types/typography';
@@ -11,6 +11,7 @@ import {
   buildPerceptualGradingEditTransaction,
   type PerceptualGradingCommitIdentity,
 } from '../../../utils/perceptualGradingEditTransaction';
+import { isCurrentPerceptualGradingSliderInteraction } from '../../../utils/perceptualGradingSliderInteraction';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import UiText from '../../ui/primitives/Text';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -25,6 +26,7 @@ type ColorGradingPreset = (typeof COLOR_GRADING_PRESETS)[number];
 type ColorGradingRange = (typeof colorGradingRangeKeys)[number];
 type ColorGradingView = (typeof colorGradingViews)[number];
 type ThreeWayRange = (typeof threeWayRangeKeys)[number];
+type ColorGradingValue = Adjustments['colorGrading'];
 
 interface ColorGradingControlsProps extends ColorPanelGroupProps {
   isForMask?: boolean;
@@ -74,11 +76,25 @@ export const ColorGradingControls = ({
   const [activeThreeWayRange, setActiveThreeWayRange] = useState<ThreeWayRange>('midtones');
   const [isExpanded, setIsExpanded] = useState(true);
   const [isPresetMenuOpen, setIsPresetMenuOpen] = useState(false);
+  const [interactionDraft, setInteractionDraft] = useState<ColorGradingValue | null>(null);
   const presetMenuId = useId();
   const presetMenuRef = useRef<HTMLDivElement>(null);
   const presetTriggerRef = useRef<HTMLButtonElement>(null);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const perceptualGradingSliderInteraction = useEditorStore((state) => state.perceptualGradingSliderInteraction);
+  const beginPerceptualGradingSliderInteraction = useEditorStore(
+    (state) => state.beginPerceptualGradingSliderInteraction,
+  );
+  const updatePerceptualGradingSliderInteraction = useEditorStore(
+    (state) => state.updatePerceptualGradingSliderInteraction,
+  );
+  const commitPerceptualGradingSliderInteraction = useEditorStore(
+    (state) => state.commitPerceptualGradingSliderInteraction,
+  );
+  const cancelPerceptualGradingSliderInteraction = useEditorStore(
+    (state) => state.cancelPerceptualGradingSliderInteraction,
+  );
   const imageSessionId = useEditorStore(
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
@@ -92,22 +108,32 @@ export const ColorGradingControls = ({
   );
   const commitIdentityRef = useRef(commitIdentity);
   commitIdentityRef.current = commitIdentity;
+  const interactionIdRef = useRef<string | null>(null);
+  const interactionDraftRef = useRef<ColorGradingValue | null>(null);
   const colorGrading = adjustments.colorGrading;
+  const currentPerceptualGradingInteraction =
+    perceptualGradingSliderInteraction !== null &&
+    isCurrentPerceptualGradingSliderInteraction(useEditorStore.getState(), perceptualGradingSliderInteraction)
+      ? perceptualGradingSliderInteraction
+      : null;
+  const displayedColorGrading =
+    interactionDraft ?? currentPerceptualGradingInteraction?.latestColorGrading ?? colorGrading;
   const activeRange: ColorGradingRange = activeView === '3way' ? activeThreeWayRange : activeView;
-  const activeValue = colorGrading[activeRange];
+  const activeValue = displayedColorGrading[activeRange];
   const activeDefaultValue = INITIAL_ADJUSTMENTS.colorGrading[activeRange];
   const activePresetId = useMemo(
-    () => COLOR_GRADING_PRESETS.find((preset) => isColorGradingPresetApplied(colorGrading, preset))?.id ?? null,
-    [colorGrading],
+    () =>
+      COLOR_GRADING_PRESETS.find((preset) => isColorGradingPresetApplied(displayedColorGrading, preset))?.id ?? null,
+    [displayedColorGrading],
   );
   const activePreset = useMemo(
     () => COLOR_GRADING_PRESETS.find((preset) => preset.id === activePresetId) ?? null,
     [activePresetId],
   );
   const isToolModified =
-    colorGrading.balance !== INITIAL_ADJUSTMENTS.colorGrading.balance ||
-    colorGrading.blending !== INITIAL_ADJUSTMENTS.colorGrading.blending ||
-    colorGradingRangeKeys.some((range) => isColorGradingRangeModified(range, colorGrading[range]));
+    displayedColorGrading.balance !== INITIAL_ADJUSTMENTS.colorGrading.balance ||
+    displayedColorGrading.blending !== INITIAL_ADJUSTMENTS.colorGrading.blending ||
+    colorGradingRangeKeys.some((range) => isColorGradingRangeModified(range, displayedColorGrading[range]));
 
   useEffect(() => {
     if (!isPresetMenuOpen) return;
@@ -118,29 +144,97 @@ export const ColorGradingControls = ({
 
   const getRangeLabel = (range: ColorGradingRange) => t(`adjustments.color.grading.${range}`);
 
-  const commitColorGrading = (nextColorGrading: Adjustments['colorGrading']) => {
-    const perceptualGradingV1 = perceptualGradingFromWheelSurface(nextColorGrading);
+  const commitColorGrading = useCallback(
+    (nextColorGrading: ColorGradingValue) => {
+      const perceptualGradingV1 = perceptualGradingFromWheelSurface(nextColorGrading);
+      const identity = commitIdentityRef.current;
+      if (identity === null) {
+        setAdjustments((prev) => ({
+          ...prev,
+          colorGrading: nextColorGrading,
+          perceptualGradingV1,
+          rawEngineEditGraphVersion: 2,
+        }));
+        return;
+      }
+      const result = applyEditTransaction(
+        buildPerceptualGradingEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          nextColorGrading,
+          perceptualGradingV1,
+          crypto.randomUUID(),
+        ),
+      );
+      commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+    },
+    [applyEditTransaction, setAdjustments],
+  );
+
+  const beginColorGradingInteraction = useCallback(() => {
+    if (interactionIdRef.current !== null) return;
+    const initial = structuredClone(displayedColorGrading);
+    interactionDraftRef.current = initial;
+    setInteractionDraft(initial);
     const identity = commitIdentityRef.current;
-    if (identity === null) {
-      setAdjustments((prev) => ({
-        ...prev,
-        colorGrading: nextColorGrading,
-        perceptualGradingV1,
-        rawEngineEditGraphVersion: 2,
-      }));
-      return;
+    if (!isForMask && identity !== null) {
+      const interactionId = crypto.randomUUID();
+      if (beginPerceptualGradingSliderInteraction(identity, interactionId)) {
+        interactionIdRef.current = interactionId;
+      }
     }
-    const result = applyEditTransaction(
-      buildPerceptualGradingEditTransaction(
-        useEditorStore.getState(),
-        identity,
-        nextColorGrading,
-        perceptualGradingV1,
-        crypto.randomUUID(),
-      ),
-    );
-    commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
-  };
+    onDragStateChange?.(true);
+  }, [beginPerceptualGradingSliderInteraction, displayedColorGrading, isForMask, onDragStateChange]);
+
+  const updateColorGradingInteraction = useCallback(
+    (nextColorGrading: ColorGradingValue) => {
+      interactionDraftRef.current = nextColorGrading;
+      setInteractionDraft(nextColorGrading);
+      const interactionId = interactionIdRef.current;
+      if (interactionId !== null) {
+        updatePerceptualGradingSliderInteraction(interactionId, nextColorGrading);
+      }
+    },
+    [updatePerceptualGradingSliderInteraction],
+  );
+
+  const commitColorGradingInteraction = useCallback(() => {
+    const interactionId = interactionIdRef.current;
+    const draft = interactionDraftRef.current;
+    interactionIdRef.current = null;
+    interactionDraftRef.current = null;
+    setInteractionDraft(null);
+    if (interactionId !== null) {
+      const result = commitPerceptualGradingSliderInteraction(interactionId);
+      if (result !== null) {
+        const identity = commitIdentityRef.current;
+        if (identity !== null) {
+          commitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+        }
+      }
+    } else if (draft !== null) {
+      commitColorGrading(draft);
+    }
+    onDragStateChange?.(false);
+  }, [commitColorGrading, commitPerceptualGradingSliderInteraction, onDragStateChange]);
+
+  const cancelColorGradingInteraction = useCallback(() => {
+    const interactionId = interactionIdRef.current;
+    interactionIdRef.current = null;
+    interactionDraftRef.current = null;
+    setInteractionDraft(null);
+    if (interactionId !== null) cancelPerceptualGradingSliderInteraction(interactionId);
+    onDragStateChange?.(false);
+  }, [cancelPerceptualGradingSliderInteraction, onDragStateChange]);
+
+  const cancelInteractionRef = useRef(cancelColorGradingInteraction);
+  cancelInteractionRef.current = cancelColorGradingInteraction;
+  useEffect(
+    () => () => {
+      cancelInteractionRef.current();
+    },
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
 
   const handleApplyPreset = (preset: ColorGradingPreset) => {
     commitColorGrading({
@@ -156,17 +250,27 @@ export const ColorGradingControls = ({
   };
 
   const handleRangeChange = (range: ColorGradingRange, newValue: HueSatLum) => {
-    commitColorGrading({
-      ...colorGrading,
+    const nextColorGrading = {
+      ...displayedColorGrading,
       [getColorGradingRangeEnum(range)]: newValue,
-    });
+    };
+    if (interactionIdRef.current !== null || interactionDraftRef.current !== null) {
+      updateColorGradingInteraction(nextColorGrading);
+    } else {
+      commitColorGrading(nextColorGrading);
+    }
   };
 
   const handleGlobalChange = (grading: ColorGrading, value: number) => {
-    commitColorGrading({
-      ...colorGrading,
+    const nextColorGrading = {
+      ...displayedColorGrading,
       [grading]: value,
-    });
+    };
+    if (interactionIdRef.current !== null || interactionDraftRef.current !== null) {
+      updateColorGradingInteraction(nextColorGrading);
+    } else {
+      commitColorGrading(nextColorGrading);
+    }
   };
 
   const handleResetAll = () => {
@@ -256,17 +360,17 @@ export const ColorGradingControls = ({
           const isActive = activeView === view;
           const isModified =
             view === '3way'
-              ? threeWayRangeKeys.some((range) => isColorGradingRangeModified(range, colorGrading[range]))
-              : isColorGradingRangeModified(view, colorGrading[view]);
+              ? threeWayRangeKeys.some((range) => isColorGradingRangeModified(range, displayedColorGrading[range]))
+              : isColorGradingRangeModified(view, displayedColorGrading[view]);
           const label = view === '3way' ? t('adjustments.color.grading.threeWayTab') : getRangeLabel(view);
-          const shortLabel = view === '3way' ? '3-Way' : label.slice(0, 1);
+          const shortLabel = view === '3way' ? '3-Way' : label;
 
           return (
             <button
               aria-label={label}
               aria-selected={isActive}
               className={cx(
-                'relative min-w-0 rounded-sm px-1 text-[10px] font-semibold leading-6 text-text-secondary transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+                'relative min-w-0 rounded-sm px-1 text-[9px] font-semibold leading-6 text-text-secondary transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
                 isActive
                   ? 'bg-editor-selected-quiet text-editor-selected-quiet-text'
                   : 'hover:bg-editor-hover hover:text-text-primary',
@@ -382,31 +486,39 @@ export const ColorGradingControls = ({
       </div>
 
       {activeView === '3way' && (
-        <div className="mt-1 grid grid-cols-3 gap-1" data-testid="color-grading-three-way-summary">
+        <div
+          className="mt-1 grid grid-cols-3 gap-1"
+          data-testid="color-grading-three-way-summary"
+          role="group"
+          aria-label={t('adjustments.color.grading.threeWayTab')}
+        >
           {threeWayRangeKeys.map((range) => {
-            const value = colorGrading[range];
+            const value = displayedColorGrading[range];
             const isActive = activeThreeWayRange === range;
             const isModified = isColorGradingRangeModified(range, value);
 
             return (
-              <button
-                aria-label={getRangeLabel(range)}
-                aria-pressed={isActive}
+              <div
                 className={cx(
-                  'min-w-0 rounded-sm border px-1 py-1 text-left transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+                  'min-w-0 rounded-sm border p-1 transition-colors',
                   isActive
                     ? 'border-editor-focus-ring bg-editor-selected-quiet'
-                    : 'border-editor-border bg-editor-panel hover:bg-editor-hover',
+                    : 'border-editor-border bg-editor-panel',
                 )}
                 data-modified={isModified ? 'true' : 'false'}
+                data-range={range}
                 data-testid={`color-grading-summary-${range}`}
                 key={range}
-                onClick={() => {
-                  setActiveThreeWayRange(range);
-                }}
-                type="button"
               >
-                <span className="flex min-w-0 items-center gap-1">
+                <button
+                  aria-label={getRangeLabel(range)}
+                  aria-pressed={isActive}
+                  className="mb-0.5 flex min-h-6 w-full min-w-0 items-center gap-1 rounded-sm px-0.5 text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+                  onClick={() => {
+                    setActiveThreeWayRange(range);
+                  }}
+                  type="button"
+                >
                   <span
                     aria-hidden="true"
                     className={cx(
@@ -415,31 +527,54 @@ export const ColorGradingControls = ({
                     )}
                     style={{ backgroundColor: getColorGradingSwatchColor(value) }}
                   />
-                  <span className="min-w-0 truncate text-[9px] font-semibold leading-3 text-text-secondary">
+                  <span className="min-w-0 flex-1 truncate text-[9px] font-semibold leading-3 text-text-secondary">
                     {getRangeLabel(range)}
                   </span>
-                </span>
-                <span className="mt-0.5 block truncate font-mono text-[8px] leading-3 tabular-nums text-text-tertiary">
+                  <span className="shrink-0 font-mono text-[8px] tabular-nums text-text-tertiary">
+                    L{Math.round(value.luminance)}
+                  </span>
+                </button>
+                <span className="sr-only" data-testid={`color-grading-values-${range}`}>
                   H{Math.round(value.hue)} S{Math.round(value.saturation)} L{Math.round(value.luminance)}
                 </span>
-              </button>
+                <div className="mx-auto w-full" data-testid={`color-grading-wheel-${range}`}>
+                  <ColorWheel
+                    defaultValue={INITIAL_ADJUSTMENTS.colorGrading[range]}
+                    isExpanded={false}
+                    label={getRangeLabel(range)}
+                    onChange={(nextValue) => {
+                      handleRangeChange(range, nextValue);
+                    }}
+                    onDragStateChange={onDragStateChange}
+                    onInteractionCancel={cancelColorGradingInteraction}
+                    onInteractionCommit={commitColorGradingInteraction}
+                    onInteractionStart={beginColorGradingInteraction}
+                    value={value}
+                  />
+                </div>
+              </div>
             );
           })}
         </div>
       )}
 
-      <div className="mx-auto mt-1.5 w-full max-w-[13rem]" data-active-range={activeRange}>
-        <ColorWheel
-          defaultValue={activeDefaultValue}
-          isExpanded={isExpanded}
-          label={getRangeLabel(activeRange)}
-          onChange={(value) => {
-            handleRangeChange(activeRange, value);
-          }}
-          onDragStateChange={onDragStateChange}
-          value={activeValue}
-        />
-      </div>
+      {activeView !== '3way' && (
+        <div className="mx-auto mt-1.5 w-full max-w-[13rem]" data-active-range={activeRange}>
+          <ColorWheel
+            defaultValue={activeDefaultValue}
+            isExpanded={isExpanded}
+            label={getRangeLabel(activeRange)}
+            onChange={(nextValue) => {
+              handleRangeChange(activeRange, nextValue);
+            }}
+            onDragStateChange={onDragStateChange}
+            onInteractionCancel={cancelColorGradingInteraction}
+            onInteractionCommit={commitColorGradingInteraction}
+            onInteractionStart={beginColorGradingInteraction}
+            value={activeValue}
+          />
+        </div>
+      )}
 
       <div className="mt-1 border-t border-editor-border pt-1">
         <AdjustmentSlider
@@ -449,12 +584,15 @@ export const ColorGradingControls = ({
           max={100}
           min={0}
           onDragStateChange={onDragStateChange}
+          onInteractionCancel={cancelColorGradingInteraction}
+          onInteractionCommit={commitColorGradingInteraction}
+          onInteractionStart={beginColorGradingInteraction}
           onValueChange={(value) => {
             handleGlobalChange(ColorGrading.Blending, value);
           }}
           step={1}
           testId="color-grading-blending"
-          value={colorGrading.blending}
+          value={displayedColorGrading.blending}
         />
         <AdjustmentSlider
           defaultValue={INITIAL_ADJUSTMENTS.colorGrading.balance}
@@ -463,12 +601,15 @@ export const ColorGradingControls = ({
           max={100}
           min={-100}
           onDragStateChange={onDragStateChange}
+          onInteractionCancel={cancelColorGradingInteraction}
+          onInteractionCommit={commitColorGradingInteraction}
+          onInteractionStart={beginColorGradingInteraction}
           onValueChange={(value) => {
             handleGlobalChange(ColorGrading.Balance, value);
           }}
           step={1}
           testId="color-grading-balance"
-          value={colorGrading.balance}
+          value={displayedColorGrading.balance}
         />
       </div>
     </div>
