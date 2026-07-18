@@ -1,5 +1,5 @@
 import cx from 'clsx';
-import { Crop, Eraser, Layers3 } from 'lucide-react';
+import { Crop, Eraser, Layers3, Spline } from 'lucide-react';
 import { type KeyboardEvent, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
@@ -20,6 +20,7 @@ export const DEVELOP_TOOL_DEFINITIONS: readonly DevelopToolDefinition[] = [
   { icon: Crop, id: 'crop', label: 'Crop', panel: DEVELOP_TOOL_PANEL_BY_ID.crop },
   { icon: Eraser, id: 'remove', label: 'Remove', panel: DEVELOP_TOOL_PANEL_BY_ID.remove },
   { icon: Layers3, id: 'masking', label: 'Masking', panel: DEVELOP_TOOL_PANEL_BY_ID.masking },
+  { icon: Spline, id: 'tone-curve', label: 'Tone Curve Target', panel: DEVELOP_TOOL_PANEL_BY_ID.toneCurve },
 ];
 
 export interface DevelopToolAvailability {

@@ -62,9 +62,19 @@ describe('Lightroom Crop canvas-first draft workflow', () => {
     expect(useEditorStore.getState().cropDraft?.geometry.aspectRatio).toBeCloseTo(16 / 9);
     expect(useEditorStore.getState().history).toHaveLength(1);
 
+    const ratioLock = required<HTMLButtonElement>(container, '[data-testid="crop-panel-ratio-lock-toggle"]');
+    expect(ratioLock.getAttribute('aria-pressed')).toBe('true');
+    await user.click(ratioLock);
+    expect(ratioLock.getAttribute('aria-pressed')).toBe('false');
+    expect(useEditorStore.getState().cropDraft?.geometry.aspectRatio).toBeNull();
+    await user.click(ratioLock);
+    expect(ratioLock.getAttribute('aria-pressed')).toBe('true');
+    expect(useEditorStore.getState().cropDraft?.geometry.aspectRatio).toBeCloseTo(16 / 9);
+
     await user.click(buttonByText(container, 'Apply'));
     expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBeCloseTo(16 / 9);
     expect(useEditorStore.getState().history).toHaveLength(2);
+    expect(useEditorStore.getState().lastEditApplicationReceipt?.source).toBe('geometry-tool');
     expect(useEditorStore.getState().cropDraft).toBeNull();
 
     useEditorStore.getState().undo();
@@ -154,6 +164,65 @@ describe('Lightroom Crop canvas-first draft workflow', () => {
     expect(container.querySelectorAll('[data-testid="crop-canvas-handles"] circle')).toHaveLength(8);
     expect(container.querySelector('[data-crop-selection-active="true"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="composition-overlays"]')).not.toBeNull();
+  });
+
+  test('replaces a stale draft when the image session changes at the same revision', async () => {
+    const initial = patchEditDocumentV2Node(createDefaultEditDocumentV2(), 'geometry', { aspectRatio: 3 / 2 });
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      editDocumentV2: initial,
+      history: [initial],
+      historyIndex: 0,
+      selectedImage,
+    });
+    useUIStore.setState({ activeRightPanel: Panel.Crop, renderedRightPanel: Panel.Crop });
+    const { container, unmount } = await renderCropPanel();
+    const user = userEvent.setup();
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-16-9"]'));
+    expect(useEditorStore.getState().cropDraft?.sourceIdentity).toBe(selectedImage.path);
+
+    const switchedImage = { ...selectedImage, path: '/validation/lightroom-crop-switched.ARW' };
+    act(() => {
+      useEditorStore.getState().hydrateEditorRenderAuthority({
+        editDocumentV2: initial,
+        history: [initial],
+        historyIndex: 0,
+        selectedImage: switchedImage,
+      });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(useEditorStore.getState().cropDraft?.sourceIdentity).toBe(switchedImage.path);
+    expect(useEditorStore.getState().cropDraft?.geometry.aspectRatio).toBe(3 / 2);
+    unmount();
+  });
+
+  test('clears crop transients when the active tool closes externally', async () => {
+    const initial = createDefaultEditDocumentV2();
+    useEditorStore.getState().hydrateEditorRenderAuthority({
+      editDocumentV2: initial,
+      history: [initial],
+      historyIndex: 0,
+      selectedImage,
+    });
+    useUIStore.setState({ activeRightPanel: Panel.Crop, renderedRightPanel: Panel.Crop });
+    const { container, unmount } = await renderCropPanel();
+    const user = userEvent.setup();
+    await user.click(required<HTMLButtonElement>(container, '[data-testid="crop-panel-straighten-toggle"]'));
+    act(() => {
+      useEditorStore.setState({ isRotationActive: true, liveRotation: 7 });
+      useUIStore.setState({ activeRightPanel: Panel.Adjustments });
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(useEditorStore.getState().cropDraft).toBeNull();
+    expect(useEditorStore.getState().isStraightenActive).toBe(false);
+    expect(useEditorStore.getState().isRotationActive).toBe(false);
+    expect(useEditorStore.getState().liveRotation).toBeNull();
+    unmount();
   });
 });
 

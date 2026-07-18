@@ -4,8 +4,10 @@
       "blackAndWhite": "",
       "blacks": "Noirs",
       "brightness": "Luminosité",
+      "clarity": "",
       "color": "",
       "contrast": "Contraste",
+      "dehaze": "",
       "evShift": "Décalage EV",
       "exposure": "Exposition",
       "highlightRolloff": "Atténuation des hautes lumières",
@@ -17,9 +19,12 @@
         "basicDesc": "Mappage des tons standard",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "Réinitialiser",
+      "saturation": "",
       "shadowRolloff": "Atténuation des ombres",
       "shadows": "Ombres",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -44,6 +49,7 @@
       },
       "toneMapper": "Mappeur de tons",
       "treatment": "",
+      "vibrance": "",
       "viewContrast": "Contraste d’affichage",
       "whites": "Blancs"
     },
@@ -194,9 +200,18 @@
       },
       "pointColor": {
         "addPoint": "",
+        "addPointHint": "",
         "deletePoint": "",
         "empty": "",
+        "name": "",
+        "nameInput": "",
+        "pickerHint": "",
+        "pickerReceipt": "",
         "pickFromImage": "",
+        "reset": "",
+        "resetAction": "",
+        "sampleConfidence": "",
+        "sampledRange": "",
         "samples": "",
         "visualize": ""
       },
@@ -272,6 +287,7 @@
         "title": "",
         "warning": ""
       },
+      "targetedAdjustment": "",
       "temperature": "Température",
       "tint": "Teinte",
       "toggleSliders": "Basculer les curseurs",
@@ -296,6 +312,7 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "",
         "quick": "Quick"
       }
     },
@@ -328,6 +345,7 @@
       "resetAllPoint": "Réinitialiser toutes les courbes à points",
       "resetParametric": "Réinitialiser la courbe paramétrique {{channel}}",
       "resetPoint": "Réinitialiser la courbe à points {{channel}}",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
@@ -344,6 +362,7 @@
       }
     },
     "details": {
+      "advanced": "Advanced",
       "altPreviewNoiseReduction": "",
       "altPreviewSharpening": "",
       "amount": "",
@@ -353,6 +372,7 @@
       "chromaticAberration": "Aberration chromatique",
       "clarity": "Clarté",
       "color": "Couleur",
+      "colorNoiseReduction": "Color Noise Reduction",
       "contrastProtection": "Protection du contraste",
       "deblur": "",
       "deblurStatus": "",
@@ -366,18 +386,21 @@
       "localContrastStatus": "",
       "loupe": "",
       "luminance": "Luminance",
+      "masking": "Masking",
       "midtoneMask": "",
       "minSpotRadius": "",
       "moveLoupeTarget": "",
       "naturalGrain": "Grain naturel",
       "noiseReduction": "Réduction du bruit",
       "presence": "Présence",
+      "radius": "Radius",
       "redCyan": "Rouge/Cyan",
       "sensitivity": "",
       "shadowBias": "Priorité aux ombres",
       "sharpening": "Accentuation",
       "sharpness": "Netteté",
       "showDustOverlay": "",
+      "smoothness": "Smoothness",
       "structure": "Structure",
       "threshold": "Seuil"
     },
@@ -389,8 +412,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Quantité",
       "creative": "Créatif",
+      "disabled": "",
+      "enabled": "",
       "feather": "Contour progressif",
       "filmLookBrowser": {
         "activeLook": "",
@@ -456,6 +482,7 @@
       "roughness": "Rugosité",
       "roundness": "Arrondi",
       "size": "Taille",
+      "title": "",
       "vignette": "Vignettage"
     },
     "perspective": {
@@ -716,6 +743,21 @@
         "action": "Réinitialiser les points",
         "title": "Risque d'écrêtage"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Épinglés",
         "unpin": "Désépingler {{control}}"
@@ -776,9 +818,13 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Étalonnage",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
@@ -800,7 +846,13 @@
         "details": "Détails",
         "effects": "Effets"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_one": "",
         "editedSections_many": "",
         "editedSections_other": "",
@@ -811,6 +863,9 @@
         "autoAdjust": "Ajustement auto de l'image",
         "resetAdjustments": "Réinitialiser les ajustements",
         "toggleAnalytics": "Basculer l'affichage des analyses"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {
@@ -1312,6 +1367,7 @@
         "flipHoriz": "Retourner l'image horizontalement",
         "flipVert": "Retourner l'image verticalement",
         "lens": "Correction de distorsion de l'objectif",
+        "lockAspect": "",
         "overlayDetails": "Superposition : {{name}}{{rotateHint}}",
         "resetFineRotation": "Réinitialiser la rotation fine",
         "rotateHint": " (Maj+O pour pivoter)",
@@ -1321,7 +1377,8 @@
         "switchOrientation": "Changer l'orientation",
         "switchToLandscape": "Basculer en paysage",
         "switchToPortrait": "Basculer en portrait",
-        "transform": "Correction de perspective et de trapèze"
+        "transform": "Correction de perspective et de trapèze",
+        "unlockAspect": ""
       }
     },
     "developTools": {

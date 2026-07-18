@@ -217,7 +217,7 @@ pub struct PointColorGpuPoint {
 #[repr(C)]
 pub struct PointColorGpuSettings {
     pub points: [PointColorGpuPoint; MAX_POINT_COLOR_POINTS],
-    /// active point count, visualize mode, process version, reserved.
+    /// active point count, visualize mode, process version, selected point (one-based; zero means all).
     pub control: [u32; 4],
     pub skin_range: PointColorGpuPoint,
     /// target lightness, chroma, hue degrees, enabled.

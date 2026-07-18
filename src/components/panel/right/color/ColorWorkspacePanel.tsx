@@ -101,7 +101,7 @@ export const useColorPanelAdjustmentView = (): ColorPanelAdjustmentView => {
 
 const changed = (left: unknown, right: unknown): boolean => JSON.stringify(left) !== JSON.stringify(right);
 
-const buildColorPanelOperations = (
+export const buildColorPanelOperations = (
   current: ColorPanelAdjustmentView,
   next: ColorPanelAdjustmentView,
 ): readonly EditNodeOperation[] => [

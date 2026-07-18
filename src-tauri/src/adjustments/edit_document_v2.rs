@@ -919,7 +919,15 @@ impl PointColorV2 {
                 PointColorVisualizeModeV1::Solo => 2,
             },
             1,
-            0,
+            plan.selected_point_id
+                .as_ref()
+                .and_then(|selected_id| {
+                    plan.points
+                        .iter()
+                        .position(|point| &point.id == selected_id)
+                })
+                .map(|index| index.saturating_add(1) as u32)
+                .unwrap_or(0),
         ];
         if plan.skin_uniformity.enabled
             && let (Some(range), Some(target)) =

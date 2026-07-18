@@ -272,12 +272,14 @@ export default interface Resources {
       };
       details: {
         amount: 'Amount';
+        advanced: 'Advanced';
         blueYellow: 'Blue/Yellow';
         blurRadius: 'Blur radius';
         centre: 'Centré';
         chromaticAberration: 'Chromatic Aberration';
         clarity: 'Clarity';
         color: 'Color';
+        colorNoiseReduction: 'Color Noise Reduction';
         deblur: 'Deblur';
         deblurStatus: 'UI/API wired · preview/export not applied';
         dehaze: 'Dehaze';
@@ -288,15 +290,18 @@ export default interface Resources {
         localContrastRadius: 'Local contrast radius';
         localContrastStatus: 'UI controls only · halo-guarded runtime contrast remains tracked separately';
         luminance: 'Luminance';
+        masking: 'Masking';
         midtoneMask: 'Midtone mask';
         minSpotRadius: 'Min spot radius';
         noiseReduction: 'Noise Reduction';
         presence: 'Presence';
+        radius: 'Radius';
         redCyan: 'Red/Cyan';
         sensitivity: 'Sensitivity';
         sharpening: 'Sharpening';
         sharpness: 'Sharpness';
         showDustOverlay: 'Show dust overlay';
+        smoothness: 'Smoothness';
         structure: 'Structure';
         threshold: 'Threshold';
       };

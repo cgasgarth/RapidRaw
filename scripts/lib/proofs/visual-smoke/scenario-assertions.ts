@@ -12,6 +12,7 @@ import {
   layerMaskDryRunResultV1Schema,
   layerMaskMutationResultV1Schema,
 } from '../../../../packages/rawengine-schema/src/rawEngineSchemas.ts';
+import { DEVELOP_INSPECTOR_SECTION_ORDER } from '../../../../src/utils/developInspectorStack.ts';
 import {
   BRUSH_MASK_COMMAND_COORDINATE_SPACE,
   buildBrushMaskCommandFromParameters,
@@ -294,7 +295,7 @@ export async function assertAdjustmentsPanelRetune(page) {
 
   // Transform and Lens Corrections are intentionally separate Develop surfaces.
   // Calibration is a first-class Develop section and remains the final primary surface.
-  const sectionNames = ['basic', 'curves', 'transform', 'lensCorrection', 'details', 'effects', 'calibration'];
+  const sectionNames = DEVELOP_INSPECTOR_SECTION_ORDER;
   const sectionBounds = await Promise.all(
     sectionNames.map(async (sectionName) => {
       const section = panel.getByTestId(`adjustments-section-${sectionName}`);
@@ -307,7 +308,7 @@ export async function assertAdjustmentsPanelRetune(page) {
   }
   if (sectionBounds.some((bounds, index) => index > 0 && (bounds?.y ?? 0) <= (sectionBounds[index - 1]?.y ?? 0))) {
     throw new Error(
-      'Adjust inspector sections should follow the Light, Curve, Transform, Lens Corrections, Detail, Effects, Calibration order.',
+      'Adjust inspector sections should follow the Light, Curve, Color Mixer, Color Grading, Detail, Lens Corrections, Transform, Effects, Calibration order.',
     );
   }
 
@@ -327,7 +328,10 @@ export async function assertAdjustmentsPanelRetune(page) {
   }
 
   await panel.locator('[role="status"][aria-label$="edited" i]').first().waitFor({ timeout: 10_000 });
-  await panel.getByText('Off', { exact: true }).first().waitFor({ timeout: 10_000 });
+  // Several collapsed inspector sections legitimately retain an off-status
+  // badge in the DOM. Assert the visible status instead of depending on DOM
+  // order, which made the visual proof fail after adding Mixer subsections.
+  await panel.getByText('Off', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 10_000 });
 
   if ((await panel.getByTestId('raw-processing-mode-override-control').count()) !== 0) {
     throw new Error('The Adjust inspector should not render RAW processing diagnostics.');

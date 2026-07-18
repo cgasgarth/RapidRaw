@@ -13,6 +13,9 @@ interface ColorWheelProps {
   defaultValue: HueSatLum;
   label: string;
   onChange: (hsl: HueSatLum) => void;
+  onInteractionCancel?: (() => void) | undefined;
+  onInteractionCommit?: (() => void) | undefined;
+  onInteractionStart?: (() => void) | undefined;
   value: HueSatLum;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
   isExpanded?: boolean | undefined;
@@ -27,6 +30,7 @@ export interface ColorWheelInteractionState {
 
 interface ColorWheelInteractionController {
   activate: () => void;
+  cancel: () => void;
   dispose: () => void;
   finish: () => void;
   getState: () => ColorWheelInteractionState;
@@ -36,22 +40,27 @@ interface ColorWheelInteractionController {
 
 export function createColorWheelInteractionController(
   onTransition: (state: ColorWheelInteractionState) => void,
-  onAggregateChange: (active: boolean) => void,
+  onAggregateChange: (active: boolean, cancelled?: boolean) => void,
 ): ColorWheelInteractionController {
   let state: ColorWheelInteractionState = { sliderCount: 0, wheel: false };
   let disposed = false;
   const sliders = new Set<ColorWheelSliderSource>();
-  const commit = (next: ColorWheelInteractionState) => {
+  const commit = (next: ColorWheelInteractionState, cancelled = false) => {
     if (disposed) return;
     const wasActive = state.wheel || state.sliderCount > 0;
     const isActive = next.wheel || next.sliderCount > 0;
     state = next;
     onTransition(next);
-    if (wasActive !== isActive) onAggregateChange(isActive);
+    if (wasActive !== isActive) onAggregateChange(isActive, cancelled);
   };
   return {
     activate: () => {
       disposed = false;
+    },
+    cancel: () => {
+      if (!state.wheel && state.sliderCount === 0) return;
+      sliders.clear();
+      commit({ sliderCount: 0, wheel: false }, true);
     },
     dispose: () => {
       if (disposed) return;
@@ -59,7 +68,7 @@ export function createColorWheelInteractionController(
       const wasActive = state.wheel || state.sliderCount > 0;
       state = { sliderCount: 0, wheel: false };
       sliders.clear();
-      if (wasActive) onAggregateChange(false);
+      if (wasActive) onAggregateChange(false, true);
     },
     finish: () => {
       if (!state.wheel) return;
@@ -103,6 +112,9 @@ const formatPx = (value: number) => `${String(value)}px`;
 const ColorWheel = ({
   defaultValue,
   label,
+  onInteractionCancel,
+  onInteractionCommit,
+  onInteractionStart,
   onChange,
   value,
   onDragStateChange,
@@ -121,11 +133,20 @@ const ColorWheel = ({
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const modifierState = useRef({ ctrl: false, shift: false });
   const onDragStateChangeRef = useRef(onDragStateChange);
+  const onInteractionCancelRef = useRef(onInteractionCancel);
+  const onInteractionCommitRef = useRef(onInteractionCommit);
+  const onInteractionStartRef = useRef(onInteractionStart);
   onDragStateChangeRef.current = onDragStateChange;
+  onInteractionCancelRef.current = onInteractionCancel;
+  onInteractionCommitRef.current = onInteractionCommit;
+  onInteractionStartRef.current = onInteractionStart;
   const interactionController = useRef<ColorWheelInteractionController | null>(null);
   if (interactionController.current === null) {
-    interactionController.current = createColorWheelInteractionController(setInteractionState, (active) => {
+    interactionController.current = createColorWheelInteractionController(setInteractionState, (active, cancelled) => {
       onDragStateChangeRef.current?.(active);
+      if (active) onInteractionStartRef.current?.();
+      else if (cancelled) onInteractionCancelRef.current?.();
+      else onInteractionCommitRef.current?.();
     });
   }
   const isDragging = interactionState.wheel || interactionState.sliderCount > 0;
@@ -179,21 +200,24 @@ const ColorWheel = ({
   const finishWheelInteraction = useCallback(() => {
     interactionController.current?.finish();
   }, []);
+  const cancelWheelInteraction = useCallback(() => {
+    interactionController.current?.cancel();
+  }, []);
 
   useEffect(() => {
-    window.addEventListener('blur', finishWheelInteraction);
     window.addEventListener('mouseup', finishWheelInteraction);
-    window.addEventListener('pointercancel', finishWheelInteraction);
-    window.addEventListener('touchcancel', finishWheelInteraction);
+    window.addEventListener('blur', cancelWheelInteraction);
+    window.addEventListener('pointercancel', cancelWheelInteraction);
+    window.addEventListener('touchcancel', cancelWheelInteraction);
     window.addEventListener('touchend', finishWheelInteraction);
     return () => {
-      window.removeEventListener('blur', finishWheelInteraction);
       window.removeEventListener('mouseup', finishWheelInteraction);
-      window.removeEventListener('pointercancel', finishWheelInteraction);
-      window.removeEventListener('touchcancel', finishWheelInteraction);
+      window.removeEventListener('blur', cancelWheelInteraction);
+      window.removeEventListener('pointercancel', cancelWheelInteraction);
+      window.removeEventListener('touchcancel', cancelWheelInteraction);
       window.removeEventListener('touchend', finishWheelInteraction);
     };
-  }, [finishWheelInteraction]);
+  }, [cancelWheelInteraction, finishWheelInteraction]);
 
   useEffect(() => {
     interactionController.current?.activate();
@@ -302,9 +326,9 @@ const ColorWheel = ({
             onDoubleClick={handleReset}
             onMouseDownCapture={handleDragStart}
             onMouseUpCapture={finishWheelInteraction}
-            onPointerCancel={finishWheelInteraction}
+            onPointerCancel={cancelWheelInteraction}
             onTouchStartCapture={handleDragStart}
-            onTouchCancel={finishWheelInteraction}
+            onTouchCancel={cancelWheelInteraction}
             onTouchEndCapture={finishWheelInteraction}
           >
             <Wheel
@@ -357,6 +381,13 @@ const ColorWheel = ({
                 onDragStateChange={(active) => {
                   interactionController.current?.setSlider('hue', active);
                 }}
+                onInteractionCancel={cancelWheelInteraction}
+                onInteractionCommit={() => {
+                  interactionController.current?.setSlider('hue', false);
+                }}
+                onInteractionStart={() => {
+                  interactionController.current?.setSlider('hue', true);
+                }}
                 step={1}
                 value={hue}
                 trackClassName="cg-hue-gradient"
@@ -373,6 +404,13 @@ const ColorWheel = ({
                 onDragStateChange={(active) => {
                   interactionController.current?.setSlider('saturation', active);
                 }}
+                onInteractionCancel={cancelWheelInteraction}
+                onInteractionCommit={() => {
+                  interactionController.current?.setSlider('saturation', false);
+                }}
+                onInteractionStart={() => {
+                  interactionController.current?.setSlider('saturation', true);
+                }}
                 step={1}
                 value={saturation}
                 trackClassName="cg-sat-gradient"
@@ -384,6 +422,7 @@ const ColorWheel = ({
 
       <div className="w-full">
         <Slider
+          ariaLabel={t('ui.colorWheel.luminance')}
           defaultValue={defaultValue.luminance}
           label={isExpanded ? t('ui.colorWheel.luminance') : <Sun size={16} className="text-text-secondary" />}
           max={100}
@@ -391,6 +430,13 @@ const ColorWheel = ({
           onChange={handleLumChange}
           onDragStateChange={(active) => {
             interactionController.current?.setSlider('luminance', active);
+          }}
+          onInteractionCancel={cancelWheelInteraction}
+          onInteractionCommit={() => {
+            interactionController.current?.setSlider('luminance', false);
+          }}
+          onInteractionStart={() => {
+            interactionController.current?.setSlider('luminance', true);
           }}
           step={1}
           value={luminance}

@@ -20,6 +20,7 @@ const viewerTargetTool = (target: EventTarget | null): ViewerActiveTool | undefi
   if (!(target instanceof Element)) return undefined;
   const value = target.closest<HTMLElement>('[data-viewer-input-tool]')?.dataset['viewerInputTool'];
   if (
+    value === 'color-mixer' ||
     value === 'brush' ||
     value === 'compare-divider' ||
     value === 'crop' ||
@@ -30,6 +31,7 @@ const viewerTargetTool = (target: EventTarget | null): ViewerActiveTool | undefi
     value === 'point-color' ||
     value === 'retouch' ||
     value === 'straighten' ||
+    value === 'tone-curve' ||
     value === 'tone-equalizer' ||
     value === 'white-balance'
   )

@@ -107,6 +107,30 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
   expect(genericSetter).not.toHaveBeenCalled();
 });
 
+test('Color Mixer exposes HSL and Color views without targeted-adjustment controls', () => {
+  window.sessionStorage.setItem(COLOR_WORKSPACE_TAB_SESSION_KEY, 'mixer');
+  const adjustments = initializeFallbackStore(94);
+  const Harness = () => {
+    const [current, setCurrent] = useState(adjustments);
+    return createElement(ColorPanel, {
+      adjustments: current,
+      appSettings: null,
+      setAdjustments: (update) =>
+        setCurrent((previous) => (typeof update === 'function' ? update(previous) : { ...previous, ...update })),
+    });
+  };
+  const container = render(createElement(Harness));
+  expect(getButton(container, 'color-mixer-view-hsl').getAttribute('aria-checked')).toBe('true');
+  expect(getButton(container, 'color-mixer-mode-hue').getAttribute('aria-checked')).toBe('true');
+  expect(container.querySelector('[data-testid="color-mixer-targeted-adjustment"]')).toBeNull();
+  expect(container.querySelector('[data-testid="point-color-controls"]')).toBeNull();
+  act(() => getButton(container, 'color-mixer-mode-saturation').click());
+  expect(getButton(container, 'color-mixer-mode-saturation').getAttribute('aria-checked')).toBe('true');
+  act(() => getButton(container, 'color-mixer-view-color').click());
+  expect(getButton(container, 'color-mixer-view-color').getAttribute('aria-checked')).toBe('true');
+  expect(container.querySelectorAll('[data-testid^="color-mixer-row-"]')).toHaveLength(8);
+});
+
 test('ColorAdvancedControls slider commits calibration through fallback authority', () => {
   const adjustments = initializeFallbackStore(92);
   const genericSetter = mock(() => undefined);
