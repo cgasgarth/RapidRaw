@@ -1393,20 +1393,27 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
   details: [
     {
       label: 'modals.copyPaste.groups.clarityDehaze',
+      keys: [DetailsAdjustment.Centré, DetailsAdjustment.LocalContrastHaloGuard],
+    },
+    {
+      label: 'modals.copyPaste.groups.sharpness',
       keys: [
-        DetailsAdjustment.Centré,
+        DetailsAdjustment.Sharpness,
+        DetailsAdjustment.SharpnessThreshold,
         DetailsAdjustment.LocalContrastRadiusPx,
-        DetailsAdjustment.LocalContrastHaloGuard,
         DetailsAdjustment.LocalContrastMidtoneMask,
       ],
     },
     {
-      label: 'modals.copyPaste.groups.sharpness',
-      keys: [DetailsAdjustment.Sharpness, DetailsAdjustment.SharpnessThreshold],
-    },
-    {
       label: 'modals.copyPaste.groups.noiseReduction',
-      keys: [DetailsAdjustment.LumaNoiseReduction, DetailsAdjustment.ColorNoiseReduction],
+      keys: [
+        DetailsAdjustment.LumaNoiseReduction,
+        DetailsAdjustment.ColorNoiseReduction,
+        DetailsAdjustment.DenoiseDetail,
+        DetailsAdjustment.DenoiseContrastProtection,
+        DetailsAdjustment.DenoiseNaturalGrain,
+        DetailsAdjustment.DenoiseShadowBias,
+      ],
     },
     {
       label: 'modals.copyPaste.groups.deblur',
@@ -1566,8 +1573,14 @@ export const ADJUSTMENT_SECTIONS: Sections = {
     DetailsAdjustment.Centré,
     DetailsAdjustment.Sharpness,
     DetailsAdjustment.SharpnessThreshold,
+    DetailsAdjustment.LocalContrastRadiusPx,
+    DetailsAdjustment.LocalContrastMidtoneMask,
     DetailsAdjustment.LumaNoiseReduction,
     DetailsAdjustment.ColorNoiseReduction,
+    DetailsAdjustment.DenoiseDetail,
+    DetailsAdjustment.DenoiseContrastProtection,
+    DetailsAdjustment.DenoiseNaturalGrain,
+    DetailsAdjustment.DenoiseShadowBias,
     DetailsAdjustment.DustSpotOverlayEnabled,
     DetailsAdjustment.DustSpotSensitivity,
     DetailsAdjustment.DustSpotMinRadiusPx,
