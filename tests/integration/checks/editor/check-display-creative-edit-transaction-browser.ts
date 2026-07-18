@@ -11,16 +11,22 @@ const host = '127.0.0.1';
 const port = await allocateFreeTcpPort(host);
 const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
+const displayCreativeParamsSchema = z
+  .object({
+    grainAmount: z.number(),
+    grainRoughness: z.number(),
+    grainSize: z.number(),
+    halationAmount: z.number(),
+    vignetteAmount: z.number(),
+    vignetteMidpoint: z.number(),
+  })
+  .passthrough();
+const displayCreativeNodeSchema = z.object({ enabled: z.boolean(), params: displayCreativeParamsSchema }).passthrough();
 const persistenceSchema = z
   .object({
-    adjustments: z
+    editDocumentV2: z
       .object({
-        grainAmount: z.literal(28),
-        grainRoughness: z.literal(50),
-        grainSize: z.literal(34),
-        halationAmount: z.literal(24),
-        vignetteAmount: z.literal(-32),
-        vignetteMidpoint: z.literal(63),
+        nodes: z.object({ display_creative: displayCreativeNodeSchema }).passthrough(),
       })
       .passthrough(),
     path: z.literal(sourcePath),
@@ -36,18 +42,35 @@ const persistenceSchema = z
   .passthrough();
 const vignettePersistenceSchema = z
   .object({
-    adjustments: z.object({ vignetteAmount: z.literal(-32), vignetteMidpoint: z.literal(63) }).passthrough(),
+    editDocumentV2: z
+      .object({
+        nodes: z
+          .object({
+            display_creative: displayCreativeNodeSchema.extend({
+              params: displayCreativeParamsSchema.extend({
+                vignetteAmount: z.literal(-32),
+                vignetteMidpoint: z.literal(63),
+              }),
+            }),
+          })
+          .passthrough(),
+      })
+      .passthrough(),
     path: z.literal(sourcePath),
     transaction: persistenceSchema.shape.transaction,
   })
   .passthrough();
 const halationPersistenceSchema = z
   .object({
-    adjustments: z
+    editDocumentV2: z
       .object({
-        halationAmount: z.literal(24),
-        vignetteAmount: z.literal(-32),
-        vignetteMidpoint: z.literal(63),
+        nodes: z
+          .object({
+            display_creative: displayCreativeNodeSchema.extend({
+              params: displayCreativeParamsSchema.extend({ halationAmount: z.literal(24) }),
+            }),
+          })
+          .passthrough(),
       })
       .passthrough(),
     path: z.literal(sourcePath),
@@ -56,8 +79,19 @@ const halationPersistenceSchema = z
   .passthrough();
 const effectsEnablementPersistenceSchema = z
   .object({
-    adjustments: z
-      .object({ effectsEnabled: z.boolean(), vignetteAmount: z.literal(-32), vignetteMidpoint: z.literal(63) })
+    editDocumentV2: z
+      .object({
+        nodes: z
+          .object({
+            display_creative: displayCreativeNodeSchema.extend({
+              params: displayCreativeParamsSchema.extend({
+                vignetteAmount: z.literal(-32),
+                vignetteMidpoint: z.literal(63),
+              }),
+            }),
+          })
+          .passthrough(),
+      })
       .passthrough(),
     path: z.literal(sourcePath),
     transaction: persistenceSchema.shape.transaction,
@@ -342,6 +376,8 @@ try {
   }
   await waitForRenderedVignette(page, -32, 63);
 
+  await page.getByTestId('effects-advanced-toggle').click();
+  await page.getByTestId('effects-control-halation-amount-value').waitFor({ state: 'visible', timeout: 10_000 });
   await page.getByTestId('effects-control-halation-amount-value').click();
   const halationInput = page.getByTestId('effects-control-halation-amount-input');
   await halationInput.fill('24');
@@ -374,7 +410,7 @@ try {
   const halationSave = halationPersistenceSchema.parse(saveCalls.at(-2)?.args);
   const grainSave = persistenceSchema.parse(saveCalls.at(-1)?.args);
   if (
-    halationSave.adjustments.halationAmount !== 24 ||
+    halationSave.editDocumentV2.nodes.display_creative.params.halationAmount !== 24 ||
     halationSave.transaction.nextAdjustmentRevision !== grainSave.transaction.baseAdjustmentRevision ||
     grainSave.transaction.nextAdjustmentRevision !== grainSave.transaction.baseAdjustmentRevision + 1
   ) {
@@ -407,9 +443,15 @@ try {
     grainSize: 25,
     halationAmount: 0,
   });
-  if ((await page.getByTestId('effects-active-summary').textContent())?.includes('72%') !== true) {
-    throw new Error('Undo of manual Halation did not visibly restore the prior Film Look identity.');
+  const summary = page.getByTestId('effects-active-summary');
+  if (
+    (await summary.getAttribute('data-active-effect-count')) !== '1' ||
+    (await summary.textContent())?.includes('Halation') === true
+  ) {
+    throw new Error('Undo of manual Halation did not restore the prior active-effects summary.');
   }
+  await page.getByTestId('effects-advanced-toggle').click();
+  await page.getByTestId('effects-advanced').waitFor({ state: 'hidden', timeout: 10_000 });
 
   const enablementBaselineApplies = await commandCount(page, 'apply_adjustments');
   const enablementBaselineSaves = await commandCount(page, 'save_metadata_and_update_thumbnail');
@@ -423,7 +465,8 @@ try {
       { color: [210, 120, 60], delayMs: 20 },
     );
   });
-  await effectsSection.getByRole('button', { name: 'Disable Section' }).click();
+  const effectsEnableToggle = page.getByTestId('effects-enable-toggle');
+  await effectsEnableToggle.click();
   await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', enablementBaselineSaves + 1);
   await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 1);
   await page.waitForTimeout(200);
@@ -450,15 +493,15 @@ try {
     ),
   );
   if (
-    disabledPersistence.adjustments.effectsEnabled !== false ||
-    disabledPersistence.adjustments.vignetteAmount !== -32
+    disabledPersistence.editDocumentV2.nodes.display_creative.enabled !== false ||
+    disabledPersistence.editDocumentV2.nodes.display_creative.params.vignetteAmount !== -32
   ) {
     throw new Error(
       `Effects disablement was not persisted with latent parameters: ${JSON.stringify(disabledPersistence)}`,
     );
   }
 
-  await effectsSection.getByRole('button', { name: 'Enable Section' }).click();
+  await effectsEnableToggle.click();
   await waitForCommandCount(page, 'save_metadata_and_update_thumbnail', enablementBaselineSaves + 2);
   await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 2);
   const reenabledNode = await waitForRenderedEffectsEnabled(page, true);
@@ -469,7 +512,7 @@ try {
   await undo.click();
   await waitForCommandCount(page, 'apply_adjustments', enablementBaselineApplies + 3);
   await waitForRenderedEffectsEnabled(page, false);
-  if ((await effectsSection.getByRole('button', { name: 'Enable Section' }).count()) !== 1) {
+  if ((await effectsEnableToggle.getAttribute('aria-pressed')) !== 'false') {
     throw new Error('Undo did not restore disabled Effects UI state.');
   }
 
@@ -492,7 +535,7 @@ try {
   if (
     redoneNode.params['vignetteAmount'] !== -32 ||
     redoneNode.params['vignetteMidpoint'] !== 63 ||
-    (await effectsSection.getByRole('button', { name: 'Disable Section' }).count()) !== 1
+    (await effectsEnableToggle.getAttribute('aria-pressed')) !== 'true'
   ) {
     throw new Error(`Redo did not restore enabled Effects with latent parameters: ${JSON.stringify(redoneNode)}`);
   }

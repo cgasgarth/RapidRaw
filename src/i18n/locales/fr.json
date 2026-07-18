@@ -391,8 +391,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Quantité",
       "creative": "Créatif",
+      "disabled": "",
+      "enabled": "",
       "feather": "Contour progressif",
       "filmLookBrowser": {
         "activeLook": "",
@@ -458,6 +461,7 @@
       "roughness": "Rugosité",
       "roundness": "Arrondi",
       "size": "Taille",
+      "title": "",
       "vignette": "Vignettage"
     },
     "perspective": {

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import type { FilmStageControlDescriptorV1 } from '../../../packages/rawengine-schema/src/index.js';
@@ -8,8 +8,11 @@ import { CreativeAdjustment, Effect } from '../../utils/adjustments';
 import {
   buildDisplayCreativePatchEditTransaction,
   type DisplayCreativeCommitIdentity,
+  type DisplayCreativeNodeAdjustment,
   isDisplayCreativeNodeAdjustment,
 } from '../../utils/displayCreativeEditTransaction';
+import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
+import { reduceEditTransaction } from '../../utils/editTransaction';
 import {
   buildFilmStageOperation,
   FILM_REFERENCE_STAGE_DEFAULT_P,
@@ -26,7 +29,10 @@ import AdjustmentSlider from './AdjustmentSlider';
 import LUTControl from './LUTControl';
 
 export type EffectAdjustmentView = EditDocumentNodeParamsV2<'display_creative'> &
-  EditDocumentNodeParamsV2<'film_emulation'>;
+  EditDocumentNodeParamsV2<'film_emulation'> & {
+    /** Mask adjustment views carry this legacy section toggle outside display_creative.params. */
+    effectsEnabled?: boolean;
+  };
 export type EffectAdjustmentUpdate =
   | Partial<EffectAdjustmentView>
   | ((prev: EffectAdjustmentView) => EffectAdjustmentView);
@@ -73,8 +79,12 @@ export default function EffectsPanel({
 }: EffectsPanelProps) {
   const { t } = useTranslation();
   const [filmStageP, setFilmStageP] = useState(FILM_REFERENCE_STAGE_DEFAULT_P);
+  const [advancedOpen, setAdvancedOpen] = useState(isForMask);
   const adjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const applyEditTransaction = useEditorStore((state) => state.applyEditTransaction);
+  const displayCreativeNodeEnabled = useEditorStore(
+    (state) => selectEditDocumentNode(state.editDocumentV2, 'display_creative').enabled,
+  );
   const imageSessionId = useEditorStore(
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
@@ -85,6 +95,108 @@ export default function EffectsPanel({
       : null;
   const displayCreativeCommitIdentityRef = useRef(displayCreativeCommitIdentity);
   displayCreativeCommitIdentityRef.current = displayCreativeCommitIdentity;
+  const displayCreativeSliderInteractionsRef = useRef<
+    Partial<
+      Record<
+        DisplayCreativeNodeAdjustment,
+        {
+          baseEditDocumentV2: ReturnType<typeof useEditorStore.getState>['editDocumentV2'];
+          identity: DisplayCreativeCommitIdentity;
+          interactionId: string;
+          latestValue: number;
+        }
+      >
+    >
+  >({});
+
+  const cancelDisplayCreativeSliderInteraction = (key: DisplayCreativeNodeAdjustment) => {
+    const interaction = displayCreativeSliderInteractionsRef.current[key];
+    if (interaction === undefined) return;
+    useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+    delete displayCreativeSliderInteractionsRef.current[key];
+    useEditorStore.getState().setEditor({ isSliderDragging: false });
+  };
+
+  const beginDisplayCreativeSliderInteraction = (key: DisplayCreativeNodeAdjustment) => {
+    if (isForMask || displayCreativeSliderInteractionsRef.current[key] !== undefined) {
+      if (isForMask) onDragStateChange?.(true);
+      return;
+    }
+    const identity = displayCreativeCommitIdentityRef.current;
+    if (identity === null) return;
+    const state = useEditorStore.getState();
+    const currentValue = selectEditDocumentNode(state.editDocumentV2, 'display_creative').params[key];
+    displayCreativeSliderInteractionsRef.current[key] = {
+      baseEditDocumentV2: structuredClone(state.editDocumentV2),
+      identity,
+      interactionId: crypto.randomUUID(),
+      latestValue: currentValue,
+    };
+    state.setEditor({ isSliderDragging: true });
+  };
+
+  const updateDisplayCreativeSliderInteraction = (key: DisplayCreativeNodeAdjustment, value: number) => {
+    const interaction = displayCreativeSliderInteractionsRef.current[key];
+    if (interaction === undefined) {
+      commitDisplayCreativePatch({ [key]: value });
+      return;
+    }
+    const result = reduceEditTransaction(
+      interaction.baseEditDocumentV2,
+      interaction.identity.adjustmentRevision,
+      {
+        baseAdjustmentRevision: interaction.identity.adjustmentRevision,
+        history: 'none',
+        imageSessionId: interaction.identity.imageSessionId,
+        operations: [{ nodeType: 'display_creative', patch: { [key]: value }, type: 'patch-edit-document-node' }],
+        persistence: 'preview-only',
+        source: 'manual-control',
+        transactionId: interaction.interactionId,
+      },
+      interaction.identity.imageSessionId,
+    );
+    interaction.latestValue = value;
+    useEditorStore.getState().publishWhiteBalancePickerPreview(result.after);
+  };
+
+  const commitDisplayCreativeSliderInteraction = (key: DisplayCreativeNodeAdjustment) => {
+    const interaction = displayCreativeSliderInteractionsRef.current[key];
+    if (interaction === undefined) {
+      if (isForMask) onDragStateChange?.(false);
+      return;
+    }
+    delete displayCreativeSliderInteractionsRef.current[key];
+    try {
+      const result = applyEditTransaction(
+        buildDisplayCreativePatchEditTransaction(
+          useEditorStore.getState(),
+          interaction.identity,
+          { [key]: interaction.latestValue },
+          interaction.interactionId,
+        ),
+      );
+      displayCreativeCommitIdentityRef.current = {
+        ...interaction.identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+    } catch {
+      useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+    } finally {
+      useEditorStore.getState().setEditor({ isSliderDragging: false });
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      for (const key of Object.keys(displayCreativeSliderInteractionsRef.current) as DisplayCreativeNodeAdjustment[]) {
+        cancelDisplayCreativeSliderInteraction(key);
+      }
+    };
+  }, [adjustmentRevision, imageSessionId, selectedImagePath]);
+
+  useEffect(() => {
+    if (isForMask) setAdvancedOpen(true);
+  }, [isForMask]);
 
   const commitDisplayCreativePatch = (patch: Parameters<typeof buildDisplayCreativePatchEditTransaction>[2]) => {
     const identity = displayCreativeCommitIdentityRef.current;
@@ -100,8 +212,15 @@ export default function EffectsPanel({
 
   const handleAdjustmentChange = (key: string, value: number) => {
     const nextValue = Math.trunc(value);
-    if (!isForMask && isDisplayCreativeNodeAdjustment(key)) {
-      commitDisplayCreativePatch({ [key]: nextValue });
+    if (isDisplayCreativeNodeAdjustment(key)) {
+      if (!isForMask) {
+        updateDisplayCreativeSliderInteraction(key, nextValue);
+        return;
+      }
+      setAdjustments((prev: EffectAdjustmentView) => ({
+        ...prev,
+        [key]: nextValue,
+      }));
       return;
     }
     setAdjustments((prev: EffectAdjustmentView) => ({
@@ -109,6 +228,15 @@ export default function EffectsPanel({
       [key]: nextValue,
     }));
   };
+
+  const displayCreativeSliderInteractionProps = (key: DisplayCreativeNodeAdjustment) =>
+    isForMask
+      ? {}
+      : {
+          onInteractionCancel: () => cancelDisplayCreativeSliderInteraction(key),
+          onInteractionCommit: () => commitDisplayCreativeSliderInteraction(key),
+          onInteractionStart: () => beginDisplayCreativeSliderInteraction(key),
+        };
 
   const handleLutIntensityChange = (intensity: number) => {
     handleAdjustmentChange(Effect.LutIntensity, intensity);
@@ -147,8 +275,42 @@ export default function EffectsPanel({
     }));
   };
 
+  const handleEffectsEnabledToggle = () => {
+    if (isForMask) {
+      setAdjustments((prev: EffectAdjustmentView) => ({
+        ...prev,
+        effectsEnabled: !(prev.effectsEnabled ?? true),
+      }));
+      return;
+    }
+    const identity = displayCreativeCommitIdentityRef.current;
+    if (identity === null) return;
+    const state = useEditorStore.getState();
+    const displayCreativeNode = selectEditDocumentNode(state.editDocumentV2, 'display_creative');
+    const result = applyEditTransaction({
+      baseAdjustmentRevision: identity.adjustmentRevision,
+      history: 'single-entry',
+      imageSessionId: identity.imageSessionId,
+      operations: [
+        {
+          enabled: !displayCreativeNode.enabled,
+          nodeType: 'display_creative',
+          type: 'set-edit-document-node-enabled',
+        },
+      ],
+      persistence: 'commit',
+      source: 'manual-control',
+      transactionId: crypto.randomUUID(),
+    });
+    displayCreativeCommitIdentityRef.current = {
+      ...identity,
+      adjustmentRevision: result.nextAdjustmentRevision,
+    };
+  };
+
   const adjustmentVisibility = appSettings?.adjustmentVisibility || {};
   const density = professionalInspectorDensityTokens;
+  const effectsEnabled = isForMask ? (adjustments.effectsEnabled ?? true) : displayCreativeNodeEnabled;
   const activeLutName =
     typeof adjustments.lutName === 'string' && adjustments.lutName.length > 0 ? adjustments.lutName : null;
   const activeLutIntensity = adjustments.lutIntensity ?? 100;
@@ -202,6 +364,180 @@ export default function EffectsPanel({
       data-commit-source-identity={displayCreativeCommitIdentity?.sourceIdentity}
       data-testid="effects-controls"
     >
+      <div
+        className="flex items-center justify-between rounded border border-editor-border bg-editor-panel-well px-1.5 py-1"
+        data-testid="effects-section-enable"
+      >
+        <UiText className={density.sectionHeader.title} variant={TextVariants.heading}>
+          {t('adjustments.effects.title', { defaultValue: 'Effects' })}
+        </UiText>
+        <button
+          aria-pressed={effectsEnabled}
+          className={editorChromeStatusChipClassName(effectsEnabled ? 'success' : 'neutral')}
+          data-testid="effects-enable-toggle"
+          onClick={handleEffectsEnabledToggle}
+          type="button"
+        >
+          {effectsEnabled
+            ? t('adjustments.effects.enabled', { defaultValue: 'On' })
+            : t('adjustments.effects.disabled', { defaultValue: 'Off' })}
+        </button>
+      </div>
+
+      {!isForMask && adjustmentVisibility['vignette'] !== false && (
+        <section
+          className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1"
+          data-testid="effects-vignette-section"
+        >
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+            {t('adjustments.effects.vignette')}
+          </UiText>
+          <AdjustmentSlider
+            {...displayCreativeSliderInteractionProps(Effect.VignetteAmount)}
+            density="compact"
+            label={t('adjustments.effects.amount')}
+            max={100}
+            min={-100}
+            onValueChange={(value) => {
+              handleAdjustmentChange(Effect.VignetteAmount, value);
+            }}
+            step={1}
+            testId="effects-control-vignette-amount"
+            value={adjustments.vignetteAmount}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            {...displayCreativeSliderInteractionProps(Effect.VignetteMidpoint)}
+            density="compact"
+            defaultValue={50}
+            label={t('adjustments.effects.midpoint')}
+            max={100}
+            min={0}
+            onValueChange={(value) => {
+              handleAdjustmentChange(Effect.VignetteMidpoint, value);
+            }}
+            step={1}
+            testId="effects-control-vignette-midpoint"
+            value={adjustments.vignetteMidpoint}
+            onDragStateChange={onDragStateChange}
+            fillOrigin="min"
+          />
+          <AdjustmentSlider
+            {...displayCreativeSliderInteractionProps(Effect.VignetteRoundness)}
+            density="compact"
+            label={t('adjustments.effects.roundness')}
+            max={100}
+            min={-100}
+            onValueChange={(value) => {
+              handleAdjustmentChange(Effect.VignetteRoundness, value);
+            }}
+            step={1}
+            testId="effects-control-vignette-roundness"
+            value={adjustments.vignetteRoundness}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            {...displayCreativeSliderInteractionProps(Effect.VignetteFeather)}
+            density="compact"
+            defaultValue={50}
+            label={t('adjustments.effects.feather')}
+            max={100}
+            min={0}
+            onValueChange={(value) => {
+              handleAdjustmentChange(Effect.VignetteFeather, value);
+            }}
+            step={1}
+            testId="effects-control-vignette-feather"
+            value={adjustments.vignetteFeather}
+            onDragStateChange={onDragStateChange}
+            fillOrigin="min"
+          />
+        </section>
+      )}
+
+      {!isForMask && adjustmentVisibility['grain'] !== false && (
+        <section
+          className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1"
+          data-testid="film-grain-ui-controls"
+        >
+          <div className={density.sectionHeader.root}>
+            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+              {t('adjustments.effects.grain')}
+            </UiText>
+            <span className={editorChromeStatusChipClassName('neutral')} data-testid="film-grain-renderer-status">
+              {t('adjustments.effects.grainRendererStatus')}
+            </span>
+          </div>
+          <div className="mb-0.5 grid grid-cols-3 gap-1" data-testid="film-grain-preset-shortcuts">
+            {FILM_GRAIN_UI_PRESETS.map((preset) => (
+              <button
+                className="min-h-5 rounded border border-editor-border bg-editor-panel px-1 py-px text-[10px] font-medium leading-4 text-text-primary transition-colors hover:border-editor-focus-ring hover:bg-editor-selected-quiet focus:outline-none focus:ring-2 focus:ring-editor-focus-ring"
+                data-testid={`film-grain-preset-${preset.id}`}
+                key={preset.id}
+                onClick={() => {
+                  handleFilmGrainPresetApply(preset);
+                }}
+                type="button"
+              >
+                {t(preset.labelKey)}
+              </button>
+            ))}
+          </div>
+          <AdjustmentSlider
+            {...displayCreativeSliderInteractionProps(Effect.GrainAmount)}
+            density="compact"
+            label={t('adjustments.effects.amount')}
+            max={100}
+            min={0}
+            onValueChange={(value) => {
+              handleAdjustmentChange(Effect.GrainAmount, value);
+            }}
+            step={1}
+            testId="effects-control-grain-amount"
+            value={adjustments.grainAmount}
+            onDragStateChange={onDragStateChange}
+          />
+          <AdjustmentSlider
+            {...displayCreativeSliderInteractionProps(Effect.GrainSize)}
+            density="compact"
+            defaultValue={25}
+            label={t('adjustments.effects.size')}
+            max={100}
+            min={0}
+            onValueChange={(value) => {
+              handleAdjustmentChange(Effect.GrainSize, value);
+            }}
+            step={1}
+            testId="effects-control-grain-size"
+            value={adjustments.grainSize}
+            onDragStateChange={onDragStateChange}
+            fillOrigin="min"
+          />
+          <AdjustmentSlider
+            {...displayCreativeSliderInteractionProps(Effect.GrainRoughness)}
+            density="compact"
+            defaultValue={50}
+            label={t('adjustments.effects.roughness')}
+            max={100}
+            min={0}
+            onValueChange={(value) => {
+              handleAdjustmentChange(Effect.GrainRoughness, value);
+            }}
+            step={1}
+            testId="effects-control-grain-roughness"
+            value={adjustments.grainRoughness}
+            onDragStateChange={onDragStateChange}
+            fillOrigin="min"
+          />
+          <div
+            className="mt-1 rounded border border-editor-border bg-editor-panel px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary"
+            data-testid="film-grain-chroma-planned"
+          >
+            {t('adjustments.effects.grainChromaPlanned')}
+          </div>
+        </section>
+      )}
+
       <section
         aria-label={t('adjustments.effects.activeSummary', { defaultValue: 'Active effects summary' })}
         className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1"
@@ -241,228 +577,113 @@ export default function EffectsPanel({
         )}
       </section>
 
-      <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
-        <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-          {t('adjustments.effects.creative')}
-        </UiText>
-
-        <AdjustmentSlider
-          density="compact"
-          label={t('adjustments.effects.glow')}
-          max={100}
-          min={0}
-          onValueChange={(value) => {
-            handleAdjustmentChange(CreativeAdjustment.GlowAmount, value);
+      <section
+        className="rounded border border-editor-border bg-editor-panel-well"
+        data-testid="effects-advanced-section"
+      >
+        <button
+          aria-controls="effects-advanced-controls"
+          aria-expanded={advancedOpen}
+          className="flex min-h-7 w-full items-center justify-between px-1.5 py-1 text-left text-[11px] font-medium text-text-primary hover:bg-editor-selected-quiet focus:outline-none focus:ring-2 focus:ring-editor-focus-ring"
+          data-testid="effects-advanced-toggle"
+          onClick={() => {
+            setAdvancedOpen((open) => !open);
           }}
-          step={1}
-          testId="effects-control-glow-amount"
-          value={adjustments.glowAmount}
-          onDragStateChange={onDragStateChange}
-        />
-
-        <AdjustmentSlider
-          density="compact"
-          label={t('adjustments.effects.halation')}
-          max={100}
-          min={0}
-          onValueChange={(value) => {
-            handleAdjustmentChange(CreativeAdjustment.HalationAmount, value);
-          }}
-          step={1}
-          testId="effects-control-halation-amount"
-          value={adjustments.halationAmount}
-          onDragStateChange={onDragStateChange}
-        />
-
-        {!isForMask && (
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.effects.lightFlares')}
-            max={100}
-            min={0}
-            onValueChange={(value) => {
-              handleAdjustmentChange(CreativeAdjustment.FlareAmount, value);
-            }}
-            step={1}
-            testId="effects-control-flare-amount"
-            value={adjustments.flareAmount}
-            onDragStateChange={onDragStateChange}
-          />
-        )}
-      </div>
-
-      {!isForMask && (
-        <div className={density.gutter.section}>
-          <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
-            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-              {t('adjustments.effects.filmStages.title', { defaultValue: 'Film stages' })}
-            </UiText>
-            <FilmStageControls
-              descriptors={filmStageDescriptors}
-              onChange={handleFilmStageChange}
-              onReset={handleFilmStageReset}
-            />
-          </div>
-
-          <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
-            <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-              {t('adjustments.effects.lut')}
-            </UiText>
-            <LUTControl
-              lutName={adjustments.lutName || null}
-              lutIntensity={adjustments.lutIntensity ?? 100}
-              onLutSelect={handleLutSelect}
-              onIntensityChange={handleLutIntensityChange}
-              onClear={handleLutClear}
-              onDragStateChange={onDragStateChange}
-            />
-          </div>
-
-          {adjustmentVisibility['vignette'] !== false && (
+          type="button"
+        >
+          <span>{t('adjustments.effects.advanced', { defaultValue: 'Creative and advanced' })}</span>
+          <span aria-hidden="true">{advancedOpen ? '−' : '+'}</span>
+        </button>
+        {advancedOpen && (
+          <div
+            className="space-y-1.5 border-t border-editor-border p-1.5"
+            data-testid="effects-advanced"
+            id="effects-advanced-controls"
+          >
             <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
               <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-                {t('adjustments.effects.vignette')}
+                {t('adjustments.effects.creative')}
               </UiText>
-              <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.effects.amount')}
-                max={100}
-                min={-100}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(Effect.VignetteAmount, value);
-                }}
-                step={1}
-                testId="effects-control-vignette-amount"
-                value={adjustments.vignetteAmount}
-                onDragStateChange={onDragStateChange}
-              />
-              <AdjustmentSlider
-                density="compact"
-                defaultValue={50}
-                label={t('adjustments.effects.midpoint')}
-                max={100}
-                min={0}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(Effect.VignetteMidpoint, value);
-                }}
-                step={1}
-                testId="effects-control-vignette-midpoint"
-                value={adjustments.vignetteMidpoint}
-                onDragStateChange={onDragStateChange}
-                fillOrigin="min"
-              />
-              <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.effects.roundness')}
-                max={100}
-                min={-100}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(Effect.VignetteRoundness, value);
-                }}
-                step={1}
-                testId="effects-control-vignette-roundness"
-                value={adjustments.vignetteRoundness}
-                onDragStateChange={onDragStateChange}
-              />
-              <AdjustmentSlider
-                density="compact"
-                defaultValue={50}
-                label={t('adjustments.effects.feather')}
-                max={100}
-                min={0}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(Effect.VignetteFeather, value);
-                }}
-                step={1}
-                testId="effects-control-vignette-feather"
-                value={adjustments.vignetteFeather}
-                onDragStateChange={onDragStateChange}
-                fillOrigin="min"
-              />
-            </div>
-          )}
 
-          {adjustmentVisibility['grain'] !== false && (
-            <div
-              className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1"
-              data-testid="film-grain-ui-controls"
-            >
-              <div className={density.sectionHeader.root}>
-                <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-                  {t('adjustments.effects.grain')}
-                </UiText>
-                <span className={editorChromeStatusChipClassName('neutral')} data-testid="film-grain-renderer-status">
-                  {t('adjustments.effects.grainRendererStatus')}
-                </span>
-              </div>
-              <div className="mb-0.5 grid grid-cols-3 gap-1" data-testid="film-grain-preset-shortcuts">
-                {FILM_GRAIN_UI_PRESETS.map((preset) => (
-                  <button
-                    className="min-h-5 rounded border border-editor-border bg-editor-panel px-1 py-px text-[10px] font-medium leading-4 text-text-primary transition-colors hover:border-editor-focus-ring hover:bg-editor-selected-quiet focus:outline-none focus:ring-2 focus:ring-editor-focus-ring"
-                    data-testid={`film-grain-preset-${preset.id}`}
-                    key={preset.id}
-                    onClick={() => {
-                      handleFilmGrainPresetApply(preset);
-                    }}
-                    type="button"
-                  >
-                    {t(preset.labelKey)}
-                  </button>
-                ))}
-              </div>
               <AdjustmentSlider
+                {...displayCreativeSliderInteractionProps(CreativeAdjustment.GlowAmount)}
                 density="compact"
-                label={t('adjustments.effects.amount')}
+                label={t('adjustments.effects.glow')}
                 max={100}
                 min={0}
                 onValueChange={(value) => {
-                  handleAdjustmentChange(Effect.GrainAmount, value);
+                  handleAdjustmentChange(CreativeAdjustment.GlowAmount, value);
                 }}
                 step={1}
-                testId="effects-control-grain-amount"
-                value={adjustments.grainAmount}
+                testId="effects-control-glow-amount"
+                value={adjustments.glowAmount}
                 onDragStateChange={onDragStateChange}
               />
+
               <AdjustmentSlider
+                {...displayCreativeSliderInteractionProps(CreativeAdjustment.HalationAmount)}
                 density="compact"
-                defaultValue={25}
-                label={t('adjustments.effects.size')}
+                label={t('adjustments.effects.halation')}
                 max={100}
                 min={0}
                 onValueChange={(value) => {
-                  handleAdjustmentChange(Effect.GrainSize, value);
+                  handleAdjustmentChange(CreativeAdjustment.HalationAmount, value);
                 }}
                 step={1}
-                testId="effects-control-grain-size"
-                value={adjustments.grainSize}
+                testId="effects-control-halation-amount"
+                value={adjustments.halationAmount}
                 onDragStateChange={onDragStateChange}
-                fillOrigin="min"
               />
-              <AdjustmentSlider
-                density="compact"
-                defaultValue={50}
-                label={t('adjustments.effects.roughness')}
-                max={100}
-                min={0}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(Effect.GrainRoughness, value);
-                }}
-                step={1}
-                testId="effects-control-grain-roughness"
-                value={adjustments.grainRoughness}
-                onDragStateChange={onDragStateChange}
-                fillOrigin="min"
-              />
-              <div
-                className="mt-1 rounded border border-editor-border bg-editor-panel px-1.5 py-0.5 text-[10px] leading-4 text-text-secondary"
-                data-testid="film-grain-chroma-planned"
-              >
-                {t('adjustments.effects.grainChromaPlanned')}
-              </div>
+
+              {!isForMask && (
+                <AdjustmentSlider
+                  {...displayCreativeSliderInteractionProps(CreativeAdjustment.FlareAmount)}
+                  density="compact"
+                  label={t('adjustments.effects.lightFlares')}
+                  max={100}
+                  min={0}
+                  onValueChange={(value) => {
+                    handleAdjustmentChange(CreativeAdjustment.FlareAmount, value);
+                  }}
+                  step={1}
+                  testId="effects-control-flare-amount"
+                  value={adjustments.flareAmount}
+                  onDragStateChange={onDragStateChange}
+                />
+              )}
             </div>
-          )}
-        </div>
-      )}
+
+            {!isForMask && (
+              <>
+                <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
+                  <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                    {t('adjustments.effects.filmStages.title', { defaultValue: 'Film stages' })}
+                  </UiText>
+                  <FilmStageControls
+                    descriptors={filmStageDescriptors}
+                    onChange={handleFilmStageChange}
+                    onReset={handleFilmStageReset}
+                  />
+                </div>
+
+                <div className="rounded border border-editor-border bg-editor-panel-well px-1.5 py-1">
+                  <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                    {t('adjustments.effects.lut')}
+                  </UiText>
+                  <LUTControl
+                    lutName={adjustments.lutName || null}
+                    lutIntensity={adjustments.lutIntensity ?? 100}
+                    onLutSelect={handleLutSelect}
+                    onIntensityChange={handleLutIntensityChange}
+                    onClear={handleLutClear}
+                    onDragStateChange={onDragStateChange}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
