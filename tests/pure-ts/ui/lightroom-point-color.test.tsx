@@ -152,6 +152,37 @@ test('sampled Point Color exposes independent H/S/L ranges, shifts, rename, and 
   view.unmount();
 });
 
+test('Point Color coalesces a multi-step slider drag into one history entry', () => {
+  const view = render(initialize(true));
+  const range = view.container.querySelector('[data-testid="point-color-hue-range-range"]');
+  if (!(range instanceof window.HTMLInputElement)) throw new Error('missing point color hue range');
+  range.getBoundingClientRect = () => ({
+    bottom: 0,
+    height: 0,
+    left: 0,
+    right: 100,
+    toJSON: () => ({}),
+    top: 0,
+    width: 100,
+    x: 0,
+    y: 0,
+  });
+
+  act(() => {
+    fireEvent.mouseDown(range, { clientX: 20 });
+    fireEvent.mouseMove(window, { clientX: 45 });
+    fireEvent.mouseMove(window, { clientX: 80 });
+    fireEvent.mouseUp(window, { clientX: 80 });
+  });
+
+  expect(useEditorStore.getState().history).toHaveLength(2);
+  expect(
+    selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'point_color').params.pointColor.points[0]
+      ?.hueRadiusDegrees,
+  ).toBe(144);
+  view.unmount();
+});
+
 test('Point Color cancels its picker on unmount and never enables sampling for mask-local controls', () => {
   const view = render(initialize());
   const picker = view.container.querySelector('[data-testid="point-color-picker"]');
