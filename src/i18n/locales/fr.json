@@ -793,6 +793,8 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Étalonnage",
@@ -824,6 +826,8 @@
         "tooltip": ""
       },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_one": "",
         "editedSections_many": "",
         "editedSections_other": "",

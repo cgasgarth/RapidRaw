@@ -813,6 +813,8 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Калибровка",
@@ -844,6 +846,8 @@
         "tooltip": ""
       },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_one": "Изменён {{count}} раздел",
         "editedSections_few": "Изменено разделов: {{count}}",
         "editedSections_many": "Изменено разделов: {{count}}",

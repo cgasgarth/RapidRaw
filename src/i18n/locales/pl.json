@@ -840,6 +840,8 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Kalibracja",
@@ -871,6 +873,8 @@
         "tooltip": ""
       },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_one": "",
         "editedSections_few": "",
         "editedSections_many": "",
