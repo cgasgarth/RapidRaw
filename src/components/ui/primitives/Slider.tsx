@@ -14,6 +14,7 @@ export type SliderChangeEvent =
     };
 
 interface SliderProps {
+  ariaLabel?: string;
   defaultValue?: number;
   label: React.ReactNode;
   max: number;
@@ -41,6 +42,7 @@ const TOUCH_THUMB_HIT_RADIUS_PX = 24;
 const formatPercent = (value: number) => `${String(value)}%`;
 
 const Slider = ({
+  ariaLabel,
   defaultValue = 0,
   label,
   max,
@@ -646,7 +648,7 @@ const Slider = ({
     <div className={tokens.valueSlot} data-slider-value-slot="true">
       {isEditing ? (
         <input
-          aria-label={typeof label === 'string' ? `${label} value` : undefined}
+          aria-label={ariaLabel ? `${ariaLabel} value` : typeof label === 'string' ? `${label} value` : undefined}
           className={tokens.valueInput}
           data-testid={testId ? `${testId}-input` : undefined}
           disabled={disabled}
@@ -698,7 +700,7 @@ const Slider = ({
       />
       <input
         ref={rangeInputRef}
-        aria-label={typeof label === 'string' ? label : undefined}
+        aria-label={ariaLabel ?? (typeof label === 'string' ? label : undefined)}
         className={cx(
           tokens.input,
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
