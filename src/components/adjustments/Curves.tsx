@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { ClipboardPaste, Copy, RotateCcw, Settings2, Spline } from 'lucide-react';
+import { ClipboardPaste, Copy, RotateCcw, Settings2, Spline, Target } from 'lucide-react';
 import {
   type FocusEvent as ReactFocusEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
 import { useContextMenu } from '../../context/ContextMenuContext';
+import { useUIStore } from '../../store/useUIStore';
 import { ActiveChannel, type Coord, type ParametricCurveSettings } from '../../utils/adjustments';
 import { OPTION_SEPARATOR, Theme } from '../ui/AppProperties';
 import AdjustmentSlider from './AdjustmentSlider';
@@ -46,6 +47,9 @@ interface CurveGraphProps {
   adjustments: CurveAdjustmentView;
   histogram: ChannelConfig | null;
   isForMask?: boolean;
+  onInteractionCancel?: (() => void) | undefined;
+  onInteractionCommit?: (() => void) | undefined;
+  onInteractionStart?: (() => void) | undefined;
   setAdjustments: (updater: CurveAdjustmentUpdater) => void;
   theme: Theme;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
@@ -398,38 +402,60 @@ export function constrainParametricSplit(
 
 export default function CurveGraph(props: CurveGraphProps) {
   const { t } = useTranslation();
-  const [domain, setDomain] = useState<'legacy' | 'scene' | 'output'>(() => {
+  // The photographic Tone Curve is the canonical entry point. Scene and Output
+  // curves remain available as explicit advanced authorities, but never steal
+  // the default focus from the point/parametric workflow.
+  const [domain, setDomain] = useState<'tone' | 'scene' | 'output'>(() => {
+    // Existing typed documents reopen on their selected authority. New/default
+    // documents always start in the photographic Tone Curve workflow.
     if (props.adjustments.sceneCurveV1) return 'scene';
     if (props.adjustments.outputCurveV1) return 'output';
-    return 'legacy';
+    return 'tone';
   });
   const domainOptions = [
-    { label: t('adjustments.curves.typed.legacyTab', { defaultValue: 'Legacy' }), value: 'legacy' },
-    { label: t('adjustments.curves.typed.sceneTab', { defaultValue: 'Scene' }), value: 'scene' },
-    { label: t('adjustments.curves.typed.outputTab', { defaultValue: 'Output' }), value: 'output' },
+    {
+      advanced: false,
+      label: t('adjustments.curves.typed.toneCurveTab', { defaultValue: 'Tone Curve' }),
+      value: 'tone',
+    },
+    { advanced: true, label: t('adjustments.curves.typed.sceneTab', { defaultValue: 'Scene' }), value: 'scene' },
+    { advanced: true, label: t('adjustments.curves.typed.outputTab', { defaultValue: 'Output' }), value: 'output' },
   ] as const;
   if (props.isForMask) return <LegacyCurveGraph {...props} />;
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-1 rounded bg-surface p-1" data-testid="curve-domain-switcher">
+    <div className="space-y-3" data-testid="tone-curve-panel">
+      <div
+        className="grid grid-cols-3 gap-1 rounded bg-surface p-1"
+        data-testid="curve-domain-switcher"
+        data-tone-curve-domain-switcher="true"
+        role="tablist"
+        aria-label={t('adjustments.curves.advancedDomains', { defaultValue: 'Curve domains' })}
+      >
         {domainOptions.map((option) => (
           <button
+            aria-controls={option.value === 'tone' ? 'tone-curve-content' : undefined}
+            aria-label={option.label}
             aria-pressed={domain === option.value}
+            aria-selected={domain === option.value}
             className={`rounded px-2 py-1 text-xs font-medium capitalize ${
               domain === option.value
                 ? 'bg-surface-light text-text-primary shadow-sm'
                 : 'text-text-secondary hover:text-text-primary'
             }`}
             key={option.value}
+            data-advanced-curve-domain={option.advanced ? 'true' : undefined}
             onClick={() => setDomain(option.value)}
+            role="tab"
             type="button"
           >
             {option.label}
           </button>
         ))}
       </div>
-      {domain === 'legacy' ? (
-        <LegacyCurveGraph {...props} />
+      {domain === 'tone' ? (
+        <div id="tone-curve-content" role="tabpanel">
+          <LegacyCurveGraph {...props} />
+        </div>
       ) : (
         <TypedCurveEditor adjustments={props.adjustments} domain={domain} />
       )}
@@ -437,18 +463,37 @@ export default function CurveGraph(props: CurveGraphProps) {
   );
 }
 
-function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDragStateChange }: CurveGraphProps) {
+function LegacyCurveGraph({
+  adjustments,
+  isForMask = false,
+  onInteractionCancel,
+  onInteractionCommit,
+  onInteractionStart,
+  setAdjustments,
+  histogram,
+  theme,
+  onDragStateChange,
+}: CurveGraphProps) {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
   const [activeChannel, setActiveChannel] = useState<ActiveChannel>(ActiveChannel.Luma);
   const [interaction, dispatchInteraction] = useReducer(curveInteractionReducer, { kind: 'idle' });
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
+  const isParametricMode = (adjustments.curveMode || 'point') === 'parametric';
+  const activeDevelopTool = useUIStore((state) => state.activeDevelopTool);
+  const setUI = useUIStore((state) => state.setUI);
+  useEffect(() => {
+    setUI({
+      toneCurveTargetChannel: activeChannel,
+      toneCurveTargetMode: isParametricMode ? 'parametric' : 'point',
+      toneCurveTargetPointIndex: selectedPointIndex,
+    });
+  }, [activeChannel, isParametricMode, selectedPointIndex, setUI]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const splitterContainerRef = useRef<HTMLDivElement>(null);
   const interactionRef = useRef<CurveInteraction>(interaction);
-  const isParametricMode = (adjustments.curveMode || 'point') === 'parametric';
   const curvesRef = useRef(adjustments.curves);
 
   const parametricCurves: Record<ActiveChannel, ParametricCurveSettings> =
@@ -461,12 +506,17 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
       ? interaction.settings
       : parametricCurves[activeChannel];
 
-  const finishInteraction = useCallback(() => {
-    if (interactionRef.current.kind === 'idle') return;
-    interactionRef.current = { kind: 'idle' };
-    dispatchInteraction({ type: 'finish' });
-    onDragStateChange?.(false);
-  }, [onDragStateChange]);
+  const finishInteraction = useCallback(
+    (cancelled = false) => {
+      if (interactionRef.current.kind === 'idle') return;
+      interactionRef.current = { kind: 'idle' };
+      dispatchInteraction({ type: 'finish' });
+      onDragStateChange?.(false);
+      if (cancelled) onInteractionCancel?.();
+      else onInteractionCommit?.();
+    },
+    [onDragStateChange, onInteractionCancel, onInteractionCommit],
+  );
 
   const startInteraction = useCallback(
     (nextInteraction: Exclude<CurveInteraction, { kind: 'idle' }>) => {
@@ -474,8 +524,9 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
       interactionRef.current = nextInteraction;
       dispatchInteraction({ type: 'replace', interaction: nextInteraction });
       onDragStateChange?.(true);
+      onInteractionStart?.();
     },
-    [finishInteraction, onDragStateChange],
+    [finishInteraction, onDragStateChange, onInteractionStart],
   );
 
   const cancelInteraction = useCallback(() => {
@@ -497,7 +548,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         };
       });
     }
-    finishInteraction();
+    finishInteraction(true);
   }, [finishInteraction, setAdjustments]);
 
   const handleToggleMode = (newMode: 'point' | 'parametric') => {
@@ -1006,14 +1057,23 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
   );
 
   return (
-    <div className="select-none touch-none pt-1" ref={containerRef} data-testid="curves-editor">
+    <div
+      className="select-none touch-none pt-1"
+      ref={containerRef}
+      data-active-channel={activeChannel}
+      data-curve-mode={isParametricMode ? 'parametric' : 'point'}
+      data-tone-curve-editor="true"
+      data-testid="curves-editor"
+    >
       <div className="mb-1.5 flex items-center gap-1">
         <div
           className="flex min-w-0 flex-1 items-center rounded bg-surface-secondary p-0.5"
           role="group"
           aria-label={`${t('adjustments.curves.pointCurve')} / ${t('adjustments.curves.parametricCurve')}`}
+          data-testid="tone-curve-mode-switcher"
         >
           <button
+            aria-label={t('adjustments.curves.pointCurve')}
             className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded px-2 text-[11px] font-medium transition-colors ${
               !isParametricMode
                 ? 'bg-surface text-text-primary shadow-sm'
@@ -1029,6 +1089,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
             <span className="truncate">{t('adjustments.curves.pointCurve')}</span>
           </button>
           <button
+            aria-label={t('adjustments.curves.parametricCurve')}
             className={`flex h-7 min-w-0 flex-1 items-center justify-center gap-1 rounded px-2 text-[11px] font-medium transition-colors ${
               isParametricMode
                 ? 'bg-surface text-text-primary shadow-sm'
@@ -1062,6 +1123,26 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         >
           <RotateCcw aria-hidden="true" size={14} />
         </button>
+        {!isForMask && (
+          <button
+            aria-label={t('adjustments.curves.targetTool', { defaultValue: 'Targeted adjustment tool' })}
+            aria-pressed={activeDevelopTool === 'tone-curve'}
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded transition-colors ${
+              activeDevelopTool === 'tone-curve'
+                ? 'bg-accent text-white shadow-sm'
+                : 'text-text-secondary hover:bg-surface-secondary hover:text-text-primary'
+            }`}
+            data-testid="tone-curve-target-tool"
+            data-tone-curve-target-active={String(activeDevelopTool === 'tone-curve')}
+            data-tooltip={t('adjustments.curves.targetTool', { defaultValue: 'Targeted adjustment tool' })}
+            onClick={() => {
+              setUI({ activeDevelopTool: activeDevelopTool === 'tone-curve' ? null : 'tone-curve' });
+            }}
+            type="button"
+          >
+            <Target aria-hidden="true" size={14} />
+          </button>
+        )}
         <button
           aria-label={`${activeModeLabel} - ${t('settings.title')}`}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-text-secondary transition-colors hover:bg-surface-secondary hover:text-text-primary"
@@ -1077,6 +1158,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
         className="mb-1.5 grid grid-cols-4 rounded border border-editor-divider bg-surface-secondary p-0.5"
         role="group"
         aria-label={t('adjustments.curves.channelTitle', { channel: activeChannelLabel })}
+        data-testid="tone-curve-channel-switcher"
       >
         {CURVE_CHANNELS.map((channel) => {
           const selected = activeChannel === channel;
@@ -1085,6 +1167,7 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
           });
           return (
             <button
+              aria-label={channelLabel}
               key={channel}
               aria-pressed={selected}
               className={`flex h-7 min-w-0 items-center justify-center gap-1 rounded px-1 text-[11px] font-semibold transition-colors ${
@@ -1370,6 +1453,9 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
                     updateParametricValue('whiteLevel', value);
                   }}
                   onDragStateChange={onDragStateChange}
+                  onInteractionCancel={onInteractionCancel}
+                  onInteractionCommit={onInteractionCommit}
+                  onInteractionStart={onInteractionStart}
                 />
                 <AdjustmentSlider
                   density="compact"
@@ -1383,6 +1469,9 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
                     updateParametricValue('highlights', value);
                   }}
                   onDragStateChange={onDragStateChange}
+                  onInteractionCancel={onInteractionCancel}
+                  onInteractionCommit={onInteractionCommit}
+                  onInteractionStart={onInteractionStart}
                 />
                 <AdjustmentSlider
                   density="compact"
@@ -1396,6 +1485,9 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
                     updateParametricValue('lights', value);
                   }}
                   onDragStateChange={onDragStateChange}
+                  onInteractionCancel={onInteractionCancel}
+                  onInteractionCommit={onInteractionCommit}
+                  onInteractionStart={onInteractionStart}
                 />
                 <AdjustmentSlider
                   density="compact"
@@ -1409,6 +1501,9 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
                     updateParametricValue('darks', value);
                   }}
                   onDragStateChange={onDragStateChange}
+                  onInteractionCancel={onInteractionCancel}
+                  onInteractionCommit={onInteractionCommit}
+                  onInteractionStart={onInteractionStart}
                 />
                 <AdjustmentSlider
                   density="compact"
@@ -1422,6 +1517,9 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
                     updateParametricValue('shadows', value);
                   }}
                   onDragStateChange={onDragStateChange}
+                  onInteractionCancel={onInteractionCancel}
+                  onInteractionCommit={onInteractionCommit}
+                  onInteractionStart={onInteractionStart}
                 />
                 <AdjustmentSlider
                   density="compact"
@@ -1435,6 +1533,9 @@ function LegacyCurveGraph({ adjustments, setAdjustments, histogram, theme, onDra
                     updateParametricValue('blackLevel', value);
                   }}
                   onDragStateChange={onDragStateChange}
+                  onInteractionCancel={onInteractionCancel}
+                  onInteractionCommit={onInteractionCommit}
+                  onInteractionStart={onInteractionStart}
                 />
               </div>
             </div>

@@ -80,6 +80,7 @@ export const resolveViewerFooterRenderStatus = ({
 
 const toolHints: Record<Exclude<ViewerActiveTool, 'none'>, ViewerFooterToolHint> = {
   brush: { cancelHint: 'Esc', label: 'Paint the active mask', tool: 'brush' },
+  'color-mixer': { cancelHint: 'Esc', label: 'Drag vertically to adjust the sampled color', tool: 'color-mixer' },
   'compare-divider': { cancelHint: 'Esc', label: 'Drag to position the before/after divider', tool: 'compare-divider' },
   crop: { cancelHint: 'Esc', label: 'Drag to crop; Enter applies', tool: 'crop' },
   'focus-retouch': { cancelHint: 'Esc', label: 'Paint the focus source override', tool: 'focus-retouch' },
@@ -88,6 +89,7 @@ const toolHints: Record<Exclude<ViewerActiveTool, 'none'>, ViewerFooterToolHint>
   'point-color': { cancelHint: 'Esc', label: 'Click a color to create a Point Color sample', tool: 'point-color' },
   retouch: { cancelHint: 'Esc', label: 'Click to place the retouch source and target', tool: 'retouch' },
   straighten: { cancelHint: 'Esc', label: 'Drag along a horizon to straighten', tool: 'straighten' },
+  'tone-curve': { cancelHint: 'Esc', label: 'Click or drag a tone to target its curve region', tool: 'tone-curve' },
   'tone-equalizer': { cancelHint: 'Esc', label: 'Click or drag a tone to target its band', tool: 'tone-equalizer' },
   'white-balance': { cancelHint: 'Esc', label: 'Click a neutral area to set white balance', tool: 'white-balance' },
 };

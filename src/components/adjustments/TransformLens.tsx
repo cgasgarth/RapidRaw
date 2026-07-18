@@ -102,9 +102,10 @@ const copy = {
   profileIdle: 'Profile idle',
   profileNotFound: 'No profile',
   profileReady: 'Profile ready',
-  profileTca: 'Chromatic aberration',
+  profileTca: 'Remove Chromatic Aberration',
   profileVignette: 'Lens vignette',
   rotation: 'Rotation',
+  aspect: 'Aspect',
   scale: 'Scale',
   selectLens: 'Select lens',
   selectMaker: 'Select maker',
@@ -546,6 +547,7 @@ export default function TransformLens({
       data-commit-adjustment-revision={lensCorrectionCommitIdentity?.adjustmentRevision}
       data-commit-image-session={lensCorrectionCommitIdentity?.imageSessionId}
       data-commit-source-identity={lensCorrectionCommitIdentity?.sourceIdentity}
+      data-lens-detection-status={detectionStatus}
       data-testid="transform-lens-inspector"
     >
       {showTransform && (
@@ -564,7 +566,7 @@ export default function TransformLens({
             </span>
           </div>
           <div className="space-y-1.5 rounded border border-editor-border bg-editor-panel-well p-1.5">
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2" data-testid="transform-mode-row">
               <Dropdown
                 chrome="editor"
                 onChange={(mode) => {
@@ -739,6 +741,7 @@ export default function TransformLens({
                 updateAdjustment('transformVertical', Math.trunc(value));
               }}
               step={1}
+              testId="transform-vertical"
               value={adjustments.transformVertical}
             />
             <AdjustmentSlider
@@ -751,6 +754,7 @@ export default function TransformLens({
                 updateAdjustment('transformHorizontal', Math.trunc(value));
               }}
               step={1}
+              testId="transform-horizontal"
               value={adjustments.transformHorizontal}
             />
             <AdjustmentSlider
@@ -764,7 +768,22 @@ export default function TransformLens({
               }}
               step={0.1}
               suffix="°"
+              testId="transform-rotation"
               value={adjustments.transformRotate}
+            />
+            <AdjustmentSlider
+              density="compact"
+              label={copy.aspect}
+              max={100}
+              min={-100}
+              onDragStateChange={onDragStateChange}
+              onValueChange={(value) => {
+                updateAdjustment('transformAspect', Math.trunc(value));
+              }}
+              step={1}
+              suffix="%"
+              testId="transform-aspect"
+              value={adjustments.transformAspect}
             />
             <AdjustmentSlider
               density="compact"
@@ -778,6 +797,7 @@ export default function TransformLens({
               }}
               step={1}
               suffix="%"
+              testId="transform-scale"
               value={adjustments.transformScale}
             />
             <AdjustmentSlider
@@ -790,6 +810,7 @@ export default function TransformLens({
                 updateAdjustment('transformXOffset', Math.trunc(value));
               }}
               step={1}
+              testId="transform-x-offset"
               value={adjustments.transformXOffset}
             />
             <AdjustmentSlider
@@ -802,6 +823,7 @@ export default function TransformLens({
                 updateAdjustment('transformYOffset', Math.trunc(value));
               }}
               step={1}
+              testId="transform-y-offset"
               value={adjustments.transformYOffset}
             />
             <AdjustmentSlider
@@ -814,6 +836,7 @@ export default function TransformLens({
                 updateAdjustment('transformDistortion', Math.trunc(value));
               }}
               step={1}
+              testId="transform-distortion"
               value={adjustments.transformDistortion}
             />
           </div>
@@ -833,6 +856,7 @@ export default function TransformLens({
                   ? 'bg-editor-selected-quiet text-text-primary'
                   : 'bg-editor-panel text-text-secondary',
               )}
+              data-testid="lens-profile-status"
             >
               {detectionStatus === 'detecting' ? <Loader className="animate-spin" size={11} /> : <Aperture size={11} />}
               {detectionLabel}
@@ -924,6 +948,7 @@ export default function TransformLens({
                 checked={adjustments.lensTcaEnabled && availability.tca}
                 chrome="editor"
                 disabled={!availability.tca}
+                id="switch-remove-chromatic-aberration"
                 label={copy.profileTca}
                 onChange={(checked) => {
                   commitLensCorrectionAdjustment('lensTcaEnabled', checked);

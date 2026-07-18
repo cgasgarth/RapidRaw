@@ -1,8 +1,10 @@
 import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../packages/rawengine-schema/src/editDocumentV2';
 import type { ViewerPickerCommitResult } from '../components/panel/editor/viewerPickerInteractionControllers';
+import { applyColorMixerTargetedDelta } from './colorMixerTargetedAdjustment';
 import { selectEditDocumentNode } from './editDocumentSelectors';
 import type { EditTransactionRequest } from './editTransaction';
 import { buildPointColorEditTransaction } from './pointColorEditTransaction';
+import { buildSelectiveColorEditTransaction } from './selectiveColorEditTransaction';
 import { buildToneEqualizerEditTransaction } from './toneEqualizerEditTransaction';
 import { applyToneEqualizerPickerSelection, applyToneEqualizerTargetedDelta } from './toneEqualizerPicker';
 
@@ -91,6 +93,18 @@ export const buildViewerPickerEditTransaction = (
     imageSessionId: command.key.imageSessionId,
     sourceIdentity: command.key.sourceIdentity,
   };
+
+  if (command.kind === 'color-mixer') {
+    const currentSelective = selectEditDocumentNode(state.editDocumentV2, 'selective_color_mixer').params;
+    const baselineSelective = selectEditDocumentNode(command.baseline, 'selective_color_mixer').params;
+    if (JSON.stringify(currentSelective) !== JSON.stringify(baselineSelective))
+      rejectPicker('stale_color_mixer_baseline');
+    const nextSelective = applyColorMixerTargetedDelta(currentSelective, command.mode, command.bands, command.delta);
+    return {
+      ...buildSelectiveColorEditTransaction(state, identity, nextSelective, transactionId),
+      source: 'picker',
+    };
+  }
 
   if (command.kind === 'point-color') {
     if (

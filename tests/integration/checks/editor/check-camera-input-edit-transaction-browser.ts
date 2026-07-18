@@ -243,11 +243,13 @@ try {
   const adjustmentsPanelButton = page.getByTestId('right-panel-switcher-button-adjustments');
   if ((await adjustmentsPanelButton.getAttribute('aria-pressed')) !== 'true') await adjustmentsPanelButton.click();
   await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
-  const colorPanelButton = page.getByTestId('right-panel-switcher-button-color');
-  await colorPanelButton.click();
-  await page.getByTestId('color-workspace-tab-foundation').click();
-  const profileControls = page.getByTestId('profile-tone-controls');
-  const quickControls = page.getByTestId('quick-color-controls');
+  const basicSection = page.getByTestId('adjustments-section-basic');
+  await basicSection.waitFor({ timeout: 10_000 });
+  const basicToggle = basicSection.getByTestId('adjustments-section-basic-toggle');
+  if ((await basicToggle.getAttribute('aria-expanded')) !== 'true') await basicToggle.click();
+  const basicCameraInput = basicSection.getByTestId('basic-camera-input-controls');
+  const profileControls = basicCameraInput.getByTestId('profile-tone-controls');
+  const quickControls = basicCameraInput.getByTestId('quick-color-controls');
   await profileControls.waitFor({ timeout: 10_000 });
   await quickControls.waitFor({ timeout: 10_000 });
   const identity = await profileControls.evaluate((element) => ({
@@ -315,8 +317,8 @@ try {
   await page.locator(`[data-testid="filmstrip-thumbnail"][data-image-path="${sourcePath}"]`).click();
   await waitForSelectedSource(page, sourcePath);
   await waitForToolbarIdle(page);
-  if ((await colorPanelButton.getAttribute('aria-pressed')) !== 'true') await colorPanelButton.click();
-  await page.getByTestId('color-workspace-tab-foundation').click();
+  await basicSection.waitFor({ timeout: 10_000 });
+  if ((await basicToggle.getAttribute('aria-expanded')) !== 'true') await basicToggle.click();
 
   const presetBaselineSaves = (await calls(page, 'save_metadata_and_update_thumbnail')).length;
   await page.getByTestId('color-white-balance-mode').selectOption('preset');

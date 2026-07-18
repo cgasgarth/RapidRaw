@@ -29,6 +29,10 @@ const parseToneCurveId = (value: string): ToneCurveId =>
 interface ColorProfileToneControlsProps extends ColorPanelGroupProps {
   adjustmentVisibility: Record<string, boolean>;
   rawDevelopmentReport?: RawDevelopmentReport | null;
+  /** Basic owns the profile browser; Color keeps the tone-curve authority as an advanced control. */
+  showCameraProfile?: boolean;
+  /** Basic owns the familiar camera-input order; tone-curve stays in Color's advanced surface. */
+  showToneCurve?: boolean;
 }
 
 export const ColorProfileToneControls = ({
@@ -36,15 +40,18 @@ export const ColorProfileToneControls = ({
   adjustments,
   rawDevelopmentReport = null,
   setAdjustments,
+  showCameraProfile = true,
+  showToneCurve = true,
 }: ColorProfileToneControlsProps) => {
   const { t } = useTranslation();
   const { commitCameraInput, commitIdentity } = useCameraInputEditCommit();
   const profileRegistry = useCameraProfileRegistry(rawDevelopmentReport?.cameraProfile.cameraModel ?? null);
   const profileToneLabels = getProfileToneLabels(adjustments, t);
   const isModified =
-    adjustments.cameraProfile !== INITIAL_ADJUSTMENTS.cameraProfile ||
-    adjustments.cameraProfileAmount !== INITIAL_ADJUSTMENTS.cameraProfileAmount ||
-    adjustments.toneCurve !== INITIAL_ADJUSTMENTS.toneCurve;
+    (showCameraProfile &&
+      (adjustments.cameraProfile !== INITIAL_ADJUSTMENTS.cameraProfile ||
+        adjustments.cameraProfileAmount !== INITIAL_ADJUSTMENTS.cameraProfileAmount)) ||
+    (showToneCurve && adjustments.toneCurve !== INITIAL_ADJUSTMENTS.toneCurve);
   const cameraProfileOptions = useMemo(
     () =>
       [
@@ -102,8 +109,8 @@ export const ColorProfileToneControls = ({
   };
 
   if (
-    adjustmentVisibility[ColorAdjustment.CameraProfile] === false &&
-    adjustmentVisibility[ColorAdjustment.ToneCurve] === false
+    (!showCameraProfile || adjustmentVisibility[ColorAdjustment.CameraProfile] === false) &&
+    (!showToneCurve || adjustmentVisibility[ColorAdjustment.ToneCurve] === false)
   ) {
     return null;
   }
@@ -125,44 +132,58 @@ export const ColorProfileToneControls = ({
         summary={
           <span
             data-testid="profile-tone-summary"
-            title={`${profileToneLabels.activeCameraProfileLabel} / ${profileToneLabels.activeToneCurveLabel}`}
+            title={
+              showCameraProfile
+                ? `${profileToneLabels.activeCameraProfileLabel} / ${profileToneLabels.activeToneCurveLabel}`
+                : profileToneLabels.activeToneCurveLabel
+            }
           >
-            {profileToneLabels.activeCameraProfileLabel} / {profileToneLabels.activeToneCurveLabel}
+            {showCameraProfile
+              ? `${profileToneLabels.activeCameraProfileLabel} / ${profileToneLabels.activeToneCurveLabel}`
+              : profileToneLabels.activeToneCurveLabel}
           </span>
         }
-        title={t('adjustments.color.profileTone.foundationTitle')}
+        title={
+          showCameraProfile
+            ? t('adjustments.color.profileTone.foundationTitle')
+            : t('adjustments.color.profileTone.toneCurve')
+        }
       />
       <div className="space-y-1">
-        <div
-          className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-0.5 py-0.5"
-          data-testid="color-input-profile-identity"
-        >
-          <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
-            {t('adjustments.color.profileTone.inputTransform')}
-          </UiText>
-          <div className="min-w-0 text-right">
-            <UiText
-              as="span"
-              variant={TextVariants.label}
-              className={cx(
-                'inline-block max-w-full truncate text-[10px] leading-4',
-                runtimeProfileStatus === 'fallback' || runtimeProfileStatus === 'unavailable'
-                  ? 'text-editor-warning'
-                  : 'text-text-primary',
-              )}
-              data-testid="color-input-profile-status"
-              title={runtimeProfile?.fallbackReason ?? runtimeProfileLabel}
+        {showCameraProfile ? (
+          <>
+            <div
+              className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-0.5 py-0.5"
+              data-testid="color-input-profile-identity"
             >
-              {runtimeProfileLabel}
-            </UiText>
-            {runtimeProcessLabel && (
-              <UiText className="truncate text-[9px] leading-3 text-text-tertiary" title={runtimeProcessLabel}>
-                {runtimeProcessLabel}
+              <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
+                {t('adjustments.color.profileTone.inputTransform')}
               </UiText>
-            )}
-          </div>
-        </div>
-        {adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
+              <div className="min-w-0 text-right">
+                <UiText
+                  as="span"
+                  variant={TextVariants.label}
+                  className={cx(
+                    'inline-block max-w-full truncate text-[10px] leading-4',
+                    runtimeProfileStatus === 'fallback' || runtimeProfileStatus === 'unavailable'
+                      ? 'text-editor-warning'
+                      : 'text-text-primary',
+                  )}
+                  data-testid="color-input-profile-status"
+                  title={runtimeProfile?.fallbackReason ?? runtimeProfileLabel}
+                >
+                  {runtimeProfileLabel}
+                </UiText>
+                {runtimeProcessLabel && (
+                  <UiText className="truncate text-[9px] leading-3 text-text-tertiary" title={runtimeProcessLabel}>
+                    {runtimeProcessLabel}
+                  </UiText>
+                )}
+              </div>
+            </div>
+          </>
+        ) : null}
+        {showCameraProfile && adjustmentVisibility[ColorAdjustment.CameraProfile] !== false && (
           <div className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2">
             <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
               {t('adjustments.color.profileTone.profilePreset')}
@@ -183,7 +204,7 @@ export const ColorProfileToneControls = ({
             />
           </div>
         )}
-        {adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
+        {showToneCurve && adjustmentVisibility[ColorAdjustment.ToneCurve] !== false && (
           <label className="grid min-w-0 grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2">
             <UiText variant={TextVariants.label} className="truncate text-[10px] leading-4 text-text-secondary">
               {t('adjustments.color.profileTone.toneCurve')}

@@ -61,9 +61,11 @@ interface ColorPanelProps {
   isWbPickerActive?: boolean;
   toggleWbPicker?: () => void;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
+  /** Render one canonical Develop subsection without the workspace tab chrome. */
+  workspaceTab?: ColorWorkspaceTabId;
 }
 
-const COLOR_WORKSPACE_TAB_IDS = ['foundation', 'mixer', 'grading', 'output'] as const;
+const COLOR_WORKSPACE_TAB_IDS = ['foundation', 'point-color', 'mixer', 'grading', 'output'] as const;
 type ColorWorkspaceTabId = (typeof COLOR_WORKSPACE_TAB_IDS)[number];
 let sessionColorWorkspaceTab: ColorWorkspaceTabId = 'foundation';
 const COLOR_WORKSPACE_TAB_BASE_CLASS = professionalInspectorDensityTokens.workspaceNavigation.tab;
@@ -142,6 +144,7 @@ export default function ColorPanel({
   isWbPickerActive = false,
   toggleWbPicker,
   onDragStateChange,
+  workspaceTab,
 }: ColorPanelProps) {
   const { t } = useTranslation();
   const tablistId = useId();
@@ -187,7 +190,7 @@ export default function ColorPanel({
   const blackWhiteMixerRef = useRef(adjustments.blackWhiteMixer);
   blackWhiteMixerRef.current = adjustments.blackWhiteMixer;
   const commitBlackWhiteMixer = useCallback(
-    (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => {
+    (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings, interactionId?: string) => {
       const next = update(blackWhiteMixerRef.current);
       const identity = blackWhiteMixerCommitIdentityRef.current;
       if (isForMask || identity === null) {
@@ -196,7 +199,13 @@ export default function ColorPanel({
         return;
       }
       const result = applyEditTransaction(
-        buildBlackWhiteMixerEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+        buildBlackWhiteMixerEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          next,
+          interactionId ?? crypto.randomUUID(),
+          interactionId === undefined ? 'single-entry' : 'coalesced-interaction',
+        ),
       );
       blackWhiteMixerRef.current = next;
       blackWhiteMixerCommitIdentityRef.current = {
@@ -296,7 +305,7 @@ export default function ColorPanel({
     selectiveColorRangeControls: selectiveColorAdjustments.selectiveColorRangeControls,
   };
   const commitSelectiveColorMixer = useCallback(
-    (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings) => {
+    (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings, interactionId?: string) => {
       const next = update(selectiveColorMixerRef.current);
       const identity = selectiveColorCommitIdentityRef.current;
       if (isForMask) {
@@ -311,7 +320,13 @@ export default function ColorPanel({
       if (identity === null) return;
 
       const result = applyEditTransaction(
-        buildSelectiveColorEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+        buildSelectiveColorEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          next,
+          interactionId ?? crypto.randomUUID(),
+          interactionId === undefined ? 'single-entry' : 'coalesced-interaction',
+        ),
       );
       selectiveColorMixerRef.current = next;
       selectiveColorCommitIdentityRef.current = {
@@ -447,7 +462,7 @@ export default function ColorPanel({
         label: t('adjustments.color.workspaceTabs.foundation'),
         panel: (
           <div className="space-y-px" data-testid="color-foundation-controls">
-            {!isForMask && (
+            {!isForMask ? (
               <ColorProfileToneControls
                 adjustmentVisibility={adjustmentVisibility}
                 adjustments={adjustments}
@@ -455,8 +470,9 @@ export default function ColorPanel({
                 rawDevelopmentReport={selectedImage?.rawDevelopmentReport ?? null}
                 onDragStateChange={onDragStateChange}
                 setAdjustments={setAdjustments}
+                showCameraProfile={false}
               />
-            )}
+            ) : null}
             <ColorQuickControls
               adjustments={adjustments}
               appSettings={appSettings}
@@ -468,9 +484,24 @@ export default function ColorPanel({
               }
               onDragStateChange={onDragStateChange}
               setAdjustments={setAdjustments}
+              showPresence={false}
+              showWhiteBalance={isForMask}
               {...(toggleWbPicker ? { toggleWbPicker } : {})}
             />
           </div>
+        ),
+      },
+      {
+        id: 'point-color',
+        label: t('adjustments.color.workspaceTabs.pointColor'),
+        panel: (
+          <PointColorControls
+            adjustments={adjustments}
+            appSettings={appSettings}
+            isForMask={isForMask}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={setAdjustments}
+          />
         ),
       },
       {
@@ -478,13 +509,6 @@ export default function ColorPanel({
         label: t('adjustments.color.workspaceTabs.mixer'),
         panel: (
           <div className="space-y-1">
-            <PointColorControls
-              adjustments={adjustments}
-              appSettings={appSettings}
-              isForMask={isForMask}
-              onDragStateChange={onDragStateChange}
-              setAdjustments={setAdjustments}
-            />
             <ColorMixerControls
               activeChannelMixerOutput={activeChannelMixerOutput}
               activeColor={activeColor}
@@ -655,6 +679,14 @@ export default function ColorPanel({
     }
   };
 
+  if (workspaceTab !== undefined) {
+    return (
+      <div className="space-y-1" data-color-inspector-density="compact" data-color-workspace-scope={workspaceTab}>
+        {workspaceTabs.find((tab) => tab.id === workspaceTab)?.panel ?? null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1" data-color-inspector-density="compact">
       <div
@@ -703,19 +735,20 @@ export default function ColorPanel({
         </div>
       </div>
 
-      {workspaceTabs.map((tab) => (
-        <div
-          aria-labelledby={`${tablistId}-${tab.id}-tab`}
-          className="pb-0.5"
-          hidden={effectiveWorkspaceTab !== tab.id}
-          id={`${tablistId}-${tab.id}-panel`}
-          key={tab.id}
-          role="tabpanel"
-          data-testid={`color-workspace-tab-panel-${tab.id}`}
-        >
-          {tab.panel}
-        </div>
-      ))}
+      {workspaceTabs.map((tab) =>
+        effectiveWorkspaceTab === tab.id ? (
+          <div
+            aria-labelledby={`${tablistId}-${tab.id}-tab`}
+            className="pb-0.5"
+            id={`${tablistId}-${tab.id}-panel`}
+            key={tab.id}
+            role="tabpanel"
+            data-testid={`color-workspace-tab-panel-${tab.id}`}
+          >
+            {tab.panel}
+          </div>
+        ) : null,
+      )}
     </div>
   );
 }

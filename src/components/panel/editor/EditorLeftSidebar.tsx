@@ -22,7 +22,7 @@ type EditorLeftSidebarSlots = Partial<Record<EditorLeftSectionId, ReactNode>>;
 const EDITOR_LEFT_RESIZER_WIDTH = DEVELOP_SHELL_RESIZER_SIZE;
 
 interface EditorLeftSidebarProps {
-  expandedSections: readonly string[];
+  expandedSections: readonly EditorLeftSectionId[];
   hasMacWindowOverlay?: boolean;
   isFullScreen: boolean;
   isResizing: boolean;

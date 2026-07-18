@@ -1,9 +1,13 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "黒レベル",
       "brightness": "明るさ",
+      "clarity": "",
+      "color": "",
       "contrast": "コントラスト",
+      "dehaze": "",
       "evShift": "露出補正",
       "exposure": "露光量",
       "highlightRolloff": "ハイライトのロールオフ",
@@ -15,9 +19,12 @@
         "basicDesc": "標準トーンマッピング",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "リセット",
+      "saturation": "",
       "shadowRolloff": "シャドウのロールオフ",
       "shadows": "シャドウ",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -41,6 +48,8 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "トーンマッパー",
+      "treatment": "",
+      "vibrance": "",
       "viewContrast": "ビューコントラスト",
       "whites": "白レベル"
     },
@@ -191,9 +200,18 @@
       },
       "pointColor": {
         "addPoint": "",
+        "addPointHint": "",
         "deletePoint": "",
         "empty": "",
+        "name": "",
+        "nameInput": "",
+        "pickerHint": "",
+        "pickerReceipt": "",
         "pickFromImage": "",
+        "reset": "",
+        "resetAction": "",
+        "sampleConfidence": "",
+        "sampledRange": "",
         "samples": "",
         "visualize": ""
       },
@@ -269,6 +287,7 @@
         "title": "",
         "warning": ""
       },
+      "targetedAdjustment": "",
       "temperature": "色温度",
       "tint": "色かぶり補正",
       "toggleSliders": "スライダー切り替え",
@@ -293,10 +312,12 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "",
         "quick": "Quick"
       }
     },
     "curves": {
+      "advancedDomains": "",
       "channels": {
         "blue": "ブルー",
         "green": "グリーン",
@@ -324,6 +345,7 @@
       "resetAllPoint": "すべてのポイントカーブをリセット",
       "resetParametric": "{{channel}} パラメトリックカーブをリセット",
       "resetPoint": "{{channel}} ポイントカーブをリセット",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
@@ -335,10 +357,12 @@
         "outputTitle": "",
         "sceneAxis": "",
         "sceneTab": "",
-        "sceneTitle": ""
+        "sceneTitle": "",
+        "toneCurveTab": ""
       }
     },
     "details": {
+      "advanced": "Advanced",
       "altPreviewNoiseReduction": "",
       "altPreviewSharpening": "",
       "amount": "",
@@ -348,6 +372,7 @@
       "chromaticAberration": "色収差",
       "clarity": "明瞭度",
       "color": "カラー",
+      "colorNoiseReduction": "Color Noise Reduction",
       "contrastProtection": "コントラスト保護",
       "deblur": "",
       "deblurStatus": "",
@@ -361,18 +386,21 @@
       "localContrastStatus": "",
       "loupe": "",
       "luminance": "輝度",
+      "masking": "Masking",
       "midtoneMask": "",
       "minSpotRadius": "",
       "moveLoupeTarget": "",
       "naturalGrain": "自然な粒状感",
       "noiseReduction": "ノイズ低減",
       "presence": "外観",
+      "radius": "Radius",
       "redCyan": "レッド/シアン",
       "sensitivity": "",
       "shadowBias": "シャドウ優先",
       "sharpening": "シャープ",
       "sharpness": "シャープネス",
       "showDustOverlay": "",
+      "smoothness": "Smoothness",
       "structure": "構造",
       "threshold": "しきい値"
     },
@@ -384,8 +412,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "適用量",
       "creative": "クリエイティブ",
+      "disabled": "",
+      "enabled": "",
       "feather": "ぼかし",
       "filmLookBrowser": {
         "activeLook": "",
@@ -445,6 +476,7 @@
       "roughness": "粗さ",
       "roundness": "丸み",
       "size": "サイズ",
+      "title": "",
       "vignette": "周辺光量補正"
     },
     "perspective": {
@@ -687,6 +719,21 @@
         "action": "端点をリセット",
         "title": "クリッピングリスク"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "ピン留め",
         "unpin": "{{control}} のピン留めを解除"
@@ -747,13 +794,18 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "キャリブレーション",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
         "lensCorrection": "Lens Corrections",
+        "toneCurve": "",
         "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
@@ -770,7 +822,13 @@
         "details": "ディテール",
         "effects": "効果"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_other": "{{count}} 個のセクションを編集済み",
         "loadingImage": "画像プレビューを読み込み中"
       },
@@ -779,6 +837,9 @@
         "autoAdjust": "画像を自動補正",
         "resetAdjustments": "補正設定をリセット",
         "toggleAnalytics": "アナリティクス表示の切り替え"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {
@@ -1272,6 +1333,7 @@
         "flipHoriz": "画像を水平方向に反転",
         "flipVert": "画像を垂直方向に反転",
         "lens": "レンズ歪み補正",
+        "lockAspect": "",
         "overlayDetails": "ガイド: {{name}}{{rotateHint}}",
         "resetFineRotation": "微調整回転をリセット",
         "rotateHint": " (Shift+O で回転)",
@@ -1281,8 +1343,12 @@
         "switchOrientation": "縦横比の向きを切り替え",
         "switchToLandscape": "横向きに切り替え",
         "switchToPortrait": "縦向きに切り替え",
-        "transform": "遠近歪みとあおり補正"
+        "transform": "遠近歪みとあおり補正",
+        "unlockAspect": ""
       }
+    },
+    "developTools": {
+      "label": ""
     },
     "layers": {
       "actions": {

@@ -9,6 +9,8 @@ import { resolveEditorPreviewSource } from './editorImagePreviewSource';
 import type { EditorZoomMode } from './editorZoom';
 import { getEditorZoomDpr } from './editorZoom';
 import type { InteractivePreviewScope } from './interactivePreviewPatch';
+import type { PerceptualGradingSliderInteraction } from './perceptualGradingSliderInteraction';
+import { resolvePerceptualGradingSliderRenderSnapshot } from './perceptualGradingSliderInteraction';
 import {
   fingerprintPreviewGraphRevision,
   type PreviewSessionIdentity,
@@ -23,6 +25,8 @@ export interface PreviewRequestScopeInput {
   autoEditPreviewSession: AutoEditPreviewSession | null;
   baseRenderSize: BaseRenderSize;
   basicToneSliderInteraction: BasicToneSliderInteraction | null;
+  /** Optional for callers that construct a scope snapshot without interactive grading state. */
+  perceptualGradingSliderInteraction?: PerceptualGradingSliderInteraction | null;
   finalPreviewUrl: string | null;
   hasRenderedFirstFrame: boolean;
   imageSession: { id: string } | null;
@@ -72,12 +76,18 @@ export class PreviewRequestScopeAdapter {
       input.basicToneSliderInteraction,
       input,
     );
-    const renderSnapshot = resolveAutoEditRenderSnapshot(basicToneSnapshot, input.autoEditPreviewSession, {
+    const perceptualGradingSnapshot = resolvePerceptualGradingSliderRenderSnapshot(
+      basicToneSnapshot,
+      input.perceptualGradingSliderInteraction ?? null,
+      input,
+    );
+    const renderSnapshot = resolveAutoEditRenderSnapshot(perceptualGradingSnapshot, input.autoEditPreviewSession, {
       imageSessionId: input.imageSession?.id ?? null,
       path: sourceImagePath,
     });
-    const autoEditPreviewActive = renderSnapshot !== basicToneSnapshot;
+    const autoEditPreviewActive = renderSnapshot !== perceptualGradingSnapshot;
     const basicTonePreviewActive = basicToneSnapshot !== input.adjustmentSnapshot;
+    const perceptualGradingPreviewActive = perceptualGradingSnapshot !== basicToneSnapshot;
     const dpr = getEditorZoomDpr(devicePixelRatio);
     const normalizedTargetResolution = Math.max(1, Math.round(targetResolution));
     const viewport = this.viewport.snapshot({
@@ -116,11 +126,13 @@ export class PreviewRequestScopeAdapter {
         maskRevision: renderSnapshot.maskRevision,
         patchRevision: renderSnapshot.patchRevision,
         proofRevision: input.proofRevision,
-        proposalFingerprint: basicTonePreviewActive
-          ? (input.basicToneSliderInteraction?.interactionId ?? 'basic-tone-preview')
-          : autoEditPreviewActive
-            ? (input.autoEditPreviewSession?.previewIdentity ?? 'auto-edit-preview')
-            : (input.referenceMatchPreview?.proposalFingerprint ?? 'committed'),
+        proposalFingerprint: perceptualGradingPreviewActive
+          ? (input.perceptualGradingSliderInteraction?.interactionId ?? 'perceptual-grading-preview')
+          : basicTonePreviewActive
+            ? (input.basicToneSliderInteraction?.interactionId ?? 'basic-tone-preview')
+            : autoEditPreviewActive
+              ? (input.autoEditPreviewSession?.previewIdentity ?? 'auto-edit-preview')
+              : (input.referenceMatchPreview?.proposalFingerprint ?? 'committed'),
       }),
       imageSessionId: input.imageSessionId,
       maskRevision: renderSnapshot.maskRevision,

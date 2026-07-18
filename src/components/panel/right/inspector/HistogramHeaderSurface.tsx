@@ -11,7 +11,7 @@ import {
   Settings2,
   ShieldCheck,
 } from 'lucide-react';
-import type { KeyboardEventHandler, PointerEventHandler } from 'react';
+import type { KeyboardEventHandler, PointerEventHandler, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PanelScopesLayout, PreviewScopeStatus } from '../../../../store/useEditorStore';
 import { DisplayMode } from '../../../../utils/adjustments';
@@ -25,6 +25,7 @@ import Waveform, {
   formatClipPercent,
   type HistogramClippingSummary,
   type HistogramHoverSample,
+  type HistogramTonalZoneEditor,
   HistogramView,
 } from '../../editor/Waveform';
 
@@ -152,6 +153,7 @@ interface HistogramPlotFrameProps {
   retryLabel: string;
   stateLabel: string;
   testId: string;
+  tonalZoneEditor?: HistogramTonalZoneEditor;
   zoneLabel: string | null;
 }
 
@@ -169,6 +171,7 @@ function HistogramPlotFrame(props: HistogramPlotFrameProps) {
           onHoverSample={props.onHoverSample}
           showClippingReadouts={false}
           testId={`${props.testId}-histogram`}
+          {...(props.tonalZoneEditor === undefined ? {} : { tonalZoneEditor: props.tonalZoneEditor })}
         />
       )}
       <div className="pointer-events-none absolute inset-x-9 top-1.5 z-20 flex justify-center">
@@ -225,6 +228,7 @@ interface HistogramHeaderSurfaceProps extends HistogramPlotFrameProps {
   onToggleAdvanced: () => void;
   photoIdentity: string;
   photoSettings: string | null;
+  toolStrip?: ReactNode;
 }
 
 export function HistogramHeaderSurface({
@@ -232,6 +236,7 @@ export function HistogramHeaderSurface({
   onToggleAdvanced,
   photoIdentity,
   photoSettings,
+  toolStrip,
   ...plotProps
 }: HistogramHeaderSurfaceProps) {
   const { t } = useTranslation();
@@ -269,7 +274,9 @@ export function HistogramHeaderSurface({
           )}
         </button>
       </div>
-      <div data-develop-tool-strip-slot="true" data-testid={`${plotProps.testId}-tool-strip-mount`} />
+      <div data-develop-tool-strip-slot="true" data-testid={`${plotProps.testId}-tool-strip-mount`}>
+        {toolStrip}
+      </div>
     </div>
   );
 }

@@ -1414,6 +1414,10 @@ fn apply_point_color(color: vec3<f32>, settings: PointColorGpuSettings) -> vec3<
     var oklch = point_color_ap1_to_oklch(color);
     var visualization_weight = 0.0;
     for (var point_index = 0u; point_index < min(settings.control.x, 8u); point_index += 1u) {
+        if ((settings.control.y == 1u || settings.control.y == 2u) && settings.control.w > 0u &&
+            settings.control.w != point_index + 1u) {
+            continue;
+        }
         let point = settings.points[point_index];
         if (point.control.w < 0.5) { continue; }
         var membership = 0.0;

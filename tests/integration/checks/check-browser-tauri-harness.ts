@@ -3467,6 +3467,10 @@ try {
   await verifySceneCurveTransaction(page);
   await verifyColorCalibrationTransaction(page);
   await verifyViewerPickerControllers(page);
+  // Mixer controls live in the explicit Mixer workspace tab.  Do not rely on
+  // the session's last tab: CI and fresh installs correctly default to
+  // Foundation, which otherwise makes the mixer proof time out.
+  await page.getByTestId('color-workspace-tab-mixer').click();
   await verifyBlackWhiteMixerTransaction(page);
   await verifyChannelMixerTransaction(page);
   await verifyColorRangeLocalAdjustmentTransaction(page);
@@ -4736,7 +4740,18 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
   await page.getByTestId('right-panel-switcher-button-adjustments').click();
   await page.getByTestId('adjustments-inspector').waitFor({ state: 'visible', timeout: 10_000 });
   const toneAdvanced = page.getByTestId('tone-equalizer-advanced');
-  if (!(await toneAdvanced.isVisible())) await page.getByTestId('tone-equalizer-advanced-toggle').click();
+  if (!(await toneAdvanced.isVisible())) {
+    // Basic now owns a single collapsed Advanced disclosure around Tone Mapper
+    // and Tone Equalizer. Open that canonical disclosure before addressing the
+    // nested picker controls; retain the nested selector for already-open views.
+    const canonicalAdvancedToggle = page.getByTestId('basic-tone-advanced-toggle');
+    if (await canonicalAdvancedToggle.isVisible()) {
+      await canonicalAdvancedToggle.click();
+    } else {
+      await page.getByTestId('tone-equalizer-advanced-toggle').click();
+    }
+  }
+  await toneAdvanced.waitFor({ state: 'visible', timeout: 10_000 });
   const tonePicker = page.getByTestId('tone-equalizer-picker');
   await tonePicker.scrollIntoViewIfNeeded();
   await waitForStablePreview(page);
@@ -4765,7 +4780,7 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
   await tonePicker.click();
 
   await page.getByTestId('right-panel-switcher-button-color').click();
-  await page.getByTestId('color-workspace-tab-mixer').click();
+  await page.getByTestId('color-workspace-tab-point-color').click();
   const pointControls = page.getByTestId('point-color-controls');
   await pointControls.waitFor({ state: 'visible', timeout: 10_000 });
   const pointPicker = page.getByTestId('point-color-picker');
@@ -4799,6 +4814,9 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
 }
 
 async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
+  const advancedUtilities = page.getByTestId('advanced-utilities-disclosure');
+  if ((await advancedUtilities.getAttribute('open')) === null)
+    await advancedUtilities.locator('summary').first().click();
   const disclosure = page.getByTestId('black-white-mixer-disclosure');
   await disclosure.scrollIntoViewIfNeeded();
   if ((await disclosure.getAttribute('open')) === null) await disclosure.locator('summary').click();
@@ -4830,7 +4848,7 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
   }
   await toggle.click();
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'true',
+    () => document.querySelector('[data-testid="black-white-mix-controls"]') !== null,
     undefined,
     { timeout: 10_000 },
   );
@@ -4950,15 +4968,13 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
   await page.waitForFunction(
     () =>
       document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0' &&
-      document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'true',
+      document.querySelector('[data-testid="black-white-mix-controls"]') !== null,
     undefined,
     { timeout: 10_000 },
   );
   await undo.click();
   await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'false' &&
-      document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0',
+    () => document.querySelector('[data-testid="color-mixer-view-hsl"]')?.getAttribute('aria-checked') === 'true',
     undefined,
     { timeout: 10_000 },
   );

@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useCallback, useState } from 'react';
+import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -6,7 +6,11 @@ import { useWaveformControls } from '../../../../hooks/editor/useWaveformControl
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useSettingsStore } from '../../../../store/useSettingsStore';
 import { useUIStore } from '../../../../store/useUIStore';
-import { DisplayMode } from '../../../../utils/adjustments';
+import { type BasicAdjustment, DisplayMode } from '../../../../utils/adjustments';
+import {
+  type BasicToneCommitIdentity,
+  captureBasicToneCommitIdentity,
+} from '../../../../utils/basicToneEditTransaction';
 import {
   buildColorOutputProofingDiagnosticRow,
   buildColorOutputProofingDiagnostics,
@@ -15,9 +19,17 @@ import {
   getRenderedPreviewWarningStatus,
 } from '../../../../utils/color/runtime/gamutWarningDisplay';
 import { requestColorOutputFocus } from '../../../../utils/colorWorkspaceNavigation';
+import { selectEditDocumentNode } from '../../../../utils/editDocumentSelectors';
 import { PANEL_SCOPES_HEIGHT } from '../../../../utils/waveformSizing';
 import { type ExifData, Panel } from '../../../ui/AppProperties';
-import { getHistogramClippingSummary, type HistogramHoverSample } from '../../editor/Waveform';
+import {
+  getHistogramClippingSummary,
+  getHistogramTonalZoneConfig,
+  type HistogramHoverSample,
+  type HistogramTonalZone,
+  type HistogramTonalZoneEditor,
+} from '../../editor/Waveform';
+import DevelopToolStrip from './DevelopToolStrip';
 import {
   AdvancedScopesDrawer,
   type HistogramHeaderState,
@@ -26,6 +38,7 @@ import {
 } from './HistogramHeaderSurface';
 
 interface InspectorAnalyticsHeaderProps {
+  includeDevelopToolStrip?: boolean;
   testId: string;
 }
 
@@ -117,7 +130,10 @@ export const formatDevelopPhotoMetadata = (exif: ExifData | null): DevelopPhotoM
   return { camera, settings: settings || null };
 };
 
-export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsHeaderProps) {
+export default function InspectorAnalyticsHeader({
+  includeDevelopToolStrip = false,
+  testId,
+}: InspectorAnalyticsHeaderProps) {
   const { t } = useTranslation();
   const {
     handleWaveformResize,
@@ -138,6 +154,7 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
     exportSoftProofTransform,
     gamutWarningOverlay,
     histogram,
+    editDocumentV2,
     isExportSoftProofEnabled,
     isWaveformVisible,
     panelScopesLayout,
@@ -145,6 +162,7 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
     previewScopeRecoveryRequestId,
     previewScopeRecoveryState,
     selectedImage,
+    basicToneSliderInteraction,
     waveform,
     waveformHeight,
   } = useEditorStore(
@@ -156,6 +174,7 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
       exportSoftProofTransform: state.exportSoftProofTransform,
       gamutWarningOverlay: state.gamutWarningOverlay,
       histogram: state.histogram,
+      editDocumentV2: state.editDocumentV2,
       isExportSoftProofEnabled: state.isExportSoftProofEnabled,
       isWaveformVisible: state.isWaveformVisible,
       panelScopesLayout: state.panelScopesLayout,
@@ -163,6 +182,7 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
       previewScopeRecoveryRequestId: state.previewScopeRecoveryRequestId,
       previewScopeRecoveryState: state.previewScopeRecoveryState,
       selectedImage: state.selectedImage,
+      basicToneSliderInteraction: state.basicToneSliderInteraction,
       waveform: state.waveform,
       waveformHeight: state.waveformHeight,
     })),
@@ -199,6 +219,73 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
     recoveryState: previewScopeRecoveryState,
     scopeStatusPresent: previewScopeStatus !== null,
   });
+  const tonalInteractionRef = useRef<{
+    id: string;
+    identity: BasicToneCommitIdentity;
+    key: BasicAdjustment;
+    zone: HistogramTonalZone;
+  } | null>(null);
+  const tonalZoneValues = useMemo(() => {
+    const params = selectEditDocumentNode(editDocumentV2, 'scene_global_color_tone').params;
+    const values: Partial<Record<BasicAdjustment, number>> = { ...params };
+    const interaction = basicToneSliderInteraction;
+    if (interaction !== null) values[interaction.key] = interaction.latestValue;
+    return values;
+  }, [basicToneSliderInteraction, editDocumentV2]);
+  const cancelTonalInteraction = useCallback(() => {
+    const interaction = tonalInteractionRef.current;
+    if (interaction !== null) {
+      useEditorStore.getState().cancelBasicToneSliderInteraction(interaction.id);
+      tonalInteractionRef.current = null;
+    }
+  }, []);
+  const beginTonalInteraction = useCallback(
+    (zone: HistogramTonalZone) => {
+      if (analyticsState !== 'current') return;
+      const state = useEditorStore.getState();
+      if (state.basicToneSliderInteraction !== null) return;
+      const identity = captureBasicToneCommitIdentity(state);
+      if (identity === null) return;
+      const config = getHistogramTonalZoneConfig(zone);
+      const interactionId = crypto.randomUUID();
+      if (state.beginBasicToneSliderInteraction(identity, config.adjustment, interactionId)) {
+        tonalInteractionRef.current = { id: interactionId, identity, key: config.adjustment, zone };
+      }
+    },
+    [analyticsState],
+  );
+  const updateTonalInteraction = useCallback((zone: HistogramTonalZone, value: number) => {
+    const interaction = tonalInteractionRef.current;
+    const config = getHistogramTonalZoneConfig(zone);
+    if (interaction === null || interaction.zone !== zone || interaction.key !== config.adjustment) return;
+    useEditorStore.getState().updateBasicToneSliderInteraction(interaction.id, value);
+  }, []);
+  const commitTonalInteraction = useCallback((zone: HistogramTonalZone) => {
+    const interaction = tonalInteractionRef.current;
+    if (interaction === null || interaction.zone !== zone) return;
+    useEditorStore.getState().commitBasicToneSliderInteraction(interaction.id);
+    tonalInteractionRef.current = null;
+  }, []);
+  const resetTonalInteraction = useCallback(
+    (zone: HistogramTonalZone) => {
+      const config = getHistogramTonalZoneConfig(zone);
+      beginTonalInteraction(zone);
+      const interaction = tonalInteractionRef.current;
+      if (interaction === null || interaction.key !== config.adjustment) return;
+      useEditorStore.getState().updateBasicToneSliderInteraction(interaction.id, 0);
+      useEditorStore.getState().commitBasicToneSliderInteraction(interaction.id);
+      tonalInteractionRef.current = null;
+    },
+    [beginTonalInteraction],
+  );
+  useEffect(() => {
+    return () => cancelTonalInteraction();
+  }, [cancelTonalInteraction, selectedImage?.path]);
+  useEffect(() => {
+    if (tonalInteractionRef.current !== null && useEditorStore.getState().basicToneSliderInteraction === null) {
+      tonalInteractionRef.current = null;
+    }
+  }, [basicToneSliderInteraction]);
   const stateLabel = t(`ui.waveform.header.states.${analyticsState}`, {
     defaultValue: stateFallbacks[analyticsState],
   });
@@ -225,6 +312,27 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
   const proofLabel = isExportSoftProofEnabled
     ? t('ui.waveform.header.proofOn', { defaultValue: 'Proof on: {{coverage}}', coverage: proofStatus.coverageLabel })
     : t('ui.waveform.header.proofOff', { defaultValue: 'Proof off' });
+  const tonalZoneEditor = useMemo<HistogramTonalZoneEditor>(
+    () => ({
+      enabled: analyticsState === 'current' && selectedImage?.isReady === true,
+      onInteractionCancel: cancelTonalInteraction,
+      onInteractionChange: updateTonalInteraction,
+      onInteractionCommit: commitTonalInteraction,
+      onInteractionReset: resetTonalInteraction,
+      onInteractionStart: beginTonalInteraction,
+      values: tonalZoneValues,
+    }),
+    [
+      analyticsState,
+      beginTonalInteraction,
+      cancelTonalInteraction,
+      commitTonalInteraction,
+      resetTonalInteraction,
+      selectedImage?.isReady,
+      tonalZoneValues,
+      updateTonalInteraction,
+    ],
+  );
 
   const toggleClipping = useCallback(() => {
     if (analyticsState !== 'current') return;
@@ -302,6 +410,8 @@ export default function InspectorAnalyticsHeader({ testId }: InspectorAnalyticsH
         retryLabel={recoverScopesLabel}
         stateLabel={stateLabel}
         testId={testId}
+        tonalZoneEditor={tonalZoneEditor}
+        toolStrip={includeDevelopToolStrip ? <DevelopToolStrip /> : undefined}
         zoneLabel={zoneLabel}
       />
       <AdvancedScopesDrawer

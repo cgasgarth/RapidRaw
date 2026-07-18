@@ -1,12 +1,20 @@
 import cx from 'clsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { EditDocumentNodeParamsV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import type { EditDocumentNodeParamsV2, EditDocumentV2 } from '../../../packages/rawengine-schema/src/editDocumentV2';
+import { useEditorActions } from '../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { type BasicToneCommitIdentity, buildBasicToneEditTransaction } from '../../utils/basicToneEditTransaction';
+import type { DetailCommitIdentity } from '../../utils/detailEditTransaction';
+import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
+import {
+  type EditNodeOperation,
+  type EditTransactionRequest,
+  reduceEditTransaction,
+} from '../../utils/editTransaction';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import {
   buildToneEqualizerEditTransaction,
@@ -17,10 +25,15 @@ import type { AppSettings } from '../ui/AppProperties';
 import { compactInspectorSliderTokens } from '../ui/inspectorTokens';
 import InspectorSegmentedControl from '../ui/primitives/InspectorSegmentedControl';
 import AdjustmentSlider from './AdjustmentSlider';
+import { ColorProfileToneControls } from './color/ColorProfileToneControls';
+import { ColorQuickControls } from './color/ColorQuickControls';
+import type { ColorPanelAdjustmentView } from './color/types';
 
 export type BasicAdjustmentView = EditDocumentNodeParamsV2<'scene_global_color_tone'> &
   EditDocumentNodeParamsV2<'scene_to_view_transform'> &
-  EditDocumentNodeParamsV2<'tone_equalizer'>;
+  EditDocumentNodeParamsV2<'tone_equalizer'> &
+  Partial<EditDocumentNodeParamsV2<'detail_denoise_dehaze'>> &
+  Partial<EditDocumentNodeParamsV2<'color_presence'>>;
 export type BasicAdjustmentUpdate = Partial<BasicAdjustmentView> | ((prev: BasicAdjustmentView) => BasicAdjustmentView);
 
 interface BasicAdjustmentsProps {
@@ -29,14 +42,51 @@ interface BasicAdjustmentsProps {
   isForMask?: boolean;
   onRequireEditGraphV2?: () => void;
   onDragStateChange?: ((isDragging: boolean) => void) | undefined;
-  appSettings?: Pick<AppSettings, 'tonemapperOverrideEnabled'> | null;
+  appSettings?: Pick<AppSettings, 'adjustmentVisibility' | 'tonemapperOverrideEnabled' | 'useWgpuRenderer'> | null;
+  cameraInputAdjustments?: ColorPanelAdjustmentView;
+  isWbPickerActive?: boolean;
+  toggleWbPicker?: () => void;
+  onAutoAdjust?: (() => void) | undefined;
+  autoAdjustDisabled?: boolean;
+  autoAdjustStatus?: 'idle' | 'busy' | 'error' | undefined;
 }
 
 interface ToneMapperSwitchProps {
   selectedMapper: BasicAdjustmentView['toneMapper'];
   onMapperChange: (mapper: BasicAdjustmentView['toneMapper']) => void;
   onReset: () => void;
+  disabled?: boolean;
 }
+
+interface BasicTreatmentProps {
+  enabled: boolean;
+  onChange: (enabled: boolean) => void;
+}
+
+const BasicTreatment = ({ enabled, onChange }: BasicTreatmentProps) => {
+  const { t } = useTranslation();
+  const treatmentLabel = t('adjustments.basic.treatment', { defaultValue: 'Treatment' });
+  return (
+    <section
+      className="border-b border-editor-border pb-1.5"
+      data-testid="basic-treatment"
+      data-treatment={enabled ? 'black_and_white' : 'color'}
+    >
+      <div className="grid grid-cols-[5.75rem_minmax(0,1fr)] items-center gap-2 px-0.5 py-0.5">
+        <span className="truncate text-[10px] leading-4 text-text-secondary">{treatmentLabel}</span>
+        <InspectorSegmentedControl
+          ariaLabel={treatmentLabel}
+          onChange={(value) => onChange(value === 'black_and_white')}
+          options={[
+            { label: t('adjustments.basic.color', { defaultValue: 'Color' }), value: 'color' },
+            { label: t('adjustments.basic.blackAndWhite', { defaultValue: 'B&W' }), value: 'black_and_white' },
+          ]}
+          value={enabled ? 'black_and_white' : 'color'}
+        />
+      </div>
+    </section>
+  );
+};
 
 type AdjustmentUpdate = BasicAdjustmentUpdate;
 
@@ -50,7 +100,73 @@ const TONE_CONTROL_ORDER = [
   BasicAdjustment.Blacks,
 ] as const;
 
-const ToneMapperSwitch = ({ selectedMapper, onMapperChange, onReset }: ToneMapperSwitchProps) => {
+const PRESENCE_CONTROL_ORDER = ['texture', 'clarity', 'dehaze', 'vibrance', 'saturation'] as const;
+type PresenceControl = (typeof PRESENCE_CONTROL_ORDER)[number];
+type PresenceAdjustmentKey = 'structure' | 'clarity' | 'dehaze' | 'vibrance' | 'saturation';
+
+const PRESENCE_CONTROL_KEYS: Record<PresenceControl, PresenceAdjustmentKey> = {
+  texture: 'structure',
+  clarity: 'clarity',
+  dehaze: 'dehaze',
+  vibrance: 'vibrance',
+  saturation: 'saturation',
+};
+
+type PresenceSliderInteraction = {
+  baseEditDocumentV2: EditDocumentV2;
+  identity: DetailCommitIdentity;
+  interactionId: string;
+  key: PresenceAdjustmentKey;
+  latestValue: number;
+};
+
+const isColorPresenceAdjustment = (key: PresenceAdjustmentKey): key is 'vibrance' | 'saturation' =>
+  key === 'vibrance' || key === 'saturation';
+
+const buildPresenceNodeOperation = (key: PresenceAdjustmentKey, value: number): EditNodeOperation =>
+  isColorPresenceAdjustment(key)
+    ? { nodeType: 'color_presence', patch: { [key]: value }, type: 'patch-edit-document-node' }
+    : { nodeType: 'detail_denoise_dehaze', patch: { [key]: value }, type: 'patch-edit-document-node' };
+
+const buildPresenceEditTransaction = (
+  state: {
+    adjustmentRevision: number;
+    editDocumentV2: EditDocumentV2;
+    imageSession: { id: string } | null;
+    imageSessionId: number;
+    selectedImage: { path: string } | null;
+  },
+  identity: DetailCommitIdentity,
+  key: PresenceAdjustmentKey,
+  value: number,
+  transactionId: string,
+  history: EditTransactionRequest['history'],
+  persistence: EditTransactionRequest['persistence'],
+): EditTransactionRequest => {
+  const currentImageSessionId = state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`;
+  if (state.selectedImage?.path !== identity.sourceIdentity) {
+    throw new Error(`basic_presence_transaction.stale_source:${identity.sourceIdentity}`);
+  }
+  if (currentImageSessionId !== identity.imageSessionId) {
+    throw new Error(`basic_presence_transaction.stale_session:${identity.imageSessionId}`);
+  }
+  if (state.adjustmentRevision !== identity.adjustmentRevision) {
+    throw new Error(
+      `basic_presence_transaction.stale_revision:${String(identity.adjustmentRevision)}:${String(state.adjustmentRevision)}`,
+    );
+  }
+  return {
+    baseAdjustmentRevision: identity.adjustmentRevision,
+    history,
+    imageSessionId: identity.imageSessionId,
+    operations: [buildPresenceNodeOperation(key, value)],
+    persistence,
+    source: 'manual-control',
+    transactionId,
+  };
+};
+
+const ToneMapperSwitch = ({ selectedMapper, onMapperChange, onReset, disabled = false }: ToneMapperSwitchProps) => {
   const { t } = useTranslation();
   const [isLabelHovered, setIsLabelHovered] = useState(false);
   const isModified = selectedMapper !== INITIAL_ADJUSTMENTS.toneMapper;
@@ -74,7 +190,11 @@ const ToneMapperSwitch = ({ selectedMapper, onMapperChange, onReset }: ToneMappe
 
   return (
     <div
-      className={cx(compactInspectorSliderTokens.root, 'mb-0.5 max-[319px]:grid-cols-[minmax(0,1fr)_3.5rem]')}
+      className={cx(
+        compactInspectorSliderTokens.root,
+        'mb-0.5 max-[319px]:grid-cols-[minmax(0,1fr)_3.5rem]',
+        disabled && 'opacity-65',
+      )}
       data-modified={String(isModified)}
       data-testid="basic-tone-mapper"
     >
@@ -91,6 +211,7 @@ const ToneMapperSwitch = ({ selectedMapper, onMapperChange, onReset }: ToneMappe
           setIsLabelHovered(false);
         }}
         type="button"
+        disabled={disabled}
       >
         <span
           aria-hidden={isLabelHovered}
@@ -124,8 +245,15 @@ export default function BasicAdjustments({
   onRequireEditGraphV2,
   onDragStateChange,
   appSettings,
+  cameraInputAdjustments,
+  isWbPickerActive = false,
+  toggleWbPicker,
+  onAutoAdjust,
+  autoAdjustDisabled = false,
+  autoAdjustStatus = 'idle',
 }: BasicAdjustmentsProps) {
   const { t } = useTranslation();
+  const { commitEditNodeOperations } = useEditorActions();
   const [toneAdvancedOpen, setToneAdvancedOpen] = useState(false);
   const [tonePlacementStatus, setTonePlacementStatus] = useState<string | null>(null);
   const [toneHistogram, setToneHistogram] = useState<number[]>([]);
@@ -142,6 +270,9 @@ export default function BasicAdjustments({
     (state) => state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
   );
   const selectedImagePath = useEditorStore((state) => state.selectedImage?.path ?? null);
+  const selectedRawDevelopmentReport = useEditorStore((state) => state.selectedImage?.rawDevelopmentReport ?? null);
+  const isWgpuEnabled = appSettings?.useWgpuRenderer !== false;
+  const selectedImageReady = useEditorStore((state) => state.selectedImage?.isReady ?? false);
   const basicToneCommitIdentity = useMemo<BasicToneCommitIdentity | null>(
     () =>
       !isForMask && selectedImagePath !== null
@@ -151,7 +282,17 @@ export default function BasicAdjustments({
   );
   const basicToneCommitIdentityRef = useRef(basicToneCommitIdentity);
   basicToneCommitIdentityRef.current = basicToneCommitIdentity;
+  const detailCommitIdentity = useMemo<DetailCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const detailCommitIdentityRef = useRef(detailCommitIdentity);
+  detailCommitIdentityRef.current = detailCommitIdentity;
   const basicToneSliderInteractionIdsRef = useRef<Partial<Record<BasicAdjustment, string>>>({});
+  const presenceSliderInteractionsRef = useRef<Partial<Record<PresenceControl, PresenceSliderInteraction>>>({});
   const tonePlacementRequestGenerationRef = useRef(0);
   const toneHistogramPath = useMemo(() => {
     if (toneHistogram.length === 0) return '';
@@ -183,6 +324,114 @@ export default function BasicAdjustments({
       return;
     }
     setAdjustments((prev: BasicAdjustmentView) => ({ ...prev, [key]: value }));
+  };
+
+  const beginPresenceSliderInteraction = (control: PresenceControl) => {
+    if (isForMask) {
+      onDragStateChange?.(true);
+      return;
+    }
+    if (presenceSliderInteractionsRef.current[control] !== undefined) return;
+    const identity = detailCommitIdentityRef.current;
+    if (identity === null) return;
+    const key = PRESENCE_CONTROL_KEYS[control];
+    const state = useEditorStore.getState();
+    const currentValue = isColorPresenceAdjustment(key)
+      ? selectEditDocumentNode(state.editDocumentV2, 'color_presence').params[key]
+      : selectEditDocumentNode(state.editDocumentV2, 'detail_denoise_dehaze').params[key];
+    presenceSliderInteractionsRef.current[control] = {
+      baseEditDocumentV2: structuredClone(state.editDocumentV2),
+      identity,
+      interactionId: crypto.randomUUID(),
+      key,
+      latestValue: currentValue,
+    };
+    state.setEditor({ isSliderDragging: true });
+  };
+
+  const updatePresenceSliderInteraction = (control: PresenceControl, value: number) => {
+    const nextValue = Math.trunc(value);
+    const interaction = presenceSliderInteractionsRef.current[control];
+    if (interaction === undefined) {
+      const identity = detailCommitIdentityRef.current;
+      if (identity === null || isForMask) {
+        setAdjustments((prev: BasicAdjustmentView) => ({ ...prev, [PRESENCE_CONTROL_KEYS[control]]: nextValue }));
+        return;
+      }
+      const result = applyEditTransaction(
+        buildPresenceEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          PRESENCE_CONTROL_KEYS[control],
+          nextValue,
+          crypto.randomUUID(),
+          'single-entry',
+          'commit',
+        ),
+      );
+      detailCommitIdentityRef.current = { ...identity, adjustmentRevision: result.nextAdjustmentRevision };
+      return;
+    }
+    interaction.latestValue = nextValue;
+    const preview = reduceEditTransaction(
+      interaction.baseEditDocumentV2,
+      interaction.identity.adjustmentRevision,
+      buildPresenceEditTransaction(
+        useEditorStore.getState(),
+        interaction.identity,
+        interaction.key,
+        nextValue,
+        interaction.interactionId,
+        'none',
+        'preview-only',
+      ),
+      interaction.identity.imageSessionId,
+    );
+    useEditorStore.getState().publishWhiteBalancePickerPreview(preview.after);
+  };
+
+  const commitPresenceSliderInteraction = (control: PresenceControl) => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interaction = presenceSliderInteractionsRef.current[control];
+    if (interaction === undefined) return;
+    delete presenceSliderInteractionsRef.current[control];
+    try {
+      useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+      const result = applyEditTransaction(
+        buildPresenceEditTransaction(
+          useEditorStore.getState(),
+          interaction.identity,
+          interaction.key,
+          interaction.latestValue,
+          interaction.interactionId,
+          'single-entry',
+          'commit',
+        ),
+      );
+      detailCommitIdentityRef.current = {
+        ...interaction.identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+    } catch {
+      useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+    } finally {
+      useEditorStore.getState().setEditor({ isSliderDragging: false });
+    }
+  };
+
+  const cancelPresenceSliderInteraction = (control: PresenceControl) => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interaction = presenceSliderInteractionsRef.current[control];
+    if (interaction === undefined) return;
+    delete presenceSliderInteractionsRef.current[control];
+    useEditorStore.getState().publishWhiteBalancePickerPreview(interaction.baseEditDocumentV2);
+    useEditorStore.getState().setEditor({ isSliderDragging: false });
   };
 
   const beginBasicSliderInteraction = (key: BasicAdjustment) => {
@@ -232,6 +481,10 @@ export default function BasicAdjustments({
         if (interactionId !== undefined) cancelBasicToneSliderInteraction(interactionId);
       }
       basicToneSliderInteractionIdsRef.current = {};
+      for (const control of Object.keys(presenceSliderInteractionsRef.current) as PresenceControl[]) {
+        cancelPresenceSliderInteraction(control);
+      }
+      presenceSliderInteractionsRef.current = {};
     },
     [adjustmentRevision, cancelBasicToneSliderInteraction, imageSessionId, selectedImagePath],
   );
@@ -255,6 +508,19 @@ export default function BasicAdjustments({
       ...prev,
       viewTransform: { ...prev.viewTransform, [key]: value },
     }));
+  };
+
+  const handleTreatmentChange = (enabled: boolean) => {
+    if (isForMask || cameraInputAdjustments === undefined) return;
+    const current = selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'black_white_mixer').params;
+    if (current.blackWhiteMixer.enabled === enabled) return;
+    commitEditNodeOperations([
+      {
+        nodeType: 'black_white_mixer',
+        patch: { blackWhiteMixer: { ...current.blackWhiteMixer, enabled } },
+        type: 'patch-edit-document-node',
+      },
+    ]);
   };
 
   const commitToneEqualizerAtIdentity = (
@@ -364,9 +630,11 @@ export default function BasicAdjustments({
     }
   };
 
+  const toneControlsUnavailable = !isForMask && (basicToneCommitIdentity === null || !selectedImageReady);
   const renderSlider = (key: BasicAdjustment, label: string, range: { max: number; min: number; step: number }) => (
     <AdjustmentSlider
       defaultValue={INITIAL_ADJUSTMENTS[key]}
+      disabled={toneControlsUnavailable}
       density="compact"
       label={label}
       max={range.max}
@@ -382,6 +650,32 @@ export default function BasicAdjustments({
       value={adjustments[key]}
     />
   );
+
+  const renderPresenceSlider = (control: PresenceControl, label: string) => {
+    const key = PRESENCE_CONTROL_KEYS[control];
+    const value = adjustments[key] ?? 0;
+    const isUnavailable = !isForMask && (detailCommitIdentity === null || !selectedImageReady);
+    return (
+      <AdjustmentSlider
+        defaultValue={0}
+        disabled={isUnavailable}
+        density="compact"
+        label={label}
+        max={100}
+        min={-100}
+        onDragStateChange={onDragStateChange}
+        onInteractionCancel={() => cancelPresenceSliderInteraction(control)}
+        onInteractionCommit={() => commitPresenceSliderInteraction(control)}
+        onInteractionStart={() => beginPresenceSliderInteraction(control)}
+        onValueChange={(nextValue) => {
+          updatePresenceSliderInteraction(control, nextValue);
+        }}
+        step={1}
+        testId={`basic-presence-control-${control}`}
+        value={value}
+      />
+    );
+  };
 
   const hideToneMapper = isForMask || appSettings?.tonemapperOverrideEnabled;
   const toneLabels: Record<(typeof TONE_CONTROL_ORDER)[number], string> = {
@@ -400,223 +694,319 @@ export default function BasicAdjustments({
       data-commit-source-identity={basicToneCommitIdentity?.sourceIdentity}
       data-testid="basic-light-controls"
     >
-      {!hideToneMapper && (
-        <ToneMapperSwitch
-          selectedMapper={adjustments.toneMapper}
-          onMapperChange={handleToneMapperChange}
-          onReset={handleToneMapperReset}
-        />
-      )}
-
-      {!hideToneMapper && adjustments.toneMapper === 'rapidView' ? (
-        <div className="border-b border-editor-divider pb-1" data-testid="rapid-view-controls">
-          <AdjustmentSlider
-            defaultValue={INITIAL_ADJUSTMENTS.viewTransform.contrast}
-            density="compact"
-            label={t('adjustments.basic.viewContrast')}
-            max={2}
-            min={0.5}
-            onValueChange={(value) => handleViewSettingChange('contrast', value)}
-            step={0.01}
-            testId="rapid-view-contrast"
-            value={adjustments.viewTransform.contrast}
+      {!isForMask && cameraInputAdjustments ? (
+        <div className="space-y-px" data-testid="basic-camera-input-controls">
+          <BasicTreatment enabled={cameraInputAdjustments.blackWhiteMixer.enabled} onChange={handleTreatmentChange} />
+          <ColorProfileToneControls
+            adjustmentVisibility={appSettings?.adjustmentVisibility ?? {}}
+            adjustments={cameraInputAdjustments}
+            appSettings={null}
+            rawDevelopmentReport={selectedRawDevelopmentReport}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={() => undefined}
+            showToneCurve={false}
           />
-          <AdjustmentSlider
-            defaultValue={INITIAL_ADJUSTMENTS.viewTransform.shoulder}
-            density="compact"
-            label={t('adjustments.basic.highlightRolloff')}
-            max={1}
-            min={0}
-            onValueChange={(value) => handleViewSettingChange('shoulder', value)}
-            step={0.01}
-            testId="rapid-view-shoulder"
-            value={adjustments.viewTransform.shoulder}
-          />
-          <AdjustmentSlider
-            defaultValue={INITIAL_ADJUSTMENTS.viewTransform.toe}
-            density="compact"
-            label={t('adjustments.basic.shadowRolloff')}
-            max={1}
-            min={0}
-            onValueChange={(value) => handleViewSettingChange('toe', value)}
-            step={0.01}
-            testId="rapid-view-toe"
-            value={adjustments.viewTransform.toe}
+          <ColorQuickControls
+            adjustments={cameraInputAdjustments}
+            appSettings={null}
+            isForMask={false}
+            isWbPickerActive={isWbPickerActive}
+            isWgpuEnabled={isWgpuEnabled}
+            inputSemantics={selectedRawDevelopmentReport ? 'raw_scene_linear' : 'rendered_scene_linear_approximation'}
+            onDragStateChange={onDragStateChange}
+            setAdjustments={() => undefined}
+            showPresence={false}
+            {...(toggleWbPicker ? { toggleWbPicker } : {})}
           />
         </div>
       ) : null}
 
-      {renderSlider(BasicAdjustment.Exposure, t('adjustments.basic.evShift'), {
-        max: 5,
-        min: -5,
-        step: 0.01,
-      })}
-
-      {TONE_CONTROL_ORDER.map((key) => (
-        <div key={key}>{renderSlider(key, toneLabels[key], { max: 100, min: -100, step: 1 })}</div>
-      ))}
-
-      {!isForMask || adjustments.toneEqualizer ? (
-        <div className="mt-1 border-t border-editor-divider pt-1" data-testid="tone-equalizer-panel">
-          <div className="flex items-center justify-between gap-2 px-1 py-1">
+      <section className="space-y-px" data-testid="basic-tone-section">
+        <div className="flex min-h-6 items-center justify-between gap-2 border-b border-editor-divider pb-0.5">
+          <span className="px-1 text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary">
+            {t('modals.copyPaste.groups.tone')}
+          </span>
+          {!isForMask ? (
             <button
-              className="min-w-0 truncate text-left text-xs text-editor-text"
-              data-testid="tone-equalizer-advanced-toggle"
-              onClick={() => setToneAdvancedOpen((open) => !open)}
+              aria-busy={autoAdjustStatus === 'busy'}
+              className="rounded border border-editor-divider px-1.5 py-0.5 text-[10px] font-medium text-editor-text transition-colors hover:bg-editor-selected-quiet focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring disabled:cursor-not-allowed disabled:opacity-50"
+              data-testid="basic-tone-auto"
+              disabled={autoAdjustDisabled || onAutoAdjust === undefined}
+              onClick={() => onAutoAdjust?.()}
               type="button"
             >
-              {t('adjustments.basic.toneEqualizer.title')} {toneAdvancedOpen ? '▾' : '▸'}
+              {t('adjustments.color.auto', { defaultValue: 'Auto' })}
             </button>
-            <button
-              className="rounded border border-editor-divider px-1.5 py-0.5 text-[10px] text-editor-text"
-              data-testid="tone-equalizer-enable"
-              onClick={() => updateToneEqualizer({ enabled: !adjustments.toneEqualizer.enabled })}
-              type="button"
-            >
-              {adjustments.toneEqualizer.enabled
-                ? t('adjustments.basic.toneEqualizer.on')
-                : t('adjustments.basic.toneEqualizer.enable')}
-            </button>
-          </div>
-          {toneAdvancedOpen ? (
-            <div className="space-y-px" data-testid="tone-equalizer-advanced">
-              <div className="grid grid-cols-3 gap-1 px-1 pb-1">
-                <button
-                  className="rounded border border-editor-divider px-1 py-0.5 text-[10px] text-editor-text"
-                  data-testid="tone-equalizer-auto-place"
-                  onClick={() => void autoPlaceToneEqualizer()}
-                  type="button"
-                >
-                  {t('adjustments.basic.toneEqualizer.autoPlace')}
-                </button>
-                {!isForMask ? (
-                  <button
-                    aria-pressed={toneEqualizerPickerActive}
-                    className="rounded border border-editor-divider px-1 py-0.5 text-[10px] text-editor-text aria-pressed:bg-editor-accent/20"
-                    data-testid="tone-equalizer-picker"
-                    onClick={() =>
-                      setUI({
-                        toneEqualizerPickerActive: !toneEqualizerPickerActive,
-                        toneEqualizerPickerReceipt: null,
-                      })
-                    }
-                    type="button"
-                  >
-                    {t('adjustments.basic.toneEqualizer.pickZone')}
-                  </button>
-                ) : null}
-                <button
-                  className="rounded border border-editor-divider px-1 py-0.5 text-[10px] text-editor-text"
-                  onClick={() => updateToneEqualizer(structuredClone(INITIAL_ADJUSTMENTS.toneEqualizer))}
-                  type="button"
-                >
-                  {t('adjustments.basic.toneEqualizer.resetZones')}
-                </button>
-              </div>
-              {tonePlacementStatus ? (
-                <p className="px-1 text-[10px] text-editor-text-muted">{tonePlacementStatus}</p>
-              ) : null}
-              {toneEqualizerPickerReceipt?.sourceIdentity === selectedImagePath ? (
-                <p className="px-1 text-[10px] text-editor-text-muted" data-testid="tone-equalizer-picker-receipt">
-                  {t('adjustments.basic.toneEqualizer.pickerReceipt', {
-                    band: toneEqualizerPickerReceipt.primaryBand + 1,
-                    ev: toneEqualizerPickerReceipt.exposureEv.toFixed(2),
-                  })}
-                </p>
-              ) : null}
-              {toneHistogram.length > 0 ? (
-                <svg
-                  aria-label={t('adjustments.basic.toneEqualizer.histogram')}
-                  className="h-8 w-full px-1 text-editor-text-muted/45"
-                  data-testid="tone-equalizer-histogram"
-                  preserveAspectRatio="none"
-                  role="img"
-                  viewBox="0 0 320 32"
-                >
-                  <path d={toneHistogramPath} fill="currentColor" />
-                </svg>
-              ) : null}
-              {adjustments.toneEqualizer.bandEv.map((value, index) => (
-                <AdjustmentSlider
-                  defaultValue={0}
-                  density="compact"
-                  key={TONE_ZONE_LABELS[index]}
-                  label={TONE_ZONE_LABELS[index] ?? `${index}`}
-                  max={4}
-                  min={-4}
-                  onDragStateChange={onDragStateChange}
-                  onValueChange={(next) => updateToneBand(index, next)}
-                  step={0.05}
-                  testId={`tone-equalizer-band-${index}`}
-                  value={value}
-                />
-              ))}
-              <AdjustmentSlider
-                defaultValue={INITIAL_ADJUSTMENTS.toneEqualizer.detailPreservation}
-                density="compact"
-                label={t('adjustments.basic.toneEqualizer.detailPreservation')}
-                max={1}
-                min={0}
-                onValueChange={(value) => updateToneEqualizer({ detailPreservation: value })}
-                step={0.01}
-                testId="tone-equalizer-detail"
-                value={adjustments.toneEqualizer.detailPreservation}
-              />
-              <AdjustmentSlider
-                defaultValue={INITIAL_ADJUSTMENTS.toneEqualizer.edgeRefinement}
-                density="compact"
-                label={t('adjustments.basic.toneEqualizer.edgeRefinement')}
-                max={8}
-                min={0}
-                onValueChange={(value) => updateToneEqualizer({ edgeRefinement: value })}
-                step={0.05}
-                testId="tone-equalizer-edge"
-                value={adjustments.toneEqualizer.edgeRefinement}
-              />
-              <AdjustmentSlider
-                defaultValue={INITIAL_ADJUSTMENTS.toneEqualizer.smoothingRadius}
-                density="compact"
-                label={t('adjustments.basic.toneEqualizer.smoothingRadius')}
-                max={64}
-                min={4}
-                onValueChange={(value) => updateToneEqualizer({ smoothingRadius: value })}
-                step={1}
-                testId="tone-equalizer-radius"
-                value={adjustments.toneEqualizer.smoothingRadius}
-              />
-              <div className="grid grid-cols-5 gap-1 px-1 py-1" data-testid="tone-equalizer-preview-modes">
-                {(
-                  [
-                    t('adjustments.basic.toneEqualizer.preview.image'),
-                    t('adjustments.basic.toneEqualizer.preview.zones'),
-                    t('adjustments.basic.toneEqualizer.preview.band'),
-                    t('adjustments.basic.toneEqualizer.preview.filter'),
-                    t('adjustments.basic.toneEqualizer.preview.clip'),
-                  ] as const
-                ).map((label, previewMode) => (
-                  <button
-                    aria-pressed={adjustments.toneEqualizer.previewMode === previewMode}
-                    className="rounded border border-editor-divider px-1 py-0.5 text-[9px] text-editor-text aria-pressed:bg-editor-accent/20"
-                    key={label}
-                    onClick={() => updateToneEqualizer({ previewMode: previewMode as 0 | 1 | 2 | 3 | 4 })}
-                    type="button"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
           ) : null}
         </div>
-      ) : null}
 
-      <div className="mt-1 border-t border-editor-divider pt-1" data-testid="basic-secondary-controls">
-        {renderSlider(
-          BasicAdjustment.Brightness,
-          t('adjustments.basic.brightness', { defaultValue: t('adjustments.basic.exposure') }),
-          { max: 5, min: -5, step: 0.01 },
-        )}
-      </div>
+        {autoAdjustStatus === 'error' && !isForMask ? (
+          <p className="px-1 py-0.5 text-[10px] text-editor-danger" data-testid="basic-tone-auto-error" role="status">
+            {t('adjustments.basic.toneEqualizer.analysisUnavailable')}
+          </p>
+        ) : null}
+
+        {toneControlsUnavailable ? (
+          <p
+            className="px-1 py-0.5 text-[10px] text-editor-text-muted"
+            data-testid="basic-tone-unavailable"
+            role="status"
+          >
+            {t('editor.ai.noImageSelected')}
+          </p>
+        ) : null}
+
+        {renderSlider(BasicAdjustment.Exposure, t('adjustments.basic.exposure'), {
+          max: 5,
+          min: -5,
+          step: 0.01,
+        })}
+
+        {TONE_CONTROL_ORDER.map((key) => (
+          <div key={key}>{renderSlider(key, toneLabels[key], { max: 100, min: -100, step: 1 })}</div>
+        ))}
+      </section>
+
+      <section className="mt-1 border-t border-editor-divider pt-1" data-testid="basic-tone-advanced-section">
+        <button
+          aria-expanded={toneAdvancedOpen}
+          className="flex w-full items-center justify-between gap-2 px-1 py-1 text-left text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring"
+          data-testid="basic-tone-advanced-toggle"
+          onClick={() => setToneAdvancedOpen((open) => !open)}
+          type="button"
+        >
+          <span>{t('export.sections.advanced')}</span>
+          <span aria-hidden="true">{toneAdvancedOpen ? '▾' : '▸'}</span>
+        </button>
+        {toneAdvancedOpen ? (
+          <div className="space-y-px" data-testid="basic-tone-advanced">
+            {!hideToneMapper && (
+              <ToneMapperSwitch
+                selectedMapper={adjustments.toneMapper}
+                onMapperChange={handleToneMapperChange}
+                onReset={handleToneMapperReset}
+              />
+            )}
+
+            {!hideToneMapper && adjustments.toneMapper === 'rapidView' ? (
+              <div className="border-b border-editor-divider pb-1" data-testid="rapid-view-controls">
+                <AdjustmentSlider
+                  defaultValue={INITIAL_ADJUSTMENTS.viewTransform.contrast}
+                  density="compact"
+                  label={t('adjustments.basic.viewContrast')}
+                  max={2}
+                  min={0.5}
+                  onValueChange={(value) => handleViewSettingChange('contrast', value)}
+                  step={0.01}
+                  testId="rapid-view-contrast"
+                  value={adjustments.viewTransform.contrast}
+                />
+                <AdjustmentSlider
+                  defaultValue={INITIAL_ADJUSTMENTS.viewTransform.shoulder}
+                  density="compact"
+                  label={t('adjustments.basic.highlightRolloff')}
+                  max={1}
+                  min={0}
+                  onValueChange={(value) => handleViewSettingChange('shoulder', value)}
+                  step={0.01}
+                  testId="rapid-view-shoulder"
+                  value={adjustments.viewTransform.shoulder}
+                />
+                <AdjustmentSlider
+                  defaultValue={INITIAL_ADJUSTMENTS.viewTransform.toe}
+                  density="compact"
+                  label={t('adjustments.basic.shadowRolloff')}
+                  max={1}
+                  min={0}
+                  onValueChange={(value) => handleViewSettingChange('toe', value)}
+                  step={0.01}
+                  testId="rapid-view-toe"
+                  value={adjustments.viewTransform.toe}
+                />
+              </div>
+            ) : null}
+
+            {!isForMask || adjustments.toneEqualizer ? (
+              <div className="mt-1 border-t border-editor-divider pt-1" data-testid="tone-equalizer-panel">
+                <div className="flex items-center justify-between gap-2 px-1 py-1">
+                  <button
+                    aria-expanded="true"
+                    className="min-w-0 truncate text-left text-xs text-editor-text"
+                    data-testid="tone-equalizer-advanced-toggle"
+                    onClick={() => setToneAdvancedOpen(true)}
+                    type="button"
+                  >
+                    {t('adjustments.basic.toneEqualizer.title')}
+                  </button>
+                  <button
+                    className="rounded border border-editor-divider px-1.5 py-0.5 text-[10px] text-editor-text"
+                    data-testid="tone-equalizer-enable"
+                    onClick={() => updateToneEqualizer({ enabled: !adjustments.toneEqualizer.enabled })}
+                    type="button"
+                  >
+                    {adjustments.toneEqualizer.enabled
+                      ? t('adjustments.basic.toneEqualizer.on')
+                      : t('adjustments.basic.toneEqualizer.enable')}
+                  </button>
+                </div>
+                <div className="space-y-px" data-testid="tone-equalizer-advanced">
+                  <div className="grid grid-cols-3 gap-1 px-1 pb-1">
+                    <button
+                      className="rounded border border-editor-divider px-1 py-0.5 text-[10px] text-editor-text"
+                      data-testid="tone-equalizer-auto-place"
+                      onClick={() => void autoPlaceToneEqualizer()}
+                      type="button"
+                    >
+                      {t('adjustments.basic.toneEqualizer.autoPlace')}
+                    </button>
+                    {!isForMask ? (
+                      <button
+                        aria-pressed={toneEqualizerPickerActive}
+                        className="rounded border border-editor-divider px-1 py-0.5 text-[10px] text-editor-text aria-pressed:bg-editor-accent/20"
+                        data-testid="tone-equalizer-picker"
+                        onClick={() =>
+                          setUI({
+                            toneEqualizerPickerActive: !toneEqualizerPickerActive,
+                            toneEqualizerPickerReceipt: null,
+                          })
+                        }
+                        type="button"
+                      >
+                        {t('adjustments.basic.toneEqualizer.pickZone')}
+                      </button>
+                    ) : null}
+                    <button
+                      className="rounded border border-editor-divider px-1 py-0.5 text-[10px] text-editor-text"
+                      onClick={() => updateToneEqualizer(structuredClone(INITIAL_ADJUSTMENTS.toneEqualizer))}
+                      type="button"
+                    >
+                      {t('adjustments.basic.toneEqualizer.resetZones')}
+                    </button>
+                  </div>
+                  {tonePlacementStatus ? (
+                    <p className="px-1 text-[10px] text-editor-text-muted">{tonePlacementStatus}</p>
+                  ) : null}
+                  {toneEqualizerPickerReceipt?.sourceIdentity === selectedImagePath ? (
+                    <p className="px-1 text-[10px] text-editor-text-muted" data-testid="tone-equalizer-picker-receipt">
+                      {t('adjustments.basic.toneEqualizer.pickerReceipt', {
+                        band: toneEqualizerPickerReceipt.primaryBand + 1,
+                        ev: toneEqualizerPickerReceipt.exposureEv.toFixed(2),
+                      })}
+                    </p>
+                  ) : null}
+                  {toneHistogram.length > 0 ? (
+                    <svg
+                      aria-label={t('adjustments.basic.toneEqualizer.histogram')}
+                      className="h-8 w-full px-1 text-editor-text-muted/45"
+                      data-testid="tone-equalizer-histogram"
+                      preserveAspectRatio="none"
+                      role="img"
+                      viewBox="0 0 320 32"
+                    >
+                      <path d={toneHistogramPath} fill="currentColor" />
+                    </svg>
+                  ) : null}
+                  {adjustments.toneEqualizer.bandEv.map((value, index) => (
+                    <AdjustmentSlider
+                      defaultValue={0}
+                      density="compact"
+                      key={TONE_ZONE_LABELS[index]}
+                      label={TONE_ZONE_LABELS[index] ?? `${index}`}
+                      max={4}
+                      min={-4}
+                      onDragStateChange={onDragStateChange}
+                      onValueChange={(next) => updateToneBand(index, next)}
+                      step={0.05}
+                      testId={`tone-equalizer-band-${index}`}
+                      value={value}
+                    />
+                  ))}
+                  <AdjustmentSlider
+                    defaultValue={INITIAL_ADJUSTMENTS.toneEqualizer.detailPreservation}
+                    density="compact"
+                    label={t('adjustments.basic.toneEqualizer.detailPreservation')}
+                    max={1}
+                    min={0}
+                    onValueChange={(value) => updateToneEqualizer({ detailPreservation: value })}
+                    step={0.01}
+                    testId="tone-equalizer-detail"
+                    value={adjustments.toneEqualizer.detailPreservation}
+                  />
+                  <AdjustmentSlider
+                    defaultValue={INITIAL_ADJUSTMENTS.toneEqualizer.edgeRefinement}
+                    density="compact"
+                    label={t('adjustments.basic.toneEqualizer.edgeRefinement')}
+                    max={8}
+                    min={0}
+                    onValueChange={(value) => updateToneEqualizer({ edgeRefinement: value })}
+                    step={0.05}
+                    testId="tone-equalizer-edge"
+                    value={adjustments.toneEqualizer.edgeRefinement}
+                  />
+                  <AdjustmentSlider
+                    defaultValue={INITIAL_ADJUSTMENTS.toneEqualizer.smoothingRadius}
+                    density="compact"
+                    label={t('adjustments.basic.toneEqualizer.smoothingRadius')}
+                    max={64}
+                    min={4}
+                    onValueChange={(value) => updateToneEqualizer({ smoothingRadius: value })}
+                    step={1}
+                    testId="tone-equalizer-radius"
+                    value={adjustments.toneEqualizer.smoothingRadius}
+                  />
+                  <div className="grid grid-cols-5 gap-1 px-1 py-1" data-testid="tone-equalizer-preview-modes">
+                    {(
+                      [
+                        t('adjustments.basic.toneEqualizer.preview.image'),
+                        t('adjustments.basic.toneEqualizer.preview.zones'),
+                        t('adjustments.basic.toneEqualizer.preview.band'),
+                        t('adjustments.basic.toneEqualizer.preview.filter'),
+                        t('adjustments.basic.toneEqualizer.preview.clip'),
+                      ] as const
+                    ).map((label, previewMode) => (
+                      <button
+                        aria-pressed={adjustments.toneEqualizer.previewMode === previewMode}
+                        className="rounded border border-editor-divider px-1 py-0.5 text-[9px] text-editor-text aria-pressed:bg-editor-accent/20"
+                        key={label}
+                        onClick={() => updateToneEqualizer({ previewMode: previewMode as 0 | 1 | 2 | 3 | 4 })}
+                        type="button"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-1 border-t border-editor-divider pt-1" data-testid="basic-secondary-controls">
+              {renderSlider(
+                BasicAdjustment.Brightness,
+                t('adjustments.basic.brightness', { defaultValue: t('adjustments.basic.exposure') }),
+                { max: 5, min: -5, step: 0.01 },
+              )}
+            </div>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="mt-1 border-t border-editor-divider pt-1" data-testid="basic-presence-section">
+        <div className="flex min-h-6 items-center justify-between gap-2 border-b border-editor-divider pb-0.5">
+          <span className="px-1 text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary">
+            {t('adjustments.basic.presence', { defaultValue: 'Presence' })}
+          </span>
+        </div>
+        {PRESENCE_CONTROL_ORDER.map((control) => (
+          <div key={control}>
+            {renderPresenceSlider(
+              control,
+              t(`adjustments.basic.${control}`, {
+                defaultValue: control.charAt(0).toUpperCase() + control.slice(1),
+              }),
+            )}
+          </div>
+        ))}
+      </section>
     </div>
   );
 }

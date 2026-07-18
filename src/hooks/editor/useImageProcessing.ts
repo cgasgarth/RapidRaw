@@ -14,6 +14,7 @@ import { selectEditDocumentGeometry, selectEditDocumentLayers } from '../../util
 import { EditedPreviewEffectRunner } from '../../utils/editedPreviewEffectRunner';
 import { getEditorZoomDpr } from '../../utils/editorZoom';
 import { globalImageCache } from '../../utils/ImageLRUCache';
+import { resolvePerceptualGradingSliderRenderSnapshot } from '../../utils/perceptualGradingSliderInteraction';
 import { PreviewAnalyticsEffectRunner } from '../../utils/previewAnalyticsEffectRunner';
 import { PreviewCoordinatorRuntime } from '../../utils/previewCoordinatorRuntime';
 import { PreviewFailureAdapter } from '../../utils/previewFailureAdapter';
@@ -46,6 +47,7 @@ export function useImageProcessing() {
   const adjustmentSnapshot = useEditorStore((state) => state.adjustmentSnapshot);
   const committedAdjustmentRevision = useEditorStore((state) => state.adjustmentRevision);
   const basicToneSliderInteraction = useEditorStore((state) => state.basicToneSliderInteraction);
+  const perceptualGradingSliderInteraction = useEditorStore((state) => state.perceptualGradingSliderInteraction);
   const editorImageSession = useEditorStore((state) => state.imageSession);
   const imageSessionId = useEditorStore((state) => state.imageSessionId);
   const basicToneRenderSnapshot = resolveBasicToneSliderRenderSnapshot(adjustmentSnapshot, basicToneSliderInteraction, {
@@ -54,10 +56,24 @@ export function useImageProcessing() {
     imageSessionId,
     selectedImage,
   });
-  const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(basicToneRenderSnapshot, autoEditPreviewSession, {
-    imageSessionId: editorImageSession?.id ?? null,
-    path: selectedImage?.path ?? null,
-  });
+  const perceptualGradingRenderSnapshot = resolvePerceptualGradingSliderRenderSnapshot(
+    basicToneRenderSnapshot,
+    perceptualGradingSliderInteraction,
+    {
+      adjustmentRevision: committedAdjustmentRevision,
+      imageSession: editorImageSession,
+      imageSessionId,
+      selectedImage,
+    },
+  );
+  const renderAdjustmentSnapshot = resolveAutoEditRenderSnapshot(
+    perceptualGradingRenderSnapshot,
+    autoEditPreviewSession,
+    {
+      imageSessionId: editorImageSession?.id ?? null,
+      path: selectedImage?.path ?? null,
+    },
+  );
   const referenceMatchAdjustments = resolveReferenceMatchRenderDocument({
     adjustmentRevision: committedAdjustmentRevision,
     committed: committedAdjustments,

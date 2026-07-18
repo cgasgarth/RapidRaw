@@ -1,9 +1,13 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "Czernie",
       "brightness": "Jasność",
+      "clarity": "",
+      "color": "",
       "contrast": "Kontrast",
+      "dehaze": "",
       "evShift": "Przesunięcie EV",
       "exposure": "Ekspozycja",
       "highlightRolloff": "Łagodne światła",
@@ -15,9 +19,12 @@
         "basicDesc": "Standardowe mapowanie tonów",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "Resetuj",
+      "saturation": "",
       "shadowRolloff": "Łagodne cienie",
       "shadows": "Cienie",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -41,6 +48,8 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "Mapowanie tonów",
+      "treatment": "",
+      "vibrance": "",
       "viewContrast": "Kontrast widoku",
       "whites": "Biele"
     },
@@ -197,9 +206,18 @@
       },
       "pointColor": {
         "addPoint": "",
+        "addPointHint": "",
         "deletePoint": "",
         "empty": "",
+        "name": "",
+        "nameInput": "",
+        "pickerHint": "",
+        "pickerReceipt": "",
         "pickFromImage": "",
+        "reset": "",
+        "resetAction": "",
+        "sampleConfidence": "",
+        "sampledRange": "",
         "samples": "",
         "visualize": ""
       },
@@ -284,6 +302,7 @@
         "title": "Skin tone - sampled uniformity (Experimental)",
         "warning": "May affect other orange-range colors; not skin detection or Capture One equivalence."
       },
+      "targetedAdjustment": "",
       "temperature": "Temperatura",
       "tint": "Zabarwienie",
       "toggleSliders": "Przełącz suwaki",
@@ -314,10 +333,12 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "",
         "quick": "Quick"
       }
     },
     "curves": {
+      "advancedDomains": "",
       "channels": {
         "blue": "Niebieski",
         "green": "Zielony",
@@ -345,6 +366,7 @@
       "resetAllPoint": "Resetuj wszystkie krzywe punktowe",
       "resetParametric": "Resetuj krzywą parametryczną ({{channel}})",
       "resetPoint": "Resetuj krzywą punktową ({{channel}})",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
@@ -356,10 +378,12 @@
         "outputTitle": "",
         "sceneAxis": "",
         "sceneTab": "",
-        "sceneTitle": ""
+        "sceneTitle": "",
+        "toneCurveTab": ""
       }
     },
     "details": {
+      "advanced": "Advanced",
       "altPreviewNoiseReduction": "",
       "altPreviewSharpening": "",
       "amount": "Ilość",
@@ -369,6 +393,7 @@
       "chromaticAberration": "Aberracja chromatyczna",
       "clarity": "Przejrzystość",
       "color": "Kolor",
+      "colorNoiseReduction": "Color Noise Reduction",
       "contrastProtection": "Ochrona kontrastu",
       "deblur": "Odszumianie rozmycia",
       "deblurStatus": "UI/API połączone · podgląd/eksport bez zastosowania",
@@ -382,18 +407,21 @@
       "localContrastStatus": "",
       "loupe": "",
       "luminance": "Luminancja",
+      "masking": "Masking",
       "midtoneMask": "",
       "minSpotRadius": "",
       "moveLoupeTarget": "",
       "naturalGrain": "Naturalne ziarno",
       "noiseReduction": "Redukcja szumu",
       "presence": "Prezencja",
+      "radius": "Radius",
       "redCyan": "Czerwony/Cyjan",
       "sensitivity": "",
       "shadowBias": "Priorytet cieni",
       "sharpening": "Wyostrzanie",
       "sharpness": "Ostrość",
       "showDustOverlay": "",
+      "smoothness": "Smoothness",
       "structure": "Struktura",
       "threshold": "Próg"
     },
@@ -405,8 +433,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Ilość",
       "creative": "Kreatywne",
+      "disabled": "",
+      "enabled": "",
       "feather": "Wtapianie",
       "filmLookBrowser": {
         "activeLook": "Active look",
@@ -481,6 +512,7 @@
       "roughness": "Szorstkość",
       "roundness": "Zaokrąglenie",
       "size": "Rozmiar",
+      "title": "",
       "vignette": "Winieta"
     },
     "perspective": {
@@ -758,6 +790,21 @@
         "action": "Resetuj punkty",
         "title": "Ryzyko przycięcia"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Przypięte",
         "unpin": "Odepnij {{control}}"
@@ -818,13 +865,18 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Kalibracja",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
         "lensCorrection": "Lens Corrections",
+        "toneCurve": "",
         "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
@@ -841,7 +893,13 @@
         "details": "Detale",
         "effects": "Efekty"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_one": "",
         "editedSections_few": "",
         "editedSections_many": "",
@@ -853,6 +911,9 @@
         "autoAdjust": "Auto-korekta obrazu",
         "resetAdjustments": "Resetuj ustawienia",
         "toggleAnalytics": "Przełącz widok analityki"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {
@@ -1372,6 +1433,7 @@
         "flipHoriz": "Przerzuć obraz w poziomie",
         "flipVert": "Przerzuć obraz w pionie",
         "lens": "Korekcja zniekształceń obiektywu",
+        "lockAspect": "",
         "overlayDetails": "Nakładka: {{name}}{{rotateHint}}",
         "resetFineRotation": "Resetuj precyzyjny obrót",
         "rotateHint": " (Shift+O aby obrócić)",
@@ -1381,8 +1443,12 @@
         "switchOrientation": "Zmień orientację",
         "switchToLandscape": "Zmień na krajobraz",
         "switchToPortrait": "Zmień na portret",
-        "transform": "Korekcja perspektywy i keystone"
+        "transform": "Korekcja perspektywy i keystone",
+        "unlockAspect": ""
       }
+    },
+    "developTools": {
+      "label": ""
     },
     "layers": {
       "actions": {

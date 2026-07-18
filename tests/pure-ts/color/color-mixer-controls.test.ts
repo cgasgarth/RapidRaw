@@ -9,6 +9,7 @@ import {
   getNextAdvancedMixerSelection,
   getNextSelectiveColorRange,
   isBlackWhiteMixerModified,
+  isBlackWhiteMixModified,
   isChannelMixerModified,
   isColorBalanceRgbModified,
   resetChannelMixerOutput,
@@ -61,6 +62,7 @@ describe('Advanced mixer view models', () => {
 
   test('detects enabled, preserve-luminance, and value edits independently', () => {
     expect(isBlackWhiteMixerModified(INITIAL_ADJUSTMENTS.blackWhiteMixer)).toBe(false);
+    expect(isBlackWhiteMixModified({ ...INITIAL_ADJUSTMENTS.blackWhiteMixer, enabled: true })).toBe(false);
     expect(isColorBalanceRgbModified(INITIAL_ADJUSTMENTS.colorBalanceRgb)).toBe(false);
     expect(isChannelMixerModified(INITIAL_ADJUSTMENTS.channelMixer)).toBe(false);
 
@@ -100,6 +102,18 @@ describe('Advanced mixer view models', () => {
     const resetMixer = resetChannelMixerOutput(mixer, 'red');
     expect(resetMixer.red).toEqual(INITIAL_ADJUSTMENTS.channelMixer.red);
     expect(resetMixer.blue.constant).toBe(-5);
+  });
+
+  test('disables Color Balance when resetting its last non-zero range', () => {
+    const balance = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.colorBalanceRgb),
+      enabled: true,
+      midtones: { red: 10, green: 0, blue: 0 },
+    };
+    const resetBalance = resetColorBalanceRange(balance, 'midtones');
+
+    expect(resetBalance.enabled).toBe(false);
+    expect(resetBalance.midtones).toEqual(INITIAL_ADJUSTMENTS.colorBalanceRgb.midtones);
   });
 
   test('enables an identity channel mixer with a visible non-identity active row', () => {

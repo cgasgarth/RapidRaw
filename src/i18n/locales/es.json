@@ -1,9 +1,13 @@
 {
   "adjustments": {
     "basic": {
+      "blackAndWhite": "",
       "blacks": "Negros",
       "brightness": "Brillo",
+      "clarity": "",
+      "color": "",
       "contrast": "Contraste",
+      "dehaze": "",
       "evShift": "Compensación EV",
       "exposure": "Exposición",
       "highlightRolloff": "Transición de luces",
@@ -15,9 +19,12 @@
         "basicDesc": "Mapeo de tonos estándar",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "Restablecer",
+      "saturation": "",
       "shadowRolloff": "Transición de sombras",
       "shadows": "Sombras",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -41,6 +48,8 @@
         "title": "Tone Equalizer"
       },
       "toneMapper": "Mapeador de tonos",
+      "treatment": "",
+      "vibrance": "",
       "viewContrast": "Contraste de vista",
       "whites": "Blancos"
     },
@@ -191,9 +200,18 @@
       },
       "pointColor": {
         "addPoint": "",
+        "addPointHint": "",
         "deletePoint": "",
         "empty": "",
+        "name": "",
+        "nameInput": "",
+        "pickerHint": "",
+        "pickerReceipt": "",
         "pickFromImage": "",
+        "reset": "",
+        "resetAction": "",
+        "sampleConfidence": "",
+        "sampledRange": "",
         "samples": "",
         "visualize": ""
       },
@@ -269,6 +287,7 @@
         "title": "",
         "warning": ""
       },
+      "targetedAdjustment": "",
       "temperature": "Temperatura",
       "tint": "Matiz",
       "toggleSliders": "Alternar controles",
@@ -293,10 +312,12 @@
         "label": "Color workspace tools",
         "mixer": "Mixer",
         "output": "Output",
+        "pointColor": "",
         "quick": "Quick"
       }
     },
     "curves": {
+      "advancedDomains": "",
       "channels": {
         "blue": "Azul",
         "green": "Verde",
@@ -324,6 +345,7 @@
       "resetAllPoint": "Restablecer todas las curvas de puntos",
       "resetParametric": "Restablecer curva paramétrica de {{channel}}",
       "resetPoint": "Restablecer curva de puntos de {{channel}}",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
@@ -335,10 +357,12 @@
         "outputTitle": "",
         "sceneAxis": "",
         "sceneTab": "",
-        "sceneTitle": ""
+        "sceneTitle": "",
+        "toneCurveTab": ""
       }
     },
     "details": {
+      "advanced": "Advanced",
       "altPreviewNoiseReduction": "",
       "altPreviewSharpening": "",
       "amount": "",
@@ -348,6 +372,7 @@
       "chromaticAberration": "Aberración cromática",
       "clarity": "Claridad",
       "color": "Color",
+      "colorNoiseReduction": "Color Noise Reduction",
       "contrastProtection": "Protección de contraste",
       "deblur": "",
       "deblurStatus": "",
@@ -361,18 +386,21 @@
       "localContrastStatus": "",
       "loupe": "",
       "luminance": "Luminancia",
+      "masking": "Masking",
       "midtoneMask": "",
       "minSpotRadius": "",
       "moveLoupeTarget": "",
       "naturalGrain": "Grano natural",
       "noiseReduction": "Reducción de ruido",
       "presence": "Presencia",
+      "radius": "Radius",
       "redCyan": "Rojo/Cian",
       "sensitivity": "",
       "shadowBias": "Prioridad de sombras",
       "sharpening": "Enfoque",
       "sharpness": "Nitidez",
       "showDustOverlay": "",
+      "smoothness": "Smoothness",
       "structure": "Estructura",
       "threshold": "Umbral"
     },
@@ -384,8 +412,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Cantidad",
       "creative": "Creativo",
+      "disabled": "",
+      "enabled": "",
       "feather": "Desvanecimiento",
       "filmLookBrowser": {
         "activeLook": "",
@@ -451,6 +482,7 @@
       "roughness": "Rugosidad",
       "roundness": "Redondez",
       "size": "Tamaño",
+      "title": "",
       "vignette": "Viñeteado"
     },
     "perspective": {
@@ -711,6 +743,21 @@
         "action": "Restablecer extremos",
         "title": "Riesgo de recorte"
       },
+      "customize": {
+        "close": "",
+        "description": "",
+        "fixed": "",
+        "hide": "",
+        "keyboardHint": "",
+        "list": "",
+        "moveDown": "",
+        "moveUp": "",
+        "open": "",
+        "restore": "",
+        "show": "",
+        "title": "",
+        "visibility": ""
+      },
       "pinnedControls": {
         "title": "Fijados",
         "unpin": "Desfijar {{control}}"
@@ -771,13 +818,18 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Calibración",
+        "colorGrading": "",
+        "colorMixer": "",
         "curves": "Curve",
         "details": "Detail",
         "effects": "Effects",
         "lensCorrection": "Lens Corrections",
+        "toneCurve": "",
         "transform": "Transform",
         "transformLens": "Geometry & Lens"
       },
@@ -794,7 +846,13 @@
         "details": "Detalles",
         "effects": "Efectos"
       },
+      "soloMode": {
+        "label": "",
+        "tooltip": ""
+      },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_one": "",
         "editedSections_many": "",
         "editedSections_other": "",
@@ -805,6 +863,9 @@
         "autoAdjust": "Ajuste automático de imagen",
         "resetAdjustments": "Restablecer ajustes",
         "toggleAnalytics": "Alternar vista de análisis"
+      },
+      "utilities": {
+        "title": ""
       }
     },
     "ai": {
@@ -1306,6 +1367,7 @@
         "flipHoriz": "Voltear imagen horizontalmente",
         "flipVert": "Voltear imagen verticalmente",
         "lens": "Corrección de distorsión de lente",
+        "lockAspect": "",
         "overlayDetails": "Superposición: {{name}}{{rotateHint}}",
         "resetFineRotation": "Restablecer rotación fina",
         "rotateHint": " (Shift+O para rotar)",
@@ -1315,8 +1377,12 @@
         "switchOrientation": "Cambiar orientación",
         "switchToLandscape": "Cambiar a horizontal",
         "switchToPortrait": "Cambiar a vertical",
-        "transform": "Corrección de perspectiva y distorsión trapezoidal"
+        "transform": "Corrección de perspectiva y distorsión trapezoidal",
+        "unlockAspect": ""
       }
+    },
+    "developTools": {
+      "label": ""
     },
     "layers": {
       "actions": {

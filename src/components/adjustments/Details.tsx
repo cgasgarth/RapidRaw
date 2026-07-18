@@ -11,10 +11,6 @@ import {
   isDetailNumberNodeAdjustment,
 } from '../../utils/detailEditTransaction';
 import { type DetailModifierPreview, resolveDetailModifierPreview } from '../../utils/detailLoupe';
-import {
-  buildLensCorrectionEditTransaction,
-  isManualLensCorrectionAdjustment,
-} from '../../utils/lensCorrectionEditTransaction';
 import type { AppSettings } from '../ui/AppProperties';
 import { professionalInspectorDensityTokens } from '../ui/inspectorTokens';
 import Switch from '../ui/primitives/Switch';
@@ -64,6 +60,7 @@ export default function DetailsPanel({
   detailCommitIdentityRef.current = detailCommitIdentity;
   const [hoveredModifier, setHoveredModifier] = useState<DetailModifierPreview | null>(null);
   const [modifierPreview, setModifierPreview] = useState<DetailModifierPreview | null>(null);
+  const detailSliderInteractionRef = useRef<{ changed: boolean; transactionId: string } | null>(null);
   const altKeyRef = useRef(false);
   const draggingModifierRef = useRef<DetailModifierPreview | null>(null);
   useEffect(() => {
@@ -110,26 +107,75 @@ export default function DetailsPanel({
     setEditor({ detailModifierPreview: nextPreview });
   };
 
-  const handleAdjustmentChange = (key: DetailsAdjustment, value: number) => {
-    const nextValue = Math.trunc(value);
-    if (!isForMask && isManualLensCorrectionAdjustment(key)) {
-      const identity = detailCommitIdentityRef.current;
-      if (identity === null) return;
-      const result = applyEditTransaction(
-        buildLensCorrectionEditTransaction(useEditorStore.getState(), identity, key, nextValue, crypto.randomUUID()),
-      );
-      detailCommitIdentityRef.current = {
-        ...identity,
-        adjustmentRevision: result.nextAdjustmentRevision,
-      };
+  const beginDetailInteraction = () => {
+    if (isForMask) {
+      onDragStateChange?.(true);
       return;
     }
+    if (detailCommitIdentityRef.current === null || detailSliderInteractionRef.current !== null) return;
+    detailSliderInteractionRef.current = { changed: false, transactionId: crypto.randomUUID() };
+  };
+
+  const commitDetailInteraction = () => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    detailSliderInteractionRef.current = null;
+  };
+
+  const cancelDetailInteraction = () => {
+    if (isForMask) {
+      onDragStateChange?.(false);
+      return;
+    }
+    const interaction = detailSliderInteractionRef.current;
+    detailSliderInteractionRef.current = null;
+    if (interaction?.changed !== true) return;
+    const state = useEditorStore.getState();
+    state.undo();
+    const identity = detailCommitIdentityRef.current;
+    if (identity !== null) {
+      detailCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: useEditorStore.getState().adjustmentRevision,
+      };
+    }
+  };
+
+  const detailInteractionProps = isForMask
+    ? {}
+    : {
+        onInteractionCancel: cancelDetailInteraction,
+        onInteractionCommit: commitDetailInteraction,
+        onInteractionStart: beginDetailInteraction,
+      };
+
+  useEffect(
+    () => () => {
+      detailSliderInteractionRef.current = null;
+    },
+    [imageSessionId, isForMask, selectedImagePath],
+  );
+
+  const handleAdjustmentChange = (key: DetailsAdjustment, value: number) => {
+    const nextValue = Math.trunc(value);
     if (!isForMask && isDetailNumberNodeAdjustment(key)) {
       const identity = detailCommitIdentityRef.current;
       if (identity === null) return;
+      const interaction = detailSliderInteractionRef.current;
+      const transactionId = interaction?.transactionId ?? crypto.randomUUID();
       const result = applyEditTransaction(
-        buildDetailEditTransaction(useEditorStore.getState(), identity, key, nextValue, crypto.randomUUID()),
+        buildDetailEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          key,
+          nextValue,
+          transactionId,
+          interaction?.changed === true ? 'coalesced-interaction' : 'single-entry',
+        ),
       );
+      if (interaction !== null) interaction.changed = true;
       detailCommitIdentityRef.current = {
         ...identity,
         adjustmentRevision: result.nextAdjustmentRevision,
@@ -143,9 +189,19 @@ export default function DetailsPanel({
     if (!isForMask && isDetailNumberNodeAdjustment(key)) {
       const identity = detailCommitIdentityRef.current;
       if (identity === null) return;
+      const interaction = detailSliderInteractionRef.current;
+      const transactionId = interaction?.transactionId ?? crypto.randomUUID();
       const result = applyEditTransaction(
-        buildDetailEditTransaction(useEditorStore.getState(), identity, key, value, crypto.randomUUID()),
+        buildDetailEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          key,
+          value,
+          transactionId,
+          interaction?.changed === true ? 'coalesced-interaction' : 'single-entry',
+        ),
       );
+      if (interaction !== null) interaction.changed = true;
       detailCommitIdentityRef.current = {
         ...identity,
         adjustmentRevision: result.nextAdjustmentRevision,
@@ -182,61 +238,11 @@ export default function DetailsPanel({
       data-commit-source-identity={detailCommitIdentity?.sourceIdentity}
       data-testid="detail-controls"
     >
-      {!isForMask && adjustmentVisibility['deblur'] !== false && (
-        <div className={detailGroupClassName}>
-          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-            {t('adjustments.details.deblur')}
-          </UiText>
-          <Switch
-            chrome="editor"
-            checked={adjustments.deblurEnabled}
-            id="detail-control-deblur-enabled"
-            label={t('adjustments.details.enableDeblur')}
-            onChange={(checked) => {
-              handleBooleanAdjustmentChange(DetailsAdjustment.DeblurEnabled, checked);
-            }}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.amount')}
-            max={100}
-            min={0}
-            onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.DeblurStrength, value);
-            }}
-            step={1}
-            testId="detail-control-deblur-strength"
-            value={adjustments.deblurStrength}
-            onDragStateChange={onDragStateChange}
-            disabled={!adjustments.deblurEnabled}
-            fillOrigin="min"
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.blurRadius')}
-            max={1.35}
-            min={0.45}
-            onValueChange={(value) => {
-              handleFloatAdjustmentChange(DetailsAdjustment.DeblurSigmaPx, value);
-            }}
-            step={0.05}
-            testId="detail-control-deblur-sigma"
-            value={adjustments.deblurSigmaPx}
-            onDragStateChange={onDragStateChange}
-            disabled={!adjustments.deblurEnabled}
-            defaultValue={0.8}
-            suffix=" px"
-          />
-          <UiText variant={TextVariants.small} className="mt-1 text-[11px] leading-4 text-text-secondary">
-            {t('adjustments.details.deblurStatus')}
-          </UiText>
-        </div>
-      )}
-
       {adjustmentVisibility['sharpening'] !== false && (
         <div
           className={detailGroupClassName}
           data-detail-modifier="sharpening"
+          data-testid="detail-section-sharpening"
           onPointerEnter={() => setHoveredModifier('sharpening')}
           onPointerLeave={() => {
             setHoveredModifier(null);
@@ -250,32 +256,72 @@ export default function DetailsPanel({
             {t('adjustments.details.sharpening')}
           </UiText>
           <AdjustmentSlider
+            {...detailInteractionProps}
             density="compact"
-            label={t('adjustments.details.sharpness')}
+            label={t('adjustments.details.amount')}
             max={100}
             min={-100}
             onValueChange={(value) => {
               handleAdjustmentChange(DetailsAdjustment.Sharpness, value);
             }}
             step={1}
-            testId="detail-control-sharpness"
+            testId="detail-control-sharpening-amount"
             value={adjustments.sharpness}
             onDragStateChange={(dragging) => handleModifierDragState('sharpening', dragging)}
           />
+          {!isForMask && (
+            <AdjustmentSlider
+              {...detailInteractionProps}
+              density="compact"
+              label={t('adjustments.details.radius')}
+              max={96}
+              min={4}
+              onValueChange={(value) => {
+                handleAdjustmentChange(DetailsAdjustment.LocalContrastRadiusPx, value);
+              }}
+              step={1}
+              suffix=" px"
+              testId="detail-control-sharpening-radius"
+              value={adjustments.localContrastRadiusPx}
+              onDragStateChange={(dragging) => handleModifierDragState('sharpening', dragging)}
+              defaultValue={24}
+              fillOrigin="min"
+            />
+          )}
           <AdjustmentSlider
+            {...detailInteractionProps}
             density="compact"
-            label={t('adjustments.details.threshold')}
+            label={t('adjustments.details.detail')}
             max={80}
             min={0}
             onValueChange={(value) => {
               handleAdjustmentChange(DetailsAdjustment.SharpnessThreshold, value);
             }}
             step={1}
+            testId="detail-control-sharpening-detail"
             value={adjustments.sharpnessThreshold}
             onDragStateChange={(dragging) => handleModifierDragState('sharpening', dragging)}
             defaultValue={15}
             fillOrigin="min"
           />
+          {!isForMask && (
+            <AdjustmentSlider
+              {...detailInteractionProps}
+              density="compact"
+              label={t('adjustments.details.masking')}
+              max={100}
+              min={0}
+              onValueChange={(value) => {
+                handleAdjustmentChange(DetailsAdjustment.LocalContrastMidtoneMask, value);
+              }}
+              step={1}
+              testId="detail-control-sharpening-masking"
+              value={adjustments.localContrastMidtoneMask}
+              onDragStateChange={(dragging) => handleModifierDragState('sharpening', dragging)}
+              defaultValue={50}
+              fillOrigin="min"
+            />
+          )}
           {modifierPreview === 'sharpening' && (
             <div
               className="mt-1 rounded border border-editor-info/40 bg-editor-info-surface px-2 py-1 text-[11px] text-editor-info"
@@ -288,117 +334,11 @@ export default function DetailsPanel({
         </div>
       )}
 
-      {adjustmentVisibility['presence'] !== false && (
-        <div className={detailGroupClassName}>
-          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-            {t('adjustments.details.presence')}
-          </UiText>
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.clarity')}
-            max={100}
-            min={-100}
-            onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.Clarity, value);
-            }}
-            step={1}
-            value={adjustments.clarity}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.dehaze')}
-            max={100}
-            min={-100}
-            onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.Dehaze, value);
-            }}
-            step={1}
-            value={adjustments.dehaze}
-            onDragStateChange={onDragStateChange}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.structure')}
-            max={100}
-            min={-100}
-            onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.Structure, value);
-            }}
-            step={1}
-            value={adjustments.structure}
-            onDragStateChange={onDragStateChange}
-          />
-          {!isForMask && (
-            <>
-              <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.details.localContrastRadius')}
-                max={96}
-                min={4}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(DetailsAdjustment.LocalContrastRadiusPx, value);
-                }}
-                step={1}
-                value={adjustments.localContrastRadiusPx}
-                onDragStateChange={onDragStateChange}
-                defaultValue={24}
-                suffix=" px"
-              />
-              <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.details.haloGuard')}
-                max={100}
-                min={0}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(DetailsAdjustment.LocalContrastHaloGuard, value);
-                }}
-                step={1}
-                value={adjustments.localContrastHaloGuard}
-                onDragStateChange={onDragStateChange}
-                defaultValue={50}
-                fillOrigin="min"
-              />
-              <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.details.midtoneMask')}
-                max={100}
-                min={0}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(DetailsAdjustment.LocalContrastMidtoneMask, value);
-                }}
-                step={1}
-                value={adjustments.localContrastMidtoneMask}
-                onDragStateChange={onDragStateChange}
-                defaultValue={50}
-                fillOrigin="min"
-              />
-              <UiText variant={TextVariants.small} className="mt-1 text-[11px] leading-4 text-text-secondary">
-                {t('adjustments.details.localContrastStatus')}
-              </UiText>
-            </>
-          )}
-          {!isForMask && (
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.details.centre')}
-              max={100}
-              min={-100}
-              onValueChange={(value) => {
-                handleAdjustmentChange(DetailsAdjustment.Centré, value);
-              }}
-              step={1}
-              value={adjustments.centré}
-              onDragStateChange={onDragStateChange}
-            />
-          )}
-        </div>
-      )}
-
       {adjustmentVisibility['noiseReduction'] !== false && (
         <div
           className={detailGroupClassName}
           data-detail-modifier="noise-reduction"
+          data-testid="detail-section-noise-reduction"
           onPointerEnter={() => setHoveredModifier('noise-reduction')}
           onPointerLeave={() => {
             setHoveredModifier(null);
@@ -412,6 +352,7 @@ export default function DetailsPanel({
             {t('adjustments.details.noiseReduction')}
           </UiText>
           <AdjustmentSlider
+            {...detailInteractionProps}
             density="compact"
             label={t('adjustments.details.luminance')}
             max={100}
@@ -420,24 +361,14 @@ export default function DetailsPanel({
               handleAdjustmentChange(DetailsAdjustment.LumaNoiseReduction, value);
             }}
             step={1}
+            testId="detail-control-noise-luminance"
             value={adjustments.lumaNoiseReduction}
-            onDragStateChange={(dragging) => handleModifierDragState('noise-reduction', dragging)}
-          />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.color')}
-            max={100}
-            min={isForMask ? -100 : 0}
-            onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.ColorNoiseReduction, value);
-            }}
-            step={1}
-            value={adjustments.colorNoiseReduction}
             onDragStateChange={(dragging) => handleModifierDragState('noise-reduction', dragging)}
           />
           {!isForMask && (
             <>
               <AdjustmentSlider
+                {...detailInteractionProps}
                 density="compact"
                 label={t('adjustments.details.detail')}
                 max={100}
@@ -446,25 +377,14 @@ export default function DetailsPanel({
                   handleAdjustmentChange(DetailsAdjustment.DenoiseDetail, value);
                 }}
                 step={1}
+                testId="detail-control-noise-detail"
                 value={adjustments.denoiseDetail}
                 onDragStateChange={onDragStateChange}
                 defaultValue={50}
                 fillOrigin="min"
               />
               <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.details.naturalGrain')}
-                max={100}
-                min={0}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(DetailsAdjustment.DenoiseNaturalGrain, value);
-                }}
-                step={1}
-                value={adjustments.denoiseNaturalGrain}
-                onDragStateChange={onDragStateChange}
-                fillOrigin="min"
-              />
-              <AdjustmentSlider
+                {...detailInteractionProps}
                 density="compact"
                 label={t('adjustments.details.contrastProtection')}
                 max={100}
@@ -473,22 +393,11 @@ export default function DetailsPanel({
                   handleAdjustmentChange(DetailsAdjustment.DenoiseContrastProtection, value);
                 }}
                 step={1}
+                testId="detail-control-noise-contrast"
                 value={adjustments.denoiseContrastProtection}
                 onDragStateChange={onDragStateChange}
                 defaultValue={50}
                 fillOrigin="min"
-              />
-              <AdjustmentSlider
-                density="compact"
-                label={t('adjustments.details.shadowBias')}
-                max={100}
-                min={-100}
-                onValueChange={(value) => {
-                  handleAdjustmentChange(DetailsAdjustment.DenoiseShadowBias, value);
-                }}
-                step={1}
-                value={adjustments.denoiseShadowBias}
-                onDragStateChange={onDragStateChange}
               />
             </>
           )}
@@ -504,37 +413,191 @@ export default function DetailsPanel({
         </div>
       )}
 
-      {!isForMask && adjustmentVisibility['chromaticAberration'] !== false && (
-        <div className={detailGroupClassName}>
+      {adjustmentVisibility['noiseReduction'] !== false && (
+        <div className={detailGroupClassName} data-testid="detail-section-color-noise-reduction">
           <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
-            {t('adjustments.details.chromaticAberration')}
+            {t('adjustments.details.colorNoiseReduction')}
           </UiText>
           <AdjustmentSlider
+            {...detailInteractionProps}
             density="compact"
-            label={t('adjustments.details.redCyan')}
+            label={t('adjustments.details.color')}
             max={100}
-            min={-100}
+            min={isForMask ? -100 : 0}
             onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationRedCyan, value);
+              handleAdjustmentChange(DetailsAdjustment.ColorNoiseReduction, value);
             }}
             step={1}
-            value={adjustments.chromaticAberrationRedCyan}
+            testId="detail-control-color-noise-color"
+            value={adjustments.colorNoiseReduction}
             onDragStateChange={onDragStateChange}
           />
-          <AdjustmentSlider
-            density="compact"
-            label={t('adjustments.details.blueYellow')}
-            max={100}
-            min={-100}
-            onValueChange={(value) => {
-              handleAdjustmentChange(DetailsAdjustment.ChromaticAberrationBlueYellow, value);
-            }}
-            step={1}
-            value={adjustments.chromaticAberrationBlueYellow}
-            onDragStateChange={onDragStateChange}
-          />
+          {!isForMask && (
+            <>
+              <AdjustmentSlider
+                {...detailInteractionProps}
+                density="compact"
+                label={t('adjustments.details.detail')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DenoiseDetail, value);
+                }}
+                step={1}
+                testId="detail-control-color-noise-detail"
+                value={adjustments.denoiseDetail}
+                onDragStateChange={onDragStateChange}
+                defaultValue={50}
+                fillOrigin="min"
+              />
+              <AdjustmentSlider
+                {...detailInteractionProps}
+                density="compact"
+                label={t('adjustments.details.smoothness')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DenoiseNaturalGrain, 100 - value);
+                }}
+                step={1}
+                testId="detail-control-color-noise-smoothness"
+                value={100 - adjustments.denoiseNaturalGrain}
+                onDragStateChange={onDragStateChange}
+                defaultValue={100}
+                fillOrigin="min"
+              />
+            </>
+          )}
         </div>
       )}
+
+      <details className={detailGroupClassName} data-testid="detail-advanced">
+        <summary className="cursor-pointer list-none">
+          <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+            {t('adjustments.details.advanced')}
+          </UiText>
+        </summary>
+        <div className="pt-1">
+          {!isForMask && adjustmentVisibility['deblur'] !== false && (
+            <div data-testid="detail-advanced-deblur">
+              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                {t('adjustments.details.deblur')}
+              </UiText>
+              <Switch
+                chrome="editor"
+                checked={adjustments.deblurEnabled}
+                id="detail-control-deblur-enabled"
+                label={t('adjustments.details.enableDeblur')}
+                onChange={(checked) => {
+                  handleBooleanAdjustmentChange(DetailsAdjustment.DeblurEnabled, checked);
+                }}
+              />
+              <AdjustmentSlider
+                {...detailInteractionProps}
+                density="compact"
+                label={t('adjustments.details.amount')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DeblurStrength, value);
+                }}
+                step={1}
+                testId="detail-control-deblur-strength"
+                value={adjustments.deblurStrength}
+                onDragStateChange={onDragStateChange}
+                disabled={!adjustments.deblurEnabled}
+                fillOrigin="min"
+              />
+              <AdjustmentSlider
+                {...detailInteractionProps}
+                density="compact"
+                label={t('adjustments.details.blurRadius')}
+                max={1.35}
+                min={0.45}
+                onValueChange={(value) => {
+                  handleFloatAdjustmentChange(DetailsAdjustment.DeblurSigmaPx, value);
+                }}
+                step={0.05}
+                testId="detail-control-deblur-sigma"
+                value={adjustments.deblurSigmaPx}
+                onDragStateChange={onDragStateChange}
+                disabled={!adjustments.deblurEnabled}
+                defaultValue={0.8}
+                suffix=" px"
+              />
+              <UiText variant={TextVariants.small} className="mt-1 text-[11px] leading-4 text-text-secondary">
+                {t('adjustments.details.deblurStatus')}
+              </UiText>
+            </div>
+          )}
+          {!isForMask && (
+            <div data-testid="detail-advanced-existing">
+              <UiText variant={TextVariants.heading} className={density.sectionHeader.title}>
+                {t('adjustments.details.sharpening')}
+              </UiText>
+              <AdjustmentSlider
+                {...detailInteractionProps}
+                density="compact"
+                label={t('adjustments.details.haloGuard')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.LocalContrastHaloGuard, value);
+                }}
+                step={1}
+                testId="detail-control-advanced-halo-guard"
+                value={adjustments.localContrastHaloGuard}
+                onDragStateChange={onDragStateChange}
+                defaultValue={50}
+                fillOrigin="min"
+              />
+              <AdjustmentSlider
+                {...detailInteractionProps}
+                density="compact"
+                label={t('adjustments.details.centre')}
+                max={100}
+                min={-100}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.Centré, value);
+                }}
+                step={1}
+                testId="detail-control-advanced-centre"
+                value={adjustments.centré}
+                onDragStateChange={onDragStateChange}
+              />
+              <AdjustmentSlider
+                {...detailInteractionProps}
+                density="compact"
+                label={t('adjustments.details.naturalGrain')}
+                max={100}
+                min={0}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DenoiseNaturalGrain, value);
+                }}
+                step={1}
+                testId="detail-control-advanced-natural-grain"
+                value={adjustments.denoiseNaturalGrain}
+                onDragStateChange={onDragStateChange}
+                fillOrigin="min"
+              />
+              <AdjustmentSlider
+                {...detailInteractionProps}
+                density="compact"
+                label={t('adjustments.details.shadowBias')}
+                max={100}
+                min={-100}
+                onValueChange={(value) => {
+                  handleAdjustmentChange(DetailsAdjustment.DenoiseShadowBias, value);
+                }}
+                step={1}
+                testId="detail-control-advanced-shadow-bias"
+                value={adjustments.denoiseShadowBias}
+                onDragStateChange={onDragStateChange}
+              />
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

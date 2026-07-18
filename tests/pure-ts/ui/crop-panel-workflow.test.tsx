@@ -64,7 +64,8 @@ describe('crop panel workflow', () => {
 
     await user.click(required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-5-4"]'));
 
-    expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBe(5 / 4);
+    expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBe(3 / 2);
+    expect(useEditorStore.getState().cropDraft?.geometry.aspectRatio).toBe(5 / 4);
     expect(required<HTMLElement>(container, '[data-testid="crop-panel-status"]').dataset['cropDirty']).toBe('true');
 
     const cancel = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
@@ -74,9 +75,9 @@ describe('crop panel workflow', () => {
     await user.click(cancel);
 
     expect(useEditorStore.getState().editDocumentV2.geometry.aspectRatio).toBe(3 / 2);
-    expect(useEditorStore.getState().history).toHaveLength(3);
+    expect(useEditorStore.getState().history).toHaveLength(1);
     expect(useEditorStore.getState().history.at(-1)).toEqual(initialDocument);
-    expect(useEditorStore.getState().historyIndex).toBe(2);
+    expect(useEditorStore.getState().historyIndex).toBe(0);
     expect(useUIStore.getState().activeRightPanel).toBe(Panel.Adjustments);
   });
 
@@ -89,6 +90,7 @@ describe('crop panel workflow', () => {
       editDocumentV2,
       history: [editDocumentV2],
     });
+    useUIStore.setState({ activeRightPanel: Panel.Crop, renderedRightPanel: Panel.Crop });
 
     const { container, user } = await renderCropPanel();
     await user.click(required<HTMLButtonElement>(container, '[data-testid="crop-ratio-preset-custom"]'));
@@ -132,7 +134,7 @@ describe('crop panel workflow', () => {
     await clickControl(user, container, '[data-testid="crop-panel-overlay-rotate"]');
     fireEvent.keyDown(window, { key: 'o' });
 
-    expect(useEditorStore.getState().editDocumentV2.geometry).toMatchObject({
+    expect(useEditorStore.getState().cropDraft?.geometry).toMatchObject({
       aspectRatio: 3 / 2,
       flipHorizontal: true,
       orientationSteps: 1,
@@ -152,6 +154,7 @@ describe('crop panel workflow', () => {
       editDocumentV2,
       history: [editDocumentV2],
     });
+    useUIStore.setState({ activeRightPanel: Panel.Crop, renderedRightPanel: Panel.Crop });
     const { container, user } = await renderCropPanel();
     const width = required<HTMLInputElement>(container, 'input[name="customW"]');
     expect(width.value).toBe('170');
@@ -197,17 +200,18 @@ describe('crop panel workflow', () => {
       editDocumentV2: initialDocument,
       history: [initialDocument],
     });
+    useUIStore.setState({ activeRightPanel: Panel.Crop, renderedRightPanel: Panel.Crop });
     const { container, unmount, user } = await renderCropPanel();
     await clickControl(user, container, '[data-testid="crop-panel-straighten-toggle"]');
-    expect(useEditorStore.getState().editDocumentV2.geometry.rotation).toBe(0);
+    expect(useEditorStore.getState().cropDraft?.geometry.rotation).toBe(0);
     await clickControl(user, container, '[data-testid="crop-ratio-preset-original"]');
     const historyBeforeRotate = useEditorStore.getState().history.length;
     await clickControl(user, container, '[data-testid="crop-panel-rotate-right"]');
-    expect(useEditorStore.getState().editDocumentV2.geometry).toMatchObject({
+    expect(useEditorStore.getState().cropDraft?.geometry).toMatchObject({
       aspectRatio: 3 / 4,
       orientationSteps: 1,
     });
-    expect(useEditorStore.getState().history).toHaveLength(historyBeforeRotate + 1);
+    expect(useEditorStore.getState().history).toHaveLength(historyBeforeRotate);
 
     unmount();
     expect(useEditorStore.getState().liveRotation).toBeNull();

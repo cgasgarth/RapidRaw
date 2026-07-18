@@ -136,13 +136,15 @@ export const RIGHT_PANEL_GROUPS = [
       },
       workspacePanel('Masks'),
     ),
+  ],
+  [
     withHost(
       {
         fallbackLabel: 'Agent Edit',
         icon: BotMessageSquare,
         id: Panel.Agent,
         keywords: ['agent', 'chat', 'ai edit', 'assistant', 'instruction', 'review'],
-        priority: 'primary',
+        priority: 'secondary',
         shortLabel: 'Agent',
         tooltipKey: 'editor.switcher.tooltips.agent',
       },
@@ -154,14 +156,12 @@ export const RIGHT_PANEL_GROUPS = [
         icon: Paintbrush,
         id: Panel.Ai,
         keywords: ['inpaint', 'remove', 'retouch', 'object', 'fill', 'ai'],
-        priority: 'primary',
+        priority: 'secondary',
         shortLabel: 'Inpaint',
         tooltipKey: 'editor.switcher.tooltips.inpaint',
       },
       workspacePanel('Inpaint'),
     ),
-  ],
-  [
     withHost(
       {
         fallbackLabel: 'Info',
@@ -220,6 +220,14 @@ const RIGHT_PANEL_ENTRY_BY_ID: ReadonlyMap<Panel, RightPanelRegistryEntry> = new
 );
 
 export const DEFAULT_EDITOR_RIGHT_PANEL = Panel.Color;
+
+/** Canonical Develop tool-strip ownership; these entries do not add rail buttons. */
+export const DEVELOP_TOOL_PANEL_BY_ID = {
+  crop: Panel.Crop,
+  masking: Panel.Masks,
+  remove: Panel.Masks,
+  toneCurve: Panel.Adjustments,
+} as const;
 
 export const EDITING_RIGHT_PANELS = [
   Panel.Color,

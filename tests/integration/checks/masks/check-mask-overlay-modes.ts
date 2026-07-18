@@ -141,6 +141,12 @@ const requiredPanelFragments = [
   'nextMaskOverlayHotkeySettings(useEditorStore.getState().maskOverlaySettings)',
   "event.code !== 'KeyO'",
   'hotkeyHint="Shift+O"',
+  'maskHandlesVisible: state.maskHandlesVisible',
+  'maskSelectedPinVisible: state.maskSelectedPinVisible',
+  'handlesVisible={maskHandlesVisible}',
+  'selectedPinVisible={maskSelectedPinVisible}',
+  'setEditor({ maskHandlesVisible: visible })',
+  'setEditor({ maskSelectedPinVisible: visible })',
 ];
 
 for (const fragment of requiredPanelFragments) {
