@@ -55,10 +55,7 @@ import {
   saveNegativeLabWorkspaceLayout,
 } from '../schemas/negative-lab/negativeLabWorkspaceLayout';
 import { ActiveChannel, type MaskContainer } from '../utils/adjustments';
-import type {
-  ColorMixerTargetedBandWeight,
-  ColorMixerTargetedMode,
-} from '../utils/colorMixerTargetedAdjustment';
+import type { ColorMixerTargetedBandWeight, ColorMixerTargetedMode } from '../utils/colorMixerTargetedAdjustment';
 import {
   DEFAULT_DEVELOP_PANEL_ORDER,
   type DevelopPanelId,
