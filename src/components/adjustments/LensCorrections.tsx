@@ -30,6 +30,9 @@ const lensCorrectionCopy = {
   defringe: 'Defringe',
   defringeUnavailable: 'Manual defringe is unavailable until a typed renderer profile is selected.',
   license: 'CC BY-SA 3.0',
+  manualFallback: 'Manual fallback: no compatible profile is applied. Chromatic controls remain available.',
+  manualProfile: 'Manual lens profile correction',
+  missingProfile: 'RAW profile not found: no profile correction is applied. Manual controls remain available.',
   noImage: 'Select an image to use lens corrections.',
   nonRaw: 'Non-RAW image: profile corrections are unavailable. Manual chromatic controls remain available.',
   profileSource: 'Lensfun lens database',
@@ -89,9 +92,15 @@ export default function LensCorrections({
   const provenanceMessage =
     selectedImage === null
       ? lensCorrectionCopy.noImage
-      : selectedImage.isRaw
-        ? `${lensCorrectionCopy.raw} · ${lensCorrectionCopy.profileSource} · ${lensCorrectionCopy.license}`
-        : lensCorrectionCopy.nonRaw;
+      : !selectedImage.isRaw
+        ? lensCorrectionCopy.nonRaw
+        : profileState === 'missing'
+          ? lensCorrectionCopy.missingProfile
+          : profileState === 'manual-fallback'
+            ? lensCorrectionCopy.manualFallback
+            : profileState === 'manual'
+              ? `${lensCorrectionCopy.manualProfile} · ${lensCorrectionCopy.profileSource} · ${lensCorrectionCopy.license}`
+              : `${lensCorrectionCopy.raw} · ${lensCorrectionCopy.profileSource} · ${lensCorrectionCopy.license}`;
   const cameraLensMatch = selectedImage?.exif
     ? `${selectedImage.exif.Make ?? 'Unknown camera'} · ${selectedImage.exif.LensModel ?? 'Unknown lens'}`
     : 'Camera and lens metadata unavailable';
