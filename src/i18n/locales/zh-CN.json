@@ -798,6 +798,8 @@
         "virtualCopyState": "",
         "weight": ""
       },
+      "reset": "",
+      "resetTransform": "",
       "scopedSections": {
         "basic": "Light",
         "calibration": "校准",
@@ -829,6 +831,8 @@
         "tooltip": ""
       },
       "status": {
+        "default": "",
+        "edited": "",
         "editedSections_other": "",
         "loadingImage": ""
       },

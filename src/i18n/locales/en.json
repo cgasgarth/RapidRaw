@@ -803,6 +803,8 @@
         "virtualCopyState": "Virtual copy · {{copy}}",
         "weight": "Weight"
       },
+      "reset": "Reset",
+      "resetTransform": "Reset Transform",
       "scopedSections": {
         "basic": "Light",
         "calibration": "Calibration",
@@ -834,6 +836,8 @@
         "tooltip": "Keep one panel open at a time"
       },
       "status": {
+        "default": "Default",
+        "edited": "Edited",
         "editedSections_one": "{{count}} edited",
         "editedSections_other": "{{count}} edited",
         "loadingImage": "Loading image preview"

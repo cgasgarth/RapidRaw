@@ -117,10 +117,8 @@ import DetailsPanel, { type DetailAdjustmentUpdate, type DetailAdjustmentView } 
 import EffectsPanel, { type EffectAdjustmentUpdate, type EffectAdjustmentView } from '../../../adjustments/Effects';
 import LensCorrections from '../../../adjustments/LensCorrections';
 import ReferenceMatchPanel from '../../../adjustments/ReferenceMatchPanel';
-import TransformLens, {
-  type TransformLensAdjustmentUpdate,
-  type TransformLensAdjustmentView,
-} from '../../../adjustments/TransformLens';
+import TransformPanel from '../../../adjustments/Transform';
+import type { TransformLensAdjustmentUpdate, TransformLensAdjustmentView } from '../../../adjustments/TransformLens';
 import { OPTION_SEPARATOR, type Option, Panel } from '../../../ui/AppProperties';
 import CollapsibleSection, { type CollapsibleSectionHeaderAction } from '../../../ui/CollapsibleSection';
 import { editorChromeStatusChipClassName } from '../../../ui/editorChromeTokens';
@@ -215,6 +213,7 @@ const ADJUSTMENT_SECTION_LABEL_FALLBACKS: Record<AdjustmentSectionName, string> 
   lensCorrection: 'Lens Corrections',
 };
 const TRANSFORM_LENS_CONTROL_LABELS = {
+  aspect: 'Aspect',
   correctionAmount: 'Correction amount',
   distortionAmount: 'Distortion amount',
   horizontal: 'Horizontal perspective',
@@ -515,6 +514,27 @@ export default function Controls() {
     },
     [commitEditNodeOperations],
   );
+
+  const resetTransform = useCallback(() => {
+    const defaults = createDefaultEditDocumentV2().geometry;
+    commitEditNodeOperations([
+      {
+        nodeType: 'geometry',
+        patch: {
+          perspectiveCorrection: structuredClone(defaults.perspectiveCorrection),
+          transformAspect: defaults.transformAspect,
+          transformDistortion: defaults.transformDistortion,
+          transformHorizontal: defaults.transformHorizontal,
+          transformRotate: defaults.transformRotate,
+          transformScale: defaults.transformScale,
+          transformVertical: defaults.transformVertical,
+          transformXOffset: defaults.transformXOffset,
+          transformYOffset: defaults.transformYOffset,
+        },
+        type: 'patch-edit-document-node',
+      },
+    ]);
+  }, [commitEditNodeOperations]);
 
   const setDetailAdjustments = useCallback(
     (update: DetailAdjustmentUpdate) => {
@@ -1138,6 +1158,19 @@ export default function Controls() {
         sectionName: 'transform',
         step: 0.1,
         suffix: '°',
+      }),
+      sliderControl({
+        aliases: ['width', 'squeeze'],
+        fillOrigin: 'min',
+        id: TransformAdjustment.TransformAspect,
+        key: TransformAdjustment.TransformAspect,
+        label: TRANSFORM_LENS_CONTROL_LABELS.aspect,
+        max: 100,
+        min: -100,
+        sectionName: 'transform',
+        step: 1,
+        suffix: '%',
+        truncate: true,
       }),
       sliderControl({
         fillOrigin: 'min',
@@ -1881,14 +1914,14 @@ export default function Controls() {
         );
       case 'transform':
         return (
-          <TransformLens
+          <TransformPanel
             adjustments={{
               ...adjustments.geometry,
               ...selectEditDocumentNode(adjustments, 'lens_correction').params,
             }}
             selectedImage={selectedImage}
-            mode="transform"
             setAdjustments={setTransformLensAdjustments}
+            onReset={resetTransform}
             onDragStateChange={onDragStateChange}
           />
         );
