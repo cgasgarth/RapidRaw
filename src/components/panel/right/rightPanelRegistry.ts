@@ -226,6 +226,7 @@ export const DEVELOP_TOOL_PANEL_BY_ID = {
   crop: Panel.Crop,
   masking: Panel.Masks,
   remove: Panel.Masks,
+  toneCurve: Panel.Adjustments,
 } as const;
 
 export const EDITING_RIGHT_PANELS = [

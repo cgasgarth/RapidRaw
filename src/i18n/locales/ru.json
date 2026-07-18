@@ -329,6 +329,7 @@
       "resetAllPoint": "Сбросить все точечные кривые",
       "resetParametric": "Сбросить параметрическую кривую {{channel}}",
       "resetPoint": "Сбросить точечную кривую {{channel}}",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",

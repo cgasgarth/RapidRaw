@@ -22,6 +22,7 @@ export type ViewerToolId =
   | 'point-color'
   | 'retouch'
   | 'straighten'
+  | 'tone-curve'
   | 'tone-equalizer'
   | 'viewer-sampler'
   | 'white-balance';
@@ -111,6 +112,7 @@ const viewerToolControllers: Readonly<Record<ViewerToolId, ViewerToolController>
   'point-color': createController('point-color'),
   retouch: createController('retouch'),
   straighten: createController('straighten'),
+  'tone-curve': createController('tone-curve'),
   'tone-equalizer': createController('tone-equalizer'),
   'viewer-sampler': createController('viewer-sampler'),
   'white-balance': createController('white-balance'),
@@ -126,6 +128,7 @@ export const resolveViewerToolId = (tool: string): ViewerToolId => {
     tool === 'point-color' ||
     tool === 'retouch' ||
     tool === 'straighten' ||
+    tool === 'tone-curve' ||
     tool === 'tone-equalizer' ||
     tool === 'white-balance'
   )

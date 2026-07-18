@@ -329,6 +329,7 @@
       "resetAllPoint": "Redefinir Todas as Curvas de Pontos",
       "resetParametric": "Redefinir Curva Paramétrica {{channel}}",
       "resetPoint": "Redefinir Curva de Pontos {{channel}}",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",

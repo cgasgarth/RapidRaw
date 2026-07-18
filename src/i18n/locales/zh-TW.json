@@ -329,6 +329,7 @@
       "resetAllPoint": "重置所有點曲線",
       "resetParametric": "重置 {{channel}} 參數曲線",
       "resetPoint": "重置 {{channel}} 點曲線",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",

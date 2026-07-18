@@ -350,6 +350,7 @@
       "resetAllPoint": "Alle Punktkurven zurücksetzen",
       "resetParametric": "Parametrische {{channel}}-Kurve zurücksetzen",
       "resetPoint": "Punktkurve ({{channel}}) zurücksetzen",
+      "targetTool": "",
       "typed": {
         "addPoint": "",
         "channelMode": "",
