@@ -13,24 +13,36 @@ const baseUrl = `http://${host}:${String(port)}`;
 const sourcePath = '/tmp/rawengine-browser-harness/browser-harness.ARW';
 const persistenceSchema = z
   .object({
-    adjustments: z
+    editDocumentV2: z
       .object({
-        pointColor: z
+        nodes: z
           .object({
-            enabled: z.boolean(),
-            points: z.array(
-              z
-                .object({
-                  id: z.string().min(1),
-                  samples: z.array(
-                    z
-                      .object({ graphRevision: z.string().min(1), sourceSceneRevision: z.string().min(1) })
+            point_color: z
+              .object({
+                params: z
+                  .object({
+                    pointColor: z
+                      .object({
+                        enabled: z.boolean(),
+                        points: z.array(
+                          z
+                            .object({
+                              id: z.string().min(1),
+                              samples: z.array(
+                                z
+                                  .object({ graphRevision: z.string().min(1), sourceSceneRevision: z.string().min(1) })
+                                  .passthrough(),
+                              ),
+                            })
+                            .passthrough(),
+                        ),
+                        selectedPointId: z.string().nullable(),
+                      })
                       .passthrough(),
-                  ),
-                })
-                .passthrough(),
-            ),
-            selectedPointId: z.string().nullable(),
+                  })
+                  .strict(),
+              })
+              .passthrough(),
           })
           .passthrough(),
       })
@@ -182,7 +194,7 @@ try {
   await page.getByTestId('adjustments-inspector').waitFor({ timeout: 10_000 });
 
   await page.getByTestId('right-panel-switcher-button-color').click();
-  await page.getByTestId('color-workspace-tab-mixer').click();
+  await page.getByTestId('color-workspace-tab-point-color').click();
   const controls = page.getByTestId('point-color-controls');
   const identity = await controls.evaluate((element) => ({
     adjustmentRevision: element.dataset.commitAdjustmentRevision,
@@ -218,7 +230,7 @@ try {
     ),
   );
   if (
-    !persisted.adjustments.pointColor.enabled ||
+    !persisted.editDocumentV2.nodes.point_color.params.pointColor.enabled ||
     persisted.transaction.imageSessionId !== identity.imageSessionId ||
     persisted.transaction.baseAdjustmentRevision !== Number(identity.adjustmentRevision) ||
     persisted.transaction.nextAdjustmentRevision !== persisted.transaction.baseAdjustmentRevision + 1
@@ -276,12 +288,12 @@ try {
           .at(-1)?.args ?? null,
     ),
   );
-  const pickedPoint = pickerPersistence.adjustments.pointColor.points[0];
+  const pickedPoint = pickerPersistence.editDocumentV2.nodes.point_color.params.pointColor.points[0];
   if (
     pickerPersistence.transaction.nextAdjustmentRevision !== pickerPersistence.transaction.baseAdjustmentRevision + 1 ||
     !pickerPersistence.transaction.transactionId.startsWith('viewer-picker:point-color:') ||
     pickedPoint === undefined ||
-    pickerPersistence.adjustments.pointColor.selectedPointId !== pickedPoint.id ||
+    pickerPersistence.editDocumentV2.nodes.point_color.params.pointColor.selectedPointId !== pickedPoint.id ||
     pickedPoint.samples[0]?.graphRevision !== 'browser-harness-graph-fingerprint' ||
     pickedPoint.samples[0]?.sourceSceneRevision !== 'browser-harness-source-fingerprint'
   ) {
