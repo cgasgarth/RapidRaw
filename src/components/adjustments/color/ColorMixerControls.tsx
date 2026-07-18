@@ -1,6 +1,6 @@
 import cx from 'clsx';
-import { ChevronDown, Crosshair, Layers, RotateCcw } from 'lucide-react';
-import { type CSSProperties, type KeyboardEvent, type MouseEvent, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, Layers, RotateCcw } from 'lucide-react';
+import { type CSSProperties, type KeyboardEvent, type MouseEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BlackWhiteMixerChannel, BlackWhiteMixerSettings } from '../../../schemas/color/blackWhiteMixerSchemas';
 import type {
@@ -13,12 +13,10 @@ import type {
   ColorBalanceRgbRange,
   ColorBalanceRgbSettings,
 } from '../../../schemas/color/colorBalanceRgbSchemas';
-import { useUIStore } from '../../../store/useUIStore';
 import { type Adjustments, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
 import type { BlackWhiteMixerCommitIdentity } from '../../../utils/blackWhiteMixerEditTransaction';
 import type { ChannelMixerCommitIdentity } from '../../../utils/channelMixerEditTransaction';
 import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../utils/color/monochromePresets';
-import { applyColorMixerTargetedDelta, type ColorMixerTargetedMode } from '../../../utils/colorMixerTargetedAdjustment';
 import type { SelectiveColorMixerSettings } from '../../../utils/selectiveColorEditTransaction';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
@@ -35,10 +33,16 @@ interface ColorMixerControlsProps extends ColorPanelGroupProps {
   channelMixerCommitIdentity: ChannelMixerCommitIdentity | null;
   canCreateLocalAdjustmentFromActiveRange?: boolean;
   isForMask: boolean;
-  commitBlackWhiteMixer: (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => void;
+  commitBlackWhiteMixer: (
+    update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings,
+    interactionId?: string,
+  ) => void;
   commitChannelMixer: (update: (current: ChannelMixerSettings) => ChannelMixerSettings) => void;
   commitColorBalanceRgb: (update: (current: ColorBalanceRgbSettings) => ColorBalanceRgbSettings) => void;
-  commitSelectiveColorMixer: (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings) => void;
+  commitSelectiveColorMixer: (
+    update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings,
+    interactionId?: string,
+  ) => void;
   onCreateLocalAdjustmentFromActiveRange?: () => void;
   setActiveChannelMixerOutput: (output: ChannelMixerOutput) => void;
   setActiveColor: (color: BlackWhiteMixerChannel) => void;
@@ -65,7 +69,10 @@ export const enableBlackWhiteMixer = (
 };
 
 export const isBlackWhiteMixerModified = (settings: BlackWhiteMixerSettings): boolean =>
-  settings.enabled !== INITIAL_ADJUSTMENTS.blackWhiteMixer.enabled ||
+  settings.enabled !== INITIAL_ADJUSTMENTS.blackWhiteMixer.enabled || isBlackWhiteMixModified(settings);
+
+/** B&W Mix fields are reset independently from the Basic Treatment toggle. */
+export const isBlackWhiteMixModified = (settings: BlackWhiteMixerSettings): boolean =>
   settings.process !== INITIAL_ADJUSTMENTS.blackWhiteMixer.process ||
   settings.presetId !== INITIAL_ADJUSTMENTS.blackWhiteMixer.presetId ||
   settings.sourceClass !== INITIAL_ADJUSTMENTS.blackWhiteMixer.sourceClass ||
@@ -239,6 +246,26 @@ export const getNextAdvancedMixerSelection = <T extends string>(items: Array<T>,
   return items[(activeIndex + direction + items.length) % items.length] ?? active;
 };
 
+type MixerView = 'hsl' | 'color';
+type HslMode = ColorAdjustment.Hue | ColorAdjustment.Saturation | ColorAdjustment.Luminance;
+
+interface MixerInteraction {
+  blackWhite: BlackWhiteMixerSettings;
+  changedBlackWhite: boolean;
+  changedSelective: boolean;
+  id: string;
+  selective: SelectiveColorMixerSettings;
+}
+
+const hslModes: Array<{
+  key: HslMode;
+  labelKey: `adjustments.color.${'hue' | 'saturation' | 'luminance'}`;
+}> = [
+  { key: ColorAdjustment.Hue, labelKey: 'adjustments.color.hue' },
+  { key: ColorAdjustment.Saturation, labelKey: 'adjustments.color.saturation' },
+  { key: ColorAdjustment.Luminance, labelKey: 'adjustments.color.luminance' },
+];
+
 export const ColorMixerControls = ({
   activeChannelMixerOutput,
   activeColor,
@@ -261,17 +288,9 @@ export const ColorMixerControls = ({
 }: ColorMixerControlsProps) => {
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
-  const [mixerMode, setMixerMode] = useState<'color' | 'hsl'>('color');
-  const targetedMode = useUIStore((state) => state.colorMixerTargetedMode);
-  const targetedReceipt = useUIStore((state) => state.colorMixerTargetedReceipt);
-  const setUI = useUIStore((state) => state.setUI);
-  const canTargetFromImage = !isForMask && blackWhiteMixerCommitIdentity !== null;
-  useEffect(
-    () => () => {
-      setUI({ colorMixerTargetedMode: null, colorMixerTargetedReceipt: null });
-    },
-    [setUI],
-  );
+  const [mixerView, setMixerView] = useState<MixerView>('hsl');
+  const [hslMode, setHslMode] = useState<HslMode>(ColorAdjustment.Hue);
+  const interactionRef = useRef<MixerInteraction | null>(null);
   const ranges = useMemo(
     () =>
       SELECTIVE_COLOR_RANGES.map((range) => {
@@ -309,6 +328,10 @@ export const ColorMixerControls = ({
     activeRangeControls.widthDegrees !== initialRangeControls.widthDegrees ||
     activeRangeControls.falloffSmoothness !== initialRangeControls.falloffSmoothness;
   const hasMixerChanges = ranges.some((range) => range.edited);
+  const blackWhite = adjustments.blackWhiteMixer;
+  const isBlackWhiteTreatment = blackWhite.enabled;
+  const blackWhiteModified = isBlackWhiteMixerModified(blackWhite);
+  const blackWhiteMixModified = isBlackWhiteMixModified(blackWhite);
   const hslSummary = [
     `H ${formatSignedInteger(currentHsl.hue)}`,
     `S ${formatSignedInteger(currentHsl.saturation)}`,
@@ -316,32 +339,51 @@ export const ColorMixerControls = ({
   ].join(' / ');
   const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
   const hueBandSegments = getHueBandSegments(activeRangeControls.centerHueDegrees, activeRangeControls.widthDegrees);
-  const targetedWeight = (key: BlackWhiteMixerChannel): number =>
-    targetedReceipt?.bands.find((band) => band.key === key)?.weight ?? 0;
-  const toggleTargetedMode = (mode: ColorMixerTargetedMode) => {
-    setUI({
-      colorMixerTargetedMode: targetedMode === mode ? null : mode,
-      colorMixerTargetedReceipt: null,
-      pointColorPickerActive: false,
-      toneEqualizerPickerActive: false,
-    });
-    if (targetedMode !== mode) setMixerMode('hsl');
+
+  const beginInteraction = () => {
+    if (interactionRef.current !== null) return;
+    interactionRef.current = {
+      blackWhite: structuredClone(blackWhite),
+      changedBlackWhite: false,
+      changedSelective: false,
+      id: `color-mixer:${crypto.randomUUID()}`,
+      selective: {
+        hsl: structuredClone(adjustments.hsl),
+        selectiveColorRangeControls: structuredClone(adjustments.selectiveColorRangeControls),
+      },
+    };
   };
-  const handleTargetedKeyDown = (event: KeyboardEvent<HTMLButtonElement>, mode: ColorMixerTargetedMode) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      setUI({ colorMixerTargetedMode: null, colorMixerTargetedReceipt: null });
-      return;
+
+  const finishInteraction = () => {
+    interactionRef.current = null;
+  };
+
+  const cancelInteraction = () => {
+    const interaction = interactionRef.current;
+    if (interaction === null) return;
+    if (interaction.changedSelective) {
+      commitSelectiveColorMixer(() => structuredClone(interaction.selective), interaction.id);
     }
-    if (!targetedReceipt || targetedMode !== mode || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
-    event.preventDefault();
-    const delta = event.key === 'ArrowUp' ? 5 : -5;
-    commitSelectiveColorMixer((previous) => applyColorMixerTargetedDelta(previous, mode, targetedReceipt.bands, delta));
-    setUI({ colorMixerTargetedReceipt: { ...targetedReceipt, delta: targetedReceipt.delta + delta } });
+    if (interaction.changedBlackWhite) {
+      commitBlackWhiteMixer(() => structuredClone(interaction.blackWhite), interaction.id);
+    }
+    interactionRef.current = null;
+  };
+
+  const commitSelective = (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings) => {
+    const interaction = interactionRef.current;
+    if (interaction !== null) interaction.changedSelective = true;
+    commitSelectiveColorMixer(update, interaction?.id);
+  };
+
+  const commitBlackWhite = (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => {
+    const interaction = interactionRef.current;
+    if (interaction !== null) interaction.changedBlackWhite = true;
+    commitBlackWhiteMixer(update, interaction?.id);
   };
 
   const handleHslChange = (key: ColorAdjustment, value: number) => {
-    commitSelectiveColorMixer((previous) => ({
+    commitSelective((previous) => ({
       ...previous,
       hsl: { ...previous.hsl, [activeColor]: { ...previous.hsl[activeColor], [key]: value } },
     }));
@@ -351,7 +393,7 @@ export const ColorMixerControls = ({
     key: keyof Adjustments['selectiveColorRangeControls'][BlackWhiteMixerChannel],
     value: number,
   ) => {
-    commitSelectiveColorMixer((previous) => ({
+    commitSelective((previous) => ({
       ...previous,
       selectiveColorRangeControls: {
         ...previous.selectiveColorRangeControls,
@@ -361,14 +403,14 @@ export const ColorMixerControls = ({
   };
 
   const resetActiveHsl = () => {
-    commitSelectiveColorMixer((previous) => ({
+    commitSelective((previous) => ({
       ...previous,
       hsl: { ...previous.hsl, [activeColor]: { ...INITIAL_ADJUSTMENTS.hsl[activeColor] } },
     }));
   };
 
   const resetActiveLocalRange = () => {
-    commitSelectiveColorMixer((previous) => ({
+    commitSelective((previous) => ({
       ...previous,
       selectiveColorRangeControls: {
         ...previous.selectiveColorRangeControls,
@@ -378,11 +420,28 @@ export const ColorMixerControls = ({
   };
 
   const resetMixer = () => {
-    setUI({ colorMixerTargetedMode: null, colorMixerTargetedReceipt: null });
-    commitSelectiveColorMixer((previous) => ({
+    commitSelective((previous) => ({
       ...previous,
       hsl: structuredClone(INITIAL_ADJUSTMENTS.hsl),
       selectiveColorRangeControls: structuredClone(INITIAL_ADJUSTMENTS.selectiveColorRangeControls),
+    }));
+  };
+
+  const resetBlackWhiteMix = () => {
+    commitBlackWhite((current) => ({
+      ...structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer),
+      enabled: current.enabled,
+    }));
+  };
+
+  const resetBlackWhiteChannel = () => {
+    commitBlackWhite((current) => ({
+      ...current,
+      presetId: 'manual',
+      weights: {
+        ...current.weights,
+        [activeColor]: INITIAL_ADJUSTMENTS.blackWhiteMixer.weights[activeColor],
+      },
     }));
   };
 
@@ -392,16 +451,21 @@ export const ColorMixerControls = ({
     event.preventDefault();
     setActiveColor(nextRange);
     requestAnimationFrame(() => {
-      document.querySelector<HTMLElement>(`[data-testid="selective-color-range-${nextRange}"]`)?.focus();
+      document
+        .querySelector<HTMLElement>(
+          `[data-testid="selective-color-range-${nextRange}"], [data-testid="black-white-mixer-channel-${nextRange}"]`,
+        )
+        ?.focus();
     });
   };
 
   return (
-    <div data-testid="color-mixer-controls">
+    <div data-testid="color-mixer-controls" data-treatment={isBlackWhiteTreatment ? 'black_and_white' : 'color'}>
       <section
         className="border-b border-editor-border pb-2"
         data-active-range={activeColor}
         data-dirty={String(hasActiveHslChanges)}
+        data-mixer-dirty={String(isBlackWhiteTreatment ? blackWhiteMixModified : hasMixerChanges)}
         data-testid="selective-color-range-controls"
       >
         <CompactInspectorSectionHeader
@@ -410,285 +474,475 @@ export const ColorMixerControls = ({
               aria-label={t('adjustments.basic.reset')}
               className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
               data-testid="selective-color-reset-mixer"
-              disabled={!hasMixerChanges}
-              onClick={resetMixer}
+              disabled={isBlackWhiteTreatment ? !blackWhiteMixModified : !hasMixerChanges}
+              onClick={isBlackWhiteTreatment ? resetBlackWhiteMix : resetMixer}
               title={t('adjustments.basic.reset')}
               type="button"
             >
               <RotateCcw size={13} />
             </button>
           }
-          modified={hasMixerChanges}
+          modified={isBlackWhiteTreatment ? blackWhiteMixModified : hasMixerChanges}
           modifiedLabel={modifiedLabel}
-          summary={hslSummary}
-          title={t('adjustments.color.colorMixer')}
+          summary={
+            isBlackWhiteTreatment
+              ? `${t(activeRange.labelKey)} ${formatSignedInteger(blackWhite.weights[activeColor])}`
+              : hslSummary
+          }
+          title={
+            isBlackWhiteTreatment ? t('adjustments.color.blackWhiteMixer.title') : t('adjustments.color.colorMixer')
+          }
         />
 
-        <div
-          aria-label={t('adjustments.color.colorMixer')}
-          className="mb-1 grid min-h-7 w-full grid-cols-2 gap-px rounded-sm border border-editor-border bg-editor-panel-well p-px"
-          role="radiogroup"
-        >
-          {(['color', 'hsl'] as const).map((mode) => (
-            <button
-              aria-checked={mixerMode === mode}
-              className="min-w-0 rounded-sm px-1 text-[11px] font-medium leading-4 text-text-secondary transition-colors hover:bg-editor-hover hover:text-text-primary focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring aria-checked:bg-editor-selected-quiet aria-checked:text-editor-selected-quiet-text"
-              key={mode}
-              onClick={() => setMixerMode(mode)}
-              role="radio"
-              type="button"
-            >
-              {mode === 'color' ? 'Color' : 'HSL'}
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-1 flex items-center gap-1" data-testid="color-mixer-targeted-adjustment">
-          <Crosshair aria-hidden="true" className="text-text-secondary" size={13} />
-          <span className="mr-1 text-[10px] text-text-secondary">
-            {t('adjustments.color.targetedAdjustment', { defaultValue: 'Target' })}
-          </span>
-          {(['hue', 'saturation', 'luminance'] as const).map((mode) => (
-            <button
-              aria-pressed={targetedMode === mode}
-              className={cx(
-                'rounded border px-1.5 py-0.5 text-[10px] capitalize',
-                targetedMode === mode
-                  ? 'border-editor-primary-active bg-editor-selected-quiet text-text-primary'
-                  : 'border-editor-border text-text-secondary hover:bg-editor-hover hover:text-text-primary',
-              )}
-              data-testid={`color-mixer-target-${mode}`}
-              disabled={!canTargetFromImage}
-              key={mode}
-              onClick={() => toggleTargetedMode(mode)}
-              onKeyDown={(event) => handleTargetedKeyDown(event, mode)}
-              type="button"
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-
-        <div aria-label={t('adjustments.color.colorMixer')} className="grid grid-cols-8 gap-px" role="tablist">
-          {ranges.map((range) => (
-            <button
-              aria-label={t('adjustments.color.ariaSelectColor', { name: range.label })}
-              aria-selected={activeColor === range.key}
-              className={cx(
-                'relative flex h-9 min-w-0 flex-col items-center justify-center gap-0.5 border-b-2 px-px text-[9px] font-medium leading-3 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
-                activeColor === range.key
-                  ? 'border-editor-primary-active bg-editor-selected-quiet text-text-primary'
-                  : 'border-transparent text-text-tertiary hover:bg-editor-panel-raised hover:text-text-primary',
-                targetedWeight(range.key) > 0 && 'ring-1 ring-editor-info/70',
-              )}
-              data-edited={String(range.edited)}
-              data-targeted-weight={targetedWeight(range.key).toFixed(3)}
-              data-testid={`selective-color-range-${range.key}`}
-              key={range.key}
-              onClick={() => setActiveColor(range.key)}
-              onKeyDown={handleRangeKeyDown}
-              role="tab"
-              tabIndex={activeColor === range.key ? 0 : -1}
-              title={`${range.label}${range.edited ? `, ${modifiedLabel}` : ''}`}
-              type="button"
-            >
-              <span className="h-3 w-3 rounded-full border border-black/25" style={{ backgroundColor: range.color }} />
-              <span className="max-w-full truncate">{range.label.slice(0, 2)}</span>
-              {range.edited && (
-                <span aria-hidden="true" className="absolute right-0.5 top-0.5 h-1 w-1 rounded-full bg-editor-info" />
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="my-1.5 flex min-h-10 items-center gap-2 border-y border-editor-border bg-editor-panel-well px-2 py-1">
-          <span
-            className="h-7 w-7 shrink-0 rounded-sm border border-black/25"
-            style={{ backgroundColor: activeRange.color }}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-1.5">
-              <strong
-                className="truncate text-[12px] leading-4 text-text-primary"
-                data-testid="selective-color-active-range-chip"
-              >
-                {t(activeRange.labelKey)}
-              </strong>
-              {(hasActiveHslChanges || hasActiveLocalRangeChanges) && (
-                <span className="text-[10px] text-editor-info">{modifiedLabel}</span>
-              )}
+        {isBlackWhiteTreatment ? (
+          <div data-testid="black-white-mix-controls" data-treatment="black_and_white">
+            <div className="grid grid-cols-2 gap-1 px-1 pt-1">
+              <label className="grid gap-0.5 text-[10px] text-text-secondary">
+                <span>{t('adjustments.color.blackWhiteMixer.filterPreset', { defaultValue: 'Filter preset' })}</span>
+                <select
+                  aria-label={t('adjustments.color.blackWhiteMixer.filterPresetAria', {
+                    defaultValue: 'Black and White filter preset',
+                  })}
+                  className="h-6 rounded border border-editor-border bg-editor-panel px-1 text-[11px] text-text-primary"
+                  data-testid="black-white-mix-preset"
+                  onChange={(event) => {
+                    const presetId = event.target.value as BlackWhiteMixerSettings['presetId'];
+                    commitBlackWhite((current) => applyMonochromePreset(current, presetId));
+                  }}
+                  value={blackWhite.presetId}
+                >
+                  <option value="manual">
+                    {t('adjustments.color.blackWhiteMixer.manualResponse', { defaultValue: 'Manual response' })}
+                  </option>
+                  {MONOCHROME_PRESETS.map((preset) => (
+                    <option key={preset.id} title={preset.description} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-0.5 text-[10px] text-text-secondary">
+                <span>{t('adjustments.color.blackWhiteMixer.sourceClass', { defaultValue: 'Source class' })}</span>
+                <select
+                  aria-label={t('adjustments.color.blackWhiteMixer.sourceClassAria', {
+                    defaultValue: 'Black and White source class',
+                  })}
+                  className="h-6 rounded border border-editor-border bg-editor-panel px-1 text-[11px] text-text-primary"
+                  data-testid="black-white-mix-source-class"
+                  onChange={(event) => {
+                    const sourceClass = event.target.value as BlackWhiteMixerSettings['sourceClass'];
+                    commitBlackWhite((current) => ({ ...current, sourceClass }));
+                  }}
+                  value={blackWhite.sourceClass}
+                >
+                  <option value="color_source">
+                    {t('adjustments.color.blackWhiteMixer.sourceColor', { defaultValue: 'Color source' })}
+                  </option>
+                  <option value="monochrome_sensor">
+                    {t('adjustments.color.blackWhiteMixer.sourceMonochromeSensor', {
+                      defaultValue: 'Monochrome sensor',
+                    })}
+                  </option>
+                  <option value="encoded_grayscale">
+                    {t('adjustments.color.blackWhiteMixer.sourceEncodedGrayscale', {
+                      defaultValue: 'Encoded grayscale',
+                    })}
+                  </option>
+                  <option value="already_monochrome_working">
+                    {t('adjustments.color.blackWhiteMixer.sourceWorkingMonochrome', {
+                      defaultValue: 'Working monochrome',
+                    })}
+                  </option>
+                </select>
+              </label>
             </div>
-            <div className="font-mono text-[10px] leading-4 tabular-nums text-text-secondary">{hslSummary}</div>
-          </div>
-          <button
-            aria-label={t('adjustments.color.resetActiveRange')}
-            className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
-            data-testid="selective-color-reset-active-range"
-            disabled={!hasActiveHslChanges}
-            onClick={resetActiveHsl}
-            title={t('adjustments.color.resetActiveRange')}
-            type="button"
-          >
-            <RotateCcw size={13} />
-          </button>
-        </div>
-
-        <div className="grid gap-1">
-          {(
-            [
-              [ColorAdjustment.Hue, t('adjustments.color.hue'), currentHsl.hue, `hue-slider-${activeColor}`],
-              [
-                ColorAdjustment.Saturation,
-                t('adjustments.color.saturation'),
-                currentHsl.saturation,
-                `sat-slider-${activeColor}`,
-              ],
-              [ColorAdjustment.Luminance, t('adjustments.color.luminance'), currentHsl.luminance, undefined],
-            ] as const
-          ).map(([key, label, value, trackClassName]) => (
-            <AdjustmentSlider
-              defaultValue={INITIAL_ADJUSTMENTS.hsl[activeColor][key]}
-              density="compact"
-              key={key}
-              label={label}
-              max={100}
-              min={-100}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(nextValue) => handleHslChange(key, nextValue)}
-              step={1}
-              {...(trackClassName ? { trackClassName } : {})}
-              value={value}
-            />
-          ))}
-        </div>
-      </section>
-
-      {!isForMask && (
-        <details
-          className="group border-b border-editor-border"
-          data-scope="local-adjustment"
-          data-testid="local-color-range-adjustment-disclosure"
-        >
-          <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
-            <CompactInspectorSectionHeader
-              actions={
-                <ChevronDown
-                  aria-hidden="true"
-                  className="text-text-secondary transition-transform group-open:rotate-180"
-                  size={14}
-                />
-              }
-              modified={hasActiveLocalRangeChanges}
-              modifiedLabel={modifiedLabel}
-              summary={`${Math.round(activeRangeControls.centerHueDegrees)}° / ${Math.round(activeRangeControls.widthDegrees)}°`}
-              title="Range"
-            />
-          </summary>
-          <div
-            className="grid gap-1 border-t border-editor-border pb-1.5 pt-1"
-            data-scope="local-adjustment"
-            data-testid="local-color-range-adjustment-controls"
-          >
             <div
-              aria-label={t('adjustments.color.rangeCenter')}
-              className="relative mb-1 h-4 overflow-hidden rounded-sm border border-editor-border hue-range-track"
-              data-testid="selective-color-hue-band"
+              aria-label={t('adjustments.color.blackWhiteMixer.title')}
+              className="grid grid-cols-8 gap-px py-1"
+              role="tablist"
             >
-              <div className="absolute inset-0 bg-black/45" />
-              {hueBandSegments.map((segment, index) => (
-                <span
-                  className="absolute inset-y-0 border-x border-white/80 bg-white/15"
-                  key={`${segment.leftPercent}-${index}`}
-                  style={{ left: `${segment.leftPercent}%`, width: `${segment.widthPercent}%` } as CSSProperties}
-                />
+              {ranges.map((range) => {
+                const edited = blackWhite.weights[range.key] !== INITIAL_ADJUSTMENTS.blackWhiteMixer.weights[range.key];
+                return (
+                  <button
+                    aria-label={t('adjustments.color.blackWhiteMixer.ariaSelectChannel', { name: range.label })}
+                    aria-selected={activeColor === range.key}
+                    className={cx(
+                      'relative flex h-9 min-w-0 flex-col items-center justify-center gap-0.5 border-b-2 px-px text-[9px] font-medium leading-3 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring',
+                      activeColor === range.key
+                        ? 'border-editor-primary-active bg-editor-selected-quiet text-text-primary'
+                        : 'border-transparent text-text-tertiary hover:bg-editor-panel-raised hover:text-text-primary',
+                    )}
+                    data-edited={String(edited)}
+                    data-testid={`black-white-mixer-channel-${range.key}`}
+                    key={range.key}
+                    onClick={() => setActiveColor(range.key)}
+                    onKeyDown={handleRangeKeyDown}
+                    role="tab"
+                    tabIndex={activeColor === range.key ? 0 : -1}
+                    type="button"
+                  >
+                    <span
+                      className="h-3 w-3 rounded-full border border-black/25"
+                      style={{ backgroundColor: range.color }}
+                    />
+                    <span className="max-w-full truncate">{range.label.slice(0, 2)}</span>
+                    {edited && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute right-0.5 top-0.5 h-1 w-1 rounded-full bg-editor-info"
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="grid gap-1 px-1" data-testid="black-white-mix-channel-row">
+              <AdjustmentSlider
+                defaultValue={INITIAL_ADJUSTMENTS.blackWhiteMixer.weights[activeColor]}
+                density="compact"
+                label={t('adjustments.color.blackWhiteMixer.contribution', { name: t(activeRange.labelKey) })}
+                max={100}
+                min={-100}
+                onDragStateChange={onDragStateChange}
+                onInteractionCancel={cancelInteraction}
+                onInteractionCommit={finishInteraction}
+                onInteractionStart={beginInteraction}
+                onValueChange={(value) =>
+                  commitBlackWhite((current) => ({
+                    ...current,
+                    presetId: 'manual',
+                    weights: { ...current.weights, [activeColor]: value },
+                  }))
+                }
+                step={1}
+                testId="black-white-mixer-contribution"
+                value={blackWhite.weights[activeColor]}
+              />
+              <div className="flex justify-end">
+                <button
+                  aria-label={t('adjustments.color.resetActiveRange')}
+                  className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
+                  data-testid="black-white-mixer-reset-channel"
+                  disabled={
+                    blackWhite.weights[activeColor] === INITIAL_ADJUSTMENTS.blackWhiteMixer.weights[activeColor]
+                  }
+                  onClick={resetBlackWhiteChannel}
+                  title={t('adjustments.color.resetActiveRange')}
+                  type="button"
+                >
+                  <RotateCcw size={13} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div
+              aria-label={t('adjustments.color.colorMixer')}
+              className="mb-1 grid min-h-7 w-full grid-cols-2 gap-px rounded-sm border border-editor-border bg-editor-panel-well p-px"
+              role="radiogroup"
+            >
+              {(['hsl', 'color'] as const).map((view) => (
+                <button
+                  aria-checked={mixerView === view}
+                  className="min-w-0 rounded-sm px-1 text-[11px] font-medium leading-4 text-text-secondary transition-colors hover:bg-editor-hover hover:text-text-primary focus-visible:z-10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring aria-checked:bg-editor-selected-quiet aria-checked:text-editor-selected-quiet-text"
+                  data-testid={`color-mixer-view-${view}`}
+                  key={view}
+                  onClick={() => setMixerView(view)}
+                  role="radio"
+                  type="button"
+                >
+                  {view === 'hsl' ? 'HSL' : 'Color'}
+                </button>
               ))}
             </div>
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.color.rangeCenter')}
-              max={359}
-              min={0}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => handleRangeControlChange('centerHueDegrees', value)}
-              step={1}
-              suffix="°"
-              value={Math.round(activeRangeControls.centerHueDegrees)}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.color.rangeWidth')}
-              max={180}
-              min={10}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => handleRangeControlChange('widthDegrees', value)}
-              step={1}
-              suffix="°"
-              value={Math.round(activeRangeControls.widthDegrees)}
-            />
-            <AdjustmentSlider
-              density="compact"
-              label={t('adjustments.color.falloffSmoothness')}
-              max={40}
-              min={3}
-              onDragStateChange={onDragStateChange}
-              onValueChange={(value) => handleRangeControlChange('falloffSmoothness', value / 10)}
-              step={1}
-              value={Math.round(activeRangeControls.falloffSmoothness * 10)}
-            />
-            <div className="mt-1 flex items-center justify-between gap-2">
+            {mixerView === 'hsl' && (
+              <div
+                aria-label={t('adjustments.color.colorMixer')}
+                className="mb-1 grid grid-cols-3 gap-px rounded-sm border border-editor-border bg-editor-panel-well p-px"
+                role="radiogroup"
+              >
+                {hslModes.map((mode) => (
+                  <button
+                    aria-checked={hslMode === mode.key}
+                    className="min-w-0 rounded-sm px-1 text-[10px] font-medium leading-4 text-text-secondary transition-colors hover:bg-editor-hover hover:text-text-primary aria-checked:bg-editor-selected-quiet aria-checked:text-editor-selected-quiet-text"
+                    data-testid={`color-mixer-mode-${mode.key}`}
+                    key={mode.key}
+                    onClick={() => setHslMode(mode.key)}
+                    role="radio"
+                    type="button"
+                  >
+                    {t(mode.labelKey)}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="my-1 flex min-h-9 items-center gap-2 border-y border-editor-border bg-editor-panel-well px-2 py-1">
+              <span
+                className="h-6 w-6 shrink-0 rounded-sm border border-black/25"
+                style={{ backgroundColor: activeRange.color }}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <strong
+                    className="truncate text-[11px] leading-4 text-text-primary"
+                    data-testid="selective-color-active-range-chip"
+                  >
+                    {t(activeRange.labelKey)}
+                  </strong>
+                  {hasActiveHslChanges && <span className="text-[10px] text-editor-info">{modifiedLabel}</span>}
+                </div>
+                <div className="font-mono text-[10px] leading-4 tabular-nums text-text-secondary">{hslSummary}</div>
+              </div>
               <button
                 aria-label={t('adjustments.color.resetActiveRange')}
                 className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
-                data-testid="local-color-range-reset"
-                disabled={!hasActiveLocalRangeChanges}
-                onClick={resetActiveLocalRange}
+                data-testid="selective-color-reset-active-range"
+                disabled={!hasActiveHslChanges}
+                onClick={resetActiveHsl}
                 title={t('adjustments.color.resetActiveRange')}
                 type="button"
               >
                 <RotateCcw size={13} />
               </button>
-              <button
-                className={cx(
-                  density.actionButton.base,
-                  'w-fit gap-1 border border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
-                )}
-                data-command-type="layerMask.createRangeMask"
-                data-range-key={activeColor}
-                data-testid="selective-color-create-local-adjustment"
-                disabled={
-                  !canCreateLocalAdjustmentFromActiveRange || onCreateLocalAdjustmentFromActiveRange === undefined
-                }
-                onClick={onCreateLocalAdjustmentFromActiveRange}
-                title={
-                  !canCreateLocalAdjustmentFromActiveRange ? 'Select an image to create a local adjustment' : undefined
-                }
-                type="button"
-              >
-                <Layers size={13} />
-                <span>{t('adjustments.color.createLocalAdjustmentFromRange')}</span>
-              </button>
             </div>
-          </div>
-        </details>
-      )}
+            <div className="grid gap-1" data-testid="color-mixer-channel-rows">
+              {ranges.map((range) => {
+                const channelEdited = range.edited;
+                const renderSlider = (key: HslMode) => (
+                  <AdjustmentSlider
+                    defaultValue={INITIAL_ADJUSTMENTS.hsl[range.key][key]}
+                    density="compact"
+                    label={t(hslModes.find((mode) => mode.key === key)?.labelKey ?? 'adjustments.color.hue')}
+                    max={100}
+                    min={-100}
+                    onDragStateChange={onDragStateChange}
+                    onInteractionCancel={cancelInteraction}
+                    onInteractionCommit={finishInteraction}
+                    onInteractionStart={beginInteraction}
+                    onValueChange={(value) => handleHslChange(key, value)}
+                    step={1}
+                    testId={`color-mixer-${key}-${range.key}`}
+                    value={range.hsl[key]}
+                  />
+                );
+                return (
+                  <div
+                    className="grid gap-0.5 rounded-sm border border-editor-border bg-editor-panel-well px-1 py-0.5"
+                    data-edited={String(channelEdited)}
+                    data-testid={`color-mixer-row-${range.key}`}
+                    key={range.key}
+                  >
+                    <div className="flex min-h-6 items-center gap-1.5">
+                      <button
+                        aria-label={t('adjustments.color.ariaSelectColor', { name: range.label })}
+                        aria-selected={activeColor === range.key}
+                        className={cx(
+                          'flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-left text-[10px] text-text-secondary hover:bg-editor-hover hover:text-text-primary',
+                          activeColor === range.key && 'text-text-primary',
+                        )}
+                        data-edited={String(channelEdited)}
+                        data-color-mixer-channel={range.key}
+                        data-testid={`selective-color-range-${range.key}`}
+                        onClick={() => setActiveColor(range.key)}
+                        onKeyDown={handleRangeKeyDown}
+                        role="tab"
+                        tabIndex={activeColor === range.key ? 0 : -1}
+                        type="button"
+                      >
+                        <span
+                          className="h-3.5 w-3.5 shrink-0 rounded-full border border-black/25"
+                          style={{ backgroundColor: range.color }}
+                        />
+                        <span className="truncate">{range.label}</span>
+                        {channelEdited && (
+                          <span
+                            aria-label={modifiedLabel}
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-editor-info"
+                          />
+                        )}
+                      </button>
+                      {mixerView === 'hsl' && (
+                        <span className="font-mono text-[10px] tabular-nums text-text-secondary">
+                          {formatSignedInteger(range.hsl[hslMode])}
+                        </span>
+                      )}
+                      <button
+                        aria-label={`${t('adjustments.color.resetActiveRange')} ${range.label}`}
+                        className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
+                        data-testid={`color-mixer-reset-${range.key}`}
+                        disabled={!channelEdited}
+                        onClick={() =>
+                          commitSelective((previous) => ({
+                            ...previous,
+                            hsl: { ...previous.hsl, [range.key]: { ...INITIAL_ADJUSTMENTS.hsl[range.key] } },
+                          }))
+                        }
+                        title={t('adjustments.color.resetActiveRange')}
+                        type="button"
+                      >
+                        <RotateCcw size={12} />
+                      </button>
+                    </div>
+                    {mixerView === 'hsl' ? (
+                      renderSlider(hslMode)
+                    ) : (
+                      <div className="grid gap-0.5">
+                        {hslModes.map((mode) => (
+                          <span key={mode.key}>{renderSlider(mode.key)}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </section>
 
       {!isForMask && (
-        <AdvancedMixerControls
-          activeChannelMixerOutput={activeChannelMixerOutput}
-          activeColor={activeColor}
-          activeColorBalanceRange={activeColorBalanceRange}
-          adjustmentVisibility={adjustmentVisibility}
-          adjustments={adjustments}
-          blackWhiteMixerCommitIdentity={blackWhiteMixerCommitIdentity}
-          channelMixerCommitIdentity={channelMixerCommitIdentity}
-          commitBlackWhiteMixer={commitBlackWhiteMixer}
-          commitChannelMixer={commitChannelMixer}
-          commitColorBalanceRgb={commitColorBalanceRgb}
-          onDragStateChange={onDragStateChange}
-          setActiveChannelMixerOutput={setActiveChannelMixerOutput}
-          setActiveColor={setActiveColor}
-          setActiveColorBalanceRange={setActiveColorBalanceRange}
-        />
+        <details className="group border-b border-editor-border" data-testid="advanced-utilities-disclosure">
+          <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
+            <CompactInspectorSectionHeader
+              actions={
+                <ChevronDown aria-hidden="true" className="text-text-secondary group-open:rotate-180" size={14} />
+              }
+              modified={
+                hasActiveLocalRangeChanges ||
+                (!isBlackWhiteTreatment && blackWhiteModified) ||
+                isColorBalanceRgbModified(adjustments.colorBalanceRgb) ||
+                isChannelMixerModified(adjustments.channelMixer)
+              }
+              modifiedLabel={modifiedLabel}
+              summary="Selective color, RGB balance, channel tools"
+              title="Advanced / Utilities"
+            />
+          </summary>
+          <div className="border-t border-editor-border">
+            <details
+              className="group border-b border-editor-border"
+              data-scope="local-adjustment"
+              data-testid="local-color-range-adjustment-disclosure"
+            >
+              <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
+                <CompactInspectorSectionHeader
+                  actions={
+                    <ChevronDown aria-hidden="true" className="text-text-secondary group-open:rotate-180" size={14} />
+                  }
+                  modified={hasActiveLocalRangeChanges}
+                  modifiedLabel={modifiedLabel}
+                  summary={`${Math.round(activeRangeControls.centerHueDegrees)}° / ${Math.round(activeRangeControls.widthDegrees)}°`}
+                  title="Range"
+                />
+              </summary>
+              <div
+                className="grid gap-1 border-t border-editor-border pb-1.5 pt-1"
+                data-scope="local-adjustment"
+                data-testid="local-color-range-adjustment-controls"
+              >
+                <div
+                  aria-label={t('adjustments.color.rangeCenter')}
+                  className="relative mb-1 h-4 overflow-hidden rounded-sm border border-editor-border hue-range-track"
+                  data-testid="selective-color-hue-band"
+                >
+                  <div className="absolute inset-0 bg-black/45" />
+                  {hueBandSegments.map((segment, index) => (
+                    <span
+                      className="absolute inset-y-0 border-x border-white/80 bg-white/15"
+                      key={`${segment.leftPercent}-${index}`}
+                      style={{ left: `${segment.leftPercent}%`, width: `${segment.widthPercent}%` } as CSSProperties}
+                    />
+                  ))}
+                </div>
+                {(
+                  [
+                    ['centerHueDegrees', t('adjustments.color.rangeCenter'), 0, 359, '°'],
+                    ['widthDegrees', t('adjustments.color.rangeWidth'), 10, 180, '°'],
+                    ['falloffSmoothness', t('adjustments.color.falloffSmoothness'), 3, 40, ''],
+                  ] as const
+                ).map(([key, label, min, max, suffix]) => (
+                  <AdjustmentSlider
+                    density="compact"
+                    key={key}
+                    label={label}
+                    max={max}
+                    min={min}
+                    onDragStateChange={onDragStateChange}
+                    onInteractionCancel={cancelInteraction}
+                    onInteractionCommit={finishInteraction}
+                    onInteractionStart={beginInteraction}
+                    onValueChange={(value) => {
+                      if (key === 'widthDegrees') return handleRangeControlChange('widthDegrees', value);
+                      if (key === 'centerHueDegrees') return handleRangeControlChange('centerHueDegrees', value);
+                      return handleRangeControlChange('falloffSmoothness', value / 10);
+                    }}
+                    step={1}
+                    suffix={suffix}
+                    value={
+                      key === 'falloffSmoothness'
+                        ? Math.round(activeRangeControls[key] * 10)
+                        : Math.round(activeRangeControls[key])
+                    }
+                  />
+                ))}
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <button
+                    aria-label={t('adjustments.color.resetActiveRange')}
+                    className={cx(density.actionButton.base, density.actionButton.icon, density.actionButton.quiet)}
+                    data-testid="local-color-range-reset"
+                    disabled={!hasActiveLocalRangeChanges}
+                    onClick={resetActiveLocalRange}
+                    title={t('adjustments.color.resetActiveRange')}
+                    type="button"
+                  >
+                    <RotateCcw size={13} />
+                  </button>
+                  <button
+                    className={cx(
+                      density.actionButton.base,
+                      'w-fit gap-1 border border-editor-border bg-editor-panel text-text-secondary hover:bg-editor-panel-raised hover:text-text-primary',
+                    )}
+                    data-command-type="layerMask.createRangeMask"
+                    data-range-key={activeColor}
+                    data-testid="selective-color-create-local-adjustment"
+                    disabled={
+                      !canCreateLocalAdjustmentFromActiveRange || onCreateLocalAdjustmentFromActiveRange === undefined
+                    }
+                    onClick={onCreateLocalAdjustmentFromActiveRange}
+                    title={
+                      !canCreateLocalAdjustmentFromActiveRange
+                        ? 'Select an image to create a local adjustment'
+                        : undefined
+                    }
+                    type="button"
+                  >
+                    <Layers size={13} />
+                    <span>{t('adjustments.color.createLocalAdjustmentFromRange')}</span>
+                  </button>
+                </div>
+              </div>
+            </details>
+            <AdvancedMixerControls
+              activeChannelMixerOutput={activeChannelMixerOutput}
+              activeColor={activeColor}
+              activeColorBalanceRange={activeColorBalanceRange}
+              adjustmentVisibility={adjustmentVisibility}
+              adjustments={adjustments}
+              blackWhiteMixerCommitIdentity={blackWhiteMixerCommitIdentity}
+              channelMixerCommitIdentity={channelMixerCommitIdentity}
+              commitBlackWhiteMixer={commitBlackWhiteMixer}
+              commitChannelMixer={commitChannelMixer}
+              commitColorBalanceRgb={commitColorBalanceRgb}
+              showBlackWhite={!isBlackWhiteTreatment}
+              onDragStateChange={onDragStateChange}
+              setActiveChannelMixerOutput={setActiveChannelMixerOutput}
+              setActiveColor={setActiveColor}
+              setActiveColorBalanceRange={setActiveColorBalanceRange}
+            />
+          </div>
+        </details>
       )}
     </div>
   );
@@ -708,8 +962,7 @@ type AdvancedMixerControlsProps = Pick<
   | 'setActiveChannelMixerOutput'
   | 'setActiveColor'
   | 'setActiveColorBalanceRange'
-> &
-  Omit<ColorPanelGroupProps, 'appSettings' | 'setAdjustments'>;
+> & { showBlackWhite: boolean } & Omit<ColorPanelGroupProps, 'appSettings' | 'setAdjustments'>;
 
 const AdvancedMixerControls = ({
   activeChannelMixerOutput,
@@ -722,6 +975,7 @@ const AdvancedMixerControls = ({
   commitBlackWhiteMixer,
   commitChannelMixer,
   commitColorBalanceRgb,
+  showBlackWhite,
   onDragStateChange,
   setActiveChannelMixerOutput,
   setActiveColor,
@@ -811,7 +1065,7 @@ const AdvancedMixerControls = ({
 
   return (
     <div data-testid="advanced-mixer-controls">
-      {adjustmentVisibility[ColorAdjustment.BlackWhiteMixer] !== false && (
+      {showBlackWhite && adjustmentVisibility[ColorAdjustment.BlackWhiteMixer] !== false && (
         <details className="group border-b border-editor-border" data-testid="black-white-mixer-disclosure">
           <summary className="cursor-pointer list-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-editor-focus-ring [&::-webkit-details-marker]:hidden">
             <CompactInspectorSectionHeader

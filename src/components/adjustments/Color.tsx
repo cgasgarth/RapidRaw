@@ -190,7 +190,7 @@ export default function ColorPanel({
   const blackWhiteMixerRef = useRef(adjustments.blackWhiteMixer);
   blackWhiteMixerRef.current = adjustments.blackWhiteMixer;
   const commitBlackWhiteMixer = useCallback(
-    (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings) => {
+    (update: (current: BlackWhiteMixerSettings) => BlackWhiteMixerSettings, interactionId?: string) => {
       const next = update(blackWhiteMixerRef.current);
       const identity = blackWhiteMixerCommitIdentityRef.current;
       if (isForMask || identity === null) {
@@ -199,7 +199,13 @@ export default function ColorPanel({
         return;
       }
       const result = applyEditTransaction(
-        buildBlackWhiteMixerEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+        buildBlackWhiteMixerEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          next,
+          interactionId ?? crypto.randomUUID(),
+          interactionId === undefined ? 'single-entry' : 'coalesced-interaction',
+        ),
       );
       blackWhiteMixerRef.current = next;
       blackWhiteMixerCommitIdentityRef.current = {
@@ -299,7 +305,7 @@ export default function ColorPanel({
     selectiveColorRangeControls: selectiveColorAdjustments.selectiveColorRangeControls,
   };
   const commitSelectiveColorMixer = useCallback(
-    (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings) => {
+    (update: (current: SelectiveColorMixerSettings) => SelectiveColorMixerSettings, interactionId?: string) => {
       const next = update(selectiveColorMixerRef.current);
       const identity = selectiveColorCommitIdentityRef.current;
       if (isForMask) {
@@ -314,7 +320,13 @@ export default function ColorPanel({
       if (identity === null) return;
 
       const result = applyEditTransaction(
-        buildSelectiveColorEditTransaction(useEditorStore.getState(), identity, next, crypto.randomUUID()),
+        buildSelectiveColorEditTransaction(
+          useEditorStore.getState(),
+          identity,
+          next,
+          interactionId ?? crypto.randomUUID(),
+          interactionId === undefined ? 'single-entry' : 'coalesced-interaction',
+        ),
       );
       selectiveColorMixerRef.current = next;
       selectiveColorCommitIdentityRef.current = {

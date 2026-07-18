@@ -8,7 +8,6 @@ import type { ColorPanelAdjustmentView } from '../../../src/components/adjustmen
 import { selectColorPanelAdjustmentView } from '../../../src/components/panel/right/color/ColorWorkspacePanel';
 import en from '../../../src/i18n/locales/en.json';
 import { useEditorStore } from '../../../src/store/useEditorStore';
-import { useUIStore } from '../../../src/store/useUIStore';
 import { COLOR_WORKSPACE_TAB_SESSION_KEY } from '../../../src/utils/colorWorkspaceNavigation';
 import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2 } from '../../../src/utils/editDocumentV2';
@@ -108,7 +107,7 @@ test('ColorPanel mixer toggles commit through fallback authority without its gen
   expect(genericSetter).not.toHaveBeenCalled();
 });
 
-test('Color Mixer exposes mutually exclusive targeted HSL tools with keyboard focus semantics', () => {
+test('Color Mixer exposes HSL and Color views without targeted-adjustment controls', () => {
   window.sessionStorage.setItem(COLOR_WORKSPACE_TAB_SESSION_KEY, 'mixer');
   const adjustments = initializeFallbackStore(94);
   const Harness = () => {
@@ -121,17 +120,15 @@ test('Color Mixer exposes mutually exclusive targeted HSL tools with keyboard fo
     });
   };
   const container = render(createElement(Harness));
-  const hue = getButton(container, 'color-mixer-target-hue');
-  const saturation = getButton(container, 'color-mixer-target-saturation');
-  act(() => hue.click());
-  expect(hue.getAttribute('aria-pressed')).toBe('true');
-  expect(useUIStore.getState().colorMixerTargetedMode).toBe('hue');
-  act(() => saturation.click());
-  expect(hue.getAttribute('aria-pressed')).toBe('false');
-  expect(saturation.getAttribute('aria-pressed')).toBe('true');
-  expect(useUIStore.getState().colorMixerTargetedMode).toBe('saturation');
-  act(() => saturation.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  expect(useUIStore.getState().colorMixerTargetedMode).toBeNull();
+  expect(getButton(container, 'color-mixer-view-hsl').getAttribute('aria-checked')).toBe('true');
+  expect(getButton(container, 'color-mixer-mode-hue').getAttribute('aria-checked')).toBe('true');
+  expect(container.querySelector('[data-testid="color-mixer-targeted-adjustment"]')).toBeNull();
+  expect(container.querySelector('[data-testid="point-color-controls"]')).toBeNull();
+  act(() => getButton(container, 'color-mixer-mode-saturation').click());
+  expect(getButton(container, 'color-mixer-mode-saturation').getAttribute('aria-checked')).toBe('true');
+  act(() => getButton(container, 'color-mixer-view-color').click());
+  expect(getButton(container, 'color-mixer-view-color').getAttribute('aria-checked')).toBe('true');
+  expect(container.querySelectorAll('[data-testid^="color-mixer-row-"]')).toHaveLength(8);
 });
 
 test('ColorAdvancedControls slider commits calibration through fallback authority', () => {
