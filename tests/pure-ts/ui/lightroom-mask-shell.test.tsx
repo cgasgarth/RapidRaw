@@ -121,5 +121,11 @@ describe('Lightroom mask shell authority and composition', () => {
     await user.click(handles);
     expect(container.querySelector('[data-mask-overlay-selected-pin="false"]')).not.toBeNull();
     expect(container.querySelector('[data-mask-overlay-handles="false"]')).not.toBeNull();
+
+    act(() => {
+      useEditorStore.getState().setEditor({ maskSelectedPinVisible: true, maskHandlesVisible: true });
+    });
+    expect(container.querySelector('[data-mask-overlay-selected-pin="true"]')).not.toBeNull();
+    expect(container.querySelector('[data-mask-overlay-handles="true"]')).not.toBeNull();
   });
 });

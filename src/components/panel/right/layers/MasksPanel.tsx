@@ -1719,7 +1719,9 @@ export function MasksPanel() {
     copiedMask,
     histogram,
     isGeneratingAiMask,
+    maskHandlesVisible,
     maskOverlaySettings,
+    maskSelectedPinVisible,
     previewScopeStatus,
     showClipping,
     selectedImage,
@@ -1740,7 +1742,9 @@ export function MasksPanel() {
       copiedMask: state.copiedMask,
       histogram: state.histogram,
       isGeneratingAiMask: state.isGeneratingAiMask,
+      maskHandlesVisible: state.maskHandlesVisible,
       maskOverlaySettings: state.maskOverlaySettings,
+      maskSelectedPinVisible: state.maskSelectedPinVisible,
       previewScopeStatus: state.previewScopeStatus,
       showClipping: state.showClipping,
       selectedImage: state.selectedImage,
@@ -1873,8 +1877,6 @@ export function MasksPanel() {
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [analyzingSubMaskId, setAnalyzingSubMaskId] = useState<string | null>(null);
-  const [selectedPinVisible, setSelectedPinVisible] = useState(true);
-  const [handlesVisible, setHandlesVisible] = useState(true);
 
   const commitMaskGraphCommand = useCallback(
     (command: (masks: Array<MaskContainer>) => MaskGraphCommandResult | null): MaskGraphCommandResult | null => {
@@ -2005,8 +2007,6 @@ export function MasksPanel() {
     );
 
   useEffect(() => {
-    setSelectedPinVisible(true);
-    setHandlesVisible(true);
     setEditor({ maskSelectedPinVisible: true, maskHandlesVisible: true });
   }, [activeMaskContainerId, activeMaskId, adjustmentRevision, selectedImage?.path, setEditor]);
 
@@ -2970,19 +2970,17 @@ export function MasksPanel() {
             <MaskOverlayReviewControls
               authorityIdentity={maskShellAuthorityIdentity}
               autoHidden={activeMaskContainerId === null}
-              handlesVisible={handlesVisible}
+              handlesVisible={maskHandlesVisible}
               settings={maskOverlaySettings}
               onChange={setMaskOverlaySettings}
               onDragStateChange={onDragStateChange}
               onHandlesVisibleChange={(visible) => {
-                setHandlesVisible(visible);
                 setEditor({ maskHandlesVisible: visible });
               }}
               onSelectedPinVisibleChange={(visible) => {
-                setSelectedPinVisible(visible);
                 setEditor({ maskSelectedPinVisible: visible });
               }}
-              selectedPinVisible={selectedPinVisible}
+              selectedPinVisible={maskSelectedPinVisible}
               hotkeyHint="Shift+O"
             />
           </MaskOverlayShell>
