@@ -25,6 +25,7 @@ import Waveform, {
   formatClipPercent,
   type HistogramClippingSummary,
   type HistogramHoverSample,
+  type HistogramTonalZoneEditor,
   HistogramView,
 } from '../../editor/Waveform';
 
@@ -152,6 +153,7 @@ interface HistogramPlotFrameProps {
   retryLabel: string;
   stateLabel: string;
   testId: string;
+  tonalZoneEditor?: HistogramTonalZoneEditor;
   zoneLabel: string | null;
 }
 
@@ -169,6 +171,7 @@ function HistogramPlotFrame(props: HistogramPlotFrameProps) {
           onHoverSample={props.onHoverSample}
           showClippingReadouts={false}
           testId={`${props.testId}-histogram`}
+          {...(props.tonalZoneEditor === undefined ? {} : { tonalZoneEditor: props.tonalZoneEditor })}
         />
       )}
       <div className="pointer-events-none absolute inset-x-9 top-1.5 z-20 flex justify-center">
