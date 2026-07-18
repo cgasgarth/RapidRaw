@@ -184,6 +184,11 @@
       "resetPoint": "{{channel}} 포인트 커브 초기화"
     },
     "details": {
+      "advanced": "고급",
+      "colorNoiseReduction": "색상 노이즈 감소",
+      "masking": "마스킹",
+      "radius": "반경",
+      "smoothness": "부드러움",
       "blueYellow": "파랑/노랑",
       "centre": "중앙",
       "chromaticAberration": "색수차",
