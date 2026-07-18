@@ -43,7 +43,6 @@ const initialMixer = (): SelectiveColorMixerSettings => ({
 
 describe('selective color edit transaction', () => {
   beforeEach(() => {
-    const adjustments = structuredClone(INITIAL_ADJUSTMENTS);
     const editDocumentV2 = createDefaultEditDocumentV2();
     useEditorStore.getState().hydrateEditorRenderAuthority({
       adjustmentRevision: 0,
@@ -135,6 +134,39 @@ describe('selective color edit transaction', () => {
     expect(useEditorStore.getState().editDocumentV2.nodes['selective_color_mixer']?.params).toEqual(initialMixer());
     useEditorStore.getState().redo();
     expect(useEditorStore.getState().editDocumentV2.nodes['selective_color_mixer']?.params).toEqual(next);
+  });
+
+  test('coalesces slider updates into one completed interaction history entry', () => {
+    const state = useEditorStore.getState();
+    const first = initialMixer();
+    first.hsl.reds = { ...first.hsl.reds, hue: 8 };
+    const firstResult = state.applyEditTransaction(
+      buildSelectiveColorEditTransaction(state, identity(), first, 'selective-color-red-drag', 'coalesced-interaction'),
+    );
+
+    const second = initialMixer();
+    second.hsl.reds = { ...second.hsl.reds, hue: 24 };
+    useEditorStore
+      .getState()
+      .applyEditTransaction(
+        buildSelectiveColorEditTransaction(
+          useEditorStore.getState(),
+          identity({ adjustmentRevision: firstResult.nextAdjustmentRevision }),
+          second,
+          'selective-color-red-drag',
+          'coalesced-interaction',
+        ),
+      );
+
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    expect(useEditorStore.getState().historyIndex).toBe(1);
+    expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+      baseAdjustmentRevision: 0,
+      transactionId: 'selective-color-red-drag',
+    });
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'selective_color_mixer').params['hsl'].reds.hue,
+    ).toBe(24);
   });
 
   test('carries selective-color node authority through save execution and reopen', async () => {

@@ -328,7 +328,10 @@ export async function assertAdjustmentsPanelRetune(page) {
   }
 
   await panel.locator('[role="status"][aria-label$="edited" i]').first().waitFor({ timeout: 10_000 });
-  await panel.getByText('Off', { exact: true }).first().waitFor({ timeout: 10_000 });
+  // Several collapsed inspector sections legitimately retain an off-status
+  // badge in the DOM. Assert the visible status instead of depending on DOM
+  // order, which made the visual proof fail after adding Mixer subsections.
+  await panel.getByText('Off', { exact: true }).filter({ visible: true }).first().waitFor({ timeout: 10_000 });
 
   if ((await panel.getByTestId('raw-processing-mode-override-control').count()) !== 0) {
     throw new Error('The Adjust inspector should not render RAW processing diagnostics.');

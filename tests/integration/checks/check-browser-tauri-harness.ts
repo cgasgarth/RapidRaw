@@ -4814,6 +4814,9 @@ async function verifyViewerPickerControllers(page: Page): Promise<void> {
 }
 
 async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
+  const advancedUtilities = page.getByTestId('advanced-utilities-disclosure');
+  if ((await advancedUtilities.getAttribute('open')) === null)
+    await advancedUtilities.locator('summary').first().click();
   const disclosure = page.getByTestId('black-white-mixer-disclosure');
   await disclosure.scrollIntoViewIfNeeded();
   if ((await disclosure.getAttribute('open')) === null) await disclosure.locator('summary').click();
@@ -4845,7 +4848,7 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
   }
   await toggle.click();
   await page.waitForFunction(
-    () => document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'true',
+    () => document.querySelector('[data-testid="black-white-mix-controls"]') !== null,
     undefined,
     { timeout: 10_000 },
   );
@@ -4965,15 +4968,13 @@ async function verifyBlackWhiteMixerTransaction(page: Page): Promise<void> {
   await page.waitForFunction(
     () =>
       document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0' &&
-      document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'true',
+      document.querySelector('[data-testid="black-white-mix-controls"]') !== null,
     undefined,
     { timeout: 10_000 },
   );
   await undo.click();
   await page.waitForFunction(
-    () =>
-      document.querySelector('[data-testid="black-white-mixer-toggle"]')?.getAttribute('aria-checked') === 'false' &&
-      document.querySelector('[data-testid="black-white-mixer-contribution-value"]')?.textContent?.trim() === '0',
+    () => document.querySelector('[data-testid="color-mixer-view-hsl"]')?.getAttribute('aria-checked') === 'true',
     undefined,
     { timeout: 10_000 },
   );

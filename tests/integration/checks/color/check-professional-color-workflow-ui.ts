@@ -28,8 +28,6 @@ type RenderedPanel = {
 };
 
 type AdjustmentUpdate = Partial<Adjustments> | ((previous: Adjustments) => Adjustments);
-let autoWhiteBalanceInvokeCount = 0;
-
 const appSettingsFixture = {
   exportPresets: [],
   lastRootPath: null,
@@ -340,7 +338,7 @@ async function validateMaskPointColorAuthority(container: Element) {
 async function validateMaskHslAuthority(container: Element) {
   await selectMixerWorkspace(container);
   const before = useEditorStore.getState();
-  const hue = getRangeByLabel(getByTestId(container, 'selective-color-range-controls'), 'Hue');
+  const hue = getByTestId<HTMLInputElement>(container, 'color-mixer-hue-reds-range');
   assert.ok(hue, 'Mask Hue slider was not rendered.');
   await changeRange(hue, 11);
   assert.equal(hue.value, '11', 'Mask HSL must update its local adjustment state.');
@@ -400,16 +398,25 @@ async function validateCompactMixerSurface(container: Element) {
   assert.equal(container.querySelector('[data-testid="color-workspace-warning-chips"]'), null);
   assert.equal(container.querySelector('[data-testid="professional-color-recipes-disclosure"]'), null);
   assert.equal(container.querySelector('[data-testid="selective-color-mask-preview-toggle"]'), null);
-  for (const label of ['Hue', 'Saturation', 'Luminance']) {
-    assert.ok(getRangeByLabel(container, label), `Primary HSL slider was not rendered: ${label}.`);
+  for (const [mode, label] of [
+    ['hue', 'Hue'],
+    ['saturation', 'Saturation'],
+    ['luminance', 'Luminance'],
+  ] as const) {
+    await click(getByTestId<HTMLButtonElement>(hslControls, `color-mixer-mode-${mode}`));
+    assert.ok(
+      getByTestId<HTMLInputElement>(hslControls, `color-mixer-${mode}-reds-range`),
+      `Primary HSL slider was not rendered: ${label}.`,
+    );
   }
+  await click(getByTestId<HTMLButtonElement>(hslControls, 'color-mixer-mode-hue'));
   assert.equal(localRangeDisclosure.dataset.scope, 'local-adjustment');
   assert.equal(localRangeDisclosure.open, false, 'Range refinement should start collapsed.');
 }
 
 async function validateHslSurfaceInteraction(container: Element) {
   const hslControls = getByTestId(container, 'selective-color-range-controls');
-  const hue = getRangeByLabel(hslControls, 'Hue');
+  const hue = getByTestId<HTMLInputElement>(hslControls, 'color-mixer-hue-reds-range');
   assert.ok(hue, 'Hue slider was not rendered.');
   const hueValue = container.querySelector<HTMLButtonElement>('[aria-label="Hue value"]');
   assert.equal(normalizeText(hueValue?.textContent), '0', 'Hue should expose its direct numeric value.');
@@ -443,7 +450,10 @@ async function validateHslSurfaceInteraction(container: Element) {
   assert.equal(getByTestId<HTMLButtonElement>(container, 'local-color-range-reset').disabled, false);
 
   const beforeHue = useEditorStore.getState();
-  const activeHue = getRangeByLabel(getByTestId(container, 'selective-color-range-controls'), 'Hue');
+  const activeHue = getByTestId<HTMLInputElement>(
+    getByTestId(container, 'selective-color-range-controls'),
+    'color-mixer-hue-oranges-range',
+  );
   assert.ok(activeHue, 'Active Hue slider was not rendered after the range commit.');
   await changeRange(activeHue, 8);
   assert.equal(useEditorStore.getState().adjustmentRevision, beforeHue.adjustmentRevision + 1);
@@ -696,7 +706,6 @@ function installDom() {
     value: {
       invoke: async (command: string) => {
         assert.equal(command, 'calculate_auto_adjustments');
-        autoWhiteBalanceInvokeCount += 1;
         return {
           blacks: 0,
           brightness: 0,

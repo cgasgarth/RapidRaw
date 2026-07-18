@@ -7,6 +7,7 @@ import {
   buildBlackWhiteMixerEditTransaction,
   isCurrentBlackWhiteMixerIdentity,
 } from '../../../src/utils/blackWhiteMixerEditTransaction';
+import { selectEditDocumentNode } from '../../../src/utils/editDocumentSelectors';
 import { createDefaultEditDocumentV2, patchEditDocumentV2Node } from '../../../src/utils/editDocumentV2';
 
 const sourcePath = '/fixture/black-white-mixer.ARW';
@@ -73,10 +74,45 @@ describe('black-and-white mixer edit transaction', () => {
     expect(useEditorStore.getState().history).toHaveLength(2);
 
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().editDocumentV2.nodes['black_white_mixer']!.params['blackWhiteMixer']).toEqual(
-      INITIAL_ADJUSTMENTS.blackWhiteMixer,
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'black_white_mixer').params.blackWhiteMixer,
+    ).toEqual(INITIAL_ADJUSTMENTS.blackWhiteMixer);
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'scene_global_color_tone').params.exposure,
+    ).toBe(0.4);
+  });
+
+  test('coalesces B&W slider updates into one completed interaction history entry', () => {
+    const state = useEditorStore.getState();
+    const first = {
+      ...structuredClone(INITIAL_ADJUSTMENTS.blackWhiteMixer),
+      enabled: true,
+      weights: { ...INITIAL_ADJUSTMENTS.blackWhiteMixer.weights, reds: 12 },
+    };
+    const firstResult = state.applyEditTransaction(
+      buildBlackWhiteMixerEditTransaction(state, identity(), first, 'black-white-red-drag', 'coalesced-interaction'),
     );
-    expect(useEditorStore.getState().editDocumentV2.nodes['scene_global_color_tone']!.params['exposure']).toBe(0.4);
+    const second = { ...first, weights: { ...first.weights, reds: 36 } };
+    useEditorStore
+      .getState()
+      .applyEditTransaction(
+        buildBlackWhiteMixerEditTransaction(
+          useEditorStore.getState(),
+          identity({ adjustmentRevision: firstResult.nextAdjustmentRevision }),
+          second,
+          'black-white-red-drag',
+          'coalesced-interaction',
+        ),
+      );
+
+    expect(useEditorStore.getState().history).toHaveLength(2);
+    expect(useEditorStore.getState().lastEditApplicationReceipt).toMatchObject({
+      baseAdjustmentRevision: 0,
+      transactionId: 'black-white-red-drag',
+    });
+    expect(selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'black_white_mixer').params).toMatchObject({
+      blackWhiteMixer: { weights: { reds: 36 } },
+    });
   });
 
   test('rejects stale source, session, and revision identities', () => {
@@ -155,9 +191,9 @@ describe('black-and-white mixer edit transaction', () => {
     });
     expect(useEditorStore.getState().history).toHaveLength(2);
     useEditorStore.getState().undo();
-    expect(useEditorStore.getState().editDocumentV2.nodes['black_white_mixer']!.params['blackWhiteMixer']).toEqual(
-      INITIAL_ADJUSTMENTS.blackWhiteMixer,
-    );
+    expect(
+      selectEditDocumentNode(useEditorStore.getState().editDocumentV2, 'black_white_mixer').params.blackWhiteMixer,
+    ).toEqual(INITIAL_ADJUSTMENTS.blackWhiteMixer);
 
     expect(isCurrentBlackWhiteMixerIdentity(state, fallbackIdentity)).toBeTrue();
     expect(

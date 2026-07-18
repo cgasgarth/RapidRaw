@@ -2,7 +2,7 @@ import {
   type SelectiveColorMixerSettings,
   selectiveColorMixerSettingsSchema,
 } from '../schemas/color/selectiveColorMixerSchemas';
-import type { EditTransactionRequest } from './editTransaction';
+import type { EditTransactionHistory, EditTransactionRequest } from './editTransaction';
 
 export type { SelectiveColorMixerSettings } from '../schemas/color/selectiveColorMixerSchemas';
 
@@ -35,6 +35,7 @@ export const buildSelectiveColorEditTransaction = (
   identity: SelectiveColorCommitIdentity,
   settings: SelectiveColorMixerSettings,
   transactionId: string,
+  history: Extract<EditTransactionHistory, 'single-entry' | 'coalesced-interaction'> = 'single-entry',
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== identity.sourceIdentity) {
     throw new Error(
@@ -62,7 +63,7 @@ export const buildSelectiveColorEditTransaction = (
 
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
-    history: 'single-entry',
+    history,
     imageSessionId: identity.imageSessionId,
     operations: [
       {

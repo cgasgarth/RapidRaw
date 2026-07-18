@@ -1,5 +1,5 @@
 import type { BlackWhiteMixerSettings } from '../schemas/color/blackWhiteMixerSchemas';
-import type { EditTransactionRequest } from './editTransaction';
+import type { EditTransactionHistory, EditTransactionRequest } from './editTransaction';
 
 export interface BlackWhiteMixerCommitIdentity {
   adjustmentRevision: number;
@@ -30,6 +30,7 @@ export const buildBlackWhiteMixerEditTransaction = (
   identity: BlackWhiteMixerCommitIdentity,
   blackWhiteMixer: BlackWhiteMixerSettings,
   transactionId: string,
+  history: Extract<EditTransactionHistory, 'single-entry' | 'coalesced-interaction'> = 'single-entry',
 ): EditTransactionRequest => {
   if (state.selectedImage?.path !== identity.sourceIdentity) {
     throw new Error(
@@ -49,7 +50,7 @@ export const buildBlackWhiteMixerEditTransaction = (
 
   return {
     baseAdjustmentRevision: identity.adjustmentRevision,
-    history: 'single-entry',
+    history,
     imageSessionId: identity.imageSessionId,
     operations: [{ nodeType: 'black_white_mixer', patch: { blackWhiteMixer }, type: 'patch-edit-document-node' }],
     persistence: 'commit',

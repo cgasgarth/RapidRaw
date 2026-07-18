@@ -9,6 +9,7 @@ import {
   getNextAdvancedMixerSelection,
   getNextSelectiveColorRange,
   isBlackWhiteMixerModified,
+  isBlackWhiteMixModified,
   isChannelMixerModified,
   isColorBalanceRgbModified,
   resetChannelMixerOutput,
@@ -61,6 +62,7 @@ describe('Advanced mixer view models', () => {
 
   test('detects enabled, preserve-luminance, and value edits independently', () => {
     expect(isBlackWhiteMixerModified(INITIAL_ADJUSTMENTS.blackWhiteMixer)).toBe(false);
+    expect(isBlackWhiteMixModified({ ...INITIAL_ADJUSTMENTS.blackWhiteMixer, enabled: true })).toBe(false);
     expect(isColorBalanceRgbModified(INITIAL_ADJUSTMENTS.colorBalanceRgb)).toBe(false);
     expect(isChannelMixerModified(INITIAL_ADJUSTMENTS.channelMixer)).toBe(false);
 
