@@ -472,6 +472,7 @@ export default function ColorPanel({
               }
               onDragStateChange={onDragStateChange}
               setAdjustments={setAdjustments}
+              showPresence={false}
               showWhiteBalance={isForMask}
               {...(toggleWbPicker ? { toggleWbPicker } : {})}
             />

@@ -4342,6 +4342,8 @@ function SettingsPanel({
       ...selectEditDocumentNode(defaults, 'scene_global_color_tone').params,
       ...selectEditDocumentNode(defaults, 'scene_to_view_transform').params,
       ...selectEditDocumentNode(defaults, 'tone_equalizer').params,
+      ...selectEditDocumentNode(defaults, 'detail_denoise_dehaze').params,
+      ...selectEditDocumentNode(defaults, 'color_presence').params,
     };
     const curveDefaults = selectEditDocumentNode(defaults, 'scene_curve').params;
     const detailDefaults: DetailAdjustmentView = {

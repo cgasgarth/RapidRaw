@@ -13,14 +13,14 @@ import type {
   ColorBalanceRgbRange,
   ColorBalanceRgbSettings,
 } from '../../../schemas/color/colorBalanceRgbSchemas';
+import { useUIStore } from '../../../store/useUIStore';
 import { type Adjustments, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
-import { applyColorMixerTargetedDelta, type ColorMixerTargetedMode } from '../../../utils/colorMixerTargetedAdjustment';
 import type { BlackWhiteMixerCommitIdentity } from '../../../utils/blackWhiteMixerEditTransaction';
 import type { ChannelMixerCommitIdentity } from '../../../utils/channelMixerEditTransaction';
 import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../utils/color/monochromePresets';
+import { applyColorMixerTargetedDelta, type ColorMixerTargetedMode } from '../../../utils/colorMixerTargetedAdjustment';
 import type { SelectiveColorMixerSettings } from '../../../utils/selectiveColorEditTransaction';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
-import { useUIStore } from '../../../store/useUIStore';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -113,10 +113,16 @@ export const formatRgbSummary = (values: { red: number; green: number; blue: num
 export const resetColorBalanceRange = (
   settings: ColorBalanceRgbSettings,
   range: ColorBalanceRgbRange,
-): ColorBalanceRgbSettings => ({
-  ...settings,
-  [range]: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb[range] },
-});
+): ColorBalanceRgbSettings => {
+  const next = {
+    ...settings,
+    [range]: { ...INITIAL_ADJUSTMENTS.colorBalanceRgb[range] },
+  };
+  const hasChannelAdjustment = (['shadows', 'midtones', 'highlights'] as const).some((candidateRange) =>
+    (['red', 'green', 'blue'] as const).some((channel) => next[candidateRange][channel] !== 0),
+  );
+  return hasChannelAdjustment ? next : { ...next, enabled: false };
+};
 
 export const resetChannelMixerOutput = (
   settings: ChannelMixerSettings,

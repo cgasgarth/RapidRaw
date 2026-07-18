@@ -4,8 +4,10 @@
       "blackAndWhite": "",
       "blacks": "黒レベル",
       "brightness": "明るさ",
+      "clarity": "",
       "color": "",
       "contrast": "コントラスト",
+      "dehaze": "",
       "evShift": "露出補正",
       "exposure": "露光量",
       "highlightRolloff": "ハイライトのロールオフ",
@@ -17,9 +19,12 @@
         "basicDesc": "標準トーンマッピング",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "リセット",
+      "saturation": "",
       "shadowRolloff": "シャドウのロールオフ",
       "shadows": "シャドウ",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -44,6 +49,7 @@
       },
       "toneMapper": "トーンマッパー",
       "treatment": "",
+      "vibrance": "",
       "viewContrast": "ビューコントラスト",
       "whites": "白レベル"
     },

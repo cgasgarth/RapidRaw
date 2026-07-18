@@ -8,6 +8,11 @@ import { useUIStore } from '../../store/useUIStore';
 import { Invokes } from '../../tauri/commands';
 import { BasicAdjustment, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import { type BasicToneCommitIdentity, buildBasicToneEditTransaction } from '../../utils/basicToneEditTransaction';
+import {
+  buildDetailEditTransaction,
+  type DetailCommitIdentity,
+  isDetailNumberNodeAdjustment,
+} from '../../utils/detailEditTransaction';
 import { selectEditDocumentNode } from '../../utils/editDocumentSelectors';
 import { invokeWithSchema } from '../../utils/tauriSchemaInvoke';
 import {
@@ -25,7 +30,9 @@ import type { ColorPanelAdjustmentView } from './color/types';
 
 export type BasicAdjustmentView = EditDocumentNodeParamsV2<'scene_global_color_tone'> &
   EditDocumentNodeParamsV2<'scene_to_view_transform'> &
-  EditDocumentNodeParamsV2<'tone_equalizer'>;
+  EditDocumentNodeParamsV2<'tone_equalizer'> &
+  Partial<EditDocumentNodeParamsV2<'detail_denoise_dehaze'>> &
+  Partial<EditDocumentNodeParamsV2<'color_presence'>>;
 export type BasicAdjustmentUpdate = Partial<BasicAdjustmentView> | ((prev: BasicAdjustmentView) => BasicAdjustmentView);
 
 interface BasicAdjustmentsProps {
@@ -91,6 +98,18 @@ const TONE_CONTROL_ORDER = [
   BasicAdjustment.Whites,
   BasicAdjustment.Blacks,
 ] as const;
+
+const PRESENCE_CONTROL_ORDER = ['texture', 'clarity', 'dehaze', 'vibrance', 'saturation'] as const;
+type PresenceControl = (typeof PRESENCE_CONTROL_ORDER)[number];
+type PresenceAdjustmentKey = 'structure' | 'clarity' | 'dehaze' | 'vibrance' | 'saturation';
+
+const PRESENCE_CONTROL_KEYS: Record<PresenceControl, PresenceAdjustmentKey> = {
+  texture: 'structure',
+  clarity: 'clarity',
+  dehaze: 'dehaze',
+  vibrance: 'vibrance',
+  saturation: 'saturation',
+};
 
 const ToneMapperSwitch = ({ selectedMapper, onMapperChange, onReset, disabled = false }: ToneMapperSwitchProps) => {
   const { t } = useTranslation();
@@ -208,6 +227,15 @@ export default function BasicAdjustments({
   );
   const basicToneCommitIdentityRef = useRef(basicToneCommitIdentity);
   basicToneCommitIdentityRef.current = basicToneCommitIdentity;
+  const detailCommitIdentity = useMemo<DetailCommitIdentity | null>(
+    () =>
+      !isForMask && selectedImagePath !== null
+        ? { adjustmentRevision, imageSessionId, sourceIdentity: selectedImagePath }
+        : null,
+    [adjustmentRevision, imageSessionId, isForMask, selectedImagePath],
+  );
+  const detailCommitIdentityRef = useRef(detailCommitIdentity);
+  detailCommitIdentityRef.current = detailCommitIdentity;
   const basicToneSliderInteractionIdsRef = useRef<Partial<Record<BasicAdjustment, string>>>({});
   const tonePlacementRequestGenerationRef = useRef(0);
   const toneHistogramPath = useMemo(() => {
@@ -240,6 +268,27 @@ export default function BasicAdjustments({
       return;
     }
     setAdjustments((prev: BasicAdjustmentView) => ({ ...prev, [key]: value }));
+  };
+
+  const handlePresenceAdjustmentChange = (key: PresenceAdjustmentKey, value: number) => {
+    const nextValue = Math.trunc(value);
+    if (key === 'vibrance' || key === 'saturation') {
+      setAdjustments((prev: BasicAdjustmentView) => ({ ...prev, [key]: nextValue }));
+      return;
+    }
+    if (!isForMask && isDetailNumberNodeAdjustment(key)) {
+      const identity = detailCommitIdentityRef.current;
+      if (identity === null) return;
+      const result = applyEditTransaction(
+        buildDetailEditTransaction(useEditorStore.getState(), identity, key, nextValue, crypto.randomUUID()),
+      );
+      detailCommitIdentityRef.current = {
+        ...identity,
+        adjustmentRevision: result.nextAdjustmentRevision,
+      };
+      return;
+    }
+    setAdjustments((prev: BasicAdjustmentView) => ({ ...prev, [key]: nextValue }));
   };
 
   const beginBasicSliderInteraction = (key: BasicAdjustment) => {
@@ -454,6 +503,29 @@ export default function BasicAdjustments({
       value={adjustments[key]}
     />
   );
+
+  const renderPresenceSlider = (control: PresenceControl, label: string) => {
+    const key = PRESENCE_CONTROL_KEYS[control];
+    const value = adjustments[key] ?? 0;
+    const isUnavailable = !isForMask && (detailCommitIdentity === null || !selectedImageReady);
+    return (
+      <AdjustmentSlider
+        defaultValue={0}
+        disabled={isUnavailable}
+        density="compact"
+        label={label}
+        max={100}
+        min={-100}
+        onDragStateChange={onDragStateChange}
+        onValueChange={(nextValue) => {
+          handlePresenceAdjustmentChange(key, nextValue);
+        }}
+        step={1}
+        testId={`basic-presence-control-${control}`}
+        value={value}
+      />
+    );
+  };
 
   const hideToneMapper = isForMask || appSettings?.tonemapperOverrideEnabled;
   const toneLabels: Record<(typeof TONE_CONTROL_ORDER)[number], string> = {
@@ -766,6 +838,24 @@ export default function BasicAdjustments({
             </div>
           </div>
         ) : null}
+      </section>
+
+      <section className="mt-1 border-t border-editor-divider pt-1" data-testid="basic-presence-section">
+        <div className="flex min-h-6 items-center justify-between gap-2 border-b border-editor-divider pb-0.5">
+          <span className="px-1 text-[11px] font-semibold uppercase leading-4 tracking-normal text-text-secondary">
+            {t('adjustments.basic.presence', { defaultValue: 'Presence' })}
+          </span>
+        </div>
+        {PRESENCE_CONTROL_ORDER.map((control) => (
+          <div key={control}>
+            {renderPresenceSlider(
+              control,
+              t(`adjustments.basic.${control}`, {
+                defaultValue: control.charAt(0).toUpperCase() + control.slice(1),
+              }),
+            )}
+          </div>
+        ))}
       </section>
     </div>
   );

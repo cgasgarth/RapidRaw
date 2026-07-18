@@ -54,6 +54,7 @@ import {
   ActiveChannel,
   type Adjustments,
   BasicAdjustment,
+  ColorAdjustment,
   CreativeAdjustment,
   DetailsAdjustment,
   Effect,
@@ -177,6 +178,7 @@ const getAdjustmentSectionNodeTypes = (sectionName: AdjustmentSectionName): read
     case 'colorGrading':
       return ['perceptual_grading'];
     case 'basic':
+      return [...getEditDocumentNodeTypesForEditorSection('basic'), 'detail_denoise_dehaze', 'color_presence'];
     case 'curves':
     case 'details':
     case 'effects':
@@ -415,12 +417,22 @@ export default function Controls() {
       const global = selectEditDocumentNode(document, 'scene_global_color_tone').params;
       const viewTransform = selectEditDocumentNode(document, 'scene_to_view_transform').params;
       const toneEqualizer = selectEditDocumentNode(document, 'tone_equalizer').params;
-      const current: BasicAdjustmentView = { ...global, ...viewTransform, ...toneEqualizer };
+      const detail = selectEditDocumentNode(document, 'detail_denoise_dehaze').params;
+      const colorPresence = selectEditDocumentNode(document, 'color_presence').params;
+      const current: BasicAdjustmentView = {
+        ...global,
+        ...viewTransform,
+        ...toneEqualizer,
+        ...detail,
+        ...colorPresence,
+      };
       const next = typeof update === 'function' ? update(current) : { ...current, ...update };
       const operations: EditNodeOperation[] = [];
       const nextGlobal = projectOwnedParams(global, next);
       const nextViewTransform = projectOwnedParams(viewTransform, next);
       const nextToneEqualizer = projectOwnedParams(toneEqualizer, next);
+      const nextDetail = projectOwnedParams(detail, next);
+      const nextColorPresence = projectOwnedParams(colorPresence, next);
       if (hasViewChanged(global, nextGlobal)) {
         operations.push({ nodeType: 'scene_global_color_tone', patch: nextGlobal, type: 'patch-edit-document-node' });
       }
@@ -433,6 +445,12 @@ export default function Controls() {
       }
       if (hasViewChanged(toneEqualizer, nextToneEqualizer)) {
         operations.push({ nodeType: 'tone_equalizer', patch: nextToneEqualizer, type: 'patch-edit-document-node' });
+      }
+      if (hasViewChanged(detail, nextDetail)) {
+        operations.push({ nodeType: 'detail_denoise_dehaze', patch: nextDetail, type: 'patch-edit-document-node' });
+      }
+      if (hasViewChanged(colorPresence, nextColorPresence)) {
+        operations.push({ nodeType: 'color_presence', patch: nextColorPresence, type: 'patch-edit-document-node' });
       }
       if (operations.length > 0) commitEditNodeOperations(operations);
     },
@@ -1075,6 +1093,56 @@ export default function Controls() {
         step: 1,
         truncate: true,
       }),
+      sliderControl({
+        id: 'texture',
+        key: DetailsAdjustment.Structure,
+        label: t('adjustments.basic.texture', { defaultValue: 'Texture' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.Clarity,
+        key: DetailsAdjustment.Clarity,
+        label: t('adjustments.basic.clarity', { defaultValue: 'Clarity' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: DetailsAdjustment.Dehaze,
+        key: DetailsAdjustment.Dehaze,
+        label: t('adjustments.basic.dehaze', { defaultValue: 'Dehaze' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: ColorAdjustment.Vibrance,
+        key: ColorAdjustment.Vibrance,
+        label: t('adjustments.basic.vibrance', { defaultValue: 'Vibrance' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
+      sliderControl({
+        id: ColorAdjustment.Saturation,
+        key: ColorAdjustment.Saturation,
+        label: t('adjustments.basic.saturation', { defaultValue: 'Saturation' }),
+        max: 100,
+        min: -100,
+        sectionName: 'basic',
+        step: 1,
+        truncate: true,
+      }),
     ];
 
     const curveControls = [
@@ -1351,36 +1419,6 @@ export default function Controls() {
         label: t('adjustments.details.threshold'),
         max: 80,
         min: 0,
-        sectionName: 'details',
-        step: 1,
-        truncate: true,
-      }),
-      sliderControl({
-        id: DetailsAdjustment.Clarity,
-        key: DetailsAdjustment.Clarity,
-        label: t('adjustments.details.clarity'),
-        max: 100,
-        min: -100,
-        sectionName: 'details',
-        step: 1,
-        truncate: true,
-      }),
-      sliderControl({
-        id: DetailsAdjustment.Dehaze,
-        key: DetailsAdjustment.Dehaze,
-        label: t('adjustments.details.dehaze'),
-        max: 100,
-        min: -100,
-        sectionName: 'details',
-        step: 1,
-        truncate: true,
-      }),
-      sliderControl({
-        id: DetailsAdjustment.Structure,
-        key: DetailsAdjustment.Structure,
-        label: t('adjustments.details.structure'),
-        max: 100,
-        min: -100,
         sectionName: 'details',
         step: 1,
         truncate: true,
@@ -1860,6 +1898,8 @@ export default function Controls() {
                 ...selectEditDocumentNode(adjustments, 'scene_global_color_tone').params,
                 ...selectEditDocumentNode(adjustments, 'scene_to_view_transform').params,
                 ...selectEditDocumentNode(adjustments, 'tone_equalizer').params,
+                ...selectEditDocumentNode(adjustments, 'detail_denoise_dehaze').params,
+                ...selectEditDocumentNode(adjustments, 'color_presence').params,
               }}
               setAdjustments={setBasicAdjustments}
               appSettings={appSettings}
