@@ -272,6 +272,7 @@
         "title": "",
         "warning": ""
       },
+      "targetedAdjustment": "",
       "temperature": "Temperatura",
       "tint": "Tinta",
       "toggleSliders": "Attiva/Disattiva Cursori",

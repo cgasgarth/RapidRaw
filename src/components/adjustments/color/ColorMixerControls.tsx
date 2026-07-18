@@ -1,6 +1,6 @@
 import cx from 'clsx';
-import { ChevronDown, Layers, RotateCcw } from 'lucide-react';
-import { type CSSProperties, type KeyboardEvent, type MouseEvent, useMemo, useState } from 'react';
+import { ChevronDown, Crosshair, Layers, RotateCcw } from 'lucide-react';
+import { type CSSProperties, type KeyboardEvent, type MouseEvent, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { BlackWhiteMixerChannel, BlackWhiteMixerSettings } from '../../../schemas/color/blackWhiteMixerSchemas';
 import type {
@@ -14,11 +14,13 @@ import type {
   ColorBalanceRgbSettings,
 } from '../../../schemas/color/colorBalanceRgbSchemas';
 import { type Adjustments, ColorAdjustment, INITIAL_ADJUSTMENTS } from '../../../utils/adjustments';
+import { applyColorMixerTargetedDelta, type ColorMixerTargetedMode } from '../../../utils/colorMixerTargetedAdjustment';
 import type { BlackWhiteMixerCommitIdentity } from '../../../utils/blackWhiteMixerEditTransaction';
 import type { ChannelMixerCommitIdentity } from '../../../utils/channelMixerEditTransaction';
 import { applyMonochromePreset, MONOCHROME_PRESETS } from '../../../utils/color/monochromePresets';
 import type { SelectiveColorMixerSettings } from '../../../utils/selectiveColorEditTransaction';
 import { getSelectiveColorRange, SELECTIVE_COLOR_RANGES } from '../../../utils/selectiveColorRanges';
+import { useUIStore } from '../../../store/useUIStore';
 import CompactInspectorSectionHeader from '../../ui/CompactInspectorSectionHeader';
 import { professionalInspectorDensityTokens } from '../../ui/inspectorTokens';
 import AdjustmentSlider from '../AdjustmentSlider';
@@ -254,6 +256,16 @@ export const ColorMixerControls = ({
   const { t } = useTranslation();
   const density = professionalInspectorDensityTokens;
   const [mixerMode, setMixerMode] = useState<'color' | 'hsl'>('color');
+  const targetedMode = useUIStore((state) => state.colorMixerTargetedMode);
+  const targetedReceipt = useUIStore((state) => state.colorMixerTargetedReceipt);
+  const setUI = useUIStore((state) => state.setUI);
+  const canTargetFromImage = !isForMask && blackWhiteMixerCommitIdentity !== null;
+  useEffect(
+    () => () => {
+      setUI({ colorMixerTargetedMode: null, colorMixerTargetedReceipt: null });
+    },
+    [setUI],
+  );
   const ranges = useMemo(
     () =>
       SELECTIVE_COLOR_RANGES.map((range) => {
@@ -298,6 +310,29 @@ export const ColorMixerControls = ({
   ].join(' / ');
   const modifiedLabel = t('ui.collapsibleSection.dirtyBadge', { defaultValue: 'Edited' });
   const hueBandSegments = getHueBandSegments(activeRangeControls.centerHueDegrees, activeRangeControls.widthDegrees);
+  const targetedWeight = (key: BlackWhiteMixerChannel): number =>
+    targetedReceipt?.bands.find((band) => band.key === key)?.weight ?? 0;
+  const toggleTargetedMode = (mode: ColorMixerTargetedMode) => {
+    setUI({
+      colorMixerTargetedMode: targetedMode === mode ? null : mode,
+      colorMixerTargetedReceipt: null,
+      pointColorPickerActive: false,
+      toneEqualizerPickerActive: false,
+    });
+    if (targetedMode !== mode) setMixerMode('hsl');
+  };
+  const handleTargetedKeyDown = (event: KeyboardEvent<HTMLButtonElement>, mode: ColorMixerTargetedMode) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setUI({ colorMixerTargetedMode: null, colorMixerTargetedReceipt: null });
+      return;
+    }
+    if (!targetedReceipt || targetedMode !== mode || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowUp' ? 5 : -5;
+    commitSelectiveColorMixer((previous) => applyColorMixerTargetedDelta(previous, mode, targetedReceipt.bands, delta));
+    setUI({ colorMixerTargetedReceipt: { ...targetedReceipt, delta: targetedReceipt.delta + delta } });
+  };
 
   const handleHslChange = (key: ColorAdjustment, value: number) => {
     commitSelectiveColorMixer((previous) => ({
@@ -337,6 +372,7 @@ export const ColorMixerControls = ({
   };
 
   const resetMixer = () => {
+    setUI({ colorMixerTargetedMode: null, colorMixerTargetedReceipt: null });
     commitSelectiveColorMixer((previous) => ({
       ...previous,
       hsl: structuredClone(INITIAL_ADJUSTMENTS.hsl),
@@ -401,6 +437,32 @@ export const ColorMixerControls = ({
           ))}
         </div>
 
+        <div className="mb-1 flex items-center gap-1" data-testid="color-mixer-targeted-adjustment">
+          <Crosshair aria-hidden="true" className="text-text-secondary" size={13} />
+          <span className="mr-1 text-[10px] text-text-secondary">
+            {t('adjustments.color.targetedAdjustment', { defaultValue: 'Target' })}
+          </span>
+          {(['hue', 'saturation', 'luminance'] as const).map((mode) => (
+            <button
+              aria-pressed={targetedMode === mode}
+              className={cx(
+                'rounded border px-1.5 py-0.5 text-[10px] capitalize',
+                targetedMode === mode
+                  ? 'border-editor-primary-active bg-editor-selected-quiet text-text-primary'
+                  : 'border-editor-border text-text-secondary hover:bg-editor-hover hover:text-text-primary',
+              )}
+              data-testid={`color-mixer-target-${mode}`}
+              disabled={!canTargetFromImage}
+              key={mode}
+              onClick={() => toggleTargetedMode(mode)}
+              onKeyDown={(event) => handleTargetedKeyDown(event, mode)}
+              type="button"
+            >
+              {mode}
+            </button>
+          ))}
+        </div>
+
         <div aria-label={t('adjustments.color.colorMixer')} className="grid grid-cols-8 gap-px" role="tablist">
           {ranges.map((range) => (
             <button
@@ -411,8 +473,10 @@ export const ColorMixerControls = ({
                 activeColor === range.key
                   ? 'border-editor-primary-active bg-editor-selected-quiet text-text-primary'
                   : 'border-transparent text-text-tertiary hover:bg-editor-panel-raised hover:text-text-primary',
+                targetedWeight(range.key) > 0 && 'ring-1 ring-editor-info/70',
               )}
               data-edited={String(range.edited)}
+              data-targeted-weight={targetedWeight(range.key).toFixed(3)}
               data-testid={`selective-color-range-${range.key}`}
               key={range.key}
               onClick={() => setActiveColor(range.key)}

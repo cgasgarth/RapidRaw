@@ -2,6 +2,7 @@ export const VIEWER_DRAG_THRESHOLD_PX = 5;
 
 export type ViewerActiveTool =
   | 'brush'
+  | 'color-mixer'
   | 'compare-divider'
   | 'crop'
   | 'focus-retouch'
@@ -51,6 +52,7 @@ export const isViewerDrag = (start: { x: number; y: number }, current: { x: numb
 
 const cursorForTool = (activeTool: ViewerActiveTool): ViewerCursor => {
   if (
+    activeTool === 'color-mixer' ||
     activeTool === 'point-color' ||
     activeTool === 'tone-curve' ||
     activeTool === 'tone-equalizer' ||
@@ -121,6 +123,7 @@ export const resolveViewerInput = ({
         activeTool === 'focus-retouch' ||
         activeTool === 'compare-divider' ||
         activeTool === 'point-color' ||
+        activeTool === 'color-mixer' ||
         activeTool === 'retouch' ||
         activeTool === 'straighten' ||
         activeTool === 'tone-curve' ||

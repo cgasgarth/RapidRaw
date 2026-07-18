@@ -288,6 +288,7 @@
         "title": "Skin tone - sampled uniformity (Experimental)",
         "warning": "Uses the selected manual color range; it does not detect skin automatically or smooth spatial texture."
       },
+      "targetedAdjustment": "Target",
       "temperature": "Temperature",
       "tint": "Tint",
       "toggleSliders": "Toggle Sliders",

@@ -272,6 +272,7 @@
         "title": "",
         "warning": ""
       },
+      "targetedAdjustment": "",
       "temperature": "Температура",
       "tint": "Оттенок",
       "toggleSliders": "Переключить ползунки",

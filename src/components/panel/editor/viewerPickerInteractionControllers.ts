@@ -2,8 +2,13 @@ import type { EditDocumentV2 } from '../../../../packages/rawengine-schema/src/e
 import type { PointColorPickerResponse } from '../../../utils/color/pointColorPicker';
 import { selectEditDocumentNode } from '../../../utils/editDocumentSelectors';
 import type { ToneEqualizerPickerResponse } from '../../../utils/toneEqualizerPicker';
+import {
+  type ColorMixerTargetedBandWeight,
+  type ColorMixerTargetedMode,
+  resolveColorMixerBandWeights,
+} from '../../../utils/colorMixerTargetedAdjustment';
 
-export type ViewerPickerToolId = 'point-color' | 'tone-equalizer';
+export type ViewerPickerToolId = 'color-mixer' | 'point-color' | 'tone-equalizer';
 
 export interface ViewerPickerSessionKey {
   readonly adjustmentRevision: number;
@@ -32,6 +37,15 @@ export interface ViewerPickerOverlayDescriptor extends ViewerPickerPoint {
 export type ViewerPickerCommitResult =
   | {
       readonly baseline: EditDocumentV2;
+      readonly bands: readonly ColorMixerTargetedBandWeight[];
+      readonly delta: number;
+      readonly key: ViewerPickerSessionKey & { readonly toolId: 'color-mixer' };
+      readonly kind: 'color-mixer';
+      readonly mode: ColorMixerTargetedMode;
+      readonly result: PointColorPickerResponse;
+    }
+  | {
+      readonly baseline: EditDocumentV2;
       readonly deltaEv: number;
       readonly key: ViewerPickerSessionKey & { readonly toolId: 'tone-equalizer' };
       readonly kind: 'tone-equalizer';
@@ -48,8 +62,17 @@ export type ViewerPickerCommand =
   | {
       readonly editDocumentV2: EditDocumentV2;
       readonly key: ViewerPickerSessionKey;
-      readonly kind: 'sample-point-color' | 'sample-tone-equalizer';
+      readonly kind: 'sample-color-mixer' | 'sample-point-color' | 'sample-tone-equalizer';
       readonly normalizedImagePoint: ViewerPickerPoint['normalizedImagePoint'];
+    }
+  | {
+      readonly baseline: EditDocumentV2;
+      readonly bands: readonly ColorMixerTargetedBandWeight[];
+      readonly delta: number;
+      readonly key: ViewerPickerSessionKey & { readonly toolId: 'color-mixer' };
+      readonly kind: 'commit-color-mixer';
+      readonly mode: ColorMixerTargetedMode;
+      readonly result: PointColorPickerResponse;
     }
   | {
       readonly baseline: EditDocumentV2;
@@ -64,8 +87,15 @@ export type ViewerPickerCommand =
       readonly ordinal: number;
       readonly result: PointColorPickerResponse;
     }
-  | { readonly kind: 'clear-point-color-receipt' | 'clear-tone-equalizer-receipt' }
+  | { readonly kind: 'clear-color-mixer-receipt' | 'clear-point-color-receipt' | 'clear-tone-equalizer-receipt' }
   | { readonly kind: 'deactivate-point-color' }
+  | {
+      readonly bands: readonly ColorMixerTargetedBandWeight[];
+      readonly delta: number;
+      readonly kind: 'publish-color-mixer-receipt';
+      readonly mode: ColorMixerTargetedMode;
+      readonly result: PointColorPickerResponse;
+    }
   | { readonly kind: 'publish-point-color-receipt'; readonly result: PointColorPickerResponse }
   | { readonly kind: 'publish-tone-equalizer-receipt'; readonly result: ToneEqualizerPickerResponse };
 
@@ -80,6 +110,19 @@ interface ToneSession extends ViewerPickerPoint {
   readonly toolId: 'tone-equalizer';
 }
 
+interface ColorMixerSession extends ViewerPickerPoint {
+  readonly baseline: EditDocumentV2;
+  bands: readonly ColorMixerTargetedBandWeight[];
+  readonly key: ViewerPickerSessionKey & { readonly toolId: 'color-mixer' };
+  readonly mode: ColorMixerTargetedMode;
+  readonly pointerId: number;
+  currentClientY: number;
+  released: boolean;
+  result: PointColorPickerResponse | null;
+  readonly startClientY: number;
+  readonly toolId: 'color-mixer';
+}
+
 interface PointSession extends ViewerPickerPoint {
   readonly key: ViewerPickerSessionKey & { readonly toolId: 'point-color' };
   readonly ordinal: number;
@@ -87,7 +130,7 @@ interface PointSession extends ViewerPickerPoint {
   readonly toolId: 'point-color';
 }
 
-type PickerSession = PointSession | ToneSession;
+type PickerSession = ColorMixerSession | PointSession | ToneSession;
 
 export interface ViewerPickerCurrentContext {
   readonly activeTool: ViewerPickerToolId | null;
@@ -140,6 +183,14 @@ const toneDeltaEv = (session: ToneSession): number =>
   Math.max(-4, Math.min(4, (session.startClientY - session.currentClientY) / 80));
 
 export interface ViewerPickerInteractionController {
+  beginColorMixer(input: {
+    editDocumentV2: EditDocumentV2;
+    clientY: number;
+    key: ViewerPickerSessionKey & { readonly toolId: 'color-mixer' };
+    mode: ColorMixerTargetedMode;
+    point: ViewerPickerPoint;
+    pointerId: number;
+  }): readonly ViewerPickerCommand[];
   beginPointColor(input: {
     editDocumentV2: EditDocumentV2;
     key: ViewerPickerSessionKey & { readonly toolId: 'point-color' };
@@ -158,6 +209,11 @@ export interface ViewerPickerInteractionController {
   move(pointerId: number, clientY: number): void;
   overlays(): readonly ViewerPickerOverlayDescriptor[];
   receivePointColor(
+    key: ViewerPickerSessionKey,
+    result: PointColorPickerResponse,
+    current: ViewerPickerCurrentContext,
+  ): readonly ViewerPickerCommand[];
+  receiveColorMixer(
     key: ViewerPickerSessionKey,
     result: PointColorPickerResponse,
     current: ViewerPickerCurrentContext,
@@ -206,8 +262,29 @@ export const createViewerPickerContextSynchronizer = (
 export const createViewerPickerInteractionController = (): ViewerPickerInteractionController => {
   let session: PickerSession | null = null;
   const clearReceipt = (toolId: ViewerPickerToolId): ViewerPickerCommand => ({
-    kind: toolId === 'point-color' ? 'clear-point-color-receipt' : 'clear-tone-equalizer-receipt',
+    kind:
+      toolId === 'point-color'
+        ? 'clear-point-color-receipt'
+        : toolId === 'tone-equalizer'
+          ? 'clear-tone-equalizer-receipt'
+          : 'clear-color-mixer-receipt',
   });
+  const finishColorMixer = (mixer: ColorMixerSession): readonly ViewerPickerCommand[] => {
+    if (mixer.result === null) return [];
+    session = null;
+    const delta = (mixer.startClientY - mixer.currentClientY) / 2;
+    return [
+      {
+        baseline: mixer.baseline,
+        bands: mixer.bands,
+        delta: Math.max(-100, Math.min(100, delta)),
+        key: mixer.key,
+        kind: 'commit-color-mixer',
+        mode: mixer.mode,
+        result: mixer.result,
+      },
+    ];
+  };
   const finishTone = (tone: ToneSession): readonly ViewerPickerCommand[] => {
     if (tone.result === null) return [];
     session = null;
@@ -222,12 +299,29 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
     ];
   };
   return {
+    beginColorMixer: ({ clientY, editDocumentV2, key, mode, point, pointerId }) => {
+      if (session !== null) return [];
+      session = {
+        ...point,
+        bands: [],
+        baseline: editDocumentV2,
+        currentClientY: clientY,
+        key,
+        mode,
+        pointerId,
+        released: false,
+        result: null,
+        startClientY: clientY,
+        toolId: 'color-mixer',
+      };
+      return [{ editDocumentV2, key, kind: 'sample-color-mixer', normalizedImagePoint: point.normalizedImagePoint }];
+    },
     beginPointColor: ({ editDocumentV2, key, point, pointerId }) => {
       if (session !== null) return [];
       session = {
         ...point,
         key,
-        ordinal: selectEditDocumentNode(editDocumentV2, 'point_color').params['pointColor'].points.length + 1,
+        ordinal: selectEditDocumentNode(editDocumentV2, 'point_color').params.pointColor.points.length + 1,
         pointerId,
         toolId: 'point-color',
       };
@@ -262,7 +356,11 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
       return [command];
     },
     move: (pointerId, clientY) => {
-      if (session?.toolId === 'tone-equalizer' && session.pointerId === pointerId) session.currentClientY = clientY;
+      if (
+        (session?.toolId === 'tone-equalizer' || session?.toolId === 'color-mixer') &&
+        session.pointerId === pointerId
+      )
+        session.currentClientY = clientY;
     },
     overlays: () =>
       session === null
@@ -273,7 +371,10 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
               geometryEpoch: session.key.geometryEpoch,
               id: `${session.toolId}:${session.key.operationGeneration}`,
               normalizedImagePoint: session.normalizedImagePoint,
-              status: session.toolId === 'tone-equalizer' && session.result !== null ? 'ready' : 'sampling',
+              status:
+                (session.toolId === 'tone-equalizer' || session.toolId === 'color-mixer') && session.result !== null
+                  ? 'ready'
+                  : 'sampling',
               toolId: session.toolId,
               viewPoint: session.viewPoint,
             },
@@ -295,6 +396,31 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
         { kind: 'publish-point-color-receipt', result },
       ];
     },
+    receiveColorMixer: (key, result, current) => {
+      if (
+        session?.toolId !== 'color-mixer' ||
+        !sameViewerPickerSessionKey(session.key, key) ||
+        !isViewerPickerSessionCurrent(key, current) ||
+        !responseMatchesKey(result, key)
+      )
+        return [];
+      session.result = result;
+      session.bands = resolveColorMixerBandWeights(
+        result.hueDegrees,
+        selectEditDocumentNode(session.baseline, 'selective_color_mixer').params,
+      );
+      const commands: ViewerPickerCommand[] = [
+        {
+          bands: session.bands,
+          delta: Math.max(-100, Math.min(100, (session.startClientY - session.currentClientY) / 2)),
+          kind: 'publish-color-mixer-receipt',
+          mode: session.mode,
+          result,
+        },
+      ];
+      if (session.released) commands.push(...finishColorMixer(session));
+      return commands;
+    },
     receiveToneEqualizer: (key, result, current) => {
       if (
         session?.toolId !== 'tone-equalizer' ||
@@ -309,10 +435,14 @@ export const createViewerPickerInteractionController = (): ViewerPickerInteracti
       return commands;
     },
     release: (pointerId, clientY) => {
-      if (session?.toolId !== 'tone-equalizer' || session.pointerId !== pointerId) return [];
+      if (
+        (session?.toolId !== 'tone-equalizer' && session?.toolId !== 'color-mixer') ||
+        session.pointerId !== pointerId
+      )
+        return [];
       session.currentClientY = clientY;
       session.released = true;
-      return finishTone(session);
+      return session.toolId === 'color-mixer' ? finishColorMixer(session) : finishTone(session);
     },
   };
 };

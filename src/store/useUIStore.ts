@@ -55,6 +55,7 @@ import {
   saveNegativeLabWorkspaceLayout,
 } from '../schemas/negative-lab/negativeLabWorkspaceLayout';
 import { ActiveChannel, type MaskContainer } from '../utils/adjustments';
+import type { ColorMixerTargetedBandWeight, ColorMixerTargetedMode } from '../utils/colorMixerTargetedAdjustment';
 import {
   DEFAULT_DEVELOP_PANEL_ORDER,
   type DevelopPanelId,
@@ -111,6 +112,15 @@ export interface PointColorPickerUiReceipt {
   graphRevision: string;
   sourceIdentity: string;
   sourceFingerprint: string;
+}
+
+export interface ColorMixerTargetedUiReceipt {
+  bands: readonly ColorMixerTargetedBandWeight[];
+  delta: number;
+  graphRevision: string;
+  hueDegrees: number;
+  mode: ColorMixerTargetedMode;
+  sourceIdentity: string;
 }
 
 export { EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY };
@@ -471,6 +481,8 @@ export interface UIState {
   toneEqualizerPickerReceipt: ToneEqualizerPickerUiReceipt | null;
   pointColorPickerActive: boolean;
   pointColorPickerReceipt: PointColorPickerUiReceipt | null;
+  colorMixerTargetedMode: ColorMixerTargetedMode | null;
+  colorMixerTargetedReceipt: ColorMixerTargetedUiReceipt | null;
   toneCurveTargetChannel: ActiveChannel;
   toneCurveTargetMode: 'point' | 'parametric';
   toneCurveTargetPointIndex: number | null;
@@ -616,6 +628,8 @@ export const useUIStore = create<UIState>((set, get) => {
     toneEqualizerPickerReceipt: null,
     pointColorPickerActive: false,
     pointColorPickerReceipt: null,
+    colorMixerTargetedMode: null,
+    colorMixerTargetedReceipt: null,
     toneCurveTargetChannel: ActiveChannel.Luma,
     toneCurveTargetMode: 'point',
     toneCurveTargetPointIndex: null,

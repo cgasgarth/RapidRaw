@@ -272,6 +272,7 @@
         "title": "",
         "warning": ""
       },
+      "targetedAdjustment": "",
       "temperature": "色温度",
       "tint": "色かぶり補正",
       "toggleSliders": "スライダー切り替え",

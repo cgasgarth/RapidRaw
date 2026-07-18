@@ -26,7 +26,9 @@ const pointKey = (operationGeneration = 1): ViewerPickerSessionKey & { toolId: '
   ...toneKey(operationGeneration),
   toolId: 'point-color',
 });
-const current = (tool: 'point-color' | 'tone-equalizer' | null = 'tone-equalizer'): ViewerPickerCurrentContext => ({
+const current = (
+  tool: 'color-mixer' | 'point-color' | 'tone-equalizer' | null = 'tone-equalizer',
+): ViewerPickerCurrentContext => ({
   activeTool: tool,
   adjustmentRevision: 2,
   geometryEpoch: 4,
@@ -54,6 +56,10 @@ const pointResult: PointColorPickerResponse = {
   sourceFingerprint: 'source-fingerprint',
   sourceIdentity: '/private/image-a.arw',
 };
+const colorMixerKey = (operationGeneration = 1): ViewerPickerSessionKey & { toolId: 'color-mixer' } => ({
+  ...toneKey(operationGeneration),
+  toolId: 'color-mixer',
+});
 const point = resolveViewerPickerPoint({ x: 0.25, y: 0.75 }, { height: 400, width: 800, x: 20, y: 10 });
 
 describe('viewer picker interaction controllers', () => {
@@ -140,6 +146,28 @@ describe('viewer picker interaction controllers', () => {
       { key: pointKey(), kind: 'commit-point-color', ordinal: 1, result: pointResult },
       { kind: 'deactivate-point-color' },
       { kind: 'publish-point-color-receipt', result: pointResult },
+    ]);
+    expect(controller.overlays()).toEqual([]);
+  });
+
+  test('samples rendered color, highlights weighted bands, and commits one vertical gesture', () => {
+    const controller = createViewerPickerInteractionController();
+    expect(
+      controller.beginColorMixer({
+        clientY: 200,
+        editDocumentV2,
+        key: colorMixerKey(),
+        mode: 'saturation',
+        point,
+        pointerId: 12,
+      }),
+    ).toMatchObject([{ kind: 'sample-color-mixer' }]);
+    expect(controller.receiveColorMixer(colorMixerKey(), pointResult, current('color-mixer'))).toMatchObject([
+      { bands: [{ key: 'greens' }], kind: 'publish-color-mixer-receipt', mode: 'saturation' },
+    ]);
+    controller.move(12, 100);
+    expect(controller.release(12, 100)).toMatchObject([
+      { delta: 50, kind: 'commit-color-mixer', mode: 'saturation', result: pointResult },
     ]);
     expect(controller.overlays()).toEqual([]);
   });

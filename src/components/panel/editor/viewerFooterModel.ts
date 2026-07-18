@@ -80,6 +80,7 @@ export const resolveViewerFooterRenderStatus = ({
 
 const toolHints: Record<Exclude<ViewerActiveTool, 'none'>, ViewerFooterToolHint> = {
   brush: { cancelHint: 'Esc', label: 'Paint the active mask', tool: 'brush' },
+  'color-mixer': { cancelHint: 'Esc', label: 'Drag vertically to adjust the sampled color', tool: 'color-mixer' },
   'compare-divider': { cancelHint: 'Esc', label: 'Drag to position the before/after divider', tool: 'compare-divider' },
   crop: { cancelHint: 'Esc', label: 'Drag to crop; Enter applies', tool: 'crop' },
   'focus-retouch': { cancelHint: 'Esc', label: 'Paint the focus source override', tool: 'focus-retouch' },
