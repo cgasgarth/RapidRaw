@@ -397,8 +397,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Величина",
       "creative": "Творчество",
+      "disabled": "",
+      "enabled": "",
       "feather": "Растушевка",
       "filmLookBrowser": {
         "activeLook": "",
@@ -467,6 +470,7 @@
       "roughness": "Шероховатость",
       "roundness": "Округлость",
       "size": "Размер",
+      "title": "",
       "vignette": "Виньетирование"
     },
     "perspective": {

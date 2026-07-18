@@ -418,8 +418,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Ilość",
       "creative": "Kreatywne",
+      "disabled": "",
+      "enabled": "",
       "feather": "Wtapianie",
       "filmLookBrowser": {
         "activeLook": "Active look",
@@ -494,6 +497,7 @@
       "roughness": "Szorstkość",
       "roundness": "Zaokrąglenie",
       "size": "Rozmiar",
+      "title": "",
       "vignette": "Winieta"
     },
     "perspective": {

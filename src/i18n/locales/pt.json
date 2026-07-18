@@ -397,8 +397,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Quantidade",
       "creative": "Criativo",
+      "disabled": "",
+      "enabled": "",
       "feather": "Difusão",
       "filmLookBrowser": {
         "activeLook": "",
@@ -464,6 +467,7 @@
       "roughness": "Rugosidade",
       "roundness": "Arredondamento",
       "size": "Tamanho",
+      "title": "",
       "vignette": "Vinheta"
     },
     "perspective": {

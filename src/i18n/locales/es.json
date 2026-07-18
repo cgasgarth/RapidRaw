@@ -397,8 +397,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Cantidad",
       "creative": "Creativo",
+      "disabled": "",
+      "enabled": "",
       "feather": "Desvanecimiento",
       "filmLookBrowser": {
         "activeLook": "",
@@ -464,6 +467,7 @@
       "roughness": "Rugosidad",
       "roundness": "Redondez",
       "size": "Tamaño",
+      "title": "",
       "vignette": "Viñeteado"
     },
     "perspective": {

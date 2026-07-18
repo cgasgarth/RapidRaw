@@ -419,8 +419,11 @@
       "activeSummaryCount_other": "{{count}} active",
       "activeSummaryEmpty": "None active",
       "activeSummaryNoScroll": "Creative, LUT, vignette, and grain controls are currently neutral.",
+      "advanced": "Creative and advanced",
       "amount": "Amount",
       "creative": "Creative",
+      "disabled": "Off",
+      "enabled": "On",
       "feather": "Feather",
       "filmLookBrowser": {
         "activeLook": "Active look",
@@ -491,6 +494,7 @@
       "roughness": "Roughness",
       "roundness": "Roundness",
       "size": "Size",
+      "title": "Effects",
       "vignette": "Vignette"
     },
     "perspective": {

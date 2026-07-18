@@ -418,8 +418,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "Betrag",
       "creative": "Kreativ",
+      "disabled": "",
+      "enabled": "",
       "feather": "Weiche Kante",
       "filmLookBrowser": {
         "activeLook": "Active look",
@@ -488,6 +491,7 @@
       "roughness": "Rauheit",
       "roundness": "Rundheit",
       "size": "Größe",
+      "title": "",
       "vignette": "Vignettierung"
     },
     "perspective": {

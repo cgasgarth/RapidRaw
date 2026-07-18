@@ -418,8 +418,11 @@
       "activeSummaryCount_other": "",
       "activeSummaryEmpty": "",
       "activeSummaryNoScroll": "",
+      "advanced": "",
       "amount": "数量",
       "creative": "创意",
+      "disabled": "",
+      "enabled": "",
       "feather": "羽化",
       "filmLookBrowser": {
         "activeLook": "Active look",
@@ -487,6 +490,7 @@
       "roughness": "粗糙度",
       "roundness": "圆度",
       "size": "大小",
+      "title": "",
       "vignette": "暗角"
     },
     "perspective": {
