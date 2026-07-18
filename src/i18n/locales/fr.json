@@ -4,8 +4,10 @@
       "blackAndWhite": "",
       "blacks": "Noirs",
       "brightness": "Luminosité",
+      "clarity": "",
       "color": "",
       "contrast": "Contraste",
+      "dehaze": "",
       "evShift": "Décalage EV",
       "exposure": "Exposition",
       "highlightRolloff": "Atténuation des hautes lumières",
@@ -17,9 +19,12 @@
         "basicDesc": "Mappage des tons standard",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "Réinitialiser",
+      "saturation": "",
       "shadowRolloff": "Atténuation des ombres",
       "shadows": "Ombres",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -44,6 +49,7 @@
       },
       "toneMapper": "Mappeur de tons",
       "treatment": "",
+      "vibrance": "",
       "viewContrast": "Contraste d’affichage",
       "whites": "Blancs"
     },

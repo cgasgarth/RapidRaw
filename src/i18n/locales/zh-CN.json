@@ -4,8 +4,10 @@
       "blackAndWhite": "",
       "blacks": "黑色",
       "brightness": "亮度",
+      "clarity": "",
       "color": "",
       "contrast": "对比度",
+      "dehaze": "",
       "evShift": "EV 偏移",
       "exposure": "曝光",
       "highlightRolloff": "高光滚降",
@@ -17,9 +19,12 @@
         "basicDesc": "标准色调映射",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "重置",
+      "saturation": "",
       "shadowRolloff": "阴影滚降",
       "shadows": "阴影",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -44,6 +49,7 @@
       },
       "toneMapper": "色调映射",
       "treatment": "",
+      "vibrance": "",
       "viewContrast": "视图对比度",
       "whites": "白色"
     },

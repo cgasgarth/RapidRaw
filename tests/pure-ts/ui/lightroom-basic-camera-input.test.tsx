@@ -17,7 +17,7 @@ const defaultBasicView = (): BasicAdjustmentView => ({
   ...selectEditDocumentNode(document, 'tone_equalizer').params,
 });
 
-test('Basic owns the camera-input hierarchy and leaves Presence in Color', async () => {
+test('Basic owns the camera-input hierarchy without duplicating Presence there', async () => {
   const i18n = i18next.createInstance();
   await i18n.use(initReactI18next).init({
     fallbackLng: 'en',

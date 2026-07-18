@@ -4,8 +4,10 @@
       "blackAndWhite": "",
       "blacks": "Затемнение",
       "brightness": "Яркость",
+      "clarity": "",
       "color": "",
       "contrast": "Контрастность",
+      "dehaze": "",
       "evShift": "Сдвиг экспозиции",
       "exposure": "Экспозиция",
       "highlightRolloff": "Спад светов",
@@ -17,9 +19,12 @@
         "basicDesc": "Стандартное тональное отображение",
         "rapidView": "Rapid View"
       },
+      "presence": "",
       "reset": "Сбросить",
+      "saturation": "",
       "shadowRolloff": "Спад теней",
       "shadows": "Тени",
+      "texture": "",
       "toneEqualizer": {
         "analysisUnavailable": "Scene analysis unavailable",
         "analyzing": "Analyzing scene…",
@@ -44,6 +49,7 @@
       },
       "toneMapper": "Тональное отображение",
       "treatment": "",
+      "vibrance": "",
       "viewContrast": "Контраст отображения",
       "whites": "Светлые тона"
     },
