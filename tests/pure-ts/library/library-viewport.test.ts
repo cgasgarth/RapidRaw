@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+  buildLibraryContentRevision,
   captureLibraryViewportAnchor,
   classifyLibraryLayoutChange,
   type LibraryLayoutSnapshot,
@@ -54,7 +55,44 @@ const layout = (paths: string[], options: LayoutOptions = {}): LibraryLayoutSnap
   };
 };
 
+const structuralLayout = (images: ImageFile[], viewMode = LibraryViewMode.Flat): LibraryLayoutSnapshot => {
+  const semantic = buildLibrarySemanticIndex(images, '/folder');
+  const visible = buildLibraryVisibleSemanticIndex(semantic, new Set(), viewMode);
+  const rowHeight = 100;
+  const headerHeight = 40;
+  const layoutIndex = buildLibraryLayoutIndex(visible, {
+    collapsedFolderPaths: new Set(),
+    columnCount: 1,
+    footerHeight: 12,
+    headerHeight,
+    rowHeight,
+    viewMode,
+  });
+  return {
+    layoutIndex,
+    rowHeight,
+    headerHeight,
+    footerHeight: 12,
+    contentRevision: buildLibraryContentRevision(visible, new Set(), viewMode),
+    sessionId: null,
+  };
+};
+
 describe('library viewport transitions', () => {
+  test('does not treat preview-completion catalog refreshes as structural changes', () => {
+    const beforeImages = ['/a.raw', '/b.raw', '/c.raw'].map((path, index) => image(path, index));
+    const afterImages = beforeImages.map((source, index) => ({ ...source, modified: source.modified + index + 1 }));
+    const before = structuralLayout(beforeImages);
+    const after = structuralLayout(afterImages);
+
+    expect(after.contentRevision).toBe(before.contentRevision);
+    expect(classifyLibraryLayoutChange(before, after)).toBe('dimensions-only');
+
+    const scrollTop = 175;
+    const anchor = captureLibraryViewportAnchor(before, scrollTop);
+    expect(resolveLibraryViewportAnchor(after, anchor)).toBe(scrollTop);
+  });
+
   test('classifies dimensions, measurement, ordering, and session changes independently', () => {
     const revision = {};
     const initial = layout(['/a.raw'], { contentRevision: revision });

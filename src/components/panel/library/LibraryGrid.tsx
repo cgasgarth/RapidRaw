@@ -46,6 +46,7 @@ import {
   normalizedColumnPercentages,
 } from './libraryColumnWidths';
 import {
+  buildLibraryContentRevision,
   captureLibraryViewportAnchor,
   classifyLibraryLayoutChange,
   findLibraryPathRow,
@@ -124,17 +125,6 @@ interface LibraryGridProps {
 const VirtualizedRow = ({ ariaAttributes: _ariaAttributes, ...rowProps }: VirtualizedRowProps): React.ReactElement => (
   <Row {...rowProps} />
 );
-
-const imageListRevisions = new WeakMap<readonly ImageFile[], number>();
-let nextImageListRevision = 1;
-
-const getImageListRevision = (imageList: readonly ImageFile[]): number => {
-  const existing = imageListRevisions.get(imageList);
-  if (existing !== undefined) return existing;
-  const revision = nextImageListRevision++;
-  imageListRevisions.set(imageList, revision);
-  return revision;
-};
 
 function HeaderColumn({
   resize,
@@ -510,7 +500,7 @@ export default function LibraryGrid(props: LibraryGridProps) {
   ]);
 
   const layoutContentRevision = useMemo(
-    () => ({ visibleSemanticIndex, collapsedRecursiveFolders, libraryViewMode }),
+    () => buildLibraryContentRevision(visibleSemanticIndex, collapsedRecursiveFolders, libraryViewMode),
     [visibleSemanticIndex, collapsedRecursiveFolders, libraryViewMode],
   );
 
@@ -536,8 +526,8 @@ export default function LibraryGrid(props: LibraryGridProps) {
   const didRestoreSessionScrollRef = useRef(false);
   const focusRestoreFrameRef = useRef<number | null>(null);
   const viewportContextKey = useMemo(() => {
-    return `${currentFolderPath ?? ''}:${thumbnailSize}:${thumbnailAspectRatio}:${getImageListRevision(imageList)}`;
-  }, [currentFolderPath, imageList, thumbnailAspectRatio, thumbnailSize]);
+    return `${currentFolderPath ?? ''}:${thumbnailSize}:${thumbnailAspectRatio}:${layoutContentRevision}`;
+  }, [currentFolderPath, layoutContentRevision, thumbnailAspectRatio, thumbnailSize]);
 
   useLayoutEffect(() => {
     const element = listHandle?.element;
