@@ -7,6 +7,7 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import type { ChannelConfig } from '../../../src/components/adjustments/Curves';
 import {
   getHistogramTonalZoneConfig,
+  getHistogramTonalZoneForPosition,
   HISTOGRAM_TONAL_ZONES,
   type HistogramTonalZone,
   type HistogramTonalZoneEditor,
@@ -42,6 +43,10 @@ describe('direct histogram tonal-zone editing', () => {
     ]);
     expect(getHistogramTonalZoneConfig('exposure')).toMatchObject({ min: -5, max: 5, step: 0.01 });
     expect(getHistogramTonalZoneConfig('whites').adjustment).toBe(BasicAdjustment.Whites);
+    expect(getHistogramTonalZoneForPosition(0.05)).toBe('blacks');
+    expect(getHistogramTonalZoneForPosition(0.1)).toBe('shadows');
+    expect(getHistogramTonalZoneForPosition(0.71)).toBe('highlights');
+    expect(getHistogramTonalZoneForPosition(0.91)).toBe('whites');
   });
 
   test('runs one pointer drag through start, preview, and commit', () => {

@@ -77,18 +77,69 @@ export interface HistogramTonalZoneConfig {
   max: number;
   min: number;
   step: number;
+  widthFraction: number;
 }
 
 export const HISTOGRAM_TONAL_ZONES: ReadonlyArray<HistogramTonalZoneConfig> = [
-  { adjustment: BasicAdjustment.Blacks, key: 'blacks', label: 'Blacks', max: 100, min: -100, step: 1 },
-  { adjustment: BasicAdjustment.Shadows, key: 'shadows', label: 'Shadows', max: 100, min: -100, step: 1 },
-  { adjustment: BasicAdjustment.Exposure, key: 'exposure', label: 'Exposure', max: 5, min: -5, step: 0.01 },
-  { adjustment: BasicAdjustment.Highlights, key: 'highlights', label: 'Highlights', max: 100, min: -100, step: 1 },
-  { adjustment: BasicAdjustment.Whites, key: 'whites', label: 'Whites', max: 100, min: -100, step: 1 },
+  {
+    adjustment: BasicAdjustment.Blacks,
+    key: 'blacks',
+    label: 'Blacks',
+    max: 100,
+    min: -100,
+    step: 1,
+    widthFraction: 0.1,
+  },
+  {
+    adjustment: BasicAdjustment.Shadows,
+    key: 'shadows',
+    label: 'Shadows',
+    max: 100,
+    min: -100,
+    step: 1,
+    widthFraction: 0.2,
+  },
+  {
+    adjustment: BasicAdjustment.Exposure,
+    key: 'exposure',
+    label: 'Exposure',
+    max: 5,
+    min: -5,
+    step: 0.01,
+    widthFraction: 0.4,
+  },
+  {
+    adjustment: BasicAdjustment.Highlights,
+    key: 'highlights',
+    label: 'Highlights',
+    max: 100,
+    min: -100,
+    step: 1,
+    widthFraction: 0.2,
+  },
+  {
+    adjustment: BasicAdjustment.Whites,
+    key: 'whites',
+    label: 'Whites',
+    max: 100,
+    min: -100,
+    step: 1,
+    widthFraction: 0.1,
+  },
 ] as const;
 
 export const getHistogramTonalZoneConfig = (zone: HistogramTonalZone): HistogramTonalZoneConfig =>
   HISTOGRAM_TONAL_ZONES.find((candidate) => candidate.key === zone) ?? HISTOGRAM_TONAL_ZONES[2]!;
+
+export const getHistogramTonalZoneForPosition = (position: number): HistogramTonalZone => {
+  const clamped = Math.max(0, Math.min(1, position));
+  let accumulated = 0;
+  for (const zone of HISTOGRAM_TONAL_ZONES) {
+    accumulated += zone.widthFraction;
+    if (clamped < accumulated) return zone.key;
+  }
+  return 'whites';
+};
 
 export interface HistogramTonalZoneEditor {
   enabled: boolean;
@@ -272,8 +323,7 @@ export const HistogramView = ({
     }
     const bounds = event.currentTarget.getBoundingClientRect();
     const position = bounds.width <= 0 ? 0 : Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-    const index = Math.min(HISTOGRAM_TONAL_ZONES.length - 1, Math.floor(position * HISTOGRAM_TONAL_ZONES.length));
-    return HISTOGRAM_TONAL_ZONES[index]?.key ?? 'exposure';
+    return getHistogramTonalZoneForPosition(position);
   };
 
   const snapTonalValue = (zone: HistogramTonalZone, value: number): number => {
@@ -502,7 +552,7 @@ export const HistogramView = ({
                 aria-valuemin={config.min}
                 aria-valuenow={value}
                 aria-valuetext={`${value}${zone.key === 'exposure' ? ' EV' : ''}`}
-                className={`h-full min-w-0 flex-1 cursor-ew-resize border-r border-white/8 bg-transparent transition-colors focus-visible:bg-white/12 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-white/70 ${active ? 'bg-white/12' : 'hover:bg-white/6'}`}
+                className={`h-full min-w-0 cursor-ew-resize border-r border-white/8 bg-transparent transition-colors focus-visible:bg-white/12 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-white/70 ${active ? 'bg-white/12' : 'hover:bg-white/6'}`}
                 data-active={String(active)}
                 data-histogram-tonal-zone={zone.key}
                 data-tonal-value={value}
@@ -527,6 +577,7 @@ export const HistogramView = ({
                   finishPointerInteraction(true);
                 }}
                 role="slider"
+                style={{ flex: `0 0 ${zone.widthFraction * 100}%` }}
                 type="button"
               />
             );
