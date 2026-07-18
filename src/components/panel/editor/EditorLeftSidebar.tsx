@@ -1,6 +1,7 @@
 import cx from 'clsx';
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen } from 'lucide-react';
 import { type PointerEventHandler, type ReactNode, useEffect, useRef } from 'react';
+import type { EditorLeftSectionId as PersistedEditorLeftSectionId } from '../../../schemas/editorWorkspacePreferencesSchemas';
 import { DEVELOP_SHELL_RESIZER_SIZE } from '../../../utils/developShellGeometry';
 import { Orientation } from '../../ui/AppProperties';
 import CollapsibleSection from '../../ui/CollapsibleSection';
@@ -15,8 +16,8 @@ export const EDITOR_LEFT_SECTION_IDS = [
   'history',
   'collections',
   'focusSources',
-] as const;
-export type EditorLeftSectionId = (typeof EDITOR_LEFT_SECTION_IDS)[number];
+] as const satisfies readonly PersistedEditorLeftSectionId[];
+export type EditorLeftSectionId = PersistedEditorLeftSectionId;
 type EditorLeftSidebarSlots = Partial<Record<EditorLeftSectionId, ReactNode>>;
 const EDITOR_LEFT_RESIZER_WIDTH = DEVELOP_SHELL_RESIZER_SIZE;
 
@@ -28,7 +29,9 @@ interface EditorLeftSidebarProps {
   isVisible: boolean;
   onResizeStart: PointerEventHandler<HTMLDivElement>;
   onSectionExpandedChange: (sectionId: EditorLeftSectionId, expanded: boolean) => void;
+  onSectionSoloChange?: (sectionId: EditorLeftSectionId | null) => void;
   onVisibleChange: (visible: boolean) => void;
+  soloSectionId?: EditorLeftSectionId | null;
   slots?: EditorLeftSidebarSlots;
   width: number;
 }
@@ -41,7 +44,9 @@ export default function EditorLeftSidebar({
   isVisible,
   onResizeStart,
   onSectionExpandedChange,
+  onSectionSoloChange,
   onVisibleChange,
+  soloSectionId = null,
   slots = {},
   width,
 }: EditorLeftSidebarProps) {
@@ -153,21 +158,41 @@ export default function EditorLeftSidebar({
               role="group"
             >
               {EDITOR_LEFT_SECTION_IDS.map((sectionId, index) => {
-                const isOpen = expandedSections.includes(sectionId);
+                const isSolo = soloSectionId === sectionId;
+                const isOpen = soloSectionId === null ? expandedSections.includes(sectionId) : isSolo;
+                const title = labels[sectionId];
+                const soloAction = onSectionSoloChange
+                  ? {
+                      className: 'text-text-secondary',
+                      icon: isSolo ? PanelTopClose : PanelTopOpen,
+                      label: isSolo ? `Disable solo ${title}` : `Solo ${title}`,
+                      onClick: () => {
+                        onSectionSoloChange(isSolo ? null : sectionId);
+                      },
+                      pressed: isSolo,
+                      testId: `editor-left-${sectionId}-solo`,
+                    }
+                  : null;
                 return (
                   <CollapsibleSection
+                    {...(soloAction === null ? {} : { headerActions: [soloAction] })}
                     isContentVisible
                     isOpen={isOpen}
                     key={sectionId}
                     onToggle={() => {
+                      if (soloSectionId !== null) {
+                        onSectionSoloChange?.(isSolo ? null : sectionId);
+                        return;
+                      }
                       onSectionExpandedChange(sectionId, !isOpen);
                     }}
                     testId={`editor-left-${sectionId}`}
-                    title={labels[sectionId]}
+                    title={title}
                   >
                     <div
-                      aria-label={`${labels[sectionId]} slot`}
+                      aria-label={`${title} slot`}
                       className={cx('w-full', sectionId === 'navigator' && 'min-h-28 bg-editor-panel-well')}
+                      data-editor-left-solo={isSolo ? 'true' : undefined}
                       data-editor-left-slot={sectionId}
                       data-editor-left-primary={index === 0 ? 'true' : undefined}
                       role="group"

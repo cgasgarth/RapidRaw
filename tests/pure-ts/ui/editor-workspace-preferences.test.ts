@@ -60,10 +60,28 @@ describe('editor workspace preferences', () => {
     expect(
       editorWorkspacePreferencesSchema.safeParse({ ...preferences, selectedImagePath: '/private/raw.nef' }).success,
     ).toBe(false);
+    expect(
+      editorWorkspacePreferencesSchema.safeParse({
+        ...preferences,
+        leftSidebar: { ...preferences.leftSidebar, expandedSections: ['unknown'] },
+      }).success,
+    ).toBe(false);
     const { drawerState: _drawerState, ...incompleteCompact } = preferences.compact;
     expect(editorWorkspacePreferencesSchema.safeParse({ ...preferences, compact: incompleteCompact }).success).toBe(
       false,
     );
+  });
+
+  test('hydrates optional left-rail solo state for older preference payloads', () => {
+    const storage = installStorage();
+    const current = createDefaultEditorWorkspacePreferences();
+    const { soloSectionId: _soloSectionId, ...legacyLeftSidebar } = current.leftSidebar;
+    storage.setItem(
+      EDITOR_WORKSPACE_PREFERENCES_STORAGE_KEY,
+      JSON.stringify({ ...current, leftSidebar: legacyLeftSidebar }),
+    );
+
+    expect(readEditorWorkspacePreferences().leftSidebar.soloSectionId).toBeNull();
   });
 
   test('ignores obsolete keys and incomplete current editor state', () => {

@@ -9,6 +9,14 @@ const editorWorkspaceLightsOutLevelSchema = z.enum(['off', 'dim', 'black']);
 const editorWorkspaceCompareModeSchema = z.enum(['off', 'hold-original', 'split-wipe', 'side-by-side']);
 const compactEditorDrawerStateSchema = z.enum(['collapsed', 'peek', 'expanded']);
 const editorWorkspacePanelSchema = z.nativeEnum(Panel);
+export const editorLeftSectionIdSchema = z.enum([
+  'navigator',
+  'presets',
+  'snapshots',
+  'history',
+  'collections',
+  'focusSources',
+]);
 
 const sectionIdsSchema = z.array(z.string().trim().min(1)).max(32);
 
@@ -29,7 +37,8 @@ export const editorWorkspacePreferencesSchema = z
       .strict(),
     leftSidebar: z
       .object({
-        expandedSections: sectionIdsSchema,
+        expandedSections: z.array(editorLeftSectionIdSchema).max(32),
+        soloSectionId: editorLeftSectionIdSchema.nullable().default(null),
         visible: z.boolean(),
         width: z.number().int().min(200).max(500),
       })
@@ -60,3 +69,4 @@ export type EditorWorkspaceZoomMode = z.infer<typeof editorWorkspaceZoomModeSche
 export type EditorWorkspaceLightsOutLevel = z.infer<typeof editorWorkspaceLightsOutLevelSchema>;
 export type EditorWorkspaceCompareMode = z.infer<typeof editorWorkspaceCompareModeSchema>;
 export type CompactEditorDrawerState = z.infer<typeof compactEditorDrawerStateSchema>;
+export type EditorLeftSectionId = z.infer<typeof editorLeftSectionIdSchema>;
