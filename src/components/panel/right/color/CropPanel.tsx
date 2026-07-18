@@ -21,7 +21,6 @@ import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } f
 import { useTranslation } from 'react-i18next';
 import type { EditDocumentNodeParamsV2 } from '../../../../../packages/rawengine-schema/src/editDocumentV2';
 
-import { useEditorActions } from '../../../../hooks/editor/useEditorActions';
 import { useEditorStore } from '../../../../store/useEditorStore';
 import { useUIStore } from '../../../../store/useUIStore';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../../types/typography';
@@ -179,7 +178,6 @@ function CropEditSession() {
   const activeRightPanel = useUIStore((s) => s.activeRightPanel);
   const setUI = useUIStore((s) => s.setUI);
   const setRightPanel = useUIStore((s) => s.setRightPanel);
-  const { commitEditNodeOperations } = useEditorActions();
   const draftClosedRef = useRef(false);
   const wasCropActiveRef = useRef(false);
   const draftIdentity = useMemo(
@@ -206,10 +204,13 @@ function CropEditSession() {
     }
     if (!wasCropActiveRef.current) return;
     wasCropActiveRef.current = false;
-    if (cropDraft !== null) {
-      draftClosedRef.current = true;
-      setEditor({ cropDraft: null });
-    }
+    draftClosedRef.current = true;
+    setEditor({
+      cropDraft: null,
+      isRotationActive: false,
+      isStraightenActive: false,
+      liveRotation: null,
+    });
   }, [activeRightPanel, cropDraft, setEditor]);
 
   useEffect(() => {
@@ -219,7 +220,7 @@ function CropEditSession() {
       if (cropDraft !== null) setEditor({ cropDraft: null });
       return;
     }
-    if (cropDraft !== null && cropDraft.baseAdjustmentRevision === draftIdentity.baseAdjustmentRevision) return;
+    if (cropDraft !== null && isCropEditDraftCurrent(cropDraft, draftIdentity)) return;
     setEditor({
       cropDraft: {
         baseAdjustmentRevision: draftIdentity.baseAdjustmentRevision,
@@ -776,19 +777,27 @@ function CropEditSession() {
     const state = useEditorStore.getState();
     const draft = state.cropDraft;
     const identity =
-      state.selectedImage !== null && state.imageSession !== null
+      state.selectedImage !== null
         ? {
             baseAdjustmentRevision: state.adjustmentRevision,
-            imageSessionId: state.imageSession.id,
+            imageSessionId: state.imageSession?.id ?? `editor-image-session:${String(state.imageSessionId)}`,
             sourceIdentity: state.selectedImage.path,
           }
         : null;
     if (identity !== null && isCropEditDraftCurrent(draft, identity)) {
       const committed = selectEditDocumentGeometry(state.editDocumentV2);
       if (JSON.stringify(committed) !== JSON.stringify(draft.geometry)) {
-        commitEditNodeOperations([
-          { nodeType: 'geometry', patch: structuredClone(draft.geometry), type: 'patch-edit-document-node' },
-        ]);
+        applyEditTransaction({
+          baseAdjustmentRevision: state.adjustmentRevision,
+          history: 'single-entry',
+          imageSessionId: identity.imageSessionId,
+          operations: [
+            { nodeType: 'geometry', patch: structuredClone(draft.geometry), type: 'patch-edit-document-node' },
+          ],
+          persistence: 'commit',
+          source: 'geometry-tool',
+          transactionId: crypto.randomUUID(),
+        });
       }
     }
     setEditor({ isRotationActive: false, isStraightenActive: false, liveRotation: null });
