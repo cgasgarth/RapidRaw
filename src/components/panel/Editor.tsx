@@ -90,6 +90,7 @@ import {
   captureOrientationRotateCommitIdentity,
 } from '../../utils/orientationRotateEditTransaction';
 import { buildParametricMaskTargetEditTransaction } from '../../utils/parametricMaskTargetEditTransaction';
+import { resolvePerceptualGradingSliderRenderSnapshot } from '../../utils/perceptualGradingSliderInteraction';
 import { resolveReferenceMatchRenderDocument } from '../../utils/referenceMatch';
 import { buildRetouchHandleEditTransaction } from '../../utils/retouchHandleEditTransaction';
 import { buildStraightenEditTransaction } from '../../utils/straightenEditTransaction';
@@ -241,6 +242,7 @@ export default function Editor({
   const aiPatches = selectEditDocumentSourceArtifacts(editDocumentV2).aiPatches;
   const adjustmentSnapshot = useEditorStore((s) => s.adjustmentSnapshot);
   const basicToneSliderInteraction = useEditorStore((s) => s.basicToneSliderInteraction);
+  const perceptualGradingSliderInteraction = useEditorStore((s) => s.perceptualGradingSliderInteraction);
   const lastEditApplicationReceipt = useEditorStore((s) => s.lastEditApplicationReceipt);
   const autoEditPreviewSession = useEditorStore((s) => s.autoEditPreviewSession);
   const basicToneRenderSnapshot = resolveBasicToneSliderRenderSnapshot(adjustmentSnapshot, basicToneSliderInteraction, {
@@ -249,10 +251,24 @@ export default function Editor({
     imageSessionId: editorImageSessionGeneration,
     selectedImage,
   });
-  const autoEditRenderSnapshot = resolveAutoEditRenderSnapshot(basicToneRenderSnapshot, autoEditPreviewSession, {
-    imageSessionId: editorImageSession?.id ?? null,
-    path: selectedImage?.path ?? null,
-  });
+  const perceptualGradingRenderSnapshot = resolvePerceptualGradingSliderRenderSnapshot(
+    basicToneRenderSnapshot,
+    perceptualGradingSliderInteraction,
+    {
+      adjustmentRevision: committedAdjustmentRevision,
+      imageSession: editorImageSession,
+      imageSessionId: editorImageSessionGeneration,
+      selectedImage,
+    },
+  );
+  const autoEditRenderSnapshot = resolveAutoEditRenderSnapshot(
+    perceptualGradingRenderSnapshot,
+    autoEditPreviewSession,
+    {
+      imageSessionId: editorImageSession?.id ?? null,
+      path: selectedImage?.path ?? null,
+    },
+  );
   const adjustmentGeometryRevision = autoEditRenderSnapshot.geometryRevision;
   const adjustmentRevision = autoEditRenderSnapshot.renderRevision;
   const referenceMatchPreview = useEditorStore((s) => s.referenceMatchPreview);
@@ -286,6 +302,7 @@ export default function Editor({
     exportSoftProofRecipeId,
     historyIndex: adjustmentsHistoryIndex,
     isExportSoftProofEnabled,
+    perceptualGradingSliderPreviewIdentity: perceptualGradingSliderInteraction?.interactionId ?? null,
     basicToneSliderPreviewIdentity: basicToneSliderInteraction?.interactionId ?? null,
     autoEditPreviewIdentity: autoEditPreviewSession?.previewIdentity ?? null,
     referenceMatchPreview: referenceMatchPreview
