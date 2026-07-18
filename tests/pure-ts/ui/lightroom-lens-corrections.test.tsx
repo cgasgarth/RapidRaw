@@ -73,7 +73,20 @@ function renderPanel() {
 }
 
 test('Lens Corrections is independent from Transform and exposes truthful profile provenance', async () => {
-  installSession(true);
+  installSession(true, {
+    lensCorrectionMode: 'auto',
+    lensDistortionParams: {
+      k1: 0.01,
+      k2: -0.002,
+      k3: 0,
+      model: 1,
+      tca_vb: 0.99,
+      tca_vr: 1.01,
+      vig_k1: 0.02,
+      vig_k2: 0,
+      vig_k3: 0,
+    },
+  });
   const view = renderPanel();
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -122,6 +135,25 @@ test('non-RAW and missing profiles stay explicit while manual controls remain us
   expect(view.container.querySelector('[data-lens-profile-state="missing"]')).not.toBeNull();
   expect(view.container.querySelector('[data-testid="lens-profile-provenance"]')?.textContent).toContain('Non-RAW');
   view.unmount();
+});
+
+test('RAW missing and manual fallback provenance never masquerade as profile correction', () => {
+  installSession(true, { lensCorrectionMode: 'auto', lensDistortionParams: null });
+  const missingView = renderPanel();
+  expect(missingView.container.querySelector('[data-testid="lens-profile-provenance"]')?.textContent).toContain(
+    'RAW profile not found',
+  );
+  expect(missingView.container.querySelector('[data-testid="lens-profile-provenance"]')?.textContent).not.toContain(
+    'RAW profile correction ·',
+  );
+  missingView.unmount();
+
+  installSession(true, { lensCorrectionMode: 'manual', lensDistortionParams: null });
+  const fallbackView = renderPanel();
+  expect(fallbackView.container.querySelector('[data-testid="lens-profile-provenance"]')?.textContent).toContain(
+    'Manual fallback',
+  );
+  fallbackView.unmount();
 });
 
 test('profile-backed state is marked detected when coefficients are present', () => {
