@@ -740,6 +740,24 @@ npm run tauri build
 ./src-tauri/target/release/RapidRAW
 ```
 
+### Local MCP development
+
+When the GUI build is running, RapidRAW exposes a loopback-only MCP endpoint at
+`http://127.0.0.1:7790/mcp` (or the first available port through `7800`). The
+active endpoint is written to the app config directory as `mcp-endpoint.json`.
+The server is loopback-only and intentionally has no authentication; set
+`RAPIDRAW_MCP_PORT` to request a specific port.
+
+The server is intentionally stateless at the protocol level: requests carry
+the image path and optional edit revision, and mutations are acknowledged only
+after the visible editor has applied them. Image operations are scoped to the
+active editor session; they return an error when RapidRAW has no loaded image,
+and paths outside the active session cannot be edited. Core tools are
+`list_images`, `select_image`, `get_active_image_state`, `get_image_state`,
+`set_adjustments`, `update_adjustments`, `reset_adjustments`,
+`apply_auto_adjustments`, and `get_preview`. AI, denoise, and MCP Tasks are not
+exposed.
+
 ## Command Line Interface (CLI)
 
 RapidRAW includes a headless export tool for batch processing photos in automated scripts, terminal pipelines, or server environments without opening the GUI:

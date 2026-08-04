@@ -52,6 +52,7 @@ import { useProductivityActions } from './hooks/useProductivityActions';
 
 import { useAppInitialization } from './hooks/useAppInitialization';
 import { useAndroidBackHandler } from './hooks/useAndroidBackHandler';
+import { useMcpBridge } from './hooks/useMcpBridge';
 import './i18n';
 
 import {
@@ -293,6 +294,8 @@ function App() {
     clearThumbnailQueue,
     refs: navigationRefs,
   });
+
+  useMcpBridge(handleImageSelect);
 
   const {
     externalEditSession,

@@ -29,6 +29,7 @@ mod lens_blur;
 mod lens_correction;
 mod lut_processing;
 mod mask_generation;
+mod mcp;
 mod multi_exposure;
 mod negative_conversion;
 mod panorama_stitching;
@@ -1535,6 +1536,17 @@ async fn generate_preview_for_path(
     js_adjustments: Value,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
+    Ok(Response::new(
+        generate_preview_bytes_for_path(path, js_adjustments, 0, app_handle).await?,
+    ))
+}
+
+pub async fn generate_preview_bytes_for_path(
+    path: String,
+    js_adjustments: Value,
+    target_resolution: u32,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<u8>, String> {
     tokio::task::spawn_blocking(move || {
         let state = app_handle.state::<AppState>();
         let context = get_or_init_gpu_context(&state, &app_handle)?;
@@ -1617,6 +1629,13 @@ async fn generate_preview_for_path(
         )?;
 
         let (width, height) = final_image.dimensions();
+        let final_image =
+            if target_resolution > 0 && (width > target_resolution || height > target_resolution) {
+                downscale_f32_image(&final_image, target_resolution, target_resolution)
+            } else {
+                final_image
+            };
+        let (width, height) = final_image.dimensions();
         let rgb_pixels = final_image.to_rgb8().into_vec();
 
         let bytes = Encoder::new(Preset::BaselineFastest)
@@ -1624,7 +1643,7 @@ async fn generate_preview_for_path(
             .encode_rgb(&rgb_pixels, width, height)
             .map_err(|e| format!("Failed to encode with mozjpeg-rs: {}", e))?;
 
-        Ok(Response::new(bytes))
+        Ok(bytes)
     })
     .await
     .map_err(|e| format!("Task execution failed: {}", e))?
@@ -2046,6 +2065,12 @@ pub fn run() {
 
             setup_logging(&app_handle);
 
+            if let Err(error) = mcp::initialize_runtime(&app_handle) {
+                log::warn!("Unable to initialize MCP runtime: {}", error);
+            } else {
+                mcp::start_server(app_handle.clone());
+            }
+
             if let Some(backend) = &settings.processing_backend
                 && backend != "auto" {
                     log::info!("Applied processing backend setting: {}", backend);
@@ -2279,6 +2304,7 @@ pub fn run() {
             metadata_manager: MetadataManager::new(),
             disks_cache: Mutex::new(None),
             disks_cache_refreshing: AtomicBool::new(false),
+            mcp: McpRuntime::new(),
         })
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
@@ -2385,6 +2411,9 @@ pub fn run() {
             lens_correction::get_lens_distortion_params,
             negative_conversion::preview_negative_conversion,
             negative_conversion::convert_negatives,
+            mcp::ui_response,
+            mcp::sync_editor_state,
+            mcp::clear_editor_session,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
