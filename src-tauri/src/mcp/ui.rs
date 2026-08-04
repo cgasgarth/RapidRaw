@@ -6,14 +6,6 @@ use uuid::Uuid;
 use super::{UI_TIMEOUT, adjustments};
 use crate::{AppState, McpEditorState};
 
-pub(super) async fn ensure_ui_image(app_handle: &AppHandle, path: &str) -> Result<(), String> {
-    let already_selected = require_active_session(app_handle, None)?.path == path;
-    if !already_selected {
-        let _ = request_ui(app_handle, "select-image", json!({ "path": path })).await?;
-    }
-    Ok(())
-}
-
 pub(super) fn require_active_session(
     app_handle: &AppHandle,
     expected_path: Option<&str>,

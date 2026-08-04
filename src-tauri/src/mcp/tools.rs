@@ -137,6 +137,7 @@ pub(super) async fn call_tool(
 
 fn list_images(app_handle: &AppHandle, arguments: &Value) -> Result<Value, String> {
     let path = required_string(arguments, "path")?;
+    ui::ensure_path_exists(&path, true)?;
     let recursive = arguments
         .get("recursive")
         .and_then(Value::as_bool)
@@ -197,7 +198,7 @@ async fn set_adjustments(app_handle: &AppHandle, arguments: &Value) -> Result<Va
         .ok_or("adjustments is required".to_string())?;
     adjustments::validate_adjustments(&adjustments)?;
     check_expected_revision(app_handle, &path, arguments.get("expectedRevision")).await?;
-    ui::ensure_ui_image(app_handle, &path).await?;
+    ui::require_active_session(app_handle, Some(&path))?;
     ui::request_ui(
         app_handle,
         "apply-adjustments",
@@ -220,7 +221,7 @@ async fn update_adjustments(app_handle: &AppHandle, arguments: &Value) -> Result
         .cloned()
         .unwrap_or_else(|| json!({}));
     let merged = adjustments::merge_adjustments(current_adjustments, changes)?;
-    ui::ensure_ui_image(app_handle, &path).await?;
+    ui::require_active_session(app_handle, Some(&path))?;
     ui::request_ui(
         app_handle,
         "apply-adjustments",
@@ -232,7 +233,7 @@ async fn update_adjustments(app_handle: &AppHandle, arguments: &Value) -> Result
 async fn reset_adjustments(app_handle: &AppHandle, arguments: &Value) -> Result<Value, String> {
     let path = required_image_path(arguments)?;
     check_expected_revision(app_handle, &path, arguments.get("expectedRevision")).await?;
-    ui::ensure_ui_image(app_handle, &path).await?;
+    ui::require_active_session(app_handle, Some(&path))?;
     ui::request_ui(app_handle, "reset-adjustments", json!({ "path": path })).await
 }
 
@@ -242,7 +243,7 @@ async fn apply_auto_adjustments(
 ) -> Result<Value, String> {
     let path = required_image_path(arguments)?;
     check_expected_revision(app_handle, &path, arguments.get("expectedRevision")).await?;
-    ui::ensure_ui_image(app_handle, &path).await?;
+    ui::require_active_session(app_handle, Some(&path))?;
     let state = app_handle.state::<AppState>();
     let (image, _) = crate::get_original_image(&state)?;
     let auto = crate::image_processing::perform_auto_analysis(&image);
