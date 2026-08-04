@@ -475,7 +475,8 @@ fn process_preview_job(
         .collect();
 
     let is_raw = loaded_image.is_raw;
-    let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
+    let tm_override = mcp::tone_mapper_override_for_path(&state, &loaded_image.path)
+        .or_else(|| resolve_tonemapper_override_from_handle(app_handle, is_raw));
     let final_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
     let lut_path = adjustments_clone["lutPath"].as_str();
     let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
@@ -1608,7 +1609,13 @@ pub async fn generate_preview_bytes_for_path(
             })
             .collect();
 
-        let tm_override = resolve_tonemapper_override(&settings, is_raw);
+        let requested_tone_mapper = js_adjustments
+            .get("toneMapper")
+            .and_then(Value::as_str)
+            .map(|tone_mapper| if tone_mapper == "agx" { 1 } else { 0 });
+        let tm_override = requested_tone_mapper
+            .or_else(|| mcp::tone_mapper_override_for_path(&state, &path))
+            .or_else(|| resolve_tonemapper_override(&settings, is_raw));
         let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
         let lut_path = js_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
@@ -2065,12 +2072,6 @@ pub fn run() {
 
             setup_logging(&app_handle);
 
-            if let Err(error) = mcp::initialize_runtime(&app_handle) {
-                log::warn!("Unable to initialize MCP runtime: {}", error);
-            } else {
-                mcp::start_server(app_handle.clone());
-            }
-
             if let Some(backend) = &settings.processing_backend
                 && backend != "auto" {
                     log::info!("Applied processing backend setting: {}", backend);
@@ -2101,6 +2102,12 @@ pub fn run() {
                 });
 
                 return Ok(());
+            }
+
+            if let Err(error) = mcp::initialize_runtime(&app_handle) {
+                log::warn!("Unable to initialize MCP runtime: {}", error);
+            } else {
+                mcp::start_server(app_handle.clone());
             }
 
             start_preview_worker(app_handle.clone());

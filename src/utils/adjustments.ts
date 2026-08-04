@@ -291,6 +291,54 @@ export interface Curves {
   red: Array<Coord>;
 }
 
+export function buildParametricCurvePoints(settings: ParametricCurveSettings): Array<Coord> {
+  const vH = settings.highlights / 100;
+  const vL = settings.lights / 100;
+  const vD = settings.darks / 100;
+  const vS = settings.shadows / 100;
+  const blackYOffset = settings.blackLevel;
+  const whiteYOffset = settings.whiteLevel;
+  const s1 = settings.split1 / 100;
+  const s2 = settings.split2 / 100;
+  const s3 = settings.split3 / 100;
+  const xH = (s3 + 1) / 2;
+  const xS = s1 / 2;
+  const xs = [0, xS, s1, s2, s3, xH, 1];
+  const sliderGain = 1.2;
+  const maxDisplacement = 0.35;
+
+  const response = (value: number, x: number): number => {
+    const headroom = value >= 0 ? 1 - x : x;
+    return Math.tanh(value * sliderGain) * maxDisplacement * Math.sqrt(headroom);
+  };
+
+  const ys = [
+    0,
+    xS + response(vS, xS),
+    s1 + (response(vS, s1) + response(vD, s1)) / 2,
+    s2 + (response(vD, s2) + response(vL, s2)) / 2,
+    s3 + (response(vL, s3) + response(vH, s3)) / 2,
+    xH + response(vH, xH),
+    1,
+  ];
+  const clamp = (value: number) => Math.max(0, Math.min(1, value));
+  const points = xs.map((x, index) => ({ x: x * 255, y: clamp(ys[index]) * 255 }));
+
+  points[0].y = Math.max(0, Math.min(255, points[0].y + blackYOffset));
+  const lastIndex = points.length - 1;
+  points[lastIndex].y = Math.max(0, Math.min(255, points[lastIndex].y + whiteYOffset));
+  return points;
+}
+
+export function buildParametricCurves(curve: ParametricCurve): Curves {
+  return {
+    luma: buildParametricCurvePoints(curve.luma),
+    red: buildParametricCurvePoints(curve.red),
+    green: buildParametricCurvePoints(curve.green),
+    blue: buildParametricCurvePoints(curve.blue),
+  };
+}
+
 export interface HueSatLum {
   hue: number;
   saturation: number;

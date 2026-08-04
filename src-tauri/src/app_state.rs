@@ -158,6 +158,12 @@ impl McpRuntime {
     }
 }
 
+impl Default for McpRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct AppState {
     pub window_setup_complete: AtomicBool,
     pub gpu_crash_flag_path: Mutex<Option<PathBuf>>,

@@ -754,9 +754,52 @@ after the visible editor has applied them. Image operations are scoped to the
 active editor session; they return an error when RapidRAW has no loaded image,
 and paths outside the active session cannot be edited. Core tools are
 `list_images`, `select_image`, `get_active_image_state`, `get_image_state`,
-`set_adjustments`, `update_adjustments`, `reset_adjustments`,
+`get_histogram_data`, `set_adjustments`, `update_adjustments`, `reset_adjustments`,
 `apply_auto_adjustments`, and `get_preview`. AI, denoise, and MCP Tasks are not
 exposed.
+
+#### Connect a coding agent
+
+Start RapidRAW, open an image in the editor, and then configure the agent with
+the loopback endpoint. For Codex, run:
+
+```bash
+codex mcp add rapidraw --url http://127.0.0.1:7790/mcp
+```
+
+For another MCP client, add the same URL as a Streamable HTTP server. If
+RapidRAW selected another port, use the URL in `mcp-endpoint.json` or set
+`RAPIDRAW_MCP_PORT` before launching the app. No token is required because the
+server binds only to loopback. The agent cannot bootstrap an empty editor
+session: an image must already be loaded in RapidRAW before image state,
+selection, adjustment, or preview operations are allowed.
+
+For a sparse edit, prefer `update_adjustments`; omitted fields remain unchanged,
+including nested fields. For example, one call can select the AgX tone mapper,
+set the EV shift, and grade the shadows without replacing the rest of the edit:
+
+```json
+{
+  "imagePath": "/path/to/image.ARW",
+  "changes": {
+    "toneMapper": "agx",
+    "exposure": 0.7,
+    "colorGrading": {
+      "shadows": {
+        "hue": 220,
+        "saturation": 35,
+        "luminance": -10
+      }
+    }
+  }
+}
+```
+
+The `get_histogram_data` tool returns RapidRAW's existing 256-bin red, green,
+blue, and luma histogram after the active image's analytics are ready. The
+`tools/list` response documents nested curve channels, curve point bounds,
+parametric curve controls, color-grading wheels, HSL, calibration, tone mapper,
+and EV-shift ranges for agent tool selection and validation.
 
 ## Command Line Interface (CLI)
 
