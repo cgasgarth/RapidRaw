@@ -40,6 +40,7 @@ module.exports = [
         ecmaFeatures: {
           jsx: true,
         },
+        projectService: true,
       },
     },
     settings: {
@@ -48,6 +49,7 @@ module.exports = [
       },
     },
     rules: {
+      '@typescript-eslint/no-unnecessary-condition': 'warn',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'warn',
