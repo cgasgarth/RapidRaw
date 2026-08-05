@@ -768,14 +768,17 @@ rapidraw export /path/to/photos --output /path/to/output_dir --adjustments /path
 
 ### MCP
 
-RapidRAW exposes an MCP server at `http://127.0.0.1:7790/mcp`. Start RapidRAW
-with an image loaded, then add it to your agent:
+RapidRAW exposes an MCP endpoint for agents to connect to while the app is running:
 
-| Agent | Setup |
-| :---- | :---- |
-| [Codex](https://developers.openai.com/codex/mcp/) | `codex mcp add rapidraw --url http://127.0.0.1:7790/mcp` |
-| [Claude Code](https://code.claude.com/docs/en/mcp) | `claude mcp add --transport http rapidraw http://127.0.0.1:7790/mcp` |
-| [OpenCode](https://opencode.ai/docs/mcp-servers) | Add the JSON below to `opencode.json`. |
+```bash
+# Codex
+codex mcp add rapidraw --url http://127.0.0.1:7790/mcp
+
+# Claude Code
+claude mcp add --transport http rapidraw http://127.0.0.1:7790/mcp
+```
+
+For [OpenCode](https://opencode.ai/docs/mcp-servers), add this to `opencode.json`:
 
 ```json
 {
@@ -800,17 +803,6 @@ with an image loaded, then add it to your agent:
 | `reset_adjustments`, `apply_auto_adjustments` | Reset or calculate an edit. |
 | `get_preview` | Return a JPEG preview of the current/supplied edit. |
 | `export_images` | Export one or more images to a directory and wait for completion. |
-
-`export_images` accepts `imagePaths`, `outputDirectory`, `outputFormat` (`jpg`,
-`jpeg`, `png`, `tiff`, `webp`, `jxl`, `avif`, `cube`), and `exportSettings`:
-`jpegQuality` (1–100), `resize` (`longEdge`, `shortEdge`, `width`, `height`,
-pixel value, `dontEnlarge`), `keepMetadata`, `preserveTimestamps`, `stripGps`,
-`filenameTemplate` (`{original_filename}`, `{sequence}`, `{YYYY}`, `{MM}`,
-`{DD}`, `{hh}`, `{mm}`), `watermark` (path, nine anchors, scale 1–50%, spacing
-0–25%, opacity 0–100%), `exportMasks`, and `preserveFolders`. Optional
-`baseOriginFolders` controls preserved folder roots. `tools/list` contains the
-authoritative schemas and bounds. Image mutations and export use the active
-RapidRAW editor session; AI, denoise, and Tasks are not exposed.
 
 ## System Requirements
 
