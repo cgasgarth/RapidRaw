@@ -721,15 +721,17 @@ function App() {
           isWgpuActive ? 'bg-transparent' : 'bg-bg-primary',
         )}
       >
-        <div
-          className={clsx(
-            'shrink-0 overflow-hidden z-50',
-            !isInstantTransition && 'transition-all duration-300 ease-in-out',
-            isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-[60px] opacity-100',
-          )}
-        >
-          {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
-        </div>
+        {!isAndroid && (
+          <div
+            className={clsx(
+              'shrink-0 overflow-hidden z-50',
+              !isInstantTransition && 'transition-all duration-300 ease-in-out',
+              isFullScreen ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-15 opacity-100',
+            )}
+          >
+            {appSettings?.decorations || (!isWindowFullScreen && <TitleBar />)}
+          </div>
+        )}
         <div
           className={clsx(
             'flex-1 flex flex-col min-h-0',
@@ -788,6 +790,7 @@ function App() {
                       handleZoomChange={handleZoomChange}
                       handleRightPanelSelect={handleRightPanelSelect}
                       requestThumbnails={requestThumbnails}
+                      renderAppPanel={renderAppPanel}
                     />
                   )}
                 </div>

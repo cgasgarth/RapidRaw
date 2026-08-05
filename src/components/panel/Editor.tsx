@@ -1167,12 +1167,6 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       }
 
       const currentRect = container.getBoundingClientRect();
-
-      if (currentRect.width < 10 || currentRect.height < 10) {
-        scheduleSync();
-        return;
-      }
-
       const dpr = window.devicePixelRatio || 1;
       const windowWidth = Math.max(window.innerWidth * dpr, 1);
       const windowHeight = Math.max(window.innerHeight * dpr, 1);
@@ -1185,6 +1179,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       const irs = imageRenderSizeRef.current;
 
       if (
+        currentRect.width < 10 ||
+        currentRect.height < 10 ||
         state.useWgpuRenderer === false ||
         !state.isReady ||
         !state.hasRenderedFirstFrame ||
