@@ -740,67 +740,6 @@ npm run tauri build
 ./src-tauri/target/release/RapidRAW
 ```
 
-### Local MCP development
-
-When the GUI build is running, RapidRAW exposes a loopback-only MCP endpoint at
-`http://127.0.0.1:7790/mcp` (or the first available port through `7800`). The
-active endpoint is written to the app config directory as `mcp-endpoint.json`.
-The server is loopback-only and intentionally has no authentication; set
-`RAPIDRAW_MCP_PORT` to request a specific port.
-
-The server is intentionally stateless at the protocol level: requests carry
-the image path and optional edit revision, and mutations are acknowledged only
-after the visible editor has applied them. Image operations are scoped to the
-active editor session; they return an error when RapidRAW has no loaded image,
-and paths outside the active session cannot be edited. Core tools are
-`list_images`, `select_image`, `get_active_image_state`, `get_image_state`,
-`get_histogram_data`, `set_adjustments`, `update_adjustments`, `reset_adjustments`,
-`apply_auto_adjustments`, and `get_preview`. AI, denoise, and MCP Tasks are not
-exposed.
-
-#### Connect a coding agent
-
-Start RapidRAW, open an image in the editor, and then configure the agent with
-the loopback endpoint. For Codex, run:
-
-```bash
-codex mcp add rapidraw --url http://127.0.0.1:7790/mcp
-```
-
-For another MCP client, add the same URL as a Streamable HTTP server. If
-RapidRAW selected another port, use the URL in `mcp-endpoint.json` or set
-`RAPIDRAW_MCP_PORT` before launching the app. No token is required because the
-server binds only to loopback. The agent cannot bootstrap an empty editor
-session: an image must already be loaded in RapidRAW before image state,
-selection, adjustment, or preview operations are allowed.
-
-For a sparse edit, prefer `update_adjustments`; omitted fields remain unchanged,
-including nested fields. For example, one call can select the AgX tone mapper,
-set the EV shift, and grade the shadows without replacing the rest of the edit:
-
-```json
-{
-  "imagePath": "/path/to/image.ARW",
-  "changes": {
-    "toneMapper": "agx",
-    "exposure": 0.7,
-    "colorGrading": {
-      "shadows": {
-        "hue": 220,
-        "saturation": 35,
-        "luminance": -10
-      }
-    }
-  }
-}
-```
-
-The `get_histogram_data` tool returns RapidRAW's existing 256-bin red, green,
-blue, and luma histogram after the active image's analytics are ready. The
-`tools/list` response documents nested curve channels, curve point bounds,
-parametric curve controls, color-grading wheels, HSL, calibration, tone mapper,
-and EV-shift ranges for agent tool selection and validation.
-
 ## Command Line Interface (CLI)
 
 RapidRAW includes a headless export tool for batch processing photos in automated scripts, terminal pipelines, or server environments without opening the GUI:
@@ -826,6 +765,52 @@ rapidraw export /path/to/photos --output /path/to/output_dir --adjustments /path
 | `--quality <1-100>`    | Image export quality                                                   | `90`              |
 | `--keep-metadata`      | Retain EXIF/capture metadata in exported files                         | `false`           |
 | `--adjustments <path>` | Path to a custom JSON file containing adjustments to override sidecars | _(Auto-detected)_ |
+
+### MCP
+
+RapidRAW exposes an MCP server at `http://127.0.0.1:7790/mcp`. Start RapidRAW
+with an image loaded, then add it to your agent:
+
+| Agent | Setup |
+| :---- | :---- |
+| [Codex](https://developers.openai.com/codex/mcp/) | `codex mcp add rapidraw --url http://127.0.0.1:7790/mcp` |
+| [Claude Code](https://code.claude.com/docs/en/mcp) | `claude mcp add --transport http rapidraw http://127.0.0.1:7790/mcp` |
+| [OpenCode](https://opencode.ai/docs/mcp-servers) | Add the JSON below to `opencode.json`. |
+
+```json
+{
+  "mcp": {
+    "rapidraw": {
+      "type": "remote",
+      "url": "http://127.0.0.1:7790/mcp",
+      "enabled": true
+    }
+  }
+}
+```
+
+| Tool | Purpose |
+| :---- | :---- |
+| `list_images` | List supported images with pagination. |
+| `select_image` | Load an image in the editor. |
+| `get_active_image_state`, `get_image_state` | Read the active edit and revision. |
+| `get_histogram_data` | Read RapidRAW’s existing 256-bin RGB/luma histogram. |
+| `set_adjustments` | Replace an edit snapshot. |
+| `update_adjustments` | Apply sparse changes; omitted fields stay unchanged. |
+| `reset_adjustments`, `apply_auto_adjustments` | Reset or calculate an edit. |
+| `get_preview` | Return a JPEG preview of the current/supplied edit. |
+| `export_images` | Export one or more images to a directory and wait for completion. |
+
+`export_images` accepts `imagePaths`, `outputDirectory`, `outputFormat` (`jpg`,
+`jpeg`, `png`, `tiff`, `webp`, `jxl`, `avif`, `cube`), and `exportSettings`:
+`jpegQuality` (1–100), `resize` (`longEdge`, `shortEdge`, `width`, `height`,
+pixel value, `dontEnlarge`), `keepMetadata`, `preserveTimestamps`, `stripGps`,
+`filenameTemplate` (`{original_filename}`, `{sequence}`, `{YYYY}`, `{MM}`,
+`{DD}`, `{hh}`, `{mm}`), `watermark` (path, nine anchors, scale 1–50%, spacing
+0–25%, opacity 0–100%), `exportMasks`, and `preserveFolders`. Optional
+`baseOriginFolders` controls preserved folder roots. `tools/list` contains the
+authoritative schemas and bounds. Image mutations and export use the active
+RapidRAW editor session; AI, denoise, and Tasks are not exposed.
 
 ## System Requirements
 
