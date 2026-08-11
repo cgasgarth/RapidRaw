@@ -1,13 +1,21 @@
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Display;
 use std::fs;
 
-use serde_json::{Value, json};
+use ::http::{
+    HeaderName, HeaderValue, Method, Request,
+    header::{CONNECTION, CONTENT_LENGTH, TRANSFER_ENCODING},
+};
+use bytes::Bytes;
+use http_body::Body;
+use http_body_util::{BodyExt, Full};
 use tauri::{AppHandle, Manager};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
-use super::{DEFAULT_PORT, MAX_BODY_BYTES, MAX_HEADER_BYTES, PROTOCOL_VERSION, tools};
+use super::server::{McpHttpService, create_http_service};
+use super::{DEFAULT_PORT, MAX_BODY_BYTES, MAX_HEADER_BYTES, PROTOCOL_VERSION};
 
 #[derive(Debug)]
 struct HttpRequest {
@@ -63,7 +71,7 @@ async fn run_server(app_handle: AppHandle) -> Result<(), String> {
         let _ = fs::create_dir_all(&config_dir);
         let _ = fs::write(
             config_dir.join("mcp-endpoint.json"),
-            serde_json::to_string_pretty(&json!({
+            serde_json::to_string_pretty(&serde_json::json!({
                 "url": format!("http://127.0.0.1:{bound_port}/mcp"),
                 "protocolVersion": PROTOCOL_VERSION,
             }))
@@ -75,40 +83,54 @@ async fn run_server(app_handle: AppHandle) -> Result<(), String> {
         "MCP server listening on http://127.0.0.1:{bound_port}/mcp (loopback-only, no auth)"
     );
 
+    let service = create_http_service(app_handle);
     loop {
         let (stream, _) = listener.accept().await.map_err(|error| error.to_string())?;
-        let app_for_connection = app_handle.clone();
+        let service_for_connection = service.clone();
         tauri::async_runtime::spawn(async move {
-            if let Err(error) = handle_connection(stream, app_for_connection).await {
+            if let Err(error) = handle_connection(stream, service_for_connection).await {
                 log::debug!("MCP connection closed: {}", error);
             }
         });
     }
 }
 
-async fn handle_connection(mut stream: TcpStream, app_handle: AppHandle) -> Result<(), String> {
+async fn handle_connection(mut stream: TcpStream, service: McpHttpService) -> Result<(), String> {
     let request = read_request(&mut stream).await?;
 
     if request.method == "OPTIONS" {
-        write_response(&mut stream, 204, "", "text/plain").await?;
+        write_basic_response(&mut stream, 204, "", "text/plain").await?;
         return Ok(());
     }
 
     if request.method != "POST" || request.path != "/mcp" {
-        write_response(&mut stream, 404, "not found", "text/plain").await?;
+        write_basic_response(&mut stream, 404, "not found", "text/plain").await?;
         return Ok(());
     }
 
-    let request_json: Value = serde_json::from_slice(&request.body)
-        .map_err(|error| format!("invalid JSON request: {error}"))?;
-    let response = dispatch_rpc(&app_handle, &request.headers, request_json).await;
+    let request = build_rmcp_request(request)?;
+    let response = service.handle(request).await;
+    write_rmcp_response(&mut stream, response).await
+}
 
-    match response {
-        Some(value) => write_json_response(&mut stream, 200, &value).await?,
-        None => write_response(&mut stream, 202, "", "text/plain").await?,
+fn build_rmcp_request(request: HttpRequest) -> Result<Request<Full<Bytes>>, String> {
+    let method = Method::from_bytes(request.method.as_bytes())
+        .map_err(|error| format!("invalid HTTP method: {error}"))?;
+    let mut builder = Request::builder().method(method).uri(request.path);
+    let headers = builder
+        .headers_mut()
+        .ok_or_else(|| "unable to build MCP request headers".to_string())?;
+    for (name, value) in request.headers {
+        let name = HeaderName::from_bytes(name.as_bytes())
+            .map_err(|error| format!("invalid HTTP header name: {error}"))?;
+        let value = HeaderValue::from_str(&value)
+            .map_err(|error| format!("invalid HTTP header value: {error}"))?;
+        headers.append(name, value);
     }
 
-    Ok(())
+    builder
+        .body(Full::new(Bytes::from(request.body)))
+        .map_err(|error| format!("unable to build MCP request: {error}"))
 }
 
 async fn read_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
@@ -177,14 +199,14 @@ async fn read_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
     })
 }
 
-async fn write_response(
+async fn write_basic_response(
     stream: &mut TcpStream,
     status: u16,
     body: &str,
     content_type: &str,
 ) -> Result<(), String> {
     let response = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nMCP-Protocol-Version: {PROTOCOL_VERSION}\r\nConnection: close\r\n\r\n{body}",
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
     stream
@@ -193,81 +215,41 @@ async fn write_response(
         .map_err(|error| error.to_string())
 }
 
-async fn write_json_response(
+async fn write_rmcp_response<B>(
     stream: &mut TcpStream,
-    status: u16,
-    body: &Value,
-) -> Result<(), String> {
-    let serialized = serde_json::to_string(body).map_err(|error| error.to_string())?;
-    write_response(stream, status, &serialized, "application/json").await
-}
-
-async fn dispatch_rpc(
-    app_handle: &AppHandle,
-    headers: &HashMap<String, String>,
-    request: Value,
-) -> Option<Value> {
-    let id = request.get("id").cloned().unwrap_or(Value::Null);
-    let Some(method) = request.get("method").and_then(Value::as_str) else {
-        return Some(json_rpc_error(id, -32600, "missing JSON-RPC method"));
-    };
-
-    if let Some(header_version) = headers.get("mcp-protocol-version")
-        && header_version != PROTOCOL_VERSION
-    {
-        return Some(json_rpc_error(
-            id,
-            -32602,
-            "unsupported MCP protocol version",
-        ));
+    response: ::http::Response<B>,
+) -> Result<(), String>
+where
+    B: Body<Data = Bytes> + Send,
+    B::Error: Display,
+{
+    let (parts, body) = response.into_parts();
+    let body = body
+        .collect()
+        .await
+        .map_err(|error| error.to_string())?
+        .to_bytes();
+    let reason = parts.status.canonical_reason().unwrap_or_default();
+    let mut response = format!("HTTP/1.1 {} {reason}\r\n", parts.status.as_u16());
+    for (name, value) in &parts.headers {
+        if name == CONTENT_LENGTH || name == TRANSFER_ENCODING || name == CONNECTION {
+            continue;
+        }
+        let value = value
+            .to_str()
+            .map_err(|error| format!("invalid MCP response header: {error}"))?;
+        response.push_str(&format!("{}: {value}\r\n", name.as_str()));
     }
-
-    if let Some(header_method) = headers.get("mcp-method")
-        && header_method != method
-    {
-        return Some(json_rpc_error(
-            id,
-            -32602,
-            "Mcp-Method does not match the JSON-RPC method",
-        ));
-    }
-
-    if method == "notifications/initialized" {
-        return None;
-    }
-
-    let params = request.get("params").cloned().unwrap_or_else(|| json!({}));
-    let result = match method {
-        "ping" => Ok(json!({})),
-        "initialize" | "server/discover" => Ok(discovery_result()),
-        "tools/list" => Ok(json!({
-            "tools": tools::tool_definitions(),
-            "ttlMs": 30_000,
-            "cacheScope": "public",
-        })),
-        "tools/call" => tools::call_tool(app_handle, headers, params).await,
-        _ => Err((-32601, format!("unsupported MCP method: {method}"))),
-    };
-
-    Some(match result {
-        Ok(value) => json_rpc_result(id, value),
-        Err((code, message)) => json_rpc_error(id, code, &message),
-    })
-}
-
-fn discovery_result() -> Value {
-    json!({
-        "protocolVersion": PROTOCOL_VERSION,
-        "serverInfo": { "name": "RapidRAW", "version": env!("CARGO_PKG_VERSION") },
-        "capabilities": { "tools": { "listChanged": false } },
-        "instructions": "Use imagePath explicitly on every RapidRAW operation. Mutations return an editRevision; pass it back as expectedRevision to avoid overwriting newer edits.",
-    })
-}
-
-fn json_rpc_result(id: Value, result: Value) -> Value {
-    json!({ "jsonrpc": "2.0", "id": id, "result": result })
-}
-
-fn json_rpc_error(id: Value, code: i64, message: &str) -> Value {
-    json!({ "jsonrpc": "2.0", "id": id, "error": { "code": code, "message": message } })
+    response.push_str(&format!(
+        "Content-Length: {}\r\nConnection: close\r\n\r\n",
+        body.len()
+    ));
+    stream
+        .write_all(response.as_bytes())
+        .await
+        .map_err(|error| error.to_string())?;
+    stream
+        .write_all(&body)
+        .await
+        .map_err(|error| error.to_string())
 }

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::Path;
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -161,26 +160,9 @@ pub(super) fn tool_definitions() -> Vec<Value> {
 
 pub(super) async fn call_tool(
     app_handle: &AppHandle,
-    headers: &HashMap<String, String>,
-    params: Value,
+    name: &str,
+    arguments: Value,
 ) -> Result<Value, (i64, String)> {
-    let name = params
-        .get("name")
-        .and_then(Value::as_str)
-        .ok_or((-32602, "tools/call requires params.name".to_string()))?;
-    if let Some(header_name) = headers.get("mcp-name")
-        && header_name != name
-    {
-        return Err((
-            -32602,
-            "Mcp-Name does not match the requested tool".to_string(),
-        ));
-    }
-    let arguments = params
-        .get("arguments")
-        .cloned()
-        .unwrap_or_else(|| json!({}));
-
     let result = match name {
         "list_images" => list_images(app_handle, &arguments),
         "select_image" => select_image(app_handle, &arguments).await,
