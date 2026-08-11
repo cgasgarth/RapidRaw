@@ -29,6 +29,7 @@ mod lens_blur;
 mod lens_correction;
 mod lut_processing;
 mod mask_generation;
+mod mcp;
 mod multi_exposure;
 mod negative_conversion;
 mod panorama_stitching;
@@ -474,7 +475,8 @@ fn process_preview_job(
         .collect();
 
     let is_raw = loaded_image.is_raw;
-    let tm_override = resolve_tonemapper_override_from_handle(app_handle, is_raw);
+    let tm_override = mcp::tone_mapper_override_for_path(&state, &loaded_image.path)
+        .or_else(|| resolve_tonemapper_override_from_handle(app_handle, is_raw));
     let final_adjustments = get_all_adjustments_from_json(&adjustments_clone, is_raw, tm_override);
     let lut_path = adjustments_clone["lutPath"].as_str();
     let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
@@ -1535,6 +1537,17 @@ async fn generate_preview_for_path(
     js_adjustments: Value,
     app_handle: tauri::AppHandle,
 ) -> Result<Response, String> {
+    Ok(Response::new(
+        generate_preview_bytes_for_path(path, js_adjustments, 0, app_handle).await?,
+    ))
+}
+
+pub async fn generate_preview_bytes_for_path(
+    path: String,
+    js_adjustments: Value,
+    target_resolution: u32,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<u8>, String> {
     tokio::task::spawn_blocking(move || {
         let state = app_handle.state::<AppState>();
         let context = get_or_init_gpu_context(&state, &app_handle)?;
@@ -1596,7 +1609,13 @@ async fn generate_preview_for_path(
             })
             .collect();
 
-        let tm_override = resolve_tonemapper_override(&settings, is_raw);
+        let requested_tone_mapper = js_adjustments
+            .get("toneMapper")
+            .and_then(Value::as_str)
+            .map(|tone_mapper| if tone_mapper == "agx" { 1 } else { 0 });
+        let tm_override = requested_tone_mapper
+            .or_else(|| mcp::tone_mapper_override_for_path(&state, &path))
+            .or_else(|| resolve_tonemapper_override(&settings, is_raw));
         let all_adjustments = get_all_adjustments_from_json(&js_adjustments, is_raw, tm_override);
         let lut_path = js_adjustments["lutPath"].as_str();
         let lut = lut_path.and_then(|p| lut_processing::get_or_load_lut(&state, p).ok());
@@ -1617,6 +1636,13 @@ async fn generate_preview_for_path(
         )?;
 
         let (width, height) = final_image.dimensions();
+        let final_image =
+            if target_resolution > 0 && (width > target_resolution || height > target_resolution) {
+                downscale_f32_image(&final_image, target_resolution, target_resolution)
+            } else {
+                final_image
+            };
+        let (width, height) = final_image.dimensions();
         let rgb_pixels = final_image.to_rgb8().into_vec();
 
         let bytes = Encoder::new(Preset::BaselineFastest)
@@ -1624,7 +1650,7 @@ async fn generate_preview_for_path(
             .encode_rgb(&rgb_pixels, width, height)
             .map_err(|e| format!("Failed to encode with mozjpeg-rs: {}", e))?;
 
-        Ok(Response::new(bytes))
+        Ok(bytes)
     })
     .await
     .map_err(|e| format!("Task execution failed: {}", e))?
@@ -2078,6 +2104,12 @@ pub fn run() {
                 return Ok(());
             }
 
+            if let Err(error) = mcp::initialize_runtime(&app_handle) {
+                log::warn!("Unable to initialize MCP runtime: {}", error);
+            } else {
+                mcp::start_server(app_handle.clone());
+            }
+
             start_preview_worker(app_handle.clone());
             start_analytics_worker(app_handle.clone());
             file_management::start_thumbnail_workers(app_handle.clone());
@@ -2279,6 +2311,7 @@ pub fn run() {
             metadata_manager: MetadataManager::new(),
             disks_cache: Mutex::new(None),
             disks_cache_refreshing: AtomicBool::new(false),
+            mcp: McpRuntime::new(),
         })
         .invoke_handler(tauri::generate_handler![
             apply_adjustments,
@@ -2385,6 +2418,9 @@ pub fn run() {
             lens_correction::get_lens_distortion_params,
             negative_conversion::preview_negative_conversion,
             negative_conversion::convert_negatives,
+            mcp::ui_response,
+            mcp::sync_editor_state,
+            mcp::clear_editor_session,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

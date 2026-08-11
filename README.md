@@ -766,6 +766,44 @@ rapidraw export /path/to/photos --output /path/to/output_dir --adjustments /path
 | `--keep-metadata`      | Retain EXIF/capture metadata in exported files                         | `false`           |
 | `--adjustments <path>` | Path to a custom JSON file containing adjustments to override sidecars | _(Auto-detected)_ |
 
+### MCP
+
+RapidRAW exposes an MCP endpoint for agents to connect to while the app is running:
+
+```bash
+# Codex
+codex mcp add rapidraw --url http://127.0.0.1:7790/mcp
+
+# Claude Code
+claude mcp add --transport http rapidraw http://127.0.0.1:7790/mcp
+```
+
+For [OpenCode](https://opencode.ai/docs/mcp-servers), add this to `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "rapidraw": {
+      "type": "remote",
+      "url": "http://127.0.0.1:7790/mcp",
+      "enabled": true
+    }
+  }
+}
+```
+
+| Tool | Purpose |
+| :---- | :---- |
+| `list_images` | List supported images with pagination. |
+| `select_image` | Load an image in the editor. |
+| `get_active_image_state`, `get_image_state` | Read the active edit and revision. |
+| `get_histogram_data` | Read RapidRAW’s existing 256-bin RGB/luma histogram. |
+| `set_adjustments` | Replace an edit snapshot. |
+| `update_adjustments` | Apply sparse changes; omitted fields stay unchanged. |
+| `reset_adjustments`, `apply_auto_adjustments` | Reset or calculate an edit. |
+| `get_preview` | Return a JPEG preview of the current/supplied edit. |
+| `export_images` | Export one or more images to a directory and wait for completion. |
+
 ## System Requirements
 
 RapidRAW is built to be lightweight and cross-platform. The minimum (tested) requirements are:
