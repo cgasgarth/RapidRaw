@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RotateCcw, Copy, ClipboardPaste, Spline, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -17,9 +17,22 @@ import Slider from '../ui/Slider';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 
 let curveClipboard: Array<Coord> | null = null;
-let parametricClipboard: any = null;
+let parametricClipboard: ParametricCurveSettings | null = null;
 
 export interface ChannelConfig {
+  [index: string]: number[] | undefined;
+  [ActiveChannel.Luma]: number[];
+  [ActiveChannel.Red]: number[];
+  [ActiveChannel.Green]: number[];
+  [ActiveChannel.Blue]: number[];
+}
+
+interface ColorData {
+  color: string;
+  data: number[] | undefined;
+}
+
+interface DisplayChannelConfig {
   [index: string]: ColorData;
   [ActiveChannel.Luma]: ColorData;
   [ActiveChannel.Red]: ColorData;
@@ -27,16 +40,11 @@ export interface ChannelConfig {
   [ActiveChannel.Blue]: ColorData;
 }
 
-interface ColorData {
-  color: string;
-  data: any;
-}
-
 interface CurveGraphProps {
-  adjustments: Adjustments | any;
+  adjustments: Adjustments;
   histogram: ChannelConfig | null;
   isForMask?: boolean;
-  setAdjustments(updater: (prev: any) => any): void;
+  setAdjustments(updater: (prev: Adjustments) => Adjustments): void;
   theme: string;
   onDragStateChange?: (isDragging: boolean) => void;
 }
@@ -159,7 +167,7 @@ function getCurvePath(points: Array<Coord>) {
   return path;
 }
 
-function getHistogramPath(data: Array<any>) {
+function getHistogramPath(data: Array<number>) {
   if (data.length === 0) return '';
   const maxVal = Math.max(...data);
   if (maxVal === 0) return '';
@@ -171,7 +179,7 @@ function getHistogramPath(data: Array<any>) {
   return `M0,255 L${pathData} L255,255 Z`;
 }
 
-function getZeroHistogramPath(data: Array<any>) {
+function getZeroHistogramPath(data: Array<number>) {
   if (data.length === 0) return '';
   const pathData = data.map((_, index: number) => `${(index / 255) * 255},255`).join(' ');
   return `M0,255 L${pathData} L255,255 Z`;
@@ -242,7 +250,7 @@ export default function CurveGraph({
   const localParametricSettingsRef = useRef<ParametricCurveSettings | null>(null);
   const isParametricMode = curveMode === 'parametric';
 
-  const parametricCurves = adjustments?.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
+  const parametricCurves = adjustments.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
   const parametricCurvesRef = useRef(parametricCurves);
 
   useEffect(() => {
@@ -260,7 +268,7 @@ export default function CurveGraph({
     if (newMode === curveMode) return;
     setCurveMode(newMode);
 
-    setAdjustments((prev: any) => {
+    setAdjustments((prev: Adjustments) => {
       if (newMode === 'parametric') {
         const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         return {
@@ -281,7 +289,7 @@ export default function CurveGraph({
   };
 
   const updateParametricValue = (key: keyof ParametricCurveSettings, value: number) => {
-    setAdjustments((prev: any) => {
+    setAdjustments((prev: Adjustments) => {
       const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
       const updatedSettings = { ...pC[activeChannel], [key]: value };
       const newPoints = buildParametricPoints(updatedSettings);
@@ -313,7 +321,7 @@ export default function CurveGraph({
       setLocalPoints(null);
       localPointsRef.current = null;
     }
-  }, [adjustments?.curves?.[activeChannel], draggingPointIndex]);
+  }, [adjustments.curves[activeChannel], draggingPointIndex]);
 
   useEffect(() => {
     const isDragging = draggingPointIndex !== null || draggingSplitKey !== null;
@@ -322,13 +330,13 @@ export default function CurveGraph({
   }, [draggingPointIndex, draggingSplitKey, onDragStateChange]);
 
   useEffect(() => {
-    const handleMove = (e: any) => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
       if (isParametricMode && draggingSplitKey) {
         const container = splitterContainerRef.current;
         if (!container) return;
 
         const rect = container.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
         const rawX = ((clientX - rect.left) / rect.width) * 100;
 
         const minGap = 10;
@@ -357,14 +365,13 @@ export default function CurveGraph({
 
       if (!isParametricMode && draggingIndexRef.current !== null) {
         const index = draggingIndexRef.current;
-        const currentPoints = localPointsRef.current || adjustments?.curves?.[activeChannelRef.current];
-        if (!currentPoints) return;
+        const currentPoints = localPointsRef.current || adjustments.curves[activeChannelRef.current];
 
         const svg = svgRef.current;
         if (!svg) return;
 
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
 
         const rect = svg.getBoundingClientRect();
         let x = Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255));
@@ -386,10 +393,12 @@ export default function CurveGraph({
         localPointsRef.current = newPoints;
         setLocalPoints(newPoints);
 
-        setAdjustments((prev: any) => ({
-          ...prev,
-          curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
-        }));
+        setAdjustments((prev: Adjustments) => {
+          return {
+            ...prev,
+            curves: { ...prev.curves, [activeChannelRef.current]: newPoints },
+          };
+        });
 
         if (e.cancelable) e.preventDefault();
       }
@@ -425,7 +434,7 @@ export default function CurveGraph({
   const isLightTheme = theme === Theme.Light || theme === Theme.Arctic;
   const histogramOpacity = isLightTheme ? 0.6 : 0.15;
 
-  const channelConfig: ChannelConfig = useMemo(
+  const channelConfig: DisplayChannelConfig = useMemo(
     () => ({
       luma: { color: 'var(--color-accent)', data: histogram?.luma },
       red: { color: '#FF6B6B', data: histogram?.red },
@@ -437,13 +446,13 @@ export default function CurveGraph({
 
   const activePoints = isParametricMode
     ? buildParametricPoints(activeParametricSettings)
-    : (localPoints ?? adjustments?.curves?.[activeChannel]);
+    : (localPoints ?? adjustments.curves[activeChannel]);
 
   const { color, data: histogramData } = channelConfig[activeChannel];
 
-  const handlePointStart = (e: any, index: number) => {
-    if (isParametricMode || e.button === 2) return;
-    if (!e.touches) e.preventDefault();
+  const handlePointStart = (e: ReactMouseEvent | ReactTouchEvent, index: number) => {
+    if (isParametricMode || ('button' in e && e.button === 2)) return;
+    if (!('touches' in e)) e.preventDefault();
     e.stopPropagation();
 
     onDragStateChange?.(true);
@@ -453,7 +462,7 @@ export default function CurveGraph({
     draggingIndexRef.current = index;
   };
 
-  const handlePointContextMenu = (e: React.MouseEvent, index: number) => {
+  const handlePointContextMenu = (e: ReactMouseEvent, index: number) => {
     if (isParametricMode) return;
     if (index > 0 && index < activePoints.length - 1) {
       e.preventDefault();
@@ -461,21 +470,24 @@ export default function CurveGraph({
       const newPoints = activePoints.filter((_, i) => i !== index);
       setLocalPoints(newPoints);
       localPointsRef.current = newPoints;
-      setAdjustments((prev: any) => ({
-        ...prev,
-        curves: { ...prev.curves, [activeChannel]: newPoints },
-      }));
+      setAdjustments((prev: Adjustments) => {
+        return {
+          ...prev,
+          curves: { ...prev.curves, [activeChannel]: newPoints },
+        };
+      });
     }
   };
 
-  const handleContainerStart = (e: any) => {
-    if (isParametricMode || (!e.touches && e.button !== 0) || e.target.tagName === 'circle') return;
+  const handleContainerStart = (e: ReactMouseEvent | ReactTouchEvent) => {
+    const target = e.target as Element | null;
+    if (isParametricMode || (!('touches' in e) && e.button !== 0) || target?.tagName === 'circle') return;
     onDragStateChange?.(true);
 
     const svg = svgRef.current;
     if (!svg) return;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const rect = svg.getBoundingClientRect();
     const x = Math.max(0, Math.min(255, ((clientX - rect.left) / rect.width) * 255));
     const y = Math.max(0, Math.min(255, 255 - ((clientY - rect.top) / rect.height) * 255));
@@ -485,10 +497,12 @@ export default function CurveGraph({
 
     setLocalPoints(newPoints);
     localPointsRef.current = newPoints;
-    setAdjustments((prev: any) => ({
-      ...prev,
-      curves: { ...prev.curves, [activeChannel]: newPoints },
-    }));
+    setAdjustments((prev: Adjustments) => {
+      return {
+        ...prev,
+        curves: { ...prev.curves, [activeChannel]: newPoints },
+      };
+    });
     setDraggingPointIndex(newPointIndex);
     draggingIndexRef.current = newPointIndex;
   };
@@ -496,7 +510,7 @@ export default function CurveGraph({
   const handleDoubleClick = () => {
     if (isParametricMode) {
       const defaultSettings = { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS };
-      setAdjustments((prev: any) => {
+      setAdjustments((prev: Adjustments) => {
         const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
         return {
           ...prev,
@@ -510,14 +524,16 @@ export default function CurveGraph({
         { x: 255, y: 255 },
       ];
       setLocalPoints(defaultPoints);
-      setAdjustments((prev: any) => ({
-        ...prev,
-        curves: { ...prev.curves, [activeChannel]: defaultPoints },
-      }));
+      setAdjustments((prev: Adjustments) => {
+        return {
+          ...prev,
+          curves: { ...prev.curves, [activeChannel]: defaultPoints },
+        };
+      });
     }
   };
 
-  const handleContextMenu = (e: React.MouseEvent) => {
+  const handleContextMenu = (e: ReactMouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -530,18 +546,19 @@ export default function CurveGraph({
 
       const handlePasteParametric = () => {
         if (!parametricClipboard) return;
-        setAdjustments((prev: any) => {
+        const clipboardSettings = parametricClipboard;
+        setAdjustments((prev: Adjustments) => {
           const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
           return {
             ...prev,
-            parametricCurve: { ...pC, [activeChannel]: { ...parametricClipboard } },
-            curves: { ...prev.curves, [activeChannel]: buildParametricPoints(parametricClipboard) },
+            parametricCurve: { ...pC, [activeChannel]: { ...clipboardSettings } },
+            curves: { ...prev.curves, [activeChannel]: buildParametricPoints(clipboardSettings) },
           };
         });
       };
 
       const handleResetParametric = () => {
-        setAdjustments((prev: any) => {
+        setAdjustments((prev: Adjustments) => {
           const pC = prev.parametricCurve || DEFAULT_PARAMETRIC_CURVE;
           return {
             ...prev,
@@ -557,7 +574,7 @@ export default function CurveGraph({
       const handleResetAllParametric = () => {
         setLocalParametricSettings(null);
         localParametricSettingsRef.current = null;
-        setAdjustments((prev: any) => {
+        setAdjustments((prev: Adjustments) => {
           return {
             ...prev,
             parametricCurve: {
@@ -624,7 +641,9 @@ export default function CurveGraph({
       const newPoints = curveClipboard.map((p) => ({ ...p }));
       setLocalPoints(newPoints);
       localPointsRef.current = newPoints;
-      setAdjustments((prev: any) => ({ ...prev, curves: { ...prev.curves, [activeChannel]: newPoints } }));
+      setAdjustments((prev: Adjustments) => {
+        return { ...prev, curves: { ...prev.curves, [activeChannel]: newPoints } };
+      });
     };
 
     const handlePasteFromParametric = () => {
@@ -632,7 +651,9 @@ export default function CurveGraph({
       const newPoints = convertParametricToPoints(parametricClipboard);
       setLocalPoints(newPoints);
       localPointsRef.current = newPoints;
-      setAdjustments((prev: any) => ({ ...prev, curves: { ...prev.curves, [activeChannel]: newPoints } }));
+      setAdjustments((prev: Adjustments) => {
+        return { ...prev, curves: { ...prev.curves, [activeChannel]: newPoints } };
+      });
     };
 
     const handleReset = () => {
@@ -642,7 +663,9 @@ export default function CurveGraph({
       ];
       setLocalPoints(defaultPoints);
       localPointsRef.current = defaultPoints;
-      setAdjustments((prev: any) => ({ ...prev, curves: { ...prev.curves, [activeChannel]: defaultPoints } }));
+      setAdjustments((prev: Adjustments) => {
+        return { ...prev, curves: { ...prev.curves, [activeChannel]: defaultPoints } };
+      });
     };
 
     const handleResetAllPoint = () => {
@@ -652,15 +675,17 @@ export default function CurveGraph({
       ];
       setLocalPoints(defaultPoints);
       localPointsRef.current = defaultPoints;
-      setAdjustments((prev: any) => ({
-        ...prev,
-        curves: {
-          [ActiveChannel.Luma]: [...defaultPoints],
-          [ActiveChannel.Red]: [...defaultPoints],
-          [ActiveChannel.Green]: [...defaultPoints],
-          [ActiveChannel.Blue]: [...defaultPoints],
-        },
-      }));
+      setAdjustments((prev: Adjustments) => {
+        return {
+          ...prev,
+          curves: {
+            [ActiveChannel.Luma]: [...defaultPoints],
+            [ActiveChannel.Red]: [...defaultPoints],
+            [ActiveChannel.Green]: [...defaultPoints],
+            [ActiveChannel.Blue]: [...defaultPoints],
+          },
+        };
+      });
     };
 
     const areOtherPointCurvesDirty = [
@@ -668,7 +693,7 @@ export default function CurveGraph({
       ActiveChannel.Red,
       ActiveChannel.Green,
       ActiveChannel.Blue,
-    ].some((channel) => channel !== activeChannel && !isDefaultCurve(adjustments.curves?.[channel]));
+    ].some((channel) => channel !== activeChannel && !isDefaultCurve(adjustments.curves[channel]));
 
     const options = [
       {
@@ -716,18 +741,6 @@ export default function CurveGraph({
     [activeParametricSettings.split1, activeParametricSettings.split2, activeParametricSettings.split3],
   );
 
-  if (!activePoints) {
-    return (
-      <Text
-        as="div"
-        variant={TextVariants.small}
-        className="w-full aspect-square bg-surface-secondary p-1 rounded-md flex items-center justify-center"
-      >
-        {t('adjustments.curves.curveDataUnavailable')}
-      </Text>
-    );
-  }
-
   return (
     <div className="select-none touch-none" ref={containerRef}>
       <div className="flex items-center justify-between gap-2 mb-2 mt-2">
@@ -755,7 +768,7 @@ export default function CurveGraph({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {Object.keys(channelConfig).map((channel: any) => {
+          {(Object.keys(channelConfig) as ActiveChannel[]).map((channel) => {
             const selected = activeChannel === channel;
             const channelLabel = t(`adjustments.curves.channels.${channel}`);
             return (
@@ -865,9 +878,9 @@ export default function CurveGraph({
                   cy={255 - p.y}
                   fill={color}
                   key={i}
-                  onMouseDown={(e: any) => handlePointStart(e, i)}
-                  onTouchStart={(e: any) => handlePointStart(e, i)}
-                  onContextMenu={(e: React.MouseEvent) => handlePointContextMenu(e, i)}
+                  onMouseDown={(e) => handlePointStart(e, i)}
+                  onTouchStart={(e) => handlePointStart(e, i)}
+                  onContextMenu={(e: ReactMouseEvent) => handlePointContextMenu(e, i)}
                   r="6"
                   stroke="#1e1e1e"
                   strokeWidth="2"
@@ -936,7 +949,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.whiteLevel}
-                  onChange={(e: any) => updateParametricValue('whiteLevel', parseFloat(e.target.value))}
+                  onChange={(e) => updateParametricValue('whiteLevel', parseFloat(String(e.target.value)))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -946,7 +959,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.highlights}
-                  onChange={(e: any) => updateParametricValue('highlights', parseFloat(e.target.value))}
+                  onChange={(e) => updateParametricValue('highlights', parseFloat(String(e.target.value)))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -956,7 +969,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.lights}
-                  onChange={(e: any) => updateParametricValue('lights', parseFloat(e.target.value))}
+                  onChange={(e) => updateParametricValue('lights', parseFloat(String(e.target.value)))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -966,7 +979,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.darks}
-                  onChange={(e: any) => updateParametricValue('darks', parseFloat(e.target.value))}
+                  onChange={(e) => updateParametricValue('darks', parseFloat(String(e.target.value)))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -976,7 +989,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.shadows}
-                  onChange={(e: any) => updateParametricValue('shadows', parseFloat(e.target.value))}
+                  onChange={(e) => updateParametricValue('shadows', parseFloat(String(e.target.value)))}
                   onDragStateChange={onDragStateChange}
                 />
                 <Slider
@@ -986,7 +999,7 @@ export default function CurveGraph({
                   step={1}
                   defaultValue={0}
                   value={activeParametricSettings.blackLevel}
-                  onChange={(e: any) => updateParametricValue('blackLevel', parseFloat(e.target.value))}
+                  onChange={(e) => updateParametricValue('blackLevel', parseFloat(String(e.target.value)))}
                   onDragStateChange={onDragStateChange}
                 />
               </div>

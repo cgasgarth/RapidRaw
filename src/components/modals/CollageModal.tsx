@@ -145,7 +145,10 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       setError(null);
       try {
         const imagePromises = sourceImages.map(async (imageFile) => {
-          const metadata: any = await invoke(Invokes.LoadMetadata, { path: imageFile.path });
+          const metadata = await invoke<{ adjustments?: { is_null?: boolean } & Record<string, unknown> }>(
+            Invokes.LoadMetadata,
+            { path: imageFile.path },
+          );
           const adjustments = metadata.adjustments && !metadata.adjustments.is_null ? metadata.adjustments : {};
 
           const imageData: Uint8Array = await invoke(Invokes.GeneratePreviewForPath, {
@@ -180,9 +183,9 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
           initialStates[img.path] = { offsetX: 0, offsetY: 0, scale: 1 };
         });
         setImageStates(initialStates);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Failed to load images:', err);
-        setError(err.message || 'Could not load images.');
+        setError(err instanceof Error ? err.message : 'Could not load images.');
       } finally {
         setIsLoading(false);
       }
@@ -418,8 +421,8 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
       const base64Data = offscreenCanvas.toDataURL('image/png');
       const path = await onSave(base64Data, sourceImages[0].path);
       setSavedPath(path);
-    } catch (err: any) {
-      setError(err.message || 'Could not save the collage.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not save the collage.');
     } finally {
       setIsSaving(false);
     }

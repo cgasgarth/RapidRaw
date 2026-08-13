@@ -1,6 +1,4 @@
 import { useShallow } from 'zustand/react/shallow';
-import { invoke } from '@tauri-apps/api/core';
-import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
 import { useUIStore } from '../../store/useUIStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -19,8 +17,13 @@ import ConfirmModal from './ConfirmModal';
 import ImportSettingsModal from './ImportSettingsModal';
 import CullingModal from './CullingModal';
 import CollageModal from './CollageModal';
-import { AppSettings, Invokes, AlbumItem, Album, AlbumGroup } from '../ui/AppProperties';
+import { AppSettings, AlbumItem, AlbumGroup } from '../ui/AppProperties';
 import { CopyPasteSettings } from '../../utils/adjustments';
+import { ImportSettings } from './ImportSettingsModal';
+
+export interface DeleteOptions {
+  includeAssociated: boolean;
+}
 
 export interface AppModalsProps {
   handleImageSelect: (path: string) => void;
@@ -35,10 +38,10 @@ export interface AppModalsProps {
   handleCreateFolder: (folderName: string) => Promise<void>;
   handleRenameFolder: (newName: string) => Promise<void>;
   handleSaveRename: (nameTemplate: string) => Promise<void>;
-  handleStartImport: (settings: any) => Promise<void>;
+  handleStartImport: (settings: ImportSettings) => Promise<void>;
   handleSetColorLabel: (color: string | null, paths?: string[]) => Promise<void>;
   handleRate: (rating: number, paths?: string[]) => void;
-  executeDelete: (paths: string[], options: any) => Promise<void>;
+  executeDelete: (paths: string[], options: DeleteOptions) => Promise<void>;
   handleSaveCollage: (base64Data: string, firstPath: string) => Promise<string>;
   handleCreateAlbumItem: (name: string, type: 'album' | 'group') => Promise<void>;
   handleRenameAlbumItem: (newName: string) => Promise<void>;

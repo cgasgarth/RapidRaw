@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import { ExportPreset } from './ExportImportProperties';
 import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import { ToolType } from '../panel/right/Masks';
@@ -180,7 +181,7 @@ export type GroupingMode = 'off' | GroupPreference;
 export interface AppSettings {
   aiConnectorAddress?: string;
   aiProvider?: string;
-  decorations?: any;
+  decorations?: boolean;
   editorPreviewResolution?: number;
   enableZoomHifi?: boolean;
   useFullDpiRendering?: boolean;
@@ -191,8 +192,8 @@ export interface AppSettings {
   aiTagCount?: number;
   customAiTags?: string[];
   filterCriteria?: FilterCriteria;
-  lastFolderState?: any;
-  pinnedFolders?: any;
+  lastFolderState?: LastFolderState;
+  pinnedFolders?: string[];
   lastRootPath: string | null;
   rootFolders?: string[];
   libraryViewMode?: LibraryViewMode;
@@ -200,13 +201,19 @@ export interface AppSettings {
   theme: Theme;
   thumbnailSize?: ThumbnailSize;
   thumbnailAspectRatio?: ThumbnailAspectRatio;
+  thumbnailResolution?: number;
+  thumbnailWorkerThreads?: number;
+  imageCacheSize?: number;
+  rawPreprocessingColorNr?: number;
+  rawPreprocessingSharpening?: number;
+  applyPreprocessingToNonRaws?: boolean;
   uiVisibility?: UiVisibility;
   adjustmentVisibility?: { [key: string]: boolean };
   rawHighlightCompression?: number;
   processingBackend?: string;
   linuxGpuOptimization?: boolean;
   exportPresets?: ExportPreset[];
-  myLenses?: any;
+  myLenses?: MyLens[];
   enableFolderImageCounts?: boolean;
   displayEditIcon?: boolean;
   linearRawMode?: string;
@@ -267,11 +274,36 @@ export interface FilterCriteria {
 }
 
 export interface Folder {
-  children: any;
-  id?: string | undefined;
-  name?: string | undefined;
+  children: Preset[];
+  id?: string;
+  name?: string;
   imageCount?: number;
 }
+
+export interface FolderTree {
+  children: FolderTree[];
+  isDir: boolean;
+  name: string;
+  path: string;
+  imageCount?: number;
+  hasSubdirs?: boolean;
+  modified?: number;
+  created?: number;
+}
+
+export interface LastFolderState {
+  currentFolderPath?: string | null;
+  expandedFolders?: string[];
+  expandedAlbumGroups?: string[];
+}
+
+export interface MyLens {
+  maker: string;
+  model: string;
+}
+
+export type ExifData = Record<string, string>;
+export type ImageMetadata = Record<string, unknown>;
 
 export interface ImageFile {
   is_edited: boolean;
@@ -288,13 +320,15 @@ export interface ImageFile {
 
 export interface Option {
   color?: string;
+  customComponent?: React.ComponentType<{ hideContextMenu(): void }>;
+  customProps?: Record<string, unknown>;
   disabled?: boolean;
-  icon?: any;
+  icon?: LucideIcon;
   isDestructive?: boolean;
   label?: string;
   onClick?(): void;
   onRightClick?(): void;
-  submenu?: any;
+  submenu?: Option[];
   type?: string;
 }
 
@@ -320,12 +354,12 @@ export interface Progress {
 }
 
 export interface SelectedImage {
-  exif: any;
+  exif: ExifData | null;
   group_id?: string | null;
   height: number;
   isRaw: boolean;
   isReady: boolean;
-  metadata?: any;
+  metadata?: ImageMetadata;
   original_base64?: string;
   originalUrl: string | null;
   path: string;

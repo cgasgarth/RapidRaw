@@ -1054,7 +1054,8 @@
       "or": "oppure",
       "version": "Versione {{version}}",
       "welcomeBack": "Bentornato!",
-      "welcomeBackDesc": "Continua da dove avevi interrotto o inizia una nuova sessione."
+      "welcomeBackDesc": "Continua da dove avevi interrotto o inizia una nuova sessione.",
+      "photographer": "Timon Käch"
     },
     "status": {
       "downloading": "Download in corso {{status}}...",

@@ -60,7 +60,7 @@ export default function NegativeConversionModal({
   const selectedImagePath = targetPaths.length > 0 ? targetPaths[0] : null;
 
   useEffect(() => {
-    const unlisten = listen('negative-batch-progress', (e: any) => {
+    const unlisten = listen<{ current: number; total: number }>('negative-batch-progress', (e) => {
       setProgress(e.payload);
     });
     return () => {
@@ -145,8 +145,8 @@ export default function NegativeConversionModal({
           path: selectedImagePath,
           jsAdjustments: {},
         })
-          .then((res: any) => {
-            const blob = new Blob([new Uint8Array(res)], { type: 'image/jpeg' });
+          .then((res) => {
+            const blob = new Blob([new Uint8Array(res as Uint8Array)], { type: 'image/jpeg' });
             setOriginalUrl(URL.createObjectURL(blob));
           })
           .catch(console.error);

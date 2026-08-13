@@ -16,7 +16,7 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useLibraryActions } from '../../../hooks/useLibraryActions';
 
 interface CameraSetting {
-  format?(value: number): string | number;
+  format?(value: string): string;
   label: string;
 }
 
@@ -37,7 +37,7 @@ interface GPSData {
 
 interface MetaDataItemProps {
   label: string;
-  value: any;
+  value: string | number | null | undefined;
 }
 
 const USER_TAG_PREFIX = 'user:';
@@ -205,26 +205,23 @@ const EDITABLE_FIELDS = [
 
 const KEY_CAMERA_SETTINGS_MAP: CameraSettings = {
   FNumber: {
-    format: (value: number) => {
-      const fStr = String(value);
-      return fStr.toLowerCase().startsWith('f') ? fStr : `f/${fStr}`;
-    },
+    format: (value: string) => (value.toLowerCase().startsWith('f') ? value : `f/${value}`),
     label: 'Aperture',
   },
   ExposureTime: {
-    format: (value: number) => (String(value).endsWith('s') ? value : `${value}s`),
+    format: (value: string) => (value.endsWith('s') ? value : `${value}s`),
     label: 'Shutter Speed',
   },
   PhotographicSensitivity: {
-    format: (value: number) => `${value}`,
+    format: (value: string) => value,
     label: 'ISO',
   },
   FocalLengthIn35mmFilm: {
-    format: (value: number) => (String(value).endsWith('mm') ? value : `${value} mm`),
+    format: (value: string) => (value.endsWith('mm') ? value : `${value} mm`),
     label: 'Focal Length',
   },
   LensModel: {
-    format: (value: number) => String(value).replace(/"/g, ''),
+    format: (value: string) => value.replace(/"/g, ''),
     label: 'Lens',
   },
 };
@@ -255,8 +252,8 @@ export default function MetadataPanel() {
 
     const cameraGridKeys = ['ExposureTime', 'FNumber', 'PhotographicSensitivity', 'FocalLengthIn35mmFilm'];
     const cameraGridSettings = cameraGridKeys.map((key) => {
-      const value = exif[key];
-      const hasValue = value !== undefined && value !== null && value !== '';
+      const value = key in exif ? exif[key] : '';
+      const hasValue = value !== '';
 
       const translatedLabel =
         key === 'FNumber'
@@ -274,21 +271,21 @@ export default function MetadataPanel() {
         label: translatedLabel,
         value:
           hasValue && KEY_CAMERA_SETTINGS_MAP[key].format
-            ? KEY_CAMERA_SETTINGS_MAP[key].format!(value as number)
+            ? KEY_CAMERA_SETTINGS_MAP[key].format(value)
             : hasValue
               ? value
               : '-',
       };
     });
 
-    const lensValue = exif['LensModel'];
-    const hasLensValue = lensValue !== undefined && lensValue !== null && lensValue !== '';
+    const lensValue = 'LensModel' in exif ? exif.LensModel : '';
+    const hasLensValue = lensValue !== '';
     const lensSetting = {
       key: 'LensModel',
       label: t('editor.metadata.camera.lens'),
       value:
         hasLensValue && KEY_CAMERA_SETTINGS_MAP['LensModel'].format
-          ? KEY_CAMERA_SETTINGS_MAP['LensModel'].format(lensValue as number)
+          ? KEY_CAMERA_SETTINGS_MAP['LensModel'].format(lensValue)
           : hasLensValue
             ? lensValue
             : '-',
@@ -299,7 +296,12 @@ export default function MetadataPanel() {
     const lonStr = exif.GPSLongitude;
     const lonRef = exif.GPSLongitudeRef;
 
-    const gpsData: GPSData = { lat: null, lon: null, altitude: exif.GPSAltitude || null };
+    const altitudeValue = exif.GPSAltitude ? Number(exif.GPSAltitude) : null;
+    const gpsData: GPSData = {
+      lat: null,
+      lon: null,
+      altitude: altitudeValue !== null && !Number.isNaN(altitudeValue) ? altitudeValue : null,
+    };
     if (latStr && latRef && lonStr && lonRef) {
       const parsedLat = parseDms(latStr);
       const parsedLon = parseDms(lonStr);
@@ -449,7 +451,7 @@ export default function MetadataPanel() {
               </Text>
               <div className="flex flex-col gap-2">
                 <div className="grid grid-cols-2 gap-2">
-                  {cameraGridSettings.map((item: any) => {
+                  {cameraGridSettings.map((item) => {
                     const Icon = CAMERA_ICONS[item.key];
                     return (
                       <div

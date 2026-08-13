@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { ArrowLeft, CheckCircle2, ChevronDown, Loader2, Search, Users, Layers, Crop } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Loader2, Search, Users } from 'lucide-react';
 import { siGithub } from 'simple-icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { Invokes, SupportedTypes, ImageFile } from '../ui/AppProperties';
-import { INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
+import { Adjustments, INITIAL_ADJUSTMENTS } from '../../utils/adjustments';
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import Dropdown from '../ui/Dropdown';
@@ -18,7 +18,7 @@ const DEFAULT_PREVIEW_IMAGE_URL = 'https://raw.githubusercontent.com/CyberTimon/
 interface CommunityPreset {
   name: string;
   creator: string;
-  adjustments: Record<string, any>;
+  adjustments: Partial<Adjustments>;
   includeMasks?: boolean;
   includeCropTransform?: boolean;
   presetType?: 'tool' | 'style';
@@ -49,7 +49,7 @@ interface CommunityPageProps {
   currentFolderPath: string | null;
 }
 
-const shuffleArray = (array: any[]) => {
+const shuffleArray = <T,>(array: T[]): T[] => {
   const newArray = [...array];
   for (let i = newArray.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -70,7 +70,6 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
   const searchFocusRequest = useUIStore((state) => state.searchFocusRequest);
   const lastSearchFocusRequest = useRef(searchFocusRequest);
   const [downloadStatus, setDownloadStatus] = useState<Record<string, 'idle' | 'downloading' | 'success'>>({});
-  const [allPreviewsLoaded, setAllPreviewsLoaded] = useState(false);
 
   const sortMethods = useMemo(() => [{ value: 'name', label: t('library.community.sortMethods.name') }], [t]);
 
@@ -147,7 +146,6 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
     }
 
     const generateAllPreviews = async () => {
-      setAllPreviewsLoaded(false);
       try {
         const previewDataMap: Record<string, number[]> = await invoke(Invokes.GenerateAllCommunityPreviews, {
           imagePaths: previewImagePaths,
@@ -169,8 +167,6 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
         });
       } catch (error) {
         console.error(`Failed to generate previews:`, error);
-      } finally {
-        setAllPreviewsLoaded(true);
       }
     };
 

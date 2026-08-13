@@ -401,7 +401,7 @@ export default function CropPanel() {
 
   const displayRotation = localRotation !== null ? localRotation : fineRotation;
 
-  const handleFineRotationChange = (e: any) => {
+  const handleFineRotationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newFineRotation = parseFloat(e.target.value);
     if (isRotationActive) {
       updateLocalRotation(newFineRotation);
@@ -431,7 +431,7 @@ export default function CropPanel() {
 
   const resetFineRotation = () => {
     updateLocalRotation(null);
-    setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, rotation: 0 }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, rotation: 0 }));
   };
 
   const handleOverlayCycle = () => {

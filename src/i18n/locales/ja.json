@@ -1028,7 +1028,8 @@
       "or": "または",
       "version": "バージョン {{version}}",
       "welcomeBack": "おかえりなさい！",
-      "welcomeBackDesc": "前回の続きから始めるか、新しいセッションを開始します。"
+      "welcomeBackDesc": "前回の続きから始めるか、新しいセッションを開始します。",
+      "photographer": "Timon Käch"
     },
     "status": {
       "downloading": "{{status}}をダウンロード中...",

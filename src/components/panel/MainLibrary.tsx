@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
 import {
@@ -20,6 +20,7 @@ import {
 import CullingView from './library/CullingView';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import Button from '../ui/Button';
 import { ThemeProps, THEMES, DEFAULT_THEME_ID } from '../../utils/themes';
 import {
@@ -50,6 +51,10 @@ export interface ColumnWidths {
   date: number;
   rating: number;
   color: number;
+  shutter: number;
+  aperture: number;
+  iso: number;
+  focal: number;
 }
 
 interface MainLibraryProps {
@@ -69,11 +74,11 @@ interface MainLibraryProps {
   libraryViewMode: LibraryViewMode;
   multiSelectedPaths: Array<string>;
   onClearSelection(): void;
-  onContextMenu(event: any, path: string): void;
+  onContextMenu(event: React.MouseEvent, path: string): void;
   onContinueSession(): void;
-  onEmptyAreaContextMenu(event: any): void;
+  onEmptyAreaContextMenu(event: React.MouseEvent): void;
   onGoHome(): void;
-  onImageClick(path: string, event: any): void;
+  onImageClick(path: string, event: React.MouseEvent): void;
   onImageDoubleClick(path: string): void;
   onImportClick(): void;
   onLibraryRefresh(): void;
@@ -91,22 +96,10 @@ interface MainLibraryProps {
   onNavigateToCommunity(): void;
 }
 
-export interface ColumnWidths {
-  thumbnail: number;
-  name: number;
-  date: number;
-  rating: number;
-  color: number;
-  shutter: number;
-  aperture: number;
-  iso: number;
-  focal: number;
-}
-
 interface DisplayModeSwitchProps {
   displayMode: LibraryDisplayMode;
   setDisplayMode: (mode: LibraryDisplayMode) => void;
-  t: any;
+  t: TFunction;
 }
 
 function DisplayModeSwitch({ displayMode, setDisplayMode, t }: DisplayModeSwitchProps) {
@@ -442,7 +435,7 @@ export default function MainLibrary(props: MainLibraryProps) {
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        Timon Käch
+                        {t('library.splash.photographer')}
                       </a>
                     </p>
                     {appVersion && (

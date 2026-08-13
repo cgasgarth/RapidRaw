@@ -69,8 +69,7 @@ export default function LUTControl({
             const updatedList = await invoke<LutEntry[]>('remove_lut', { path: entry.path });
             setEntries(updatedList);
             setPreviews((prev) => {
-              const next = { ...prev };
-              delete next[entry.path];
+              const { [entry.path]: _removed, ...next } = prev;
               return next;
             });
             previewCache.current.clear();

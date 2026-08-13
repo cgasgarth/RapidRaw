@@ -17,6 +17,29 @@ interface ImageLayer {
   opacity: number;
 }
 
+export type GridRow =
+  | { type: 'header'; path: string; count: number; isExpanded: boolean }
+  | { type: 'images'; images: ImageFile[]; startIndex: number }
+  | { type: 'footer' };
+
+interface ThumbnailProps {
+  isActive: boolean;
+  isSelected: boolean;
+  isForcedHover?: boolean;
+  onContextMenu(event: React.MouseEvent, path: string): void;
+  onImageClick(path: string, event: React.MouseEvent): void;
+  onImageDoubleClick(path: string): void;
+  onLoad(path: string): void;
+  path: string;
+  rating: number;
+  tags: string[] | null;
+  aspectRatio: ThumbnailAspectRatio;
+  isEdited?: boolean;
+  exif: ImageFile['exif'];
+  isCloudPlaceholder: boolean;
+  groupBadgeLabel?: string;
+}
+
 const ThumbnailComponent = ({
   isActive,
   isSelected,
@@ -33,7 +56,7 @@ const ThumbnailComponent = ({
   exif,
   isCloudPlaceholder,
   groupBadgeLabel,
-}: any) => {
+}: ThumbnailProps) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
@@ -112,12 +135,11 @@ const ThumbnailComponent = ({
 
   useEffect(() => {
     const layerToFadeIn = layers.find((l) => l.opacity === 0);
-    if (layerToFadeIn) {
-      const frame = requestAnimationFrame(() => {
-        setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
-      });
-      return () => cancelAnimationFrame(frame);
-    }
+    if (!layerToFadeIn) return;
+    const frame = requestAnimationFrame(() => {
+      setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
+    });
+    return () => cancelAnimationFrame(frame);
   }, [layers]);
 
   const handleTransitionEnd = useCallback((finishedId: string) => {
@@ -152,11 +174,11 @@ const ThumbnailComponent = ({
     <div
       className="aspect-square bg-surface rounded-md overflow-hidden cursor-pointer group relative flex flex-col transition-all duration-150 transform-gpu [-webkit-mask-image:-webkit-radial-gradient(white,black)]"
       data-bench-id="thumbnail"
-      onClick={(e: any) => {
+      onClick={(e: React.MouseEvent) => {
         e.stopPropagation();
         onImageClick(path, e);
       }}
-      onContextMenu={(e: any) => onContextMenu(e, path)}
+      onContextMenu={(e: React.MouseEvent) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
     >
       <div className="relative w-full flex-1 min-h-0 z-0 bg-surface">
@@ -435,6 +457,25 @@ const ThumbnailComponent = ({
   );
 };
 
+interface ListItemProps {
+  isActive: boolean;
+  isSelected: boolean;
+  onContextMenu(event: React.MouseEvent, path: string): void;
+  onImageClick(path: string, event: React.MouseEvent): void;
+  onImageDoubleClick(path: string): void;
+  onLoad(path: string): void;
+  path: string;
+  rating: number;
+  tags: string[] | null;
+  modified: number;
+  aspectRatio: ThumbnailAspectRatio;
+  columnWidths: ColumnWidths;
+  exif: ImageFile['exif'];
+  isCloudPlaceholder: boolean;
+  isPrevSelected: boolean;
+  isNextSelected: boolean;
+}
+
 const ListItemComponent = ({
   isActive,
   isSelected,
@@ -452,7 +493,7 @@ const ListItemComponent = ({
   isCloudPlaceholder,
   isPrevSelected,
   isNextSelected,
-}: any) => {
+}: ListItemProps) => {
   const { t } = useTranslation();
   const data = useProcessStore((s) => s.thumbnails[path]);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
@@ -539,12 +580,11 @@ const ListItemComponent = ({
 
   useEffect(() => {
     const layerToFadeIn = layers.find((l) => l.opacity === 0);
-    if (layerToFadeIn) {
-      const frame = requestAnimationFrame(() => {
-        setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
-      });
-      return () => cancelAnimationFrame(frame);
-    }
+    if (!layerToFadeIn) return;
+    const frame = requestAnimationFrame(() => {
+      setLayers((prev) => prev.map((l) => (l.id === layerToFadeIn.id ? { ...l, opacity: 1 } : l)));
+    });
+    return () => cancelAnimationFrame(frame);
   }, [layers]);
 
   const handleTransitionEnd = useCallback((finishedId: string) => {
@@ -587,11 +627,11 @@ const ListItemComponent = ({
   return (
     <div
       className={`flex items-center w-full h-full cursor-pointer transition-all duration-150 ${borderClass} ${roundingClass} ${stateClass}`}
-      onClick={(e: any) => {
+      onClick={(e: React.MouseEvent) => {
         e.stopPropagation();
         onImageClick(path, e);
       }}
-      onContextMenu={(e: any) => onContextMenu(e, path)}
+      onContextMenu={(e: React.MouseEvent) => onContextMenu(e, path)}
       onDoubleClick={() => onImageDoubleClick(path)}
     >
       <div
@@ -731,6 +771,30 @@ const ListItemComponent = ({
 export const Thumbnail = React.memo(ThumbnailComponent);
 export const ListItem = React.memo(ListItemComponent);
 
+interface RowProps {
+  index: number;
+  style: React.CSSProperties;
+  rows: GridRow[];
+  activePath: string | null;
+  multiSelectedSet: Set<string>;
+  onContextMenu(event: React.MouseEvent, path: string): void;
+  onImageClick(path: string, event: React.MouseEvent): void;
+  onImageDoubleClick(path: string): void;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  onImageLoad(path: string): void;
+  imageRatings: Record<string, number>;
+  baseFolderPath: string | null;
+  itemWidth: number;
+  itemHeight: number;
+  outerPadding: number;
+  gap: number;
+  isListView: boolean;
+  columnWidths: ColumnWidths;
+  queueThumbnailRequest(path: string): void;
+  onToggleRecursiveFolder(path: string): void;
+  groupBadgeInfo: Map<string, { label: string }> | null;
+}
+
 const RowComponent = ({
   index,
   style,
@@ -753,12 +817,12 @@ const RowComponent = ({
   queueThumbnailRequest,
   onToggleRecursiveFolder,
   groupBadgeInfo,
-}: any) => {
+}: RowProps) => {
   const { t } = useTranslation();
   const row = rows[index];
 
   useEffect(() => {
-    if (!row || row.type !== 'images') return;
+    if (row.type !== 'images') return;
 
     row.images.forEach((img: ImageFile) => {
       queueThumbnailRequest(img.path);
@@ -877,7 +941,7 @@ const RowComponent = ({
                 onImageDoubleClick={onImageDoubleClick}
                 onLoad={onImageLoad}
                 path={imageFile.path}
-                rating={imageRatings?.[imageFile.path] || 0}
+                rating={imageRatings[imageFile.path] || 0}
                 tags={imageFile.tags}
                 exif={imageFile.exif}
                 aspectRatio={thumbnailAspectRatio}
@@ -896,13 +960,15 @@ const RowComponent = ({
                 onImageDoubleClick={onImageDoubleClick}
                 onLoad={onImageLoad}
                 path={imageFile.path}
-                rating={imageRatings?.[imageFile.path] || 0}
+                rating={imageRatings[imageFile.path] || 0}
                 tags={imageFile.tags}
                 exif={imageFile.exif}
                 isEdited={imageFile.is_edited}
                 aspectRatio={thumbnailAspectRatio}
                 isCloudPlaceholder={imageFile.is_cloud_placeholder}
-                groupBadgeLabel={imageFile.group_id && groupBadgeInfo?.get(imageFile.group_id)?.label}
+                groupBadgeLabel={
+                  imageFile.group_id ? (groupBadgeInfo?.get(imageFile.group_id)?.label ?? undefined) : undefined
+                }
               />
             )}
           </div>

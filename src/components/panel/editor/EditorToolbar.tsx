@@ -10,6 +10,7 @@ import { TextColors, TextVariants, TextWeights } from '../../../types/typography
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
 import { findGroupVariants, getVariantLabel } from '../../../utils/imageGrouping';
+import type { Adjustments, AiPatch, MaskContainer } from '../../../utils/adjustments';
 
 interface EditorToolbarProps {
   canRedo: boolean;
@@ -17,7 +18,7 @@ interface EditorToolbarProps {
   isAndroid: boolean;
   isLoading: boolean;
   onBackToLibrary(): void;
-  onImageSelect?(path: string, event?: any): void;
+  onImageSelect?(path: string, event?: React.MouseEvent): void;
   onRedo(): void;
   onToggleFullScreen(): void;
   onToggleShowOriginal(): void;
@@ -26,7 +27,7 @@ interface EditorToolbarProps {
   showOriginal: boolean;
   showDateView: boolean;
   onToggleDateView(): void;
-  adjustmentsHistory: any[];
+  adjustmentsHistory: Adjustments[];
   adjustmentsHistoryIndex: number;
   goToAdjustmentsHistoryIndex(index: number): void;
 }
@@ -279,14 +280,14 @@ const EditorToolbar = memo(
           if (prev[key] === curr[key]) continue;
 
           if (key === 'masks') {
-            const prevMasks = prev.masks || [];
-            const currMasks = curr.masks || [];
+            const prevMasks = prev.masks;
+            const currMasks = curr.masks;
 
             if (currMasks.length > prevMasks.length) changed.push('Added Mask');
             else if (currMasks.length < prevMasks.length) changed.push('Deleted Mask');
             else {
-              currMasks.forEach((cMask: any) => {
-                const pMask = prevMasks.find((m: any) => m.id === cMask.id);
+              currMasks.forEach((cMask: MaskContainer) => {
+                const pMask = prevMasks.find((m: MaskContainer) => m.id === cMask.id);
                 if (pMask) {
                   if (pMask.opacity !== cMask.opacity) changed.push('Mask Opacity');
                   if (pMask.invert !== cMask.invert) changed.push('Mask Invert');
@@ -294,7 +295,7 @@ const EditorToolbar = memo(
                   if (pMask.subMasks !== cMask.subMasks) changed.push('Mask Area / Brush');
 
                   if (pMask.adjustments !== cMask.adjustments) {
-                    for (const adjKey of Object.keys(cMask.adjustments || {})) {
+                    for (const adjKey of Object.keys(cMask.adjustments)) {
                       if (pMask.adjustments[adjKey] !== cMask.adjustments[adjKey]) {
                         changed.push(`Mask ${formatKey(adjKey)}`);
                       }
@@ -304,14 +305,14 @@ const EditorToolbar = memo(
               });
             }
           } else if (key === 'aiPatches') {
-            const prevPatches = prev.aiPatches || [];
-            const currPatches = curr.aiPatches || [];
+            const prevPatches = prev.aiPatches;
+            const currPatches = curr.aiPatches;
 
             if (currPatches.length > prevPatches.length) changed.push('Added AI Patch');
             else if (currPatches.length < prevPatches.length) changed.push('Deleted AI Patch');
             else {
-              currPatches.forEach((cPatch: any) => {
-                const pPatch = prevPatches.find((p: any) => p.id === cPatch.id);
+              currPatches.forEach((cPatch: AiPatch) => {
+                const pPatch = prevPatches.find((p: AiPatch) => p.id === cPatch.id);
                 if (pPatch) {
                   if (pPatch.visible !== cPatch.visible) changed.push('AI Patch Visibility');
                   if (pPatch.subMasks !== cPatch.subMasks) changed.push('AI Patch Area');
@@ -347,6 +348,7 @@ const EditorToolbar = memo(
         }, 10);
         return () => clearTimeout(timer);
       }
+      return;
     }, [isHistoryVisible, adjustmentsHistoryIndex]);
 
     const handleButtonKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {

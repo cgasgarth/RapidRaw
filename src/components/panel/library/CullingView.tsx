@@ -7,7 +7,6 @@ import {
   Star as StarIcon,
   ZoomIn,
   ZoomOut,
-  Maximize,
   Link,
   SquarePen,
   Tag,
@@ -19,7 +18,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
-import { Invokes, ImageFile } from '../../ui/AppProperties';
+import { Invokes, ImageFile, ThumbnailAspectRatio } from '../../ui/AppProperties';
 import { Thumbnail } from './LibraryItems';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -34,6 +33,35 @@ interface SyncViewport {
   zoom: number;
   pan: { x: number; y: number };
   isDragging: boolean;
+}
+
+interface CullingViewProps {
+  imageList: ImageFile[];
+  multiSelectedPaths: string[];
+  activePath: string | null;
+  onImageClick(path: string, event: React.MouseEvent): void;
+  imageRatings: Record<string, number>;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  onContextMenu(event: React.MouseEvent, path: string): void;
+  onImageDoubleClick(path: string): void;
+  onRequestThumbnails?(paths: string[]): void;
+  onClearSelection(): void;
+  onEmptyAreaContextMenu(event: React.MouseEvent): void;
+}
+
+interface CullingRowProps {
+  index: number;
+  style: React.CSSProperties;
+  imageList: ImageFile[];
+  multiSelectedPaths: string[];
+  activePath: string | null;
+  onContextMenu(event: React.MouseEvent, path: string): void;
+  onImageDoubleClick(path: string): void;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  imageRatings: Record<string, number>;
+  onImageClick(path: string, event: React.MouseEvent): void;
+  queueThumbnailRequest?(path: string): void;
+  hoveredCullingPath: string | null;
 }
 
 function CullingPreview({
@@ -153,8 +181,8 @@ function CullingPreview({
     };
   }, [image.exif]);
 
-  const imageWidth = (image as any).width || image.exif?.ExifImageWidth || image.exif?.PixelXDimension;
-  const imageHeight = (image as any).height || image.exif?.ExifImageHeight || image.exif?.PixelYDimension;
+  const imageWidth = image.exif?.ExifImageWidth || image.exif?.PixelXDimension;
+  const imageHeight = image.exif?.ExifImageHeight || image.exif?.PixelYDimension;
 
   const handleAddTag = async (tagToAdd: string) => {
     const newTagValue = tagToAdd.trim().toLowerCase();
@@ -243,11 +271,13 @@ function CullingPreview({
 
     const fetchPreviewWithAdjustments = async () => {
       try {
-        const metadata: any = await invoke(Invokes.LoadMetadata, { path: image.path });
+        const metadata = await invoke<{ adjustments?: { is_null?: boolean } & Record<string, unknown> }>(
+          Invokes.LoadMetadata,
+          { path: image.path },
+        );
         if (isCancelled()) return;
 
-        const adjustments =
-          metadata && metadata.adjustments && !metadata.adjustments.is_null ? metadata.adjustments : {};
+        const adjustments = metadata.adjustments && !metadata.adjustments.is_null ? metadata.adjustments : {};
 
         const bytes = await invoke<Uint8Array>(Invokes.GeneratePreviewForPath, {
           path: image.path,
@@ -937,7 +967,7 @@ const Row = React.memo(
     onImageClick,
     queueThumbnailRequest,
     hoveredCullingPath,
-  }: any) => {
+  }: CullingRowProps) => {
     const image: ImageFile = imageList[index];
     const isSelected = multiSelectedPaths.includes(image.path);
 
@@ -945,12 +975,11 @@ const Row = React.memo(
       if (!queueThumbnailRequest) return;
       queueThumbnailRequest(image.path);
 
-      if (image.is_cloud_placeholder) {
-        const interval = setInterval(() => {
-          queueThumbnailRequest(image.path);
-        }, 5000);
-        return () => clearInterval(interval);
-      }
+      if (!image.is_cloud_placeholder) return;
+      const interval = setInterval(() => {
+        queueThumbnailRequest(image.path);
+      }, 5000);
+      return () => clearInterval(interval);
     }, [image, queueThumbnailRequest]);
 
     return (
@@ -961,11 +990,11 @@ const Row = React.memo(
             isSelected={isSelected}
             isActive={activePath === image.path}
             isForcedHover={hoveredCullingPath === image.path}
-            onImageClick={(path: string, e: any) => onImageClick(path, e)}
+            onImageClick={(path: string, e: React.MouseEvent) => onImageClick(path, e)}
             onContextMenu={onContextMenu}
             onImageDoubleClick={onImageDoubleClick}
             onLoad={() => {}}
-            rating={imageRatings?.[image.path] || 0}
+            rating={imageRatings[image.path] || 0}
             tags={image.tags}
             exif={image.exif}
             isEdited={image.is_edited}
@@ -978,7 +1007,7 @@ const Row = React.memo(
   },
 );
 
-export default function CullingView(props: any) {
+export default function CullingView(props: CullingViewProps) {
   const { t } = useTranslation();
   const {
     imageList,
@@ -1000,7 +1029,7 @@ export default function CullingView(props: any) {
   const isResizing = useRef(false);
 
   const requestQueueRef = useRef<Set<string>>(new Set());
-  const requestTimeoutRef = useRef<any>(null);
+  const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [hoveredCullingPath, setHoveredCullingPath] = useState<string | null>(null);
 
@@ -1152,20 +1181,20 @@ export default function CullingView(props: any) {
   const displayPaths = multiSelectedPaths.slice(-6);
   const displayImages = displayPaths
     .map((p: string) => imageList.find((img: ImageFile) => img.path === p))
-    .filter(Boolean);
+    .filter((img): img is ImageFile => Boolean(img));
   const displayCount = displayImages.length;
 
   const handleSidebarEmptyClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (!target.closest('[data-bench-id="thumbnail"]') && !target.closest('button')) {
-      onClearSelection?.();
+      onClearSelection();
     }
   };
 
   const handleSidebarEmptyContextMenu = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (!target.closest('[data-bench-id="thumbnail"]') && !target.closest('button')) {
-      onEmptyAreaContextMenu?.(e);
+      onEmptyAreaContextMenu(e);
     }
   };
 
@@ -1195,7 +1224,7 @@ export default function CullingView(props: any) {
               <CullingPreview
                 key={img.path}
                 image={img}
-                rating={imageRatings?.[img.path] || 0}
+                rating={imageRatings[img.path] || 0}
                 onContextMenu={onContextMenu}
                 onImageDoubleClick={onImageDoubleClick}
                 isActive={activePath === img.path}
@@ -1231,8 +1260,8 @@ export default function CullingView(props: any) {
             listRef={setListHandle}
             rowCount={imageList.length}
             rowHeight={sidebarWidth - 16}
-            rowComponent={Row}
-            rowProps={rowProps}
+            rowComponent={Row as never}
+            rowProps={rowProps as never}
             className="custom-scrollbar"
           />
         </div>

@@ -1,10 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, type MouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { Invokes, ImageFile, AlbumItem, Album, AlbumGroup } from '../components/ui/AppProperties';
+import type { FolderTree } from '../components/ui/AppProperties';
 import { globalImageCache } from '../utils/ImageLRUCache';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { computeSortedLibrary } from './useSortedLibrary';
@@ -84,7 +85,7 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
   }, []);
 
   const handleUpdateExif = useCallback(async (paths: Array<string> | undefined, updates: Record<string, string>) => {
-    const { multiSelectedPaths, imageList, setLibrary } = useLibraryStore.getState();
+    const { multiSelectedPaths, setLibrary } = useLibraryStore.getState();
     const { selectedImage, setEditor } = useEditorStore.getState();
 
     const pathsToUpdate =
@@ -119,7 +120,7 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
 
       pathsToUpdate.forEach((p) => {
         const cached = globalImageCache.get(p);
-        if (cached && cached.selectedImage) {
+        if (cached) {
           globalImageCache.set(p, {
             ...cached,
             selectedImage: { ...cached.selectedImage, exif: { ...(cached.selectedImage.exif || {}), ...updates } },
@@ -167,7 +168,7 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
   const handleMultiSelectClick = useCallback(
     (
       path: string,
-      event: any,
+      event: MouseEvent,
       options: {
         onSimpleClick(p: string, isAlreadySelected: boolean): void;
         updateLibraryActivePath: boolean;
@@ -219,7 +220,7 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
   );
 
   const handleLibraryImageSingleClick = useCallback(
-    (path: string, event: any) => {
+    (path: string, event: MouseEvent) => {
       const { selectionAnchorPath, libraryActivePath, setLibrary } = useLibraryStore.getState();
       handleMultiSelectClick(path, event, {
         shiftAnchor: selectionAnchorPath ?? libraryActivePath,
@@ -240,7 +241,7 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
   );
 
   const handleImageClick = useCallback(
-    (path: string, event: any) => {
+    (path: string, event: MouseEvent) => {
       const { selectionAnchorPath, libraryActivePath, setLibrary } = useLibraryStore.getState();
       const { selectedImage } = useEditorStore.getState();
       const inEditor = !!selectedImage;
@@ -269,10 +270,10 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
     const expandedArray = Array.from(expandedFolders);
 
     try {
-      const updates: any = {};
+      const updates: { folderTrees?: FolderTree[]; pinnedFolderTrees?: FolderTree[] } = {};
 
       if (rootPaths.length > 0) {
-        const treesData = await invoke(Invokes.GetPinnedFolderTrees, {
+        const treesData = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
           paths: rootPaths,
           expandedFolders: expandedArray,
           showImageCounts,
@@ -282,8 +283,8 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
         updates.folderTrees = [];
       }
 
-      if (pinnedFolders && pinnedFolders.length > 0) {
-        const pinnedTreesData = await invoke(Invokes.GetPinnedFolderTrees, {
+      if (pinnedFolders.length > 0) {
+        const pinnedTreesData = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
           paths: pinnedFolders,
           expandedFolders: expandedArray,
           showImageCounts,
@@ -315,7 +316,7 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
     handleSettingsChange({ ...appSettings, pinnedFolders: newPins });
 
     try {
-      const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+      const trees = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
         paths: newPins,
         expandedFolders: Array.from(expandedFolders),
         showImageCounts: appSettings.enableFolderImageCounts ?? false,

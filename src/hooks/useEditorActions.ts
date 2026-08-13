@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type MouseEvent } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
 import { toast } from 'react-toastify';
@@ -8,6 +8,7 @@ import { useSettingsStore } from '../store/useSettingsStore';
 import { useProcessStore } from '../store/useProcessStore';
 import {
   Adjustments,
+  AdjustmentsUpdater,
   INITIAL_ADJUSTMENTS,
   COPYABLE_ADJUSTMENT_KEYS,
   PasteMode,
@@ -17,6 +18,10 @@ import {
 import { calculateCenteredCrop } from '../utils/cropUtils';
 import { Invokes } from '../components/ui/AppProperties';
 import { globalImageCache } from '../utils/ImageLRUCache';
+
+interface LoadedMetadata {
+  adjustments?: (Adjustments & { is_null?: boolean }) | null;
+}
 
 export const debouncedSetHistory = debounce((newAdj: Adjustments) => {
   useEditorStore.getState().pushHistory(newAdj);
@@ -33,10 +38,11 @@ export function useEditorActions() {
   const setEditor = useEditorStore((s) => s.setEditor);
 
   const setAdjustments = useCallback(
-    (value: Partial<Adjustments> | ((prev: Adjustments) => Adjustments)) => {
+    (value: AdjustmentsUpdater) => {
       setEditor((state) => {
         const prev = state.adjustments;
-        const newAdjustments = typeof value === 'function' ? value(prev) : { ...prev, ...value };
+        const update = typeof value === 'function' ? value(prev) : value;
+        const newAdjustments = { ...prev, ...update };
         debouncedSetHistory(newAdjustments);
         return { adjustments: newAdjustments };
       });
@@ -87,7 +93,7 @@ export function useEditorActions() {
       const isAndroid = useSettingsStore.getState().osPlatform === 'android';
       try {
         const result: { size: number } = await invoke('load_and_parse_lut', { path });
-        let name = isAndroid && path.startsWith('content://')
+        const name = isAndroid && path.startsWith('content://')
           ? await invoke<string>('resolve_android_content_uri_name', { uriStr: path })
           : path.split(/[\\/]/).pop() || 'LUT';
         setAdjustments((prev: Adjustments) => ({
@@ -150,11 +156,11 @@ export function useEditorActions() {
     [setEditor],
   );
 
-  const handleCopyAdjustments = useCallback(async (pathOrEvent?: string | any) => {
+  const handleCopyAdjustments = useCallback(async (pathOrEvent?: string | MouseEvent) => {
     const pathOverride = typeof pathOrEvent === 'string' ? pathOrEvent : undefined;
     const { selectedImage, adjustments } = useEditorStore.getState();
     const { libraryActivePath, multiSelectedPaths } = useLibraryStore.getState();
-    let sourceAdjustments: any = null;
+    let sourceAdjustments: Adjustments | null = null;
 
     const pathToCopyFrom =
       pathOverride || (selectedImage ? selectedImage.path : libraryActivePath || multiSelectedPaths[0]);
@@ -163,8 +169,8 @@ export function useEditorActions() {
       sourceAdjustments = adjustments;
     } else if (pathToCopyFrom) {
       try {
-        const meta: any = await invoke(Invokes.LoadMetadata, { path: pathToCopyFrom });
-        if (meta?.adjustments && !meta.adjustments.is_null) {
+        const meta = await invoke<LoadedMetadata>(Invokes.LoadMetadata, { path: pathToCopyFrom });
+        if (meta.adjustments && !meta.adjustments.is_null) {
           sourceAdjustments = normalizeLoadedAdjustments(meta.adjustments);
         } else {
           sourceAdjustments = INITIAL_ADJUSTMENTS;
@@ -177,14 +183,14 @@ export function useEditorActions() {
 
     if (!sourceAdjustments) return;
 
-    const adjustmentsToCopy: any = {};
+    const adjustmentsToCopy: Partial<Adjustments> = {};
 
     for (const key of COPYABLE_ADJUSTMENT_KEYS) {
       if (Object.prototype.hasOwnProperty.call(sourceAdjustments, key)) {
         adjustmentsToCopy[key] = structuredClone(sourceAdjustments[key]);
       }
     }
-    useEditorStore.getState().setEditor({ copiedAdjustments: adjustmentsToCopy });
+    useEditorStore.getState().setEditor({ copiedAdjustments: adjustmentsToCopy as Adjustments });
     useProcessStore.getState().setProcess({ isCopied: true });
   }, []);
 
@@ -237,13 +243,14 @@ export function useEditorActions() {
       invoke(Invokes.ApplyAdjustmentsToPaths, { paths: pathsToUpdate, adjustments: adjustmentsToApply })
         .then(() => {
           if (selectedImage && pathsToUpdate.includes(selectedImage.path)) {
-            invoke('load_metadata', { path: selectedImage.path }).then((meta: any) => {
-              if (meta.adjustments) {
-                setAdjustments((prev: any) => ({
+            invoke<LoadedMetadata>('load_metadata', { path: selectedImage.path }).then((meta) => {
+              const loadedAdjustments = meta.adjustments;
+              if (loadedAdjustments) {
+                setAdjustments((prev: Adjustments) => ({
                   ...prev,
-                  lensMaker: meta.adjustments.lensMaker,
-                  lensModel: meta.adjustments.lensModel,
-                  lensDistortionParams: meta.adjustments.lensDistortionParams,
+                  lensMaker: loadedAdjustments.lensMaker,
+                  lensModel: loadedAdjustments.lensModel,
+                  lensDistortionParams: loadedAdjustments.lensDistortionParams,
                 }));
               }
             });

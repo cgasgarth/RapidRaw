@@ -1,8 +1,37 @@
 import { useMemo } from 'react';
-import { useLibraryStore } from '../store/useLibraryStore';
+import { useLibraryStore, SearchCriteria } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { RawStatus, EditedStatus, SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
+import {
+  AppSettings,
+  FilterCriteria,
+  RawStatus,
+  EditedStatus,
+  SortCriteria,
+  SortDirection,
+  ImageFile,
+  GroupingMode,
+} from '../components/ui/AppProperties';
 import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGrouping';
+
+interface LibrarySortState {
+  imageList: ImageFile[];
+  imageRatings: Record<string, number>;
+  filterCriteria: FilterCriteria;
+  searchCriteria: SearchCriteria;
+  sortCriteria: SortCriteria;
+}
+
+interface SettingsSortState {
+  appSettings: AppSettings | null;
+}
+
+interface ParsedSearchTag {
+  type: 'query' | 'normal';
+  field?: string;
+  operator?: string;
+  value: string;
+  raw: string;
+}
 
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
@@ -40,7 +69,7 @@ export interface GroupedLibrary {
   badges: Map<GroupId, GroupBadgeInfo> | null;
 }
 
-export function computeGroupedLibrary(libraryState: any, settingsState: any): GroupedLibrary {
+export function computeGroupedLibrary(libraryState: LibrarySortState, settingsState: SettingsSortState): GroupedLibrary {
   const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
   const { appSettings } = settingsState;
 
@@ -55,7 +84,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
       if (filterCriteria.rating > 0 && filterCriteria.rating < 5 && rating < filterCriteria.rating) return false;
     }
 
-    if (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) {
+    if (filterCriteria.rawStatus !== RawStatus.All) {
       if (filterCriteria.rawStatus === RawStatus.RawOnly && !image.is_raw) return false;
       if (filterCriteria.rawStatus === RawStatus.NonRawOnly && image.is_raw) return false;
     }
@@ -65,7 +94,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
       if (filterCriteria.editedStatus === EditedStatus.UneditedOnly && image.is_edited) return false;
     }
 
-    if (filterCriteria.colors && filterCriteria.colors.length > 0) {
+    if (filterCriteria.colors.length > 0) {
       const imageColor = (image.tags || []).find((tag: string) => tag.startsWith('color:'))?.substring(6);
       const hasMatchingColor = imageColor && filterCriteria.colors.includes(imageColor);
       const matchesNone = !imageColor && filterCriteria.colors.includes('none');
@@ -79,7 +108,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
   const { tags: searchTags, text: searchText, mode: searchMode } = searchCriteria;
   const lowerCaseSearchText = searchText.trim().toLowerCase();
 
-  const parsedTags = searchTags.map((tag: string) => {
+  const parsedTags: ParsedSearchTag[] = searchTags.map((tag: string) => {
     const match = tag.match(ADVANCED_QUERY_REGEX);
     if (match) {
       const operator = match[2] || '=';
@@ -88,10 +117,10 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
     return { type: 'normal', value: tag.toLowerCase(), raw: tag };
   });
 
-  const evaluateQuery = (q: any, image: ImageFile) => {
+  const evaluateQuery = (q: ParsedSearchTag, image: ImageFile) => {
     const { field, operator, value } = q;
 
-    if (['iso', 'aperture', 'f', 'shutter', 's', 'focal', 'mm', 'rating'].includes(field)) {
+    if (field && ['iso', 'aperture', 'f', 'shutter', 's', 'focal', 'mm', 'rating'].includes(field)) {
       let imgVal = 0;
       let qVal = parseFloat(value);
 
@@ -146,7 +175,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
 
     let tagsMatch = true;
     if (parsedTags.length > 0) {
-      const evaluateTag = (parsedTag: any) => {
+      const evaluateTag = (parsedTag: ParsedSearchTag) => {
         if (parsedTag.type === 'normal') {
           return lowerCaseImageTags.some((imgTag) => imgTag.includes(parsedTag.value));
         }
@@ -154,9 +183,9 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
       };
 
       if (searchMode === 'OR') {
-        tagsMatch = parsedTags.some((pt: any) => evaluateTag(pt));
+        tagsMatch = parsedTags.some((pt: ParsedSearchTag) => evaluateTag(pt));
       } else {
-        tagsMatch = parsedTags.every((pt: any) => evaluateTag(pt));
+        tagsMatch = parsedTags.every((pt: ParsedSearchTag) => evaluateTag(pt));
       }
     }
 
@@ -262,7 +291,7 @@ export function computeGroupedLibrary(libraryState: any, settingsState: any): Gr
   return { displayList: list, badges };
 }
 
-export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {
+export function computeSortedLibrary(libraryState: LibrarySortState, settingsState: SettingsSortState): ImageFile[] {
   return computeGroupedLibrary(libraryState, settingsState).displayList;
 }
 

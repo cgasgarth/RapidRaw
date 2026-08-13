@@ -1,12 +1,14 @@
 import type { Adjustments } from './adjustments';
+import type { SelectedImage, WaveformData } from '../components/ui/AppProperties';
+import type { ChannelConfig } from '../components/adjustments/Curves';
 
 export interface ImageCacheEntry {
   adjustments: Adjustments;
-  histogram: any;
-  waveform: any;
+  histogram: ChannelConfig | null;
+  waveform: WaveformData | null;
   finalPreviewUrl: string | null;
   uncroppedPreviewUrl: string | null;
-  selectedImage: any;
+  selectedImage: SelectedImage;
   originalSize: { width: number; height: number };
   previewSize: { width: number; height: number };
 }
@@ -34,13 +36,15 @@ export class ImageLRUCache {
   }
 
   set(key: string, entry: ImageCacheEntry): void {
-    if (this.cache.has(key)) {
-      this.cleanupEntry(this.cache.get(key)!, entry);
+    const existing = this.cache.get(key);
+    if (existing) {
+      this.cleanupEntry(existing, entry);
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {
       const lruKey = this.cache.keys().next().value;
       if (lruKey !== undefined) {
-        this.cleanupEntry(this.cache.get(lruKey)!);
+        const lruEntry = this.cache.get(lruKey);
+        if (lruEntry) this.cleanupEntry(lruEntry);
         this.cache.delete(lruKey);
       }
     }

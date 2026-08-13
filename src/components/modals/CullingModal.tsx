@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import { CheckCircle, XCircle, Loader2, Users, Trash2, Star, Tag } from 'lucide-react';
@@ -24,8 +24,17 @@ interface CullingModalProps {
 }
 
 type CullAction = 'reject' | 'rate_zero' | 'delete';
+type CullProgress = Progress & { stage?: string };
 
-function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: any) {
+interface ImageThumbnailProps {
+  path: string;
+  thumbnails: Record<string, string>;
+  isSelected: boolean;
+  onToggle(): void;
+  children?: ReactNode;
+}
+
+function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: ImageThumbnailProps) {
   const thumbnailUrl = thumbnails[path];
   return (
     <div
@@ -237,12 +246,12 @@ export default function CullingModal({
   const renderProgress = () => (
     <div className="flex flex-col items-center justify-center h-48">
       <Loader2 className="w-16 h-16 text-accent animate-spin" />
-      <p className="mt-4 text-text-primary">{progress?.stage || t('modals.culling.starting')}</p>
+      <p className="mt-4 text-text-primary">{(progress as CullProgress | null)?.stage || t('modals.culling.starting')}</p>
       {progress && progress.total > 0 && (
         <div className="w-full bg-surface rounded-full h-2.5 mt-2">
           <div
             className="bg-accent h-2.5 rounded-full"
-            style={{ width: `${(progress.current / progress.total) * 100}%` }}
+            style={{ width: `${((progress.current ?? 0) / progress.total) * 100}%` }}
           />
         </div>
       )}

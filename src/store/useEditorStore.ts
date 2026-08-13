@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer, AiPatch } from '../utils/adjustments';
+import { Adjustments, INITIAL_ADJUSTMENTS, MaskContainer } from '../utils/adjustments';
 import { SelectedImage, WaveformData, BrushSettings } from '../components/ui/AppProperties';
 import { ChannelConfig } from '../components/adjustments/Curves';
 import { ImageDimensions } from '../hooks/useImageRenderSize';
@@ -75,7 +75,7 @@ interface EditorState {
   patchesSentToBackend: Set<string>;
 
   // Clipboard
-  copiedSectionAdjustments: any | null;
+  copiedSectionAdjustments: { section: string; values: Partial<Adjustments> } | null;
   copiedMask: MaskContainer | null;
   copiedAdjustments: Adjustments | null;
 

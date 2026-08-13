@@ -1,13 +1,26 @@
-import { useEffect } from 'react';
+import { useEffect, type RefObject } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
 import { useEditorStore } from '../store/useEditorStore';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { Invokes } from '../components/ui/AppProperties';
-import { INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import { ExifData, ImageMetadata, Invokes } from '../components/ui/AppProperties';
+import { Adjustments, INITIAL_ADJUSTMENTS, normalizeLoadedAdjustments } from '../utils/adjustments';
+import type { ImageCacheEntry } from '../utils/ImageLRUCache';
 
-export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
+interface LoadedMetadata {
+  adjustments?: (Adjustments & { is_null?: boolean }) | null;
+}
+
+interface LoadImageResult {
+  width: number;
+  height: number;
+  exif: ExifData | null;
+  is_raw: boolean;
+  metadata: ImageMetadata;
+}
+
+export function useImageLoader(cachedEditStateRef: RefObject<ImageCacheEntry | null>) {
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const adjustments = useEditorStore((s) => s.adjustments);
   const histogram = useEditorStore((s) => s.histogram);
@@ -34,7 +47,7 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
           useEditorStore.getState().patchesSentToBackend.clear();
           await invoke('clear_session_caches').catch((e) => console.warn('Cache clear failed:', e));
 
-          const metadata: any = await invoke(Invokes.LoadMetadata, { path: selectedImage.path });
+          const metadata = await invoke<LoadedMetadata>(Invokes.LoadMetadata, { path: selectedImage.path });
           if (!isEffectActive) return;
 
           let initialAdjusts;
@@ -53,7 +66,7 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
 
       const loadFullImageData = async () => {
         try {
-          const loadImageResult: any = await invoke(Invokes.LoadImage, { path: selectedImage.path });
+          const loadImageResult = await invoke<LoadImageResult>(Invokes.LoadImage, { path: selectedImage.path });
           if (!isEffectActive) return;
 
           const { width, height } = loadImageResult;
@@ -128,6 +141,7 @@ export function useImageLoader(cachedEditStateRef: React.RefObject<any>) {
         isEffectActive = false;
       };
     }
+    return;
   }, [
     selectedImage?.path,
     selectedImage?.isReady,

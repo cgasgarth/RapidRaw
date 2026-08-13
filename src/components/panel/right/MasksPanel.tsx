@@ -1,6 +1,8 @@
 import {
   type ChangeEvent,
-  type PointerEvent as ReactPointerEvent,
+  type Dispatch,
+  type ElementType,
+  type SetStateAction,
   useState,
   useEffect,
   useRef,
@@ -33,6 +35,7 @@ import {
   FileEdit,
   FolderOpen,
   Folder as FolderIcon,
+  type LucideIcon,
   Loader2,
   Minus,
   Plus,
@@ -47,7 +50,7 @@ import CollapsibleSection from '../../ui/CollapsibleSection';
 import Switch from '../../ui/Switch';
 import Slider from '../../ui/Slider';
 import BasicAdjustments from '../../adjustments/Basic';
-import CurveGraph from '../../adjustments/Curves';
+import CurveGraph, { type ChannelConfig } from '../../adjustments/Curves';
 import ColorPanel from '../../adjustments/Color';
 import DetailsPanel from '../../adjustments/Details';
 import EffectsPanel from '../../adjustments/Effects';
@@ -59,6 +62,7 @@ import {
   Mask,
   MaskType,
   SubMask,
+  SubMaskParameters,
   MASK_PANEL_CREATION_TYPES,
   OTHERS_MASK_TYPES,
   MASK_ICON_MAP,
@@ -70,15 +74,26 @@ import {
 } from './Masks';
 import {
   Adjustments,
+  AdjustmentsUpdater,
   INITIAL_MASK_ADJUSTMENTS,
   INITIAL_MASK_CONTAINER,
+  MaskAdjustments,
   MaskContainer,
   ADJUSTMENT_SECTIONS,
 } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { OPTION_SEPARATOR, Orientation, Panel } from '../../ui/AppProperties';
+import {
+  AppSettings,
+  BrushSettings,
+  Folder,
+  OPTION_SEPARATOR,
+  Option,
+  Orientation,
+  Panel,
+  Preset,
+} from '../../ui/AppProperties';
 import { createSubMask } from '../../../utils/maskUtils';
-import { usePresets } from '../../../hooks/usePresets';
+import { usePresets, type UserPreset } from '../../../hooks/usePresets';
 import Text from '../../ui/Text';
 import { TEXT_COLOR_KEYS, TextColors, TextVariants, TextWeights } from '../../../types/typography';
 import { useEditorStore } from '../../../store/useEditorStore';
@@ -96,7 +111,140 @@ interface DragData {
   parentId?: string;
 }
 
-const SUB_MASK_CONFIG: Record<Mask, any> = {
+interface SubMaskParameterConfig {
+  key: keyof SubMaskParameters;
+  min: number;
+  max: number;
+  step: number;
+  multiplier?: number;
+  defaultValue?: number;
+}
+
+interface SubMaskConfig {
+  parameters?: SubMaskParameterConfig[];
+  showBrushTools?: boolean;
+  showFlowControl?: boolean;
+}
+
+type BrushSettingsUpdater = BrushSettings | ((prev: BrushSettings | null) => BrushSettings);
+
+interface CollapsibleState {
+  basic: boolean;
+  curves: boolean;
+  color: boolean;
+  details: boolean;
+  effects: boolean;
+  [key: string]: boolean;
+}
+
+interface CopiedSectionAdjustments {
+  section: string;
+  values: Partial<MaskAdjustments>;
+}
+
+interface PresetMenuItem {
+  folder?: Folder;
+  name?: string;
+  preset?: Preset;
+  adjustments?: Partial<Adjustments>;
+}
+
+type MaskAdjustmentsUpdater =
+  | Partial<MaskAdjustments>
+  | ((prev: MaskAdjustments) => MaskAdjustments | Partial<MaskAdjustments>);
+
+interface DraggableGridItemProps {
+  maskType: MaskType;
+  onClick: (event: React.MouseEvent) => void;
+  onRightClick: (event: React.MouseEvent) => void;
+  isDraggable: boolean;
+  activeMaskContainerId: string | null;
+}
+
+interface ContainerRowProps {
+  container: MaskContainer;
+  isSelected: boolean;
+  hasActiveChild: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onSelect: () => void;
+  renamingId: string | null;
+  setRenamingId: Dispatch<SetStateAction<string | null>>;
+  tempName: string;
+  setTempName: Dispatch<SetStateAction<string>>;
+  updateContainer: (id: string, data: Partial<MaskContainer>) => void;
+  handleDelete: (id: string) => void;
+  handleDuplicate: (container: MaskContainer) => void;
+  handleDuplicateAndInvert: (container: MaskContainer) => void;
+  handlePasteMask: (insertAfterContainerId?: string) => void;
+  copyMaskToClipboard: (container: MaskContainer) => void;
+  copiedMask: MaskContainer | null;
+  presets: UserPreset[];
+  setAdjustments: (value: AdjustmentsUpdater) => void;
+  activeDragItem: DragData | null;
+  activeMaskId: string | null;
+  onSelectContainer: (id: string | null) => void;
+  onSelectMask: (id: string | null) => void;
+  updateSubMask: (id: string, data: Partial<SubMask>) => void;
+  handleDeleteSubMask: (containerId: string, subMaskId: string) => void;
+  handleDuplicateSubMask: (containerId: string, subMask: SubMask, insertIndex?: number) => void;
+  handleDuplicateAndInvertSubMask: (containerId: string, subMask: SubMask) => void;
+  handlePasteSubMask: (containerId: string, insertIndex?: number) => void;
+  copySubMaskToClipboard: (subMask: SubMask) => void;
+  copiedSubMask: SubMask | null;
+  analyzingSubMaskId: string | null;
+  setIsMaskControlHovered: (hovered: boolean) => void;
+  onAddComponent: (event: React.MouseEvent) => void;
+}
+
+interface SubMaskRowProps {
+  subMask: SubMask;
+  index: number;
+  totalCount: number;
+  containerId: string;
+  isActive: boolean;
+  parentVisible: boolean;
+  onSelect: () => void;
+  updateSubMask: (id: string, data: Partial<SubMask>) => void;
+  handleDelete: () => void;
+  handleDuplicate: () => void;
+  handleDuplicateAndInvert: () => void;
+  handlePaste: () => void;
+  handleCopy: () => void;
+  hasCopiedSubMask: boolean;
+  activeDragItem: DragData | null;
+  analyzingSubMaskId: string | null;
+  renamingId: string | null;
+  setRenamingId: Dispatch<SetStateAction<string | null>>;
+  tempName: string;
+  setTempName: Dispatch<SetStateAction<string>>;
+  setIsMaskControlHovered: (hovered: boolean) => void;
+}
+
+interface SettingsPanelProps {
+  container: MaskContainer | undefined;
+  activeSubMask: SubMask | null;
+  aiModelDownloadStatus: string | null;
+  brushSettings: BrushSettings | null;
+  setBrushSettings: (updater: BrushSettingsUpdater) => void;
+  updateContainer: (id: string, data: Partial<MaskContainer>) => void;
+  updateSubMask: (id: string, data: Partial<SubMask>) => void;
+  histogram: ChannelConfig | null;
+  appSettings: AppSettings | null;
+  isGeneratingAiMask: boolean;
+  setIsMaskControlHovered: (hovered: boolean) => void;
+  collapsibleState: CollapsibleState;
+  setCollapsibleState: Dispatch<SetStateAction<CollapsibleState>>;
+  copiedSectionAdjustments: CopiedSectionAdjustments | null;
+  setCopiedSectionAdjustments: Dispatch<SetStateAction<CopiedSectionAdjustments | null>>;
+  onDragStateChange: (isDragging: boolean) => void;
+  isSettingsSectionOpen: boolean;
+  setSettingsSectionOpen: Dispatch<SetStateAction<boolean>>;
+  presets: UserPreset[];
+  handleGenerateAiDepthMask: (subMaskId: string, parameters: SubMaskParameters) => void;
+}
+
+const SUB_MASK_CONFIG: Partial<Record<Mask, SubMaskConfig>> = {
   [Mask.Radial]: {
     parameters: [{ key: 'feather', min: 0, max: 100, step: 1, multiplier: 100, defaultValue: 50 }],
   },
@@ -147,8 +295,8 @@ const BrushTools = ({
   onSettingsChange,
   onDragStateChange,
 }: {
-  settings: any;
-  onSettingsChange: any;
+  settings: BrushSettings;
+  onSettingsChange: (updater: BrushSettingsUpdater) => void;
   onDragStateChange?: (isDragging: boolean) => void;
 }) => {
   const { t } = useTranslation();
@@ -160,7 +308,12 @@ const BrushTools = ({
         label={t('editor.masks.brush.size')}
         max={200}
         min={1}
-        onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, size: Number(e.target.value) }))}
+        onChange={(e) =>
+          onSettingsChange((s) => ({
+            ...(s ?? { size: 50, feather: 50, tool: ToolType.Brush }),
+            size: Number(e.target.value),
+          }))
+        }
         step={1}
         value={settings.size}
         fillOrigin="min"
@@ -171,7 +324,12 @@ const BrushTools = ({
         label={t('editor.masks.brush.feather')}
         max={100}
         min={0}
-        onChange={(e: any) => onSettingsChange((s: any) => ({ ...s, feather: Number(e.target.value) }))}
+        onChange={(e) =>
+          onSettingsChange((s) => ({
+            ...(s ?? { size: 50, feather: 50, tool: ToolType.Brush }),
+            feather: Number(e.target.value),
+          }))
+        }
         step={1}
         value={settings.feather}
         fillOrigin="min"
@@ -180,13 +338,23 @@ const BrushTools = ({
       <div className="grid grid-cols-2 gap-2 pt-2">
         <button
           className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === ToolType.Brush ? 'text-primary bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}
-          onClick={() => onSettingsChange((s: any) => ({ ...s, tool: ToolType.Brush }))}
+          onClick={() =>
+            onSettingsChange((s) => ({
+              ...(s ?? { size: 50, feather: 50, tool: ToolType.Brush }),
+              tool: ToolType.Brush,
+            }))
+          }
         >
           {t('editor.masks.brush.brush')}
         </button>
         <button
           className={`p-2 rounded-md text-sm font-medium transition-colors flex items-center justify-center gap-2 ${settings.tool === ToolType.Eraser ? 'text-primary bg-surface' : 'bg-surface text-text-secondary hover:bg-card-active'}`}
-          onClick={() => onSettingsChange((s: any) => ({ ...s, tool: ToolType.Eraser }))}
+          onClick={() =>
+            onSettingsChange((s) => ({
+              ...(s ?? { size: 50, feather: 50, tool: ToolType.Brush }),
+              tool: ToolType.Eraser,
+            }))
+          }
         >
           {t('editor.masks.brush.eraser')}
         </button>
@@ -204,8 +372,8 @@ const FlowBrushTool = ({
 }: {
   flow: number;
   onFlowChange: (flow: number) => void;
-  settings: any;
-  onSettingsChange: any;
+  settings: BrushSettings;
+  onSettingsChange: (updater: BrushSettingsUpdater) => void;
   onDragStateChange?: (isDragging: boolean) => void;
 }) => {
   const { t } = useTranslation();
@@ -312,11 +480,11 @@ export default function MasksPanel() {
     })),
   );
 
-  const { isResizingWaveform, onToggleWaveform, setActiveWaveformChannel, setWaveformHeight, handleWaveformResize } =
+  const { isResizingWaveform, onToggleWaveform, setActiveWaveformChannel, setWaveformHeight: _setWaveformHeight, handleWaveformResize } =
     useWaveformControls();
 
   const setBrushSettings = useCallback(
-    (updater: any) => {
+    (updater: BrushSettingsUpdater) => {
       setEditor((state) => ({ brushSettings: typeof updater === 'function' ? updater(state.brushSettings) : updater }));
     },
     [setEditor],
@@ -347,14 +515,14 @@ export default function MasksPanel() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
   const [copiedSubMask, setCopiedSubMask] = useState<SubMask | null>(null);
-  const [collapsibleState, setCollapsibleState] = useState<any>({
+  const [collapsibleState, setCollapsibleState] = useState<CollapsibleState>({
     basic: true,
     curves: false,
     color: false,
     details: false,
     effects: false,
   });
-  const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState<any | null>(null);
+  const [copiedSectionAdjustments, setCopiedSectionAdjustments] = useState<CopiedSectionAdjustments | null>(null);
   const [isSettingsSectionOpen, setSettingsSectionOpen] = useState(true);
   const [isSettingsPanelEverOpened, setIsSettingsPanelEverOpened] = useState(false);
   const hasPerformedInitialSelection = useRef(false);
@@ -396,7 +564,7 @@ export default function MasksPanel() {
   useEffect(() => {
     if (!hasPerformedInitialSelection.current && !activeMaskContainerId && adjustments.masks.length > 0) {
       const lastMask = adjustments.masks[adjustments.masks.length - 1];
-      onSelectContainer(lastMask.id);
+      if (lastMask.id) onSelectContainer(lastMask.id);
       onSelectMask(null);
     }
 
@@ -449,12 +617,13 @@ export default function MasksPanel() {
 
   const handleResetAllMasks = () => {
     handleDeselect();
-    setAdjustments((prev: any) => ({ ...prev, masks: [] }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, masks: [] }));
   };
 
-  const createMaskLogic = (type: Mask, mode: SubMaskMode = SubMaskMode.Additive) => {
-    if (!selectedImage) return createSubMask(type, {} as any, mode);
+  const createMaskLogic = (type: Mask, mode: SubMaskMode = SubMaskMode.Additive): SubMask => {
+    if (!selectedImage) return createSubMask(type, { width: 0, height: 0 }, mode);
     const subMask = createSubMask(type, selectedImage, mode);
+    const parameters: SubMaskParameters = { ...subMask.parameters };
 
     const steps = adjustments.orientationSteps || 0;
     const isRotated = steps === 1 || steps === 3;
@@ -462,36 +631,36 @@ export default function MasksPanel() {
     const imgH = isRotated ? selectedImage.width || 1000 : selectedImage.height || 1000;
 
     if (type === Mask.Linear) {
-      subMask.parameters.range = Math.min(imgW, imgH) * 0.1;
+      parameters.range = Math.min(imgW, imgH) * 0.1;
     }
 
     if (type === Mask.Linear || type === Mask.Radial || type === Mask.Color || type === Mask.Luminance) {
-      subMask.parameters.isInitialDraw = true;
+      parameters.isInitialDraw = true;
       if (type === Mask.Linear || type === Mask.Radial) {
-        subMask.parameters.startX = -10000;
-        subMask.parameters.startY = -10000;
-        subMask.parameters.endX = -10000;
-        subMask.parameters.endY = -10000;
-        subMask.parameters.centerX = -10000;
-        subMask.parameters.centerY = -10000;
-        subMask.parameters.radiusX = 0;
-        subMask.parameters.radiusY = 0;
+        parameters.startX = -10000;
+        parameters.startY = -10000;
+        parameters.endX = -10000;
+        parameters.endY = -10000;
+        parameters.centerX = -10000;
+        parameters.centerY = -10000;
+        parameters.radiusX = 0;
+        parameters.radiusY = 0;
       } else {
-        subMask.parameters.targetX = -10000;
-        subMask.parameters.targetY = -10000;
-        subMask.parameters.tolerance = 20;
-        subMask.parameters.feather = 35;
+        parameters.targetX = -10000;
+        parameters.targetY = -10000;
+        parameters.tolerance = 20;
+        parameters.feather = 35;
       }
     }
 
     if (type === Mask.AiDepth) {
-      subMask.parameters.minDepth = 20;
-      subMask.parameters.maxDepth = 80;
-      subMask.parameters.minFade = 15;
-      subMask.parameters.maxFade = 15;
-      subMask.parameters.feather = 10;
+      parameters.minDepth = 20;
+      parameters.maxDepth = 80;
+      parameters.minFade = 15;
+      parameters.maxFade = 15;
+      parameters.feather = 10;
     }
-    return subMask;
+    return { ...subMask, parameters };
   };
 
   const handleAddMaskContainer = (type: Mask) => {
@@ -563,8 +732,12 @@ export default function MasksPanel() {
     const options = OTHERS_MASK_TYPES.map((maskType) => ({
       label: getMaskTypeName(maskType),
       icon: maskType.icon,
-      onClick: () => handleGridClick(maskType.type),
-      onRightClick: () => handleGridClick(maskType.type, true),
+      onClick: () => {
+        if (maskType.type) handleGridClick(maskType.type);
+      },
+      onRightClick: () => {
+        if (maskType.type) handleGridClick(maskType.type, true);
+      },
     }));
     showContextMenu(rect.left, rect.bottom + 5, options);
   };
@@ -580,6 +753,7 @@ export default function MasksPanel() {
         icon: maskType.icon,
         disabled: maskType.disabled,
         onClick: () => {
+          if (!maskType.type) return;
           if (targetContainerId) {
             handleAddSubMask(targetContainerId, maskType.type, mode);
           } else {
@@ -591,7 +765,7 @@ export default function MasksPanel() {
     const container = targetContainerId ? adjustments.masks.find((m) => m.id === targetContainerId) : null;
     const hasComponents = container && container.subMasks.length > 0;
 
-    const buildModeSubmenu = (label: string, icon: any, mode: SubMaskMode) => ({
+    const buildModeSubmenu = (label: string, icon: LucideIcon, mode: SubMaskMode, containerId: string) => ({
       label,
       icon,
       submenu: MASK_PANEL_CREATION_TYPES.map((maskType) => {
@@ -606,12 +780,14 @@ export default function MasksPanel() {
           label: getMaskTypeName(maskType),
           icon: maskType.icon,
           disabled: maskType.disabled,
-          onClick: () => handleAddSubMask(targetContainerId!, maskType.type, mode),
+          onClick: () => {
+            if (maskType.type) handleAddSubMask(containerId, maskType.type, mode);
+          },
         };
       }),
     });
 
-    const options: any[] = buildMenu(
+    const options: Option[] = buildMenu(
       MASK_PANEL_CREATION_TYPES.filter((m) => m.id !== 'others'),
       SubMaskMode.Additive,
     );
@@ -627,20 +803,20 @@ export default function MasksPanel() {
     if (targetContainerId && hasComponents) {
       options.push(
         { type: OPTION_SEPARATOR },
-        buildModeSubmenu(t('editor.masks.actions.subtractFromMask'), Minus, SubMaskMode.Subtractive),
-        buildModeSubmenu(t('editor.masks.actions.intersectMaskWith'), SquaresIntersect, SubMaskMode.Intersect),
+        buildModeSubmenu(t('editor.masks.actions.subtractFromMask'), Minus, SubMaskMode.Subtractive, targetContainerId),
+        buildModeSubmenu(t('editor.masks.actions.intersectMaskWith'), SquaresIntersect, SubMaskMode.Intersect, targetContainerId),
       );
     }
 
     showContextMenu(rect.left, rect.bottom + 5, options);
   };
 
-  const updateContainer = (id: string, data: any) =>
+  const updateContainer = (id: string, data: Partial<MaskContainer>) =>
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks.map((m) => (m.id === id ? { ...m, ...data } : m)),
     }));
-  const updateSubMask = (id: string, data: any) =>
+  const updateSubMask = (id: string, data: Partial<SubMask>) =>
     setAdjustments((prev: Adjustments) => ({
       ...prev,
       masks: prev.masks.map((m) => ({
@@ -717,9 +893,12 @@ export default function MasksPanel() {
       return { ...prev, masks: newMasks };
     });
 
-    onSelectContainer(container.id);
+    const containerId = container.id;
+    if (containerId) {
+      onSelectContainer(containerId);
+      setExpandedContainers((prev) => new Set(prev).add(containerId));
+    }
     onSelectMask(null);
-    setExpandedContainers((prev) => new Set(prev).add(container.id));
   };
 
   const insertSubMaskIntoContainer = (containerId: string, subMask: SubMask, insertIndex?: number) => {
@@ -820,17 +999,20 @@ export default function MasksPanel() {
     const overData = over?.data.current as DragData;
 
     if (dragData.type === 'Creation' && dragData.maskType) {
+      const maskType = dragData.maskType;
       const creationFn = () => {
         if (overData.type === 'Container') {
-          handleAddSubMask(overData.item!.id, dragData.maskType!);
+          const overItemId = overData.item?.id;
+          if (overItemId) handleAddSubMask(overItemId, maskType);
         } else if (overData.type === 'SubMask') {
-          const container = adjustments.masks.find((m) => m.id === overData.parentId);
-          if (container) {
+          const parentId = overData.parentId;
+          const container = adjustments.masks.find((m) => m.id === parentId);
+          if (container && parentId && over) {
             const targetIndex = container.subMasks.findIndex((sm) => sm.id === over.id);
-            handleAddSubMask(overData.parentId!, dragData.maskType!, targetIndex);
+            handleAddSubMask(parentId, maskType, SubMaskMode.Additive, targetIndex);
           }
         } else {
-          handleAddMaskContainer(dragData.maskType!);
+          handleAddMaskContainer(maskType);
         }
       };
 
@@ -850,10 +1032,11 @@ export default function MasksPanel() {
 
     if (dragData.type === 'Container') {
       const overId = over?.id;
-      if (!overId || active.id === overId) return;
+      const draggedItemId = dragData.item?.id;
+      if (!overId || active.id === overId || !draggedItemId) return;
 
       setAdjustments((prev: Adjustments) => {
-        const oldIndex = prev.masks.findIndex((m) => m.id === dragData.item!.id);
+        const oldIndex = prev.masks.findIndex((m) => m.id === draggedItemId);
         let newIndex = -1;
 
         if (overId === 'mask-list-root') {
@@ -877,14 +1060,15 @@ export default function MasksPanel() {
 
     if (dragData.type === 'SubMask') {
       const sourceContainerId = dragData.parentId;
-      if (!sourceContainerId) return;
+      const draggedItemId = dragData.item?.id;
+      if (!sourceContainerId || !draggedItemId) return;
 
       if (over?.id === 'mask-list-root' || !over) {
         setAdjustments((prev: Adjustments) => {
           const newMasks = JSON.parse(JSON.stringify(prev.masks));
           const sourceContainer = newMasks.find((m: MaskContainer) => m.id === sourceContainerId);
           if (!sourceContainer) return prev;
-          const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === dragData.item!.id);
+          const subMaskIndex = sourceContainer.subMasks.findIndex((sm: SubMask) => sm.id === draggedItemId);
           if (subMaskIndex === -1) return prev;
           const [movedSubMask] = sourceContainer.subMasks.splice(subMaskIndex, 1);
 
@@ -906,22 +1090,23 @@ export default function MasksPanel() {
       }
 
       let targetContainerId: string | null = null;
-      if (overData.type === 'Container') targetContainerId = overData.item!.id;
+      if (overData.type === 'Container') targetContainerId = overData.item?.id ?? null;
       else if (overData.type === 'SubMask' && overData.parentId) targetContainerId = overData.parentId;
 
       if (targetContainerId) {
+        const resolvedTargetId = targetContainerId;
         setAdjustments((prev: Adjustments) => {
           const newMasks = prev.masks.map((m) => ({ ...m, subMasks: [...m.subMasks] }));
           const sourceContainer = newMasks.find((m) => m.id === sourceContainerId);
-          const targetContainer = newMasks.find((m) => m.id === targetContainerId);
+          const targetContainer = newMasks.find((m) => m.id === resolvedTargetId);
           if (!sourceContainer || !targetContainer) return prev;
 
-          const sourceSubMaskIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === dragData.item!.id);
+          const sourceSubMaskIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === draggedItemId);
           if (sourceSubMaskIndex === -1) return prev;
 
           const [movedSubMask] = sourceContainer.subMasks.splice(sourceSubMaskIndex, 1);
 
-          if (sourceContainerId === targetContainerId) {
+          if (sourceContainerId === resolvedTargetId) {
             if (overData.type === 'SubMask') {
               const overSubMaskIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === over.id);
               const insertIndex = overSubMaskIndex >= 0 ? overSubMaskIndex : sourceContainer.subMasks.length;
@@ -937,7 +1122,7 @@ export default function MasksPanel() {
             } else {
               targetContainer.subMasks.push(movedSubMask);
             }
-            setExpandedContainers((p) => new Set(p).add(targetContainerId!));
+            setExpandedContainers((p) => new Set(p).add(resolvedTargetId));
           }
           return { ...prev, masks: newMasks };
         });
@@ -951,7 +1136,9 @@ export default function MasksPanel() {
     const newMaskSubMenu = allTypes.map((m) => ({
       label: getMaskTypeName(m),
       icon: m.icon,
-      onClick: () => handleAddMaskContainer(m.type),
+      onClick: () => {
+        if (m.type) handleAddMaskContainer(m.type);
+      },
     }));
     showContextMenu(e.clientX, e.clientY, [
       {
@@ -1056,8 +1243,10 @@ export default function MasksPanel() {
                         <DraggableGridItem
                           key={maskType.type}
                           maskType={maskType}
-                          onClick={(e: any) =>
-                            maskType.id === 'others' ? handleAddOthersMask(e) : handleGridClick(maskType.type)
+                          onClick={(e: React.MouseEvent) =>
+                            maskType.id === 'others'
+                              ? handleAddOthersMask(e)
+                              : maskType.type && handleGridClick(maskType.type)
                           }
                           onRightClick={(e: React.MouseEvent) => handleGridRightClick(e, maskType.type)}
                           isDraggable={maskType.id !== 'others'}
@@ -1082,16 +1271,19 @@ export default function MasksPanel() {
                         }
                       }}
                     >
-                      {adjustments.masks.map((container) => (
+                      {adjustments.masks.map((container) => {
+                        const containerId = container.id;
+                        if (!containerId) return null;
+                        return (
                         <ContainerRow
-                          key={container.id}
+                          key={containerId}
                           container={container}
-                          isSelected={activeMaskContainerId === container.id && activeMaskId === null}
-                          hasActiveChild={activeMaskContainerId === container.id && activeMaskId !== null}
-                          isExpanded={expandedContainers.has(container.id)}
-                          onToggle={() => handleToggleExpand(container.id)}
+                          isSelected={activeMaskContainerId === containerId && activeMaskId === null}
+                          hasActiveChild={activeMaskContainerId === containerId && activeMaskId !== null}
+                          isExpanded={expandedContainers.has(containerId)}
+                          onToggle={() => handleToggleExpand(containerId)}
                           onSelect={() => {
-                            onSelectContainer(container.id);
+                            onSelectContainer(containerId);
                             onSelectMask(null);
                           }}
                           renamingId={renamingId}
@@ -1120,9 +1312,10 @@ export default function MasksPanel() {
                           copiedSubMask={copiedSubMask}
                           analyzingSubMaskId={analyzingSubMaskId}
                           setIsMaskControlHovered={setIsMaskControlHovered}
-                          onAddComponent={(e: React.MouseEvent) => handleAddMaskContextMenu(e, container.id)}
+                          onAddComponent={(e: React.MouseEvent) => handleAddMaskContextMenu(e, containerId)}
                         />
-                      ))}
+                        );
+                      })}
                     </AnimatePresence>
 
                     <AnimatePresence>
@@ -1226,7 +1419,7 @@ export default function MasksPanel() {
               >
                 {(() => {
                   const sm = activeDragItem.item as SubMask;
-                  const Icon = MASK_ICON_MAP[sm.type] || Circle;
+                  const Icon = MASK_ICON_MAP[sm.type];
                   return <Icon size={16} className={`shrink-0 ml-1 ${TEXT_COLOR_KEYS[TextColors.secondary]}`} />;
                 })()}
                 <span className="flex-1 truncate">{getSubMaskName(activeDragItem.item as SubMask)}</span>
@@ -1279,7 +1472,7 @@ function NewMaskDropZone({ isOver }: { isOver: boolean }) {
   );
 }
 
-function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activeMaskContainerId }: any) {
+function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activeMaskContainerId }: DraggableGridItemProps) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `create-${maskType.id || maskType.type}`,
@@ -1357,10 +1550,11 @@ function ContainerRow({
   analyzingSubMaskId,
   setIsMaskControlHovered,
   onAddComponent,
-}: any) {
+}: ContainerRowProps) {
   const { t } = useTranslation();
+  const containerId = container.id ?? '';
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
-    id: container.id,
+    id: containerId,
     data: { type: 'Container', item: container },
   });
   const {
@@ -1368,7 +1562,7 @@ function ContainerRow({
     listeners,
     setNodeRef: setDraggableRef,
     isDragging,
-  } = useDraggable({ id: container.id, data: { type: 'Container', item: container } });
+  } = useDraggable({ id: containerId, data: { type: 'Container', item: container } });
   const { showContextMenu } = useContextMenu();
 
   const setCombinedRef = (node: HTMLElement | null) => {
@@ -1379,8 +1573,8 @@ function ContainerRow({
   const handleRenameSubmit = () => {
     if (tempName.trim()) {
       const newName = tempName.trim();
-      setAdjustments((prev: any) => {
-        const updatedMasks = prev.masks.map((m: any) => (m.id === container.id ? { ...m, name: newName } : m));
+      setAdjustments((prev: Adjustments) => {
+        const updatedMasks = prev.masks.map((m: MaskContainer) => (m.id === containerId ? { ...m, name: newName } : m));
         return { ...prev, masks: updatedMasks };
       });
     }
@@ -1390,30 +1584,31 @@ function ContainerRow({
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const generatePresetSubmenu = (list: any[]): any[] =>
-      list
-        .map((item) => {
-          if (item.folder)
-            return { label: item.folder.name, icon: FolderIcon, submenu: generatePresetSubmenu(item.folder.children) };
-          if (item.preset || item.adjustments)
-            return {
-              label: item.name || item.preset.name,
+    const generatePresetSubmenu = (list: PresetMenuItem[]): Option[] =>
+      list.flatMap((item): Option[] => {
+        if (item.folder)
+          return [{ label: item.folder.name, icon: FolderIcon, submenu: generatePresetSubmenu(item.folder.children) }];
+        if (item.preset || item.adjustments)
+          return [
+            {
+              label: item.name || item.preset?.name,
               onClick: () => {
-                const newAdj = { ...container.adjustments, ...(item.adjustments || item.preset.adjustments) };
+                if (!containerId) return;
+                const newAdj = { ...container.adjustments, ...(item.adjustments || item.preset?.adjustments) };
                 newAdj.sectionVisibility = { ...container.adjustments.sectionVisibility, ...newAdj.sectionVisibility };
-                updateContainer(container.id, { adjustments: newAdj });
+                updateContainer(containerId, { adjustments: newAdj });
               },
-            };
-          return null;
-        })
-        .filter(Boolean);
+            },
+          ];
+        return [];
+      });
 
     showContextMenu(e.clientX, e.clientY, [
       {
         label: t('editor.masks.actions.rename'),
         icon: FileEdit,
         onClick: () => {
-          setRenamingId(container.id);
+          setRenamingId(containerId);
           setTempName(container.name);
         },
       },
@@ -1428,7 +1623,7 @@ function ContainerRow({
         label: t('editor.masks.actions.pasteMask'),
         icon: ClipboardPaste,
         disabled: !copiedMask,
-        onClick: () => handlePasteMask(container.id),
+        onClick: () => handlePasteMask(containerId),
       },
       {
         label: t('editor.masks.actions.pasteMaskAdjustments'),
@@ -1436,7 +1631,7 @@ function ContainerRow({
         disabled: !copiedMask,
         onClick: () => {
           if (copiedMask) {
-            updateContainer(container.id, { adjustments: JSON.parse(JSON.stringify(copiedMask.adjustments)) });
+            updateContainer(containerId, { adjustments: JSON.parse(JSON.stringify(copiedMask.adjustments)) });
           }
         },
       },
@@ -1452,13 +1647,13 @@ function ContainerRow({
         label: t('editor.masks.actions.resetMaskAdjustments'),
         icon: RotateCcw,
         onClick: () =>
-          updateContainer(container.id, { adjustments: JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS)) }),
+          updateContainer(containerId, { adjustments: JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS)) }),
       },
       {
         label: t('editor.masks.actions.deleteMask'),
         icon: Trash2,
         isDestructive: true,
-        onClick: () => handleDelete(container.id),
+        onClick: () => handleDelete(containerId),
       },
     ]);
   };
@@ -1470,7 +1665,7 @@ function ContainerRow({
     if (isDraggingContainer) {
       borderClass = 'border-t-2 border-accent';
     } else if (
-      (activeDragItem?.type === 'SubMask' && activeDragItem?.parentId !== container.id) ||
+      (activeDragItem?.type === 'SubMask' && activeDragItem.parentId !== containerId) ||
       activeDragItem?.type === 'Creation'
     ) {
       borderClass = 'bg-card-active border border-accent/50';
@@ -1516,7 +1711,7 @@ function ContainerRow({
             onToggle();
           }}
         >
-          {renamingId === container.id ? (
+          {renamingId === containerId ? (
             <input
               autoFocus
               className="bg-bg-primary text-sm w-full rounded-sm px-1 outline-hidden border border-accent"
@@ -1540,7 +1735,7 @@ function ContainerRow({
             data-tooltip={container.visible ? t('editor.masks.actions.hideMask') : t('editor.masks.actions.showMask')}
             onClick={(e) => {
               e.stopPropagation();
-              updateContainer(container.id, { visible: !container.visible });
+              updateContainer(containerId, { visible: !container.visible });
             }}
           >
             {container.visible ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -1549,7 +1744,7 @@ function ContainerRow({
             className="p-1 hover:text-red-500 text-text-secondary"
             onClick={(e) => {
               e.stopPropagation();
-              handleDelete(container.id);
+              handleDelete(containerId);
             }}
           >
             <Trash2 size={16} />
@@ -1573,19 +1768,19 @@ function ContainerRow({
                   subMask={subMask}
                   index={index + 1}
                   totalCount={container.subMasks.length}
-                  containerId={container.id}
+                  containerId={containerId}
                   isActive={activeMaskId === subMask.id}
                   parentVisible={container.visible}
                   activeDragItem={activeDragItem}
                   onSelect={() => {
-                    onSelectContainer(container.id);
+                    onSelectContainer(containerId);
                     onSelectMask(subMask.id);
                   }}
                   updateSubMask={updateSubMask}
-                  handleDelete={() => handleDeleteSubMask(container.id, subMask.id)}
-                  handleDuplicate={() => handleDuplicateSubMask(container.id, subMask, index + 1)}
-                  handleDuplicateAndInvert={() => handleDuplicateAndInvertSubMask(container.id, subMask)}
-                  handlePaste={() => handlePasteSubMask(container.id, index + 1)}
+                  handleDelete={() => handleDeleteSubMask(containerId, subMask.id)}
+                  handleDuplicate={() => handleDuplicateSubMask(containerId, subMask, index + 1)}
+                  handleDuplicateAndInvert={() => handleDuplicateAndInvertSubMask(containerId, subMask)}
+                  handlePaste={() => handlePasteSubMask(containerId, index + 1)}
                   handleCopy={() => copySubMaskToClipboard(subMask)}
                   hasCopiedSubMask={!!copiedSubMask}
                   analyzingSubMaskId={analyzingSubMaskId}
@@ -1654,7 +1849,7 @@ function SubMaskRow({
   tempName,
   setTempName,
   setIsMaskControlHovered,
-}: any) {
+}: SubMaskRowProps) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: subMask.id,
@@ -1668,7 +1863,7 @@ function SubMaskRow({
     setNodeRef(node);
     setDroppableRef(node);
   };
-  const MaskIcon = MASK_ICON_MAP[subMask.type] || Circle;
+  const MaskIcon = MASK_ICON_MAP[subMask.type];
   const { showContextMenu } = useContextMenu();
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1899,8 +2094,8 @@ function SettingsPanel({
   isSettingsSectionOpen,
   setSettingsSectionOpen,
   presets,
-  handleGenerateAiDepthMask,
-}: any) {
+  handleGenerateAiDepthMask: _handleGenerateAiDepthMask,
+}: SettingsPanelProps) {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
   const isActive = !!container;
@@ -1919,32 +2114,34 @@ function SettingsPanel({
       ...currentAdjustments,
       ...presetAdjustments,
       sectionVisibility: {
-        ...(currentAdjustments.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility),
+        ...currentAdjustments.sectionVisibility,
         ...(presetAdjustments.sectionVisibility || {}),
       },
     };
-    updateContainer(container.id, { adjustments: newMaskAdjustments });
+    if (container.id) updateContainer(container.id, { adjustments: newMaskAdjustments });
   };
 
-  const generatePresetSubmenu = (presetList: any[]): any[] => {
-    return presetList
-      .map((item: any) => {
-        if (item.folder) {
-          return {
+  const generatePresetSubmenu = (presetList: PresetMenuItem[]): Option[] => {
+    return presetList.flatMap((item): Option[] => {
+      if (item.folder) {
+        return [
+          {
             label: item.folder.name,
             icon: FolderIcon,
             submenu: generatePresetSubmenu(item.folder.children),
-          };
-        }
-        if (item.preset || item.adjustments) {
-          return {
-            label: item.name || item.preset.name,
-            onClick: () => handleApplyPresetToMask(item.adjustments || item.preset.adjustments),
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
+          },
+        ];
+      }
+      if (item.preset || item.adjustments) {
+        return [
+          {
+            label: item.name || item.preset?.name,
+            onClick: () => handleApplyPresetToMask(item.adjustments || item.preset?.adjustments || {}),
+          },
+        ];
+      }
+      return [];
+    });
   };
 
   const handlePresetSelectClick = () => {
@@ -1959,9 +2156,9 @@ function SettingsPanel({
     }
   };
 
-  const handleMaskPropertyChange = (key: string, value: any) => {
-    if (!isActive) return;
-    updateContainer(container.id, { [key]: value });
+  const handleMaskPropertyChange = (key: keyof MaskContainer, value: MaskContainer[keyof MaskContainer]) => {
+    if (!container) return;
+    if (container.id) updateContainer(container.id, { [key]: value });
   };
 
   const handleSubMaskParametersChange = (changes: Record<string, number>) => {
@@ -1987,15 +2184,15 @@ function SettingsPanel({
   const isAiMask = activeSubMask && ['ai-subject', 'ai-foreground', 'ai-sky', 'ai-depth'].includes(activeSubMask.type);
   const isComponentMode = !!activeSubMask;
 
-  const setMaskContainerAdjustments = (updater: any) => {
-    if (!isActive) return;
+  const setMaskContainerAdjustments = (updater: MaskAdjustmentsUpdater) => {
+    if (!container) return;
     const currentAdjustments = container.adjustments;
     const newAdjustments = typeof updater === 'function' ? updater(currentAdjustments) : updater;
-    updateContainer(container.id, { adjustments: newAdjustments });
+    if (container.id) updateContainer(container.id, { adjustments: { ...currentAdjustments, ...newAdjustments } });
   };
 
   const handleToggleSection = (section: string) => {
-    setCollapsibleState((prev: any) => {
+    setCollapsibleState((prev) => {
       const isOpening = !prev[section];
       if (appSettings?.enableFocusMode && isOpening) {
         setSettingsSectionOpen(false);
@@ -2013,13 +2210,15 @@ function SettingsPanel({
   const handleToggleVisibility = (sectionName: string) => {
     if (!isActive) return;
     const cur = container.adjustments;
-    const vis = cur.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
-    updateContainer(container.id, {
-      adjustments: { ...cur, sectionVisibility: { ...vis, [sectionName]: !vis[sectionName] } },
-    });
+    const vis = cur.sectionVisibility;
+    if (container.id) {
+      updateContainer(container.id, {
+        adjustments: { ...cur, sectionVisibility: { ...vis, [sectionName]: !vis[sectionName] } },
+      });
+    }
   };
 
-  const handleSectionContextMenu = (event: any, sectionName: string) => {
+  const handleSectionContextMenu = (event: React.MouseEvent, sectionName: string) => {
     if (!isActive) return;
     event.preventDefault();
     event.stopPropagation();
@@ -2027,9 +2226,9 @@ function SettingsPanel({
     const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
 
     const handleCopy = () => {
-      const adjustmentsToCopy: Record<string, any> = {};
+      const adjustmentsToCopy: Partial<MaskAdjustments> = {};
       for (const key of sectionKeys) {
-        if (container.adjustments && container.adjustments[key] !== undefined) {
+        if (container.adjustments[key] !== undefined) {
           adjustmentsToCopy[key] = JSON.parse(JSON.stringify(container.adjustments[key]));
         }
       }
@@ -2039,28 +2238,28 @@ function SettingsPanel({
     const handlePaste = () => {
       if (!copiedSectionAdjustments || copiedSectionAdjustments.section !== sectionName) return;
 
-      setMaskContainerAdjustments((prev: any) => ({
+      setMaskContainerAdjustments((prev) => ({
         ...prev,
         ...copiedSectionAdjustments.values,
         sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility),
+          ...prev.sectionVisibility,
           [sectionName]: true,
         },
       }));
     };
 
     const handleReset = () => {
-      const resetValues: any = {};
+      const resetValues: Partial<MaskAdjustments> = {};
       for (const key of sectionKeys) {
         if (INITIAL_MASK_ADJUSTMENTS[key] !== undefined) {
           resetValues[key] = JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS[key]));
         }
       }
-      setMaskContainerAdjustments((prev: any) => ({
+      setMaskContainerAdjustments((prev) => ({
         ...prev,
         ...resetValues,
         sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility),
+          ...prev.sectionVisibility,
           [sectionName]: true,
         },
       }));
@@ -2089,8 +2288,7 @@ function SettingsPanel({
     ]);
   };
 
-  const sectionVisibility =
-    displayContainer.adjustments.sectionVisibility || INITIAL_MASK_ADJUSTMENTS.sectionVisibility;
+  const sectionVisibility = displayContainer.adjustments.sectionVisibility;
 
   return (
     <div
@@ -2108,7 +2306,7 @@ function SettingsPanel({
           const isOpening = !isSettingsSectionOpen;
           setSettingsSectionOpen(isOpening);
           if (appSettings?.enableFocusMode && isOpening) {
-            setCollapsibleState((prev: any) => {
+            setCollapsibleState((prev) => {
               const newState = { ...prev };
               Object.keys(newState).forEach((key) => {
                 newState[key] = false;
@@ -2150,8 +2348,8 @@ function SettingsPanel({
             label={t('editor.masks.settings.opacity')}
             max={100}
             min={0}
-            value={(isComponentMode ? activeSubMask.opacity : displayContainer.opacity) ?? 100}
-            onChange={(e: any) =>
+            value={isComponentMode ? activeSubMask.opacity : displayContainer.opacity}
+            onChange={(e) =>
               isComponentMode
                 ? updateSubMask(activeSubMask.id, { opacity: Number(e.target.value) })
                 : handleMaskPropertyChange('opacity', Number(e.target.value))
@@ -2181,10 +2379,10 @@ function SettingsPanel({
 
               {activeSubMask.type === Mask.AiDepth && (
                 <DepthRangePicker
-                  minDepth={100 - (activeSubMask.parameters?.maxDepth ?? 100)}
-                  maxDepth={100 - (activeSubMask.parameters?.minDepth ?? 0)}
-                  minFade={activeSubMask.parameters?.maxFade ?? 15}
-                  maxFade={activeSubMask.parameters?.minFade ?? 15}
+                  minDepth={100 - (activeSubMask.parameters.maxDepth ?? 100)}
+                  maxDepth={100 - (activeSubMask.parameters.minDepth ?? 0)}
+                  minFade={activeSubMask.parameters.maxFade ?? 15}
+                  maxFade={activeSubMask.parameters.minFade ?? 15}
                   defaultMinDepth={20}
                   defaultMaxDepth={80}
                   defaultMinFade={15}
@@ -2194,21 +2392,21 @@ function SettingsPanel({
                 />
               )}
 
-              {subMaskConfig.parameters?.map((param: any) => (
+              {subMaskConfig.parameters?.map((param) => (
                 <Slider
-                  key={param.key}
+                  key={String(param.key)}
                   label={
                     param.key === 'feather' && activeSubMask.type === Mask.AiDepth
                       ? t('editor.masks.params.globalFeather')
-                      : t('editor.masks.params.' + param.key)
+                      : t('editor.masks.params.' + String(param.key))
                   }
                   min={param.min}
                   max={param.max}
                   step={param.step}
                   defaultValue={param.defaultValue}
-                  value={(activeSubMask.parameters[param.key] || 0) * (param.multiplier || 1)}
-                  onChange={(e: any) =>
-                    handleSubMaskParametersChange({ [param.key]: parseFloat(e.target.value) / (param.multiplier || 1) })
+                  value={(Number(activeSubMask.parameters[param.key]) || 0) * (param.multiplier || 1)}
+                  onChange={(e) =>
+                    handleSubMaskParametersChange({ [param.key]: parseFloat(String(e.target.value)) / (param.multiplier || 1) })
                   }
                   {...(param.key !== 'grow' && { fillOrigin: 'min' })}
                   onDragStateChange={onDragStateChange}
@@ -2219,7 +2417,7 @@ function SettingsPanel({
                 brushSettings &&
                 (activeSubMask.type === Mask.Flow ? (
                   <FlowBrushTool
-                    flow={activeSubMask.parameters?.flow ?? 10}
+                    flow={typeof activeSubMask.parameters.flow === 'number' ? activeSubMask.parameters.flow : 10}
                     onFlowChange={(flow: number) => handleSubMaskParametersChange({ flow })}
                     settings={brushSettings}
                     onSettingsChange={setBrushSettings}
@@ -2243,13 +2441,14 @@ function SettingsPanel({
         className="flex flex-col gap-2"
       >
         {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName) => {
-          const SectionComponent: any = {
+          const SECTION_COMPONENTS: Record<string, ElementType> = {
             basic: BasicAdjustments,
             curves: CurveGraph,
             color: ColorPanel,
             details: DetailsPanel,
             effects: EffectsPanel,
-          }[sectionName];
+          };
+          const SectionComponent = SECTION_COMPONENTS[sectionName];
           const title = sectionName.charAt(0).toUpperCase() + sectionName.slice(1);
           return (
             <CollapsibleSection
@@ -2259,7 +2458,7 @@ function SettingsPanel({
               isContentVisible={sectionVisibility[sectionName]}
               onToggle={() => handleToggleSection(sectionName)}
               onToggleVisibility={() => handleToggleVisibility(sectionName)}
-              onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
+              onContextMenu={(e: React.MouseEvent) => handleSectionContextMenu(e, sectionName)}
             >
               <SectionComponent
                 adjustments={displayContainer.adjustments}

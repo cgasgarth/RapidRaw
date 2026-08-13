@@ -1030,7 +1030,8 @@
       "or": "o",
       "version": "Versió {{version}}",
       "welcomeBack": "Benvingut/da de nou!",
-      "welcomeBackDesc": "Continueu on ho vau deixar o inicieu una nova sessió."
+      "welcomeBackDesc": "Continueu on ho vau deixar o inicieu una nova sessió.",
+      "photographer": "Timon Käch"
     },
     "status": {
       "downloading": "S'està baixant {{status}}...",

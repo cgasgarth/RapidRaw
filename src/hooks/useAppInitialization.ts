@@ -7,21 +7,44 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { useProcessStore } from '../store/useProcessStore';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
-import { COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
+import { COPYABLE_ADJUSTMENT_KEYS, PasteMode } from '../utils/adjustments';
 import {
+  AppSettings,
   FilterCriteria,
+  ImageFile,
   Invokes,
+  LastFolderState,
   LibraryViewMode,
-  RawStatus,
   EditedStatus,
+  RawStatus,
+  SupportedTypes,
   Theme,
   ThumbnailSize,
   ThumbnailAspectRatio,
 } from '../components/ui/AppProperties';
 import { useTranslation } from 'react-i18next';
+import type { i18n as I18n } from 'i18next';
+import type { FolderTree } from '../components/ui/AppProperties';
+import { ExternalEditSession } from '../store/useProcessStore';
+
+export interface PreloadedData {
+  trees?: Promise<FolderTree[]>;
+  images?: Promise<ImageFile[]>;
+  rootPaths?: string[];
+  currentPath?: string;
+}
+
+interface PersistedFolderState extends LastFolderState {
+  activeAlbumId?: string | null;
+}
+
+interface FrontendLaunch {
+  editSession?: ExternalEditSession;
+  openWithFile?: string;
+}
 
 interface UseAppInitializationProps {
-  preloadedDataRef: React.RefObject<any>;
+  preloadedDataRef: React.RefObject<PreloadedData>;
   thumbnailSize: ThumbnailSize;
   setThumbnailSize: (size: ThumbnailSize) => void;
   thumbnailAspectRatio: ThumbnailAspectRatio;
@@ -30,14 +53,19 @@ interface UseAppInitializationProps {
   setLibraryViewMode: (mode: LibraryViewMode) => void;
 }
 
-const getDefaultLanguage = (i18nInstance: any): string => {
-  const browserLang = navigator.language || (navigator as any).userLanguage || 'en';
+const getDefaultLanguage = (i18nInstance: I18n): string => {
+  const nav = navigator as Navigator & { userLanguage?: string };
+  const browserLang = nav.language || nav.userLanguage || 'en';
   const shortLang = browserLang.split('-')[0].toLowerCase();
   const supportedLanguages = Object.keys(i18nInstance.options.resources || {});
+  const fallbackLngOption = i18nInstance.options.fallbackLng;
+  const firstFallback = Array.isArray(fallbackLngOption) ? fallbackLngOption[0] : undefined;
   const fallbackLang =
-    typeof i18nInstance.options.fallbackLng === 'string'
-      ? i18nInstance.options.fallbackLng
-      : i18nInstance.options.fallbackLng?.[0] || 'en';
+    typeof fallbackLngOption === 'string'
+      ? fallbackLngOption
+      : typeof firstFallback === 'string'
+        ? firstFallback
+        : 'en';
 
   return supportedLanguages.includes(browserLang)
     ? browserLang
@@ -139,20 +167,21 @@ export const useAppInitialization = ({
   }, [initPlatform]);
 
   useEffect(() => {
-    invoke(Invokes.GetSupportedFileTypes)
-      .then((types: any) => setSupportedTypes(types))
+    invoke<SupportedTypes>(Invokes.GetSupportedFileTypes)
+      .then((types) => setSupportedTypes(types))
       .catch((err) => console.error('Failed to load supported file types:', err));
   }, [setSupportedTypes]);
 
   useEffect(() => {
-    invoke(Invokes.LoadSettings)
-      .then(async (settings: any) => {
-        if (
-          !settings.copyPasteSettings ||
-          !settings.copyPasteSettings.includedAdjustments ||
-          settings.copyPasteSettings.includedAdjustments.length === 0
-        ) {
-          settings.copyPasteSettings = { mode: 'merge', includedAdjustments: COPYABLE_ADJUSTMENT_KEYS };
+    invoke<AppSettings>(Invokes.LoadSettings)
+      .then(async (settings) => {
+        if (!settings.copyPasteSettings || settings.copyPasteSettings.includedAdjustments.length === 0) {
+          settings.copyPasteSettings = {
+            mode: PasteMode.Merge,
+            includedAdjustments: COPYABLE_ADJUSTMENT_KEYS,
+            knownAdjustments: COPYABLE_ADJUSTMENT_KEYS,
+            autoSync: false,
+          };
         }
 
         if (!settings.language) {
@@ -161,36 +190,42 @@ export const useAppInitialization = ({
         }
 
         // legacy
-        const savedRawStatus = settings?.filterCriteria?.rawStatus as string | undefined;
+        const savedRawStatus = settings.filterCriteria?.rawStatus as string | undefined;
         if (savedRawStatus === 'groupVariants' || savedRawStatus === 'rawOverNonRaw') {
-          const legacyPref = settings?.groupPreferredType === 'jpeg' ? 'jpeg' : 'raw';
+          const legacyPref = settings.groupPreferredType === 'jpeg' ? 'jpeg' : 'raw';
           settings.grouping = legacyPref;
-          settings.filterCriteria = { ...settings.filterCriteria, rawStatus: 'all' };
+          settings.filterCriteria = {
+            colors: settings.filterCriteria?.colors ?? [],
+            rating: settings.filterCriteria?.rating ?? 0,
+            rawStatus: RawStatus.All,
+            editedStatus: settings.filterCriteria?.editedStatus,
+          };
           handleSettingsChange(settings);
         }
 
         setAppSettings(settings);
         i18n.changeLanguage(settings.language);
 
-        if (settings?.sortCriteria) setSortCriteria(settings.sortCriteria);
+        if (settings.sortCriteria) setSortCriteria(settings.sortCriteria);
 
-        if (settings?.filterCriteria) {
+        const loadedFilterCriteria = settings.filterCriteria;
+        if (loadedFilterCriteria) {
           setFilterCriteria((prev: FilterCriteria) => ({
             ...prev,
-            ...settings.filterCriteria,
-            rawStatus: settings.filterCriteria.rawStatus || RawStatus.All,
-            editedStatus: settings.filterCriteria.editedStatus || EditedStatus.All,
-            colors: settings.filterCriteria.colors || [],
+            ...loadedFilterCriteria,
+            rawStatus: loadedFilterCriteria.rawStatus,
+            editedStatus: loadedFilterCriteria.editedStatus || EditedStatus.All,
+            colors: loadedFilterCriteria.colors,
           }));
         }
 
-        if (settings?.theme) setTheme(settings.theme);
+        setTheme(settings.theme);
 
-        if (settings?.uiVisibility) {
+        if (settings.uiVisibility) {
           setUI((state) => ({ uiVisibility: { ...state.uiVisibility, ...settings.uiVisibility } }));
         }
 
-        if (settings?.workspace) {
+        if (settings.workspace) {
           setUI({
             leftPanelWidth: settings.workspace.leftPanelWidth,
             rightPanelWidth: settings.workspace.rightPanelWidth,
@@ -202,17 +237,17 @@ export const useAppInitialization = ({
           });
         }
 
-        if (settings?.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
-        if (settings?.activeWaveformChannel) setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
-        if (typeof settings?.waveformHeight === 'number') setEditor({ waveformHeight: settings.waveformHeight });
+        if (settings.isWaveformVisible !== undefined) setEditor({ isWaveformVisible: settings.isWaveformVisible });
+        if (settings.activeWaveformChannel) setEditor({ activeWaveformChannel: settings.activeWaveformChannel });
+        if (typeof settings.waveformHeight === 'number') setEditor({ waveformHeight: settings.waveformHeight });
 
-        setLibraryViewMode(settings?.libraryViewMode ?? defaultLibraryViewMode);
-        setThumbnailSize(settings?.thumbnailSize ?? defaultThumbnailSize);
-        if (settings?.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
+        setLibraryViewMode(settings.libraryViewMode ?? defaultLibraryViewMode);
+        setThumbnailSize(settings.thumbnailSize ?? defaultThumbnailSize);
+        if (settings.thumbnailAspectRatio) setThumbnailAspectRatio(settings.thumbnailAspectRatio);
 
-        if (settings?.pinnedFolders && settings.pinnedFolders.length > 0) {
+        if (settings.pinnedFolders && settings.pinnedFolders.length > 0) {
           try {
-            const trees = await invoke(Invokes.GetPinnedFolderTrees, {
+            const trees = await invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
               paths: settings.pinnedFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders || [],
               showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
@@ -240,27 +275,27 @@ export const useAppInitialization = ({
           preloadedDataRef.current = {
             rootPaths: rootFolders,
             currentPath: currentPath,
-            trees: invoke(Invokes.GetPinnedFolderTrees, {
+            trees: invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
               paths: rootFolders,
               expandedFolders: settings.lastFolderState?.expandedFolders ?? rootFolders,
               showImageCounts: settings.enableFolderImageCounts || settings.folderTreeSort?.key === 'imageCount',
             }),
-            images: isAlbum ? undefined : invoke(command, { path: currentPath }),
+            images: isAlbum ? undefined : invoke<ImageFile[]>(command, { path: currentPath }),
           };
         }
 
-        if (settings?.lastFolderState) {
+        if (settings.lastFolderState) {
           setLibrary({
             expandedFolders: new Set(settings.lastFolderState.expandedFolders || []),
             expandedAlbumGroups: new Set(settings.lastFolderState.expandedAlbumGroups || []),
           });
         }
 
-        invoke('frontend_ready')
-          .then((launch: any) => {
-            if (launch?.editSession) {
+        invoke<FrontendLaunch>('frontend_ready')
+          .then((launch) => {
+            if (launch.editSession) {
               useProcessStore.getState().setProcess({ externalEditSession: launch.editSession });
-            } else if (launch?.openWithFile) {
+            } else if (launch.openWithFile) {
               useProcessStore.getState().setProcess({ initialFileToOpen: launch.openWithFile });
             }
           })
@@ -308,6 +343,7 @@ export const useAppInitialization = ({
 
       return () => clearTimeout(timeoutId);
     }
+    return;
   }, [workspaceProps, appSettings, handleSettingsChange]);
 
   useEffect(() => {
@@ -366,7 +402,7 @@ export const useAppInitialization = ({
     const currentExpanded = Array.from(expandedFolders);
     const currentExpandedAlbums = Array.from(expandedAlbumGroups);
 
-    const prevFolderState = appSettings.lastFolderState || {
+    const prevFolderState: PersistedFolderState = appSettings.lastFolderState || {
       currentFolderPath: null,
       expandedFolders: [],
       activeAlbumId: null,
@@ -387,7 +423,7 @@ export const useAppInitialization = ({
           expandedFolders: currentExpanded,
           activeAlbumId,
           expandedAlbumGroups: currentExpandedAlbums,
-        },
+        } as LastFolderState,
       });
     }
   }, [currentFolderPath, expandedFolders, activeAlbumId, expandedAlbumGroups, appSettings, handleSettingsChange]);
@@ -422,28 +458,32 @@ export const useAppInitialization = ({
 
       if (pinnedFolders.length > 0) {
         promises.push(
-          invoke(Invokes.GetPinnedFolderTrees, {
+          invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
             paths: pinnedFolders,
             expandedFolders: currentExpanded,
             showImageCounts: needsImageCounts,
-          }).then((trees: any) => ({ type: 'pinned', trees })),
+          }).then((trees) => ({ type: 'pinned' as const, trees })),
         );
       }
 
       if (rootFolders.length > 0) {
         promises.push(
-          invoke(Invokes.GetPinnedFolderTrees, {
+          invoke<FolderTree[]>(Invokes.GetPinnedFolderTrees, {
             paths: rootFolders,
             expandedFolders: currentExpanded,
             showImageCounts: needsImageCounts,
-          }).then((trees: any) => ({ type: 'root', trees })),
+          }).then((trees) => ({ type: 'root' as const, trees })),
         );
       }
 
       Promise.all(promises)
         .then((results) => {
           useLibraryStore.getState().setLibrary((_state) => {
-            const updates: any = { isTreeLoading: false };
+            const updates: {
+              isTreeLoading: boolean;
+              pinnedFolderTrees?: FolderTree[];
+              folderTrees?: FolderTree[];
+            } = { isTreeLoading: false };
             results.forEach((res) => {
               if (res.type === 'pinned') updates.pinnedFolderTrees = res.trees;
               if (res.type === 'root') updates.folderTrees = res.trees;
@@ -456,7 +496,6 @@ export const useAppInitialization = ({
           setLibrary({ isTreeLoading: false });
         });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appSettings?.enableFolderImageCounts, appSettings?.folderTreeSort?.key]);
 
   useEffect(() => {
@@ -468,7 +507,7 @@ export const useAppInitialization = ({
       THEMES.find((t: ThemeProps) => t.id === DEFAULT_THEME_ID);
     if (!baseTheme) return;
 
-    let finalCssVariables: any = { ...baseTheme.cssVariables };
+    const finalCssVariables: Record<string, string> = { ...baseTheme.cssVariables };
 
     Object.entries(finalCssVariables).forEach(([key, value]) => {
       root.style.setProperty(key, value as string);

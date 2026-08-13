@@ -31,11 +31,11 @@ interface BottomBarProps {
   isResizing?: boolean;
   multiSelectedPaths?: Array<string>;
   onClearSelection?(): void;
-  onContextMenu?(event: any, path: string): void;
-  onEmptyAreaContextMenu?(event: any): void;
+  onContextMenu?(event: React.MouseEvent, path: string): void;
+  onEmptyAreaContextMenu?(event: React.MouseEvent): void;
   onCopy(): void;
   onExportClick?(): void;
-  onImageSelect?(path: string, event: any): void;
+  onImageSelect?(path: string, event: React.MouseEvent): void;
   onOpenCopyPasteSettings?(): void;
   onRequestThumbnails?(paths: string[]): void;
   onPaste(): void;
@@ -144,7 +144,7 @@ export default function BottomBar({
   onZoomChange = () => {},
   rating,
   selectedImage,
-  setIsFilmstripVisible,
+  setIsFilmstripVisible: _setIsFilmstripVisible,
   showFilmstrip = true,
   showZoomControls = true,
   thumbnailAspectRatio,
@@ -340,7 +340,7 @@ export default function BottomBar({
           >
             <Filmstrip
               imageList={imageList}
-              imageRatings={imageRatings}
+              imageRatings={imageRatings ?? null}
               isLoading={isLoading}
               multiSelectedPaths={multiSelectedPaths}
               onClearSelection={onClearSelection}

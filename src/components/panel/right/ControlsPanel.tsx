@@ -13,7 +13,8 @@ import Waveform from '../editor/Waveform';
 import Resizer from '../../ui/Resizer';
 import { Adjustments, SectionVisibility, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTIONS } from '../../../utils/adjustments';
 import { useContextMenu } from '../../../context/ContextMenuContext';
-import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
+import { OPTION_SEPARATOR, Option, Orientation } from '../../ui/AppProperties';
+import type { CollapsibleSectionsState } from '../../../store/useUIStore';
 import Text from '../../ui/Text';
 import { TextVariants, TextColors, TextWeights } from '../../../types/typography';
 import { useShallow } from 'zustand/react/shallow';
@@ -71,7 +72,8 @@ export default function Controls() {
   );
 
   const setCopiedSectionAdjustments = useCallback(
-    (val: any) => setEditor({ copiedSectionAdjustments: val }),
+    (val: { section: string; values: Partial<Adjustments> } | null) =>
+      setEditor({ copiedSectionAdjustments: val }),
     [setEditor],
   );
 
@@ -86,7 +88,7 @@ export default function Controls() {
   );
 
   const setCollapsibleState = useCallback(
-    (updater: any) =>
+    (updater: CollapsibleSectionsState | ((prev: CollapsibleSectionsState) => CollapsibleSectionsState)) =>
       setUI((state) => ({
         collapsibleSectionsState: typeof updater === 'function' ? updater(state.collapsibleSectionsState) : updater,
       })),
@@ -111,22 +113,25 @@ export default function Controls() {
       ...prev,
       ...Object.keys(ADJUSTMENT_SECTIONS)
         .flatMap((s) => ADJUSTMENT_SECTIONS[s])
-        .reduce((acc: any, key: string) => {
-          acc[key] = INITIAL_ADJUSTMENTS[key as keyof Adjustments];
+        .reduce((acc: Partial<Adjustments>, key: string) => {
+          acc[key as keyof Adjustments] = INITIAL_ADJUSTMENTS[key as keyof Adjustments] as never;
           return acc;
         }, {}),
       sectionVisibility: { ...INITIAL_ADJUSTMENTS.sectionVisibility },
     }));
   };
 
-  const handleToggleSection = (section: string) => {
-    setCollapsibleState((prev: any) => {
+  const handleToggleSection = (section: keyof CollapsibleSectionsState) => {
+    setCollapsibleState((prev: CollapsibleSectionsState) => {
       const isOpening = !prev[section];
       if (appSettings?.enableFocusMode && isOpening) {
-        const newState = { ...prev };
-        Object.keys(newState).forEach((key) => {
-          newState[key] = false;
-        });
+        const newState: CollapsibleSectionsState = {
+          basic: false,
+          color: false,
+          curves: false,
+          details: false,
+          effects: false,
+        };
         newState[section] = true;
         return newState;
       }
@@ -134,14 +139,14 @@ export default function Controls() {
     });
   };
 
-  const handleSectionContextMenu = (event: any, sectionName: string) => {
+  const handleSectionContextMenu = (event: React.MouseEvent<HTMLDivElement>, sectionName: string) => {
     event.preventDefault();
     event.stopPropagation();
 
     const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
 
     const handleCopy = () => {
-      const adjustmentsToCopy: any = {};
+      const adjustmentsToCopy: Partial<Adjustments> = {};
       for (const key of sectionKeys) {
         if (Object.prototype.hasOwnProperty.call(adjustments, key)) {
           adjustmentsToCopy[key] = JSON.parse(JSON.stringify(adjustments[key as keyof Adjustments]));
@@ -165,7 +170,7 @@ export default function Controls() {
     };
 
     const handleReset = () => {
-      const resetValues: any = {};
+      const resetValues: Partial<Adjustments> = {};
       for (const key of sectionKeys) {
         resetValues[key] = JSON.parse(JSON.stringify(INITIAL_ADJUSTMENTS[key as keyof Adjustments]));
       }
@@ -186,7 +191,7 @@ export default function Controls() {
       ? t('editor.adjustments.actions.pasteLabel', { section: translatedSection })
       : t('editor.adjustments.actions.pasteSettings');
 
-    const options: any = [
+    const options: Option[] = [
       {
         label: t('editor.adjustments.actions.copySectionSettings', { section: translatedSection }),
         icon: Copy,
@@ -202,6 +207,15 @@ export default function Controls() {
     ];
 
     showContextMenu(event.clientX, event.clientY, options);
+  };
+
+  const sectionNames = Object.keys(ADJUSTMENT_SECTIONS) as Array<keyof CollapsibleSectionsState>;
+  const sectionComponents = {
+    basic: BasicAdjustments,
+    curves: CurveGraph,
+    color: ColorPanel,
+    details: DetailsPanel,
+    effects: EffectsPanel,
   };
 
   return (
@@ -270,24 +284,17 @@ export default function Controls() {
 
       <div className="grow overflow-y-scroll p-3 flex flex-col gap-2">
         {selectedImage ? (
-          Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
-            const SectionComponent: any = {
-              basic: BasicAdjustments,
-              curves: CurveGraph,
-              color: ColorPanel,
-              details: DetailsPanel,
-              effects: EffectsPanel,
-            }[sectionName];
-
+          sectionNames.map((sectionName) => {
+            const SectionComponent = sectionComponents[sectionName];
             const title = t(`editor.adjustments.sections.${sectionName}`);
             const sectionVisibility = adjustments.sectionVisibility;
 
             return (
               <div className="shrink-0 group" key={sectionName}>
                 <CollapsibleSection
-                  isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
-                  isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
-                  onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
+                  isContentVisible={sectionVisibility[sectionName]}
+                  isOpen={collapsibleSectionsState[sectionName]}
+                  onContextMenu={(e: React.MouseEvent<HTMLDivElement>) => handleSectionContextMenu(e, sectionName)}
                   onToggle={() => handleToggleSection(sectionName)}
                   onToggleVisibility={() => handleToggleVisibility(sectionName)}
                   title={title}

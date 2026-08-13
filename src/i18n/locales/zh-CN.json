@@ -1028,7 +1028,8 @@
       "or": "或",
       "version": "版本 {{version}}",
       "welcomeBack": "欢迎回来！",
-      "welcomeBackDesc": "继续上次的进度或开始新会话。"
+      "welcomeBackDesc": "继续上次的进度或开始新会话。",
+      "photographer": "Timon Käch"
     },
     "status": {
       "downloading": "下载中 {{status}}...",

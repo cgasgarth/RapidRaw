@@ -10,7 +10,7 @@ const jsRecommendedForTs = {
   files: tsFiles,
 };
 
-const tsRecommended = tseslint.configs.recommended.map((config) =>
+const tsStrict = tseslint.configs.strict.map((config) =>
   config.files ? config : { ...config, files: tsFiles },
 );
 
@@ -26,7 +26,7 @@ module.exports = [
     ],
   },
   jsRecommendedForTs,
-  ...tsRecommended,
+  ...tsStrict,
   {
     files: tsFiles,
     plugins: {
@@ -51,14 +51,16 @@ module.exports = [
       },
     },
     rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unnecessary-condition': 'error',
+      'prefer-const': 'error',
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
-        'warn',
+        'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
       ],
       'i18next/no-literal-string': [
-        'warn',
+        'error',
         {
           markupOnly: true,
           ignoreAttribute: [
@@ -79,7 +81,11 @@ module.exports = [
             'stroke',
             'fill',
             'viewBox',
+            'href',
+            'target',
+            'rel',
           ],
+          ignoreComponent: ['code'],
         },
       ],
     },

@@ -6,14 +6,67 @@ import { useTranslation } from 'react-i18next';
 import { Row } from './LibraryItems';
 import { useShallow } from 'zustand/react/shallow';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { LibraryViewMode, SortDirection, LibraryDisplayMode } from '../../ui/AppProperties';
+import {
+  ImageFile,
+  LibraryViewMode,
+  SortCriteria,
+  SortDirection,
+  LibraryDisplayMode,
+  ThumbnailSize,
+  ThumbnailAspectRatio,
+} from '../../ui/AppProperties';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights, TEXT_COLOR_KEYS } from '../../../types/typography';
 import { useProcessStore } from '../../../store/useProcessStore';
 import { ExifOverlay } from '../../ui/AppProperties';
 import { useSettingsStore } from '../../../store/useSettingsStore';
+import type { ColumnWidths } from '../MainLibrary';
+import type { GroupBadgeInfo, GroupId } from '../../../utils/imageGrouping';
+import type { GridRow } from './LibraryItems';
 
-function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: any) {
+interface ThumbnailSizeOption {
+  id: ThumbnailSize;
+  label: string;
+  size: number;
+}
+
+interface LibraryGridProps {
+  imageList: ImageFile[];
+  libraryViewMode: LibraryViewMode;
+  thumbnailSize: ThumbnailSize;
+  libraryDisplayMode: LibraryDisplayMode;
+  currentFolderPath: string | null;
+  activePath: string | null;
+  multiSelectedPaths: string[];
+  onContextMenu(event: React.MouseEvent, path: string): void;
+  onImageClick(path: string, event: React.MouseEvent): void;
+  onImageDoubleClick(path: string): void;
+  thumbnailAspectRatio: ThumbnailAspectRatio;
+  imageRatings: Record<string, number>;
+  onRequestThumbnails?(paths: string[]): void;
+  thumbnailSizeOptions: ThumbnailSizeOption[];
+  onThumbnailSizeChange(size: ThumbnailSize): void;
+  groupBadgeInfo: Map<GroupId, GroupBadgeInfo> | null;
+  onClearSelection(): void;
+  onEmptyAreaContextMenu(event: React.MouseEvent): void;
+}
+
+interface ListHeaderProps {
+  widths: ColumnWidths;
+  setWidths: (widths: ColumnWidths | ((prev: ColumnWidths) => ColumnWidths)) => void;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  sortCriteria: SortCriteria;
+  onSortChange: (key: string) => void;
+}
+
+interface ListHeaderColumnProps {
+  title: string;
+  widthKey: keyof ColumnWidths;
+  nextKey?: keyof ColumnWidths;
+  sortKey?: string;
+}
+
+function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChange }: ListHeaderProps) {
   const { t } = useTranslation();
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const showExifCols = exifOverlay !== ExifOverlay.Off;
@@ -25,7 +78,7 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
     widths.color +
     (showExifCols ? widths.shutter + widths.aperture + widths.iso + widths.focal : 0);
 
-  const handleResize = (e: React.MouseEvent, leftCol: string, rightCol: string) => {
+  const handleResize = (e: React.MouseEvent, leftCol: keyof ColumnWidths, rightCol: keyof ColumnWidths) => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
@@ -49,7 +102,7 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
         newRight = 1;
       }
 
-      setWidths((prev: any) => ({
+      setWidths((prev: ColumnWidths) => ({
         ...prev,
         [leftCol]: newLeft,
         [rightCol]: newRight,
@@ -65,7 +118,7 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
     document.addEventListener('mouseup', onMouseUp);
   };
 
-  const Column = ({ title, widthKey, nextKey, sortKey }: any) => {
+  const Column = ({ title, widthKey, nextKey, sortKey }: ListHeaderColumnProps) => {
     const isSorted = sortCriteria.key === sortKey;
     const isAsc = sortCriteria.order === SortDirection.Ascending;
     const actualWidth = `${(widths[widthKey] / totalRawWidth) * 100}%`;
@@ -129,8 +182,8 @@ function ListHeader({ widths, setWidths, containerRef, sortCriteria, onSortChang
   );
 }
 
-const groupImagesByFolder = (images: any[], baseFolderPath: string | null) => {
-  const groups: Record<string, any[]> = {};
+const groupImagesByFolder = (images: ImageFile[], baseFolderPath: string | null) => {
+  const groups: Record<string, ImageFile[]> = {};
 
   images.forEach((img) => {
     const physicalPath = img.path.split('?vc=')[0];
@@ -156,7 +209,7 @@ const groupImagesByFolder = (images: any[], baseFolderPath: string | null) => {
   }));
 };
 
-export default function LibraryGrid(props: any) {
+export default function LibraryGrid(props: LibraryGridProps) {
   const {
     imageList,
     libraryViewMode,
@@ -191,7 +244,7 @@ export default function LibraryGrid(props: any) {
   const gridObserverRef = useRef<ResizeObserver | null>(null);
   const loadedThumbnailsRef = useRef(new Set<string>());
   const requestQueueRef = useRef<Set<string>>(new Set());
-  const requestTimeoutRef = useRef<any>(null);
+  const requestTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exifOverlay = useSettingsStore((s) => s.appSettings?.exifOverlay || ExifOverlay.Off);
   const showExifCols = exifOverlay !== ExifOverlay.Off;
 
@@ -216,15 +269,15 @@ export default function LibraryGrid(props: any) {
   }, [libraryContainerRef]);
 
   useEffect(() => {
-    const handleWheel = (event: any) => {
+    const handleWheel = (event: WheelEvent) => {
       const container = libraryContainerRef.current;
-      if (!container || !container.contains(event.target)) {
+      if (!container || !(event.target instanceof Node) || !container.contains(event.target)) {
         return;
       }
 
       if (event.ctrlKey || event.metaKey) {
         event.preventDefault();
-        const currentIndex = thumbnailSizeOptions.findIndex((o: any) => o.id === thumbnailSize);
+        const currentIndex = thumbnailSizeOptions.findIndex((o: ThumbnailSizeOption) => o.id === thumbnailSize);
         if (currentIndex === -1) {
           return;
         }
@@ -277,7 +330,8 @@ export default function LibraryGrid(props: any) {
   const handleToggleRecursiveFolder = useCallback((path: string) => {
     setCollapsedRecursiveFolders((prev) => {
       const next = new Set(prev);
-      next.has(path) ? next.delete(path) : next.add(path);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
       return next;
     });
   }, []);
@@ -292,7 +346,7 @@ export default function LibraryGrid(props: any) {
     const isListView = libraryDisplayMode === LibraryDisplayMode.List;
     const OUTER_PADDING = isListView ? 0 : 12;
     const ITEM_GAP = isListView ? 0 : 12;
-    const minThumbWidth = thumbnailSizeOptions.find((o: any) => o.id === thumbnailSize)?.size || 240;
+    const minThumbWidth = thumbnailSizeOptions.find((o: ThumbnailSizeOption) => o.id === thumbnailSize)?.size || 240;
 
     const availableWidth = gridSize.width - OUTER_PADDING * 2;
     const columnCount = isListView
@@ -314,7 +368,7 @@ export default function LibraryGrid(props: any) {
     const rowHeight = isListView ? listRowHeight : itemWidth + ITEM_GAP;
     const headerHeight = 40;
 
-    const rows: any[] = [];
+    const rows: GridRow[] = [];
 
     if (libraryViewMode === LibraryViewMode.Recursive) {
       const groups = groupImagesByFolder(imageList, currentFolderPath);
@@ -403,7 +457,7 @@ export default function LibraryGrid(props: any) {
     prevDisplayMode.current = libraryDisplayMode;
     prevListElement.current = element;
 
-    const { rows, rowHeight, headerHeight, columnCount } = gridData;
+    const { rowHeight, headerHeight, columnCount } = gridData;
 
     let targetTop = 0;
     let found = false;
@@ -532,7 +586,7 @@ export default function LibraryGrid(props: any) {
 
   const handleHeaderSort = (key: string) => {
     props.onClearSelection();
-    setSortCriteria((prev: any) => {
+    setSortCriteria((prev: SortCriteria) => {
       if (prev.key === key) {
         if (prev.order === SortDirection.Ascending) {
           return { ...prev, order: SortDirection.Descending };
@@ -555,7 +609,7 @@ export default function LibraryGrid(props: any) {
         {gridData.isListView && (
           <ListHeader
             widths={listColumnWidths}
-            setWidths={(w: any) => setLibrary({ listColumnWidths: typeof w === 'function' ? w(listColumnWidths) : w })}
+            setWidths={(w) => setLibrary({ listColumnWidths: typeof w === 'function' ? w(listColumnWidths) : w })}
             containerRef={libraryContainerRef}
             sortCriteria={sortCriteria}
             onSortChange={handleHeaderSort}
@@ -568,8 +622,8 @@ export default function LibraryGrid(props: any) {
             rowHeight={getItemSize}
             onScroll={(e: React.UIEvent<HTMLElement>) => handleScroll(e.currentTarget.scrollTop)}
             className="custom-scrollbar"
-            rowComponent={Row}
-            rowProps={memoizedRowProps}
+            rowComponent={Row as never}
+            rowProps={memoizedRowProps as never}
           />
         </div>
       </div>

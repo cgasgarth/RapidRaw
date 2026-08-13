@@ -141,7 +141,8 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
 
         if (oldestPath !== path) {
           URL.revokeObjectURL(newPreviews[oldestPath].url);
-          delete newPreviews[oldestPath];
+          const { [oldestPath]: _removed, ...kept } = newPreviews;
+          return { previews: kept };
         }
       }
 

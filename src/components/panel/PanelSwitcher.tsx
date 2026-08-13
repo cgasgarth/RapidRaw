@@ -108,7 +108,7 @@ export default function PanelSwitcher({
   const movePanelToIndex = useUIStore((s) => s.movePanelToIndex);
 
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
-  const [indicatorProps, setIndicatorProps] = useState<any>({});
+  const [indicatorProps, setIndicatorProps] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const { setNodeRef, isOver } = useDroppable({
@@ -163,7 +163,7 @@ export default function PanelSwitcher({
         }
       }
 
-      let style: any = {};
+      let style: React.CSSProperties = {};
       if (tabs.length === 0) {
         style = isVertical ? { top: 4, left: 4, right: 4, height: 2 } : { left: 4, top: 4, bottom: 4, width: 2 };
       } else if (insertIndex < tabs.length) {
@@ -220,9 +220,10 @@ export default function PanelSwitcher({
         {isOver && hoverIndex !== null && (
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1, ...indicatorProps }}
+            animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
+            style={indicatorProps}
             className="absolute bg-accent rounded-full pointer-events-none z-50"
           />
         )}

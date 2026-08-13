@@ -1,4 +1,4 @@
-import { type RefObject, type PointerEvent as ReactPointerEvent } from 'react';
+import { type RefObject, type PointerEvent as ReactPointerEvent, type MouseEvent, type ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -14,9 +14,10 @@ import { useLibraryStore } from '../../store/useLibraryStore';
 import { useProcessStore } from '../../store/useProcessStore';
 
 import { ImageFile, Orientation, Panel, ThumbnailAspectRatio } from '../ui/AppProperties';
+import type { TransformWrapperHandle } from '../panel/Editor';
 
 interface EditorViewProps {
-  transformWrapperRef: RefObject<any>;
+  transformWrapperRef: RefObject<TransformWrapperHandle | null>;
   isResizing: boolean;
   isCompactPortrait: boolean;
   isAndroid: boolean;
@@ -26,18 +27,18 @@ interface EditorViewProps {
   sortedImageList: ImageFile[];
   createResizeHandler: (stateKey: string, startSize: number) => (e: ReactPointerEvent<HTMLDivElement>) => void;
   handleBackToLibrary: () => void;
-  handleEditorContextMenu: (...args: any) => void;
-  handleThumbnailContextMenu: (...args: any) => void;
-  handleMainLibraryContextMenu?: (...args: any) => void;
-  handleImageClick: (...args: any) => void;
+  handleEditorContextMenu: (event: MouseEvent) => void;
+  handleThumbnailContextMenu: (event: MouseEvent, path: string) => void;
+  handleMainLibraryContextMenu?: (event: MouseEvent) => void;
+  handleImageClick: (path: string, event: MouseEvent) => void;
   handleClearSelection: () => void;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
-  handleRate: (...args: any) => void;
+  handleRate: (rate: number) => void;
   handleZoomChange: (zoom: number) => void;
-  handlePanelSelect: (panelId: any) => void;
-  requestThumbnails: any;
-  renderAppPanel: (panelId: any) => React.ReactNode;
+  handlePanelSelect: (panelId: Panel) => void;
+  requestThumbnails: (paths: string[]) => void;
+  renderAppPanel: (panelId: Panel) => ReactNode;
 }
 
 export default function EditorView({

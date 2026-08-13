@@ -6,9 +6,9 @@ interface InputProps {
   className?: string;
   disabled?: boolean;
   id?: string;
-  onBlur?(e: any): void;
-  onChange(e: any): void;
-  onKeyDown?(e: any): void;
+  onBlur?(e: React.FocusEvent<HTMLInputElement>): void;
+  onChange(e: React.ChangeEvent<HTMLInputElement>): void;
+  onKeyDown?(e: React.KeyboardEvent<HTMLInputElement>): void;
   placeholder?: string;
   type?: string;
   value?: string;
@@ -23,7 +23,7 @@ interface InputProps {
  * @param {string} type - The type of the input (e.g., 'text', 'password', 'email').
  * @param {object} props - Other standard input props (value, onChange, placeholder, etc.).
  */
-const Input = React.forwardRef(({ className, type = 'text', bgClassName, ...props }: InputProps, ref: any) => {
+const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type = 'text', bgClassName, ...props }, ref) => {
   return (
     <input
       className={clsx(

@@ -56,6 +56,8 @@ import { useMcpBridge } from './hooks/useMcpBridge';
 import './i18n';
 
 import {
+  Album,
+  AlbumItem,
   Invokes,
   ImageFile,
   LibraryViewMode,
@@ -64,20 +66,28 @@ import {
   Theme,
   ThumbnailSize,
   ThumbnailAspectRatio,
+  FolderTree as FolderTreeNode,
 } from './components/ui/AppProperties';
+import type { TransformWrapperHandle } from './components/panel/Editor';
+import type { ImageCacheEntry } from './utils/ImageLRUCache';
+import type { PrevAdjustmentsState } from './components/managers/ImageProcessingManager';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import type { UnlistenFn } from '@tauri-apps/api/event';
 
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
 
 const CLERK_PUBLISHABLE_KEY = 'pk_test_YnJpZWYtc2Vhc25haWwtMTIuY2xlcmsuYWNjb3VudHMuZGV2JA'; // local dev key
 
-const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[]): any => {
-  if (!node) return null;
-
+const insertChildrenIntoTree = (
+  node: FolderTreeNode,
+  targetPath: string,
+  newChildren: FolderTreeNode[],
+): FolderTreeNode => {
   if (node.path === targetPath) {
-    const mergedChildren = newChildren.map((newChild: any) => {
-      const existingChild = node.children?.find((c: any) => c.path === newChild.path);
-      if (existingChild && existingChild.children && existingChild.children.length > 0) {
+    const mergedChildren = newChildren.map((newChild: FolderTreeNode) => {
+      const existingChild = node.children.find((c: FolderTreeNode) => c.path === newChild.path);
+      if (existingChild && existingChild.children.length > 0) {
         return { ...newChild, children: existingChild.children };
       }
       return newChild;
@@ -85,10 +95,10 @@ const insertChildrenIntoTree = (node: any, targetPath: string, newChildren: any[
     return { ...node, children: mergedChildren };
   }
 
-  if (node.children && node.children.length > 0) {
+  if (node.children.length > 0) {
     return {
       ...node,
-      children: node.children.map((child: any) => insertChildrenIntoTree(child, targetPath, newChildren)),
+      children: node.children.map((child: FolderTreeNode) => insertChildrenIntoTree(child, targetPath, newChildren)),
     };
   }
 
@@ -114,7 +124,6 @@ function App() {
     isInstantTransition,
     isLayoutReady,
     uiVisibility,
-    isLibraryExportPanelVisible,
     leftPanelWidth,
     rightPanelWidth,
     compactEditorPanelHeightOverride,
@@ -183,7 +192,7 @@ function App() {
     selectedImagePathRef.current = selectedImage?.path ?? null;
   }, [selectedImage?.path]);
 
-  const prevAdjustmentsRef = useRef<any>(null);
+  const prevAdjustmentsRef = useRef<PrevAdjustmentsState | null>(null);
 
   const [viewportSize, setViewportSize] = useState<ImageDimensions>(() => {
     if (typeof window === 'undefined') {
@@ -200,7 +209,7 @@ function App() {
   const previewJobIdRef = useRef<number>(0);
   const latestRenderedJobIdRef = useRef<number>(0);
   const currentResRef = useRef<number>(1280);
-  const cachedEditStateRef = useRef<any | null>(null);
+  const cachedEditStateRef = useRef<ImageCacheEntry | null>(null);
 
   const [libraryViewMode, setLibraryViewMode] = useState<LibraryViewMode>(defaultLibraryViewMode);
   const [isResizing, setIsResizing] = useState(false);
@@ -209,9 +218,9 @@ function App() {
 
   const { requestThumbnails, clearThumbnailQueue, markGenerated } = useThumbnails();
 
-  const transformWrapperRef = useRef<any>(null);
+  const transformWrapperRef = useRef<TransformWrapperHandle | null>(null);
   const preloadedDataRef = useRef<{
-    trees?: Promise<any>;
+    trees?: Promise<FolderTreeNode[]>;
     images?: Promise<ImageFile[]>;
     rootPaths?: string[];
     currentPath?: string;
@@ -322,9 +331,9 @@ function App() {
       if (currentFolderPath.startsWith('Album: ')) {
         const { activeAlbumId, albumTree } = useLibraryStore.getState();
         if (activeAlbumId) {
-          const findObj = (nodes: any[]): any => {
+          const findObj = (nodes: AlbumItem[]): Album | null => {
             for (const n of nodes) {
-              if (n.id === activeAlbumId) return n;
+              if (n.id === activeAlbumId) return n.type === 'album' ? n : null;
               if (n.type === 'group') {
                 const f = findObj(n.children);
                 if (f) return f;
@@ -471,7 +480,7 @@ function App() {
   }, [activePanel, activeMaskContainerId, activeAiPatchContainerId, setEditor]);
 
   useEffect(() => {
-    const unlisten = listen('ai-connector-status-update', (event: any) => {
+    const unlisten = listen<{ connected: boolean }>('ai-connector-status-update', (event) => {
       setEditor({ isAIConnectorConnected: event.payload.connected });
     });
     invoke(Invokes.CheckAIConnectorStatus);
@@ -579,7 +588,7 @@ function App() {
     checkFullscreen();
     const unlistenPromise = appWindow.onResized(checkFullscreen);
     return () => {
-      unlistenPromise.then((unlisten: any) => unlisten());
+      unlistenPromise.then((unlisten: UnlistenFn) => unlisten());
     };
   }, [setUI]);
 
@@ -606,12 +615,12 @@ function App() {
       if (!isExpanding) return;
       try {
         const showCounts = appSettings?.enableFolderImageCounts ?? false;
-        const newChildren: any[] = await invoke(Invokes.GetFolderChildren, {
+        const newChildren = await invoke<FolderTreeNode[]>(Invokes.GetFolderChildren, {
           path,
           showImageCounts: showCounts,
         });
         setLibrary((state) => ({
-          folderTrees: state.folderTrees.map((t: any) => insertChildrenIntoTree(t, path, newChildren)),
+          folderTrees: state.folderTrees.map((t: FolderTreeNode) => insertChildrenIntoTree(t, path, newChildren)),
         }));
         setLibrary((state) => ({
           pinnedFolderTrees: state.pinnedFolderTrees.map((tree) => insertChildrenIntoTree(tree, path, newChildren)),
@@ -702,12 +711,12 @@ function App() {
   const useMacWindowShell = osPlatform === 'macos' && !appSettings?.decorations && !isWindowFullScreen && !isFullScreen;
 
   const layoutSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-  const handleDragStart = (e: any) => {
+  const handleDragStart = (e: DragStartEvent) => {
     if (e.active.data.current?.type === 'layout-tab') {
       setLayoutDragItem(e.active.data.current.panel as Panel);
     }
   };
-  const handleDragEnd = (e: any) => {
+  const handleDragEnd = (e: DragEndEvent) => {
     setLayoutDragItem(null);
     if (e.active.data.current?.type === 'layout-tab' && e.over?.data.current?.type === 'layout-region') {
       movePanel(e.active.data.current.panel as Panel, e.over.data.current.region as PanelRegion);
@@ -921,7 +930,7 @@ function App() {
 }
 
 const AppWrapper = () => (
-  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} routerPush={(to) => {}} routerReplace={(to) => {}}>
+  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} routerPush={(_to) => {}} routerReplace={(_to) => {}}>
     <ContextMenuProvider>
       <App />
       <GlobalTooltip />

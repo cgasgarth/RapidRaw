@@ -5,14 +5,31 @@ import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useLibraryStore } from '../store/useLibraryStore';
-import { Adjustments, COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
+import { Adjustments, AiPatch, MaskContainer } from '../utils/adjustments';
 import { Invokes, Panel } from '../components/ui/AppProperties';
+import { SubMask } from '../components/panel/right/Masks';
 import { debouncedSave } from './useEditorActions';
 import { globalImageCache } from '../utils/ImageLRUCache';
 
+export interface TransformWrapperHandle {
+  resetTransform: (time?: number) => void;
+  instance: {
+    transformState: {
+      scale: number;
+      positionX: number;
+      positionY: number;
+    };
+  };
+}
+
+export interface PrevAdjustmentsSnapshot {
+  path: string;
+  adjustments: Adjustments;
+}
+
 export function useImageProcessing(
-  transformWrapperRef: any,
-  prevAdjustmentsRef: React.RefObject<any>,
+  transformWrapperRef: React.RefObject<TransformWrapperHandle | null>,
+  prevAdjustmentsRef: React.RefObject<PrevAdjustmentsSnapshot | null>,
   renderRefs: {
     previewJobIdRef: React.RefObject<number>;
     latestRenderedJobIdRef: React.RefObject<number>;
@@ -64,10 +81,7 @@ export function useImageProcessing(
 
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
-    const state = transformWrapperRef.current.instance.transformState;
-    if (!state) return null;
-
-    const { scale, positionX, positionY } = state;
+    const { scale, positionX, positionY } = transformWrapperRef.current.instance.transformState;
     const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = baseRenderSize;
 
     if (!baseW || !baseH || !containerWidth || !containerHeight) return null;
@@ -96,10 +110,10 @@ export function useImageProcessing(
       return null;
     }
 
-    let roiX = (intersectLeft - imgLeft) / baseW;
-    let roiY = (intersectTop - imgTop) / baseH;
-    let roiW = (intersectRight - intersectLeft) / baseW;
-    let roiH = (intersectBottom - intersectTop) / baseH;
+    const roiX = (intersectLeft - imgLeft) / baseW;
+    const roiY = (intersectTop - imgTop) / baseH;
+    const roiW = (intersectRight - intersectLeft) / baseW;
+    const roiH = (intersectBottom - intersectTop) / baseH;
 
     const newRoiX = roiX - paddingX;
     const newRoiY = roiY - paddingY;
@@ -125,30 +139,27 @@ export function useImageProcessing(
       const { patchesSentToBackend } = useEditorStore.getState();
       const newlySentPatches = new Set<string>();
 
-      const processSubMasks = (subMasks: any[]) => {
-        if (!Array.isArray(subMasks)) return;
-        subMasks.forEach((sm: any) => {
-          if (sm.id && sm.parameters) {
-            const keys = ['mask_data_base64', 'maskDataBase64'];
-            let foundMaskData = false;
+      const processSubMasks = (subMasks: SubMask[]) => {
+        subMasks.forEach((sm: SubMask) => {
+          const keys = ['mask_data_base64', 'maskDataBase64'];
+          let foundMaskData = false;
 
-            for (const key of keys) {
-              if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
-                foundMaskData = true;
-                if (patchesSentToBackend.has(sm.id)) {
-                  sm.parameters[key] = null;
-                }
+          for (const key of keys) {
+            if (sm.parameters[key] !== undefined && sm.parameters[key] !== null) {
+              foundMaskData = true;
+              if (patchesSentToBackend.has(sm.id)) {
+                sm.parameters[key] = null;
               }
             }
-            if (foundMaskData && !patchesSentToBackend.has(sm.id)) {
-              newlySentPatches.add(sm.id);
-            }
+          }
+          if (foundMaskData && !patchesSentToBackend.has(sm.id)) {
+            newlySentPatches.add(sm.id);
           }
         });
       };
 
       if (Array.isArray(payload.aiPatches)) {
-        payload.aiPatches.forEach((p: any) => {
+        payload.aiPatches.forEach((p: AiPatch) => {
           if (p.id && p.patchData && !p.isLoading) {
             if (patchesSentToBackend.has(p.id)) {
               p.patchData = null;
@@ -156,13 +167,13 @@ export function useImageProcessing(
               newlySentPatches.add(p.id);
             }
           }
-          if (p.subMasks) processSubMasks(p.subMasks);
+          processSubMasks(p.subMasks);
         });
       }
 
       if (Array.isArray(payload.masks)) {
-        payload.masks.forEach((container: any) => {
-          if (container.subMasks) processSubMasks(container.subMasks);
+        payload.masks.forEach((container: MaskContainer) => {
+          processSubMasks(container.subMasks);
         });
       }
 
@@ -212,8 +223,8 @@ export function useImageProcessing(
             const url = URL.createObjectURL(blob);
 
             setEditor((state) => {
-              if (state.interactivePatch && state.interactivePatch.url)
-                setTimeout(() => URL.revokeObjectURL(state.interactivePatch.url), 100);
+              const previousPatchUrl = state.interactivePatch?.url;
+              if (previousPatchUrl) setTimeout(() => URL.revokeObjectURL(previousPatchUrl), 100);
               return {
                 interactivePatch: {
                   url,
@@ -246,8 +257,9 @@ export function useImageProcessing(
             });
 
             setEditor((state) => {
-              if (state.interactivePatch && state.interactivePatch.url) {
-                setTimeout(() => URL.revokeObjectURL(state.interactivePatch.url), 500);
+              const previousPatchUrl = state.interactivePatch?.url;
+              if (previousPatchUrl) {
+                setTimeout(() => URL.revokeObjectURL(previousPatchUrl), 500);
               }
               return { interactivePatch: null };
             });
@@ -399,7 +411,6 @@ export function useImageProcessing(
     return () => {
       requestHiFiZoom.cancel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeView,
     displaySize.width,
@@ -446,7 +457,7 @@ export function useImageProcessing(
             for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
               if (includedKeys.includes(key as string)) {
                 if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {
-                  (delta as any)[key] = adjustments[key];
+                  delta[key] = adjustments[key];
                 }
               }
             }
@@ -465,7 +476,6 @@ export function useImageProcessing(
     return () => {
       if (dragIdleTimer.current) clearTimeout(dragIdleTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeView,
     adjustments,
@@ -493,7 +503,7 @@ export function useImageProcessing(
       displaySize.width > 0 &&
       !isSliderDragging
     ) {
-      let targetRes = calculateTargetRes();
+      const targetRes = calculateTargetRes();
       if (targetRes > currentOriginalResRef.current) {
         requestHiFiOriginalZoom(adjustments, targetRes);
       }
@@ -501,7 +511,6 @@ export function useImageProcessing(
     return () => {
       requestHiFiOriginalZoom.cancel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeView,
     showOriginal,

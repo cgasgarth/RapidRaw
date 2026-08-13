@@ -3,18 +3,15 @@ import { Crop, PercentCrop } from 'react-image-crop';
 import { Loader2 } from 'lucide-react';
 import clsx from 'clsx';
 import { invoke } from '@tauri-apps/api/core';
-import { toast } from 'react-toastify';
 import debounce from 'lodash.debounce';
 
 import { ImageDimensions, RenderSize, useImageRenderSize } from '../../hooks/useImageRenderSize';
-import { Adjustments, AiPatch, MaskContainer } from '../../utils/adjustments';
+import { Adjustments, AiPatch, INITIAL_MASK_ADJUSTMENTS, MaskContainer } from '../../utils/adjustments';
 import { calculateCenteredCrop, rotateCropCenter } from '../../utils/cropUtils';
 import EditorToolbar from './editor/EditorToolbar';
 import ImageCanvas from './editor/ImageCanvas';
 import { Mask, SubMask } from './right/Masks';
 import { Panel, TransformState, Invokes } from '../ui/AppProperties';
-import Text from '../ui/Text';
-import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useUIStore } from '../../store/useUIStore';
@@ -69,11 +66,23 @@ interface WgpuRenderState {
   bgSecondary: [number, number, number, number];
 }
 
+export interface TransformWrapperHandle {
+  zoomIn(factor: number, time?: number): void;
+  zoomOut(factor: number, time?: number): void;
+  resetTransform(time?: number): void;
+  setTransform(x: number, y: number, scale: number, time?: number): void;
+  instance: {
+    wrapperComponent: HTMLDivElement | null;
+    contentComponent: HTMLDivElement | null;
+    readonly transformState: TransformState;
+  };
+}
+
 interface EditorProps {
   onBackToLibrary(): void;
-  onContextMenu(event: any): void;
-  onImageSelect?(path: string, event?: any): void;
-  transformWrapperRef: any;
+  onContextMenu(event: React.MouseEvent): void;
+  onImageSelect?(path: string, event?: React.MouseEvent): void;
+  transformWrapperRef: React.RefObject<TransformWrapperHandle | null>;
 }
 
 export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, transformWrapperRef }: EditorProps) {
@@ -137,7 +146,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const { handleGenerateAiMask, handleQuickErase, handleManualCleanup } = useAiMasking();
 
   const [crop, setCrop] = useState<Crop | null>(null);
-  const prevCropParams = useRef<any>(null);
+  const prevCropParams = useRef<{
+    rotation: number;
+    aspectRatio: number | null;
+    orientationSteps: number;
+  } | null>(null);
   const lastValidCropRef = useRef<PercentCrop | null>(null);
 
   const [isMaskHovered, setIsMaskHovered] = useState(false);
@@ -162,7 +175,11 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   const isTransitioningRef = useRef(false);
   const [toolbarOverflowVisible, setToolbarOverflowVisible] = useState(!isFullScreen);
   const isGeneratingOverlayRef = useRef(false);
-  const pendingOverlayRequestRef = useRef<any>(null);
+  const pendingOverlayRequestRef = useRef<{
+    maskDef: MaskContainer | AiPatch | null;
+    renderSize: RenderSize;
+    jsAdjustments: Adjustments;
+  } | null>(null);
   const animationFrameId = useRef<number | null>(null);
   const physicsFrameId = useRef<number | null>(null);
   const activePointers = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -248,7 +265,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   );
 
   const updateSubMaskLocal = useCallback(
-    (subMaskId: string, updatedData: any) => {
+    (subMaskId: string, updatedData: Partial<SubMask>) => {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
         masks: prev.masks.map((c: MaskContainer) => ({
@@ -275,6 +292,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       }, 300);
       return () => clearTimeout(timer);
     }
+    return;
   }, [isFullScreen]);
 
   const isCropping = activePanel === Panel.Crop;
@@ -451,7 +469,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         const dt = Math.min(time - lastTime, 32);
         lastTime = time;
 
-        let { positionX: x, positionY: y, scale } = transformStateRef.current;
+        let { positionX: x, positionY: y } = transformStateRef.current;
+        const { scale } = transformStateRef.current;
         const bounds = getTransformBounds(scale);
 
         x += vx * dt;
@@ -603,7 +622,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         activeSubMask?.type === Mask.AiSubject ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
-        activeSubMask?.parameters?.isInitialDraw)) ||
+        activeSubMask?.parameters.isInitialDraw)) ||
     (isAiEditing &&
       (activeSubMask?.type === Mask.Brush ||
         activeSubMask?.type === Mask.Flow ||
@@ -613,7 +632,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         activeSubMask?.type === Mask.QuickEraser ||
         activeSubMask?.type === Mask.Color ||
         activeSubMask?.type === Mask.Luminance ||
-        activeSubMask?.parameters?.isInitialDraw)) ||
+        activeSubMask?.parameters.isInitialDraw)) ||
     isWbPickerActive;
 
   useEffect(() => {
@@ -773,8 +792,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         lastPanPos.current = { x: e.clientX, y: e.clientY };
 
         const bounds = getTransformBounds(transformStateRef.current.scale);
-        let curX = transformStateRef.current.positionX;
-        let curY = transformStateRef.current.positionY;
+        const curX = transformStateRef.current.positionX;
+        const curY = transformStateRef.current.positionY;
 
         if (curX < bounds.minX && dx < 0) dx *= 0.35;
         if (curX > bounds.maxX && dx > 0) dx *= 0.35;
@@ -801,8 +820,8 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           const panX = midX - lastPinch.current.midX;
           const panY = midY - lastPinch.current.midY;
 
-          let newX = mouseX - (mouseX - transformStateRef.current.positionX) * ratio + panX;
-          let newY = mouseY - (mouseY - transformStateRef.current.positionY) * ratio + panY;
+          const newX = mouseX - (mouseX - transformStateRef.current.positionX) * ratio + panX;
+          const newY = mouseY - (mouseY - transformStateRef.current.positionY) * ratio + panY;
 
           const bounded = clampToBounds(newX, newY, newScale);
           applyTransform(bounded.x, bounded.y, bounded.scale);
@@ -897,7 +916,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
 
-        let zoomTarget = savedZoomState.current
+        const zoomTarget = savedZoomState.current
           ? savedZoomState.current.scale
           : Math.min(currentScale * 2, maxScaleRef.current);
         const ratio = zoomTarget / currentScale;
@@ -997,10 +1016,18 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   }, [imageRenderSize, transformState.scale, handleDisplaySizeChange]);
 
   const processOverlayQueue = useCallback(async () => {
-    if (isGeneratingOverlayRef.current || !pendingOverlayRequestRef.current) return;
+    if (isGeneratingOverlayRef.current) return;
 
-    const { maskDef, renderSize, jsAdjustments } = pendingOverlayRequestRef.current;
-    pendingOverlayRequestRef.current = null;
+    const takePendingOverlayRequest = () => {
+      const pending = pendingOverlayRequestRef.current;
+      pendingOverlayRequestRef.current = null;
+      return pending;
+    };
+
+    const pendingRequest = takePendingOverlayRequest();
+    if (!pendingRequest) return;
+
+    const { maskDef, renderSize, jsAdjustments } = pendingRequest;
 
     if (!maskDef || !maskDef.visible || renderSize.width === 0) {
       setMaskOverlayUrl(null);
@@ -1013,23 +1040,19 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
       const { patchesSentToBackend } = useEditorStore.getState();
 
-      const stripSubMasks = (subMasks: any[]) => {
+      const stripSubMasks = (subMasks: SubMask[]) => {
         if (!Array.isArray(subMasks)) return;
         subMasks.forEach((sm) => {
-          if (sm.id && sm.parameters && patchesSentToBackend.has(sm.id)) {
-            if (sm.parameters.mask_data_base64 !== undefined) sm.parameters.mask_data_base64 = null;
-            if (sm.parameters.maskDataBase64 !== undefined) sm.parameters.maskDataBase64 = null;
+          if (sm.id && patchesSentToBackend.has(sm.id)) {
+            if (sm.parameters.mask_data_base64 !== undefined) sm.parameters.mask_data_base64 = undefined;
+            if (sm.parameters.maskDataBase64 !== undefined) sm.parameters.maskDataBase64 = undefined;
           }
         });
       };
 
       const strippedAdjustments = structuredClone(jsAdjustments);
-      if (strippedAdjustments.masks) {
-        strippedAdjustments.masks.forEach((m: any) => stripSubMasks(m.subMasks));
-      }
-      if (strippedAdjustments.aiPatches) {
-        strippedAdjustments.aiPatches.forEach((p: any) => stripSubMasks(p.subMasks));
-      }
+      strippedAdjustments.masks.forEach((m: MaskContainer) => stripSubMasks(m.subMasks));
+      strippedAdjustments.aiPatches.forEach((p: AiPatch) => stripSubMasks(p.subMasks));
 
       const strippedMaskDef = structuredClone(maskDef);
       stripSubMasks(strippedMaskDef.subMasks);
@@ -1060,7 +1083,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   }, []);
 
   const requestMaskOverlay = useCallback(
-    (maskDef: any, renderSize: any, currentAdjustments: any) => {
+    (maskDef: MaskContainer | AiPatch | null, renderSize: RenderSize, currentAdjustments: Adjustments) => {
       pendingOverlayRequestRef.current = { maskDef, renderSize, jsAdjustments: currentAdjustments };
       processOverlayQueue();
     },
@@ -1068,12 +1091,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   );
 
   const handleLiveMaskPreview = useCallback(
-    (maskDef: any) => {
-      let normalizedDef = maskDef;
-      if (maskDef && !maskDef.adjustments) {
+    (maskDef: MaskContainer | AiPatch) => {
+      let normalizedDef: MaskContainer | AiPatch = maskDef;
+      if (!('adjustments' in maskDef)) {
         normalizedDef = {
           ...maskDef,
-          adjustments: {},
+          adjustments: { ...INITIAL_MASK_ADJUSTMENTS },
           opacity: 100,
         };
       }
@@ -1333,20 +1356,18 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       'lensVignetteEnabled',
     ];
 
-    const geometry: any = {};
+    const geometry: Record<string, unknown> = {};
     geometryKeys.forEach((k) => {
-      geometry[k] = (adjustments as any)[k];
+      geometry[k] = adjustments[k];
     });
 
-    const subMasks = activeMaskDef.subMasks.map((sm: any) => {
+    const subMasks = activeMaskDef.subMasks.map((sm: SubMask) => {
       const { parameters, ...rest } = sm;
       const cleanParams = { ...parameters };
-      const maskDataFingerprint = cleanParams.mask_data_base64
-        ? `${cleanParams.mask_data_base64.length}-${cleanParams.mask_data_base64.slice(-20)}`
-        : null;
-      const maskDataCamelFingerprint = cleanParams.maskDataBase64
-        ? `${cleanParams.maskDataBase64.length}-${cleanParams.maskDataBase64.slice(-20)}`
-        : null;
+      const maskData = typeof cleanParams.mask_data_base64 === 'string' ? cleanParams.mask_data_base64 : '';
+      const maskDataCamel = typeof cleanParams.maskDataBase64 === 'string' ? cleanParams.maskDataBase64 : '';
+      const maskDataFingerprint = maskData ? `${maskData.length}-${maskData.slice(-20)}` : null;
+      const maskDataCamelFingerprint = maskDataCamel ? `${maskDataCamel.length}-${maskDataCamel.slice(-20)}` : null;
       delete cleanParams.mask_data_base64;
       delete cleanParams.maskDataBase64;
       return {
@@ -1375,14 +1396,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   ]);
 
   useEffect(() => {
-    let maskDefForOverlay = null;
+    let maskDefForOverlay: AiPatch | MaskContainer | null = null;
 
     if (activePanel === Panel.Masks && activeMaskContainerId) {
       const activeMask = adjustments.masks.find((c: MaskContainer) => c.id === activeMaskContainerId);
       if (activeMask) {
         maskDefForOverlay = {
           ...activeMask,
-          adjustments: {},
+          adjustments: { ...INITIAL_MASK_ADJUSTMENTS },
         };
       }
     } else if (activePanel === Panel.Ai && activeAiPatchContainerId) {
@@ -1390,14 +1411,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
       if (activePatch) {
         maskDefForOverlay = {
           ...activePatch,
-          adjustments: {},
+          adjustments: { ...INITIAL_MASK_ADJUSTMENTS },
           opacity: 100,
         };
       }
     }
 
     requestMaskOverlay(maskDefForOverlay, imageRenderSize, adjustments);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     overlayTriggerHash,
     requestMaskOverlay,
@@ -1424,11 +1444,13 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
 
     const { aspectRatio, orientationSteps = 0, crop: currentAdjCrop, rotation = 0 } = adjustments;
     const effectiveRotation = liveRotation !== null ? liveRotation : rotation;
+    const prevParams = prevCropParams.current;
 
     const geometryChanged =
-      prevCropParams.current?.rotation !== rotation ||
-      prevCropParams.current?.aspectRatio !== aspectRatio ||
-      prevCropParams.current?.orientationSteps !== orientationSteps;
+      !prevParams ||
+      prevParams.rotation !== rotation ||
+      prevParams.aspectRatio !== aspectRatio ||
+      prevParams.orientationSteps !== orientationSteps;
 
     const isDraggingRotation = liveRotation !== null;
     const needsRecalc = currentAdjCrop === null || geometryChanged || isDraggingRotation;
@@ -1533,12 +1555,12 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
           let bestCrop = followedCrop;
 
           for (let i = 0; i < 10; i++) {
-            let mid = (low + high) / 2;
-            let cx = followedCrop.x + followedCrop.width / 2;
-            let cy = followedCrop.y + followedCrop.height / 2;
-            let nw = followedCrop.width * mid;
-            let nh = followedCrop.height * mid;
-            let testCrop = {
+            const mid = (low + high) / 2;
+            const cx = followedCrop.x + followedCrop.width / 2;
+            const cy = followedCrop.y + followedCrop.height / 2;
+            const nw = followedCrop.width * mid;
+            const nh = followedCrop.height * mid;
+            const testCrop = {
               unit: 'px' as const,
               x: cx - nw / 2,
               y: cy - nh / 2,
@@ -1855,14 +1877,14 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
         const expandEdge = (edge: 'L' | 'T' | 'R' | 'B', target: number) => {
           let low = 0,
             high = 1;
-          let startVal = edge === 'L' ? currL : edge === 'T' ? currT : edge === 'R' ? currR : currB;
+          const startVal = edge === 'L' ? currL : edge === 'T' ? currT : edge === 'R' ? currR : currB;
           let bestVal = startVal;
 
           for (let i = 0; i < 15; i++) {
-            let mid = (low + high) / 2;
-            let testVal = startVal + (target - startVal) * mid;
+            const mid = (low + high) / 2;
+            const testVal = startVal + (target - startVal) * mid;
 
-            let testCrop: PercentCrop = {
+            const testCrop: PercentCrop = {
               unit: '%',
               x: edge === 'L' ? testVal : currL,
               y: edge === 'T' ? testVal : currT,
@@ -1912,7 +1934,7 @@ export default function Editor({ onBackToLibrary, onContextMenu, onImageSelect, 
   );
 
   const handleCropComplete = useCallback(
-    (_: any, pc: PercentCrop) => {
+    (_: Crop, pc: PercentCrop) => {
       if (!pc.width || !pc.height || !selectedImage?.width) {
         return;
       }

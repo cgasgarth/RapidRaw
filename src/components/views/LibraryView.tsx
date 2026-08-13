@@ -10,6 +10,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
+import { type MouseEvent } from 'react';
 import { ImageFile, LibraryViewMode, ThumbnailAspectRatio, ThumbnailSize } from '../ui/AppProperties';
 import { GroupBadgeInfo, GroupId } from '../../utils/imageGrouping';
 
@@ -24,20 +25,20 @@ interface LibraryViewProps {
   setThumbnailAspectRatio: (ratio: ThumbnailAspectRatio) => void;
   setLibraryViewMode: (mode: LibraryViewMode) => void;
   handleClearSelection: () => void;
-  handleLibraryImageSingleClick: (...args: any) => void;
-  handleImageSelect: (...args: any) => void;
-  handleRate: (...args: any) => void;
-  handleThumbnailContextMenu: (...args: any) => void;
-  handleMainLibraryContextMenu: (...args: any) => void;
-  handleContinueSession: (...args: any) => void;
-  handleGoHome: (...args: any) => void;
-  handleOpenFolder: (...args: any) => void;
+  handleLibraryImageSingleClick: (path: string, event: MouseEvent) => void;
+  handleImageSelect: (path: string) => void;
+  handleRate: (rate: number) => void;
+  handleThumbnailContextMenu: (event: MouseEvent, path: string) => void;
+  handleMainLibraryContextMenu: (event: MouseEvent) => void;
+  handleContinueSession: () => void;
+  handleGoHome: () => void;
+  handleOpenFolder: () => void;
   handleImportClick: (path: string) => void;
   handleLibraryRefresh: () => Promise<void>;
   handleCopyAdjustments: () => void;
   handlePasteAdjustments: () => void;
   handleResetAdjustments: () => void;
-  requestThumbnails: any;
+  requestThumbnails: (paths: string[]) => void;
 }
 
 export default function LibraryView({

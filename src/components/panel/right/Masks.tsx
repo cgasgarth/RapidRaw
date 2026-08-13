@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import {
   Brush,
   BringToFront,
@@ -50,10 +51,39 @@ export enum ToolType {
 
 export interface MaskType {
   disabled: boolean;
-  icon: any;
+  icon: LucideIcon;
   id?: string;
   name: string;
-  type: Mask;
+  type: Mask | null;
+}
+
+export interface SubMaskParameters {
+  [key: string]: unknown;
+  centerX?: number;
+  centerY?: number;
+  radiusX?: number;
+  radiusY?: number;
+  rotation?: number;
+  feather?: number;
+  startX?: number;
+  startY?: number;
+  endX?: number;
+  endY?: number;
+  range?: unknown;
+  lines?: unknown;
+  flow?: unknown;
+  maskDataBase64?: string | null;
+  grow?: number;
+  isInitialDraw?: boolean;
+  targetX?: number;
+  targetY?: number;
+  tolerance?: number;
+  minDepth?: number;
+  maxDepth?: number;
+  minFade?: number;
+  maxFade?: number;
+  sourceX?: number;
+  sourceY?: number;
 }
 
 export interface SubMask {
@@ -62,7 +92,7 @@ export interface SubMask {
   mode: SubMaskMode;
   name?: string;
   opacity: number;
-  parameters?: any;
+  parameters: SubMaskParameters;
   type: Mask;
   visible: boolean;
 }
@@ -90,14 +120,14 @@ export function getMaskTypeName(mask: MaskType) {
   if (mask.type === Mask.QuickEraser && mask.name === 'Quick Erase') {
     return i18n.t('masks.types.quickErase');
   }
-  return formatMaskTypeName(mask.type);
+  return formatMaskTypeName(mask.type ?? '');
 }
 
 export function getSubMaskName(subMask: Pick<SubMask, 'name' | 'type'>) {
   return subMask.name?.trim() || formatMaskTypeName(subMask.type);
 }
 
-export const MASK_ICON_MAP: Record<Mask, any> = {
+export const MASK_ICON_MAP: Record<Mask, LucideIcon> = {
   [Mask.AiDepth]: BringToFront,
   [Mask.AiForeground]: User,
   [Mask.AiSky]: Cloud,
@@ -150,7 +180,7 @@ export const MASK_PANEL_CREATION_TYPES: Array<MaskType> = [
     icon: MoreHorizontal,
     id: 'others',
     name: 'Others',
-    type: null as any,
+    type: null,
   },
 ];
 
@@ -244,7 +274,7 @@ export const SUB_MASK_COMPONENT_TYPES: Array<MaskType> = [
     icon: MoreHorizontal,
     id: 'others',
     name: 'Others',
-    type: null as any,
+    type: null,
   },
 ];
 

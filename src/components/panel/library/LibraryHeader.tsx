@@ -37,13 +37,20 @@ import { useSettingsStore } from '../../../store/useSettingsStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { ADVANCED_QUERY_REGEX } from '../../../hooks/useSortedLibrary';
 
-function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = 'w-56' }: any) {
+interface DropdownMenuProps {
+  buttonContent: React.ReactNode;
+  buttonTitle: string;
+  children: React.ReactNode;
+  contentClassName?: string;
+}
+
+function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName = 'w-56' }: DropdownMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<any>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const handleClickOutside = (event: any) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && event.target instanceof Node && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     };
@@ -85,13 +92,13 @@ function DropdownMenu({ buttonContent, buttonTitle, children, contentClassName =
   );
 }
 
-interface SegmentedSwitchProps {
-  options: { id: string | number; label: string }[];
-  value: string | number;
-  onChange: (id: any) => void;
+interface SegmentedSwitchProps<T extends string | number> {
+  options: { id: T; label: string }[];
+  value: T;
+  onChange: (id: T) => void;
 }
 
-const SegmentedSwitch = ({ options, value, onChange }: SegmentedSwitchProps) => {
+const SegmentedSwitch = <T extends string | number>({ options, value, onChange }: SegmentedSwitchProps<T>) => {
   const [bubbleStyle, setBubbleStyle] = useState({});
   const isInitialAnimation = useRef(true);
 
@@ -143,7 +150,13 @@ const SegmentedSwitch = ({ options, value, onChange }: SegmentedSwitchProps) => 
   );
 };
 
-const RatingSegmentedSwitch = ({ rating, onChange, ratingFilterOptions }: any) => {
+interface RatingSegmentedSwitchProps {
+  rating: number;
+  onChange: (value: number) => void;
+  ratingFilterOptions: Array<{ value: number; label: string }>;
+}
+
+const RatingSegmentedSwitch = ({ rating, onChange, ratingFilterOptions }: RatingSegmentedSwitchProps) => {
   const [bubbleStyle, setBubbleStyle] = useState({});
   const isInitialAnimation = useRef(true);
 
@@ -185,7 +198,7 @@ const RatingSegmentedSwitch = ({ rating, onChange, ratingFilterOptions }: any) =
             activeIndex === 0 ? 'text-text-primary font-semibold' : 'text-text-secondary hover:text-text-primary',
           )}
         >
-          <span className="relative z-10">{ratingFilterOptions.find((o: any) => o.value === 0)?.label || 'All'}</span>
+          <span className="relative z-10">{ratingFilterOptions.find((o) => o.value === 0)?.label || 'All'}</span>
         </button>
 
         <button
@@ -196,7 +209,7 @@ const RatingSegmentedSwitch = ({ rating, onChange, ratingFilterOptions }: any) =
           )}
         >
           <span className="relative z-10">
-            {ratingFilterOptions.find((o: any) => o.value === -1)?.label || 'Unrated'}
+            {ratingFilterOptions.find((o) => o.value === -1)?.label || 'Unrated'}
           </span>
         </button>
 
@@ -210,7 +223,7 @@ const RatingSegmentedSwitch = ({ rating, onChange, ratingFilterOptions }: any) =
             {[...Array(5)].map((_, index) => {
               const starValue = index + 1;
               const isFilled = rating > 0 && starValue <= rating;
-              const optionLabel = ratingFilterOptions.find((o: any) => o.value === starValue)?.label;
+              const optionLabel = ratingFilterOptions.find((o) => o.value === starValue)?.label;
 
               return (
                 <button
@@ -238,7 +251,12 @@ const RatingSegmentedSwitch = ({ rating, onChange, ratingFilterOptions }: any) =
   );
 };
 
-export function SearchInput({ indexingProgress, isIndexing }: any) {
+interface SearchInputProps {
+  indexingProgress: { current?: number; total: number };
+  isIndexing: boolean;
+}
+
+export function SearchInput({ indexingProgress, isIndexing }: SearchInputProps) {
   const { t } = useTranslation();
   const { searchCriteria, setSearchCriteria } = useLibraryStore(
     useShallow((state) => ({ searchCriteria: state.searchCriteria, setSearchCriteria: state.setSearchCriteria })),
@@ -267,8 +285,14 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
   }, [searchFocusRequest]);
 
   useEffect(() => {
-    function handleClickOutside(event: any) {
-      if (containerRef.current && !containerRef.current.contains(event.target) && tags.length === 0 && !text) {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        containerRef.current &&
+        event.target instanceof Node &&
+        !containerRef.current.contains(event.target) &&
+        tags.length === 0 &&
+        !text
+      ) {
         setIsSearchActive(false);
       }
     }
@@ -279,14 +303,13 @@ export function SearchInput({ indexingProgress, isIndexing }: any) {
   }, [tags, text]);
 
   useEffect(() => {
-    if (contentRef.current) {
-      const timer = setTimeout(() => {
-        if (contentRef.current) {
-          setContentWidth(contentRef.current.scrollWidth);
-        }
-      }, 0);
-      return () => clearTimeout(timer);
-    }
+    if (!contentRef.current) return;
+    const timer = setTimeout(() => {
+      if (contentRef.current) {
+        setContentWidth(contentRef.current.scrollWidth);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [tags, text, isSearchActive]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -542,7 +565,7 @@ export function ViewOptionsDropdown({
     [t],
   );
 
-  const handleColorClick = (colorName: string, event: any) => {
+  const handleColorClick = (colorName: string, event: React.MouseEvent<HTMLButtonElement>) => {
     const { ctrlKey, metaKey, shiftKey } = event;
     const isCtrlPressed = ctrlKey || metaKey;
     const currentColors = filterCriteria.colors;
@@ -662,7 +685,10 @@ export function ViewOptionsDropdown({
               <SegmentedSwitch
                 options={metadataOptions}
                 value={appSettings?.exifOverlay || ExifOverlay.Off}
-                onChange={(val) => handleSettingsChange({ ...appSettings!, exifOverlay: val as ExifOverlay })}
+                onChange={(val) => {
+                  if (!appSettings) return;
+                  handleSettingsChange({ ...appSettings, exifOverlay: val });
+                }}
               />
             </div>
           </div>
@@ -691,7 +717,7 @@ export function ViewOptionsDropdown({
               <SegmentedSwitch
                 options={rawStatusOptions.map((o) => ({ id: o.key, label: o.label }))}
                 value={filterCriteria.rawStatus}
-                onChange={(val) => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rawStatus: val }))}
+                onChange={(val) => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rawStatus: val as RawStatus }))}
               />
             </div>
           </div>
@@ -704,7 +730,9 @@ export function ViewOptionsDropdown({
               <SegmentedSwitch
                 options={editedStatusOptions.map((o) => ({ id: o.key, label: o.label }))}
                 value={filterCriteria.editedStatus || EditedStatus.All}
-                onChange={(val) => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, editedStatus: val }))}
+                onChange={(val) =>
+                  setFilterCriteria((prev: FilterCriteria) => ({ ...prev, editedStatus: val as EditedStatus }))
+                }
               />
             </div>
           </div>
@@ -779,7 +807,7 @@ export function ViewOptionsDropdown({
                   <button
                     key={color.name}
                     data-tooltip={title}
-                    onClick={(e: any) => handleColorClick(color.name, e)}
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleColorClick(color.name, e)}
                     className="w-5 h-5 rounded-full focus:outline-hidden focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-surface transition-transform hover:scale-110"
                     role="menuitem"
                   >

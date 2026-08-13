@@ -1030,7 +1030,8 @@
       "or": "oder",
       "version": "Version {{version}}",
       "welcomeBack": "Willkommen zurück!",
-      "welcomeBackDesc": "Sitzung fortsetzen oder neu starten."
+      "welcomeBackDesc": "Sitzung fortsetzen oder neu starten.",
+      "photographer": "Timon Käch"
     },
     "status": {
       "downloading": "Wird heruntergeladen {{status}}...",

@@ -3,7 +3,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { useTranslation, Trans } from 'react-i18next';
 import {
   RotateCcw,
-  Search,
   Check,
   Info,
   Loader,
@@ -23,7 +22,7 @@ import Dropdown from '../ui/Dropdown';
 import Switch from '../ui/Switch';
 import throttle from 'lodash.throttle';
 import { Adjustments } from '../../utils/adjustments';
-import { SelectedImage } from '../ui/AppProperties';
+import { AppSettings, ExifData, SelectedImage } from '../ui/AppProperties';
 import clsx from 'clsx';
 import Text from '../ui/Text';
 import { TextColors, TextVariants } from '../../types/typography';
@@ -103,19 +102,19 @@ const DEFAULT_PARAMS: LensParams = {
   lensDistortionParams: null,
 };
 
-const parseFocalLength = (exif: any): number | null => {
+const parseFocalLength = (exif: ExifData | null | undefined): number | null => {
   if (!exif || !exif.FocalLength) return null;
   const val = parseFloat(exif.FocalLength);
   return isNaN(val) ? null : val;
 };
 
-const parseAperture = (exif: any): number | null => {
+const parseAperture = (exif: ExifData | null | undefined): number | null => {
   if (!exif || !exif.FNumber) return null;
   const val = parseFloat(exif.FNumber);
   return isNaN(val) ? null : val;
 };
 
-const parseDistance = (exif: any): number | null => {
+const parseDistance = (exif: ExifData | null | undefined): number | null => {
   if (!exif || !exif.SubjectDistance) return null;
   const val = parseFloat(exif.SubjectDistance);
   return isNaN(val) ? null : val;
@@ -235,7 +234,7 @@ export default function LensCorrectionModal({
 
   const fetchDistortionParams = async (maker: string, model: string) => {
     try {
-      const distParams: any = await invoke('get_lens_distortion_params', {
+      const distParams = await invoke<LensParams['lensDistortionParams']>('get_lens_distortion_params', {
         maker,
         model,
         focalLength: focalLength,
@@ -299,8 +298,8 @@ export default function LensCorrectionModal({
       setIsMounted(true);
       const timer = setTimeout(() => setShow(true), 10);
 
-      invoke('load_settings').then((settings: any) => {
-        if (settings?.myLenses) {
+      invoke<AppSettings>('load_settings').then((settings) => {
+        if (settings.myLenses) {
           setMyLenses(settings.myLenses);
         }
       });
@@ -324,12 +323,12 @@ export default function LensCorrectionModal({
       updatePreview(initParams);
 
       invoke('get_lensfun_makers')
-        .then((m: any) => setMakers(m))
+        .then((m) => setMakers(m as string[]))
         .catch(console.error);
 
       if (initParams.lensMaker) {
         invoke('get_lensfun_lenses_for_maker', { maker: initParams.lensMaker })
-          .then((l: any) => setLenses(l))
+          .then((l) => setLenses(l as string[]))
           .catch(console.error);
       }
 
@@ -357,7 +356,7 @@ export default function LensCorrectionModal({
     setDetectionStatus('idle');
 
     invoke('get_lensfun_lenses_for_maker', { maker })
-      .then((l: any) => setLenses(l))
+      .then((l) => setLenses(l as string[]))
       .catch(console.error);
 
     updatePreview(newParams);
@@ -386,7 +385,7 @@ export default function LensCorrectionModal({
     setDetectionStatus('idle');
 
     invoke('get_lensfun_lenses_for_maker', { maker: selected.maker })
-      .then((l: any) => setLenses(l))
+      .then((l) => setLenses(l as string[]))
       .catch(console.error);
 
     const distortionParams = await fetchDistortionParams(selected.maker, selected.model);
@@ -429,7 +428,7 @@ export default function LensCorrectionModal({
         const [detectedMaker, detectedModel] = result;
 
         invoke('get_lensfun_lenses_for_maker', { maker: detectedMaker })
-          .then((l: any) => setLenses(l))
+          .then((l) => setLenses(l as string[]))
           .catch(console.error);
 
         const distortionParams = await fetchDistortionParams(detectedMaker, detectedModel);
@@ -524,7 +523,7 @@ export default function LensCorrectionModal({
         params: fullParams,
         jsAdjustments: currentAdjustments,
         showLines: false,
-      }).then((result: any) => setPreviewUrl(result));
+      }).then((result) => setPreviewUrl(result as string));
     } else {
       updatePreview(params);
     }
@@ -548,31 +547,6 @@ export default function LensCorrectionModal({
       value: i.toString(),
     }));
   }, [myLenses, t]);
-
-  const autoDetectButtonContent = () => {
-    switch (detectionStatus) {
-      case 'detecting':
-        return (
-          <>
-            <Loader size={16} className="animate-spin" /> {t('modals.lensCorrection.detecting')}
-          </>
-        );
-      case 'not_found':
-        return t('modals.lensCorrection.notFound');
-      case 'success':
-        return (
-          <>
-            <Check size={16} /> {t('modals.lensCorrection.lensFound')}
-          </>
-        );
-      default:
-        return (
-          <>
-            <Search size={16} /> {t('modals.lensCorrection.autoDetectLens')}
-          </>
-        );
-    }
-  };
 
   const handleModeChange = (mode: 'auto' | 'manual') => {
     const newParams = { ...params, lensCorrectionMode: mode };

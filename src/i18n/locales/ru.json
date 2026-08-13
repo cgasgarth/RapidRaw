@@ -1078,7 +1078,8 @@
       "or": "или",
       "version": "Версия {{version}}",
       "welcomeBack": "С возвращением!",
-      "welcomeBackDesc": "Продолжите работу с прошлого сеанса или начните новый."
+      "welcomeBackDesc": "Продолжите работу с прошлого сеанса или начните новый.",
+      "photographer": "Timon Käch"
     },
     "status": {
       "downloading": "Загрузка {{status}}...",

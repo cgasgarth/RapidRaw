@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { X, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Invokes } from '../components/ui/AppProperties';
+import { AppSettings, Invokes } from '../components/ui/AppProperties';
 import Text from '../components/ui/Text';
 import { TextVariants } from '../types/typography';
 
@@ -11,14 +11,14 @@ interface TaggingSubMenuProps {
   paths: string[];
   initialTags: { tag: string; isUser: boolean }[];
   onTagsChanged: (paths: string[], newTags: { tag: string; isUser: boolean }[]) => void;
-  appSettings: any;
+  appSettings: AppSettings | null;
   hideContextMenu: () => void;
 }
 
 const USER_TAG_PREFIX = 'user:';
 
 const tagVariants = {
-  visible: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 500, damping: 30 } },
+  visible: { opacity: 1, scale: 1, transition: { type: 'spring' as const, stiffness: 500, damping: 30 } },
   exit: { opacity: 0, scale: 0.8, transition: { duration: 0.15 } },
 };
 

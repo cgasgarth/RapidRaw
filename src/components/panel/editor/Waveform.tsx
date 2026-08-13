@@ -4,10 +4,11 @@ import { AlertOctagon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { WaveformData } from '../../ui/AppProperties';
 import { DisplayMode } from '../../../utils/adjustments';
+import { ChannelConfig } from '../../adjustments/Curves';
 
 interface WaveformProps {
   waveformData: WaveformData | null;
-  histogram?: any;
+  histogram?: ChannelConfig | null;
   displayMode: string;
   setDisplayMode: (mode: string) => void;
   showClipping?: boolean;
@@ -53,12 +54,12 @@ const modeButtons = [
   },
 ];
 
-const HistogramView = ({ histogram }: { histogram: any }) => {
-  if (!histogram || !histogram.red || !histogram.green || !histogram.blue) return null;
+const HistogramView = ({ histogram }: { histogram: ChannelConfig | null | undefined }) => {
+  if (!histogram) return null;
 
-  const redMax = Math.max(...(histogram.red || [0]));
-  const greenMax = Math.max(...(histogram.green || [0]));
-  const blueMax = Math.max(...(histogram.blue || [0]));
+  const redMax = Math.max(...histogram.red);
+  const greenMax = Math.max(...histogram.green);
+  const blueMax = Math.max(...histogram.blue);
   const globalMax = Math.max(redMax, greenMax, blueMax, 1);
 
   const getFill = (data: number[]) => {
@@ -83,7 +84,7 @@ const HistogramView = ({ histogram }: { histogram: any }) => {
       preserveAspectRatio="none"
     >
       {channels.map((ch) => {
-        if (!ch.data || ch.data.length === 0) return null;
+        if (ch.data.length === 0) return null;
         return (
           <g key={ch.key} style={{ mixBlendMode: 'lighten' }}>
             <path d={getFill(ch.data)} fill={ch.color} fillOpacity={0.4} />

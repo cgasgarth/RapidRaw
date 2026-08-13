@@ -1078,7 +1078,8 @@
       "or": "lub",
       "version": "Wersja {{version}}",
       "welcomeBack": "Witaj ponownie!",
-      "welcomeBackDesc": "Kontynuuj w miejscu, w którym skończyłeś, lub rozpocznij nową sesję."
+      "welcomeBackDesc": "Kontynuuj w miejscu, w którym skończyłeś, lub rozpocznij nową sesję.",
+      "photographer": "Timon Käch"
     },
     "status": {
       "downloading": "Pobieranie {{status}}...",
