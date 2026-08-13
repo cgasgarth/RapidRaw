@@ -76,7 +76,7 @@ interface VisibleProps {
   total: number;
 }
 
-const ALBUM_ICONS: Record<string, React.ElementType> = {
+const ALBUM_ICONS: Record<string, typeof Plane> = {
   plane: Plane,
   mountain: Mountain,
   sun: Sun,
@@ -98,7 +98,7 @@ const filterTree = (node: FolderTree | null, query: string): FolderTree | null =
   const lowerCaseQuery = query.toLowerCase();
   const isMatch = node.name.toLowerCase().includes(lowerCaseQuery);
 
-  if (!node.children || node.children.length === 0) {
+  if (node.children.length === 0) {
     return isMatch ? node : null;
   }
 
@@ -114,7 +114,7 @@ const filterTree = (node: FolderTree | null, query: string): FolderTree | null =
 };
 
 const getAutoExpandedPaths = (node: FolderTree, paths: Set<string>) => {
-  if (node.children && node.children.length > 0) {
+  if (node.children.length > 0) {
     paths.add(node.path);
     node.children.forEach((child: FolderTree) => getAutoExpandedPaths(child, paths));
   }
@@ -130,14 +130,12 @@ const filterAlbumTree = (node: AlbumItem | null, query: string): AlbumItem | nul
     return isMatch ? node : null;
   }
 
-  if (node.type === 'group') {
-    const filteredChildren = node.children
-      .map((child: AlbumItem) => filterAlbumTree(child, query))
-      .filter((child): child is AlbumItem => child !== null);
+  const filteredChildren = node.children
+    .map((child: AlbumItem) => filterAlbumTree(child, query))
+    .filter((child): child is AlbumItem => child !== null);
 
-    if (isMatch || filteredChildren.length > 0) {
-      return { ...node, children: filteredChildren };
-    }
+  if (isMatch || filteredChildren.length > 0) {
+    return { ...node, children: filteredChildren };
   }
 
   return null;
@@ -151,18 +149,17 @@ const getAutoExpandedAlbumGroups = (node: AlbumItem, groups: Set<string>) => {
 };
 
 const sortFolderTree = (nodes: FolderTree[], sort: FolderTreeSort): FolderTree[] => {
-  if (!nodes) return [];
   const sorted = [...nodes].sort((a, b) => {
     let comparison = 0;
     if (sort.key === 'name') comparison = a.name.localeCompare(b.name);
     else if (sort.key === 'modified') comparison = (a.modified || 0) - (b.modified || 0);
     else if (sort.key === 'created') comparison = (a.created || 0) - (b.created || 0);
-    else if (sort.key === 'imageCount') comparison = (a.imageCount || 0) - (b.imageCount || 0);
+    else comparison = (a.imageCount || 0) - (b.imageCount || 0);
     return sort.order === SortDirection.Ascending ? comparison : -comparison;
   });
   return sorted.map((node) => ({
     ...node,
-    children: node.children && node.children.length > 0 ? sortFolderTree(node.children, sort) : node.children,
+    children: node.children.length > 0 ? sortFolderTree(node.children, sort) : node.children,
   }));
 };
 
@@ -333,7 +330,7 @@ function AlbumTreeNode({
   const imageCount = getAlbumImageCount(item);
 
   let ItemIcon = isGroup ? (isExpanded ? FolderOpen : Folder) : AlbumIcon;
-  if (item.icon && ALBUM_ICONS[item.icon]) {
+  if (item.icon && item.icon in ALBUM_ICONS) {
     ItemIcon = ALBUM_ICONS[item.icon];
   }
   const iconKey = item.icon || (isGroup ? (isExpanded ? 'group-open' : 'group-closed') : 'album');
@@ -446,7 +443,7 @@ function TreeNode({
   isInstantTransition,
   folderIcons,
 }: TreeNodeProps) {
-  const hasChildren = node.hasSubdirs || (node.children && node.children.length > 0);
+  const hasChildren = node.hasSubdirs || node.children.length > 0;
   const isSelected = node.path === selectedPath;
   const isPinned = pinnedFolders.includes(node.path);
 
@@ -487,7 +484,7 @@ function TreeNode({
 
   const currentFolderIconKey = folderIcons[node.path];
   let ResolvedIcon = isExpanded ? FolderOpen : Folder;
-  if (currentFolderIconKey && ALBUM_ICONS[currentFolderIconKey]) {
+  if (currentFolderIconKey && currentFolderIconKey in ALBUM_ICONS) {
     ResolvedIcon = ALBUM_ICONS[currentFolderIconKey];
   }
   const iconKey = currentFolderIconKey || (isExpanded ? 'folder-open' : 'folder-closed');
@@ -558,7 +555,7 @@ function TreeNode({
       </div>
 
       <AnimatePresence initial={false}>
-        {hasChildren && isExpanded && node.children && node.children.length > 0 && (
+        {hasChildren && isExpanded && node.children.length > 0 && (
           <motion.div
             animate="open"
             className="pl-1 border-l-[1.5px] border-border-color/50 ml-3.75 overflow-hidden"
@@ -569,7 +566,7 @@ function TreeNode({
           >
             <div className="py-1">
               <AnimatePresence>
-                {node?.children?.map((childNode: any, index: number) => (
+                {node.children.map((childNode: any, index: number) => (
                   <motion.div
                     animate="visible"
                     custom={{ index, total: node.children.length }}
@@ -715,7 +712,9 @@ export default function FolderTree({
   const filteredAlbumTree = useMemo(() => {
     let base = albumTree;
     if (isSearching) {
-      base = base.map((item: any) => filterAlbumTree(item, trimmedQuery)).filter((t: any) => t !== null);
+      base = base
+        .map((item: any) => filterAlbumTree(item, trimmedQuery))
+        .filter((t: AlbumItem | null): t is AlbumItem => t !== null);
     }
     return base;
   }, [albumTree, trimmedQuery, isSearching]);
@@ -733,9 +732,9 @@ export default function FolderTree({
 
   useEffect(() => {
     if (isSearching && appSettings) {
-      const hasPinnedResults = filteredPinnedTrees && filteredPinnedTrees.length > 0;
-      const hasBaseResults = filteredTrees && filteredTrees.length > 0;
-      const hasAlbumResults = filteredAlbumTree && filteredAlbumTree.length > 0;
+      const hasPinnedResults = filteredPinnedTrees.length > 0;
+      const hasBaseResults = filteredTrees.length > 0;
+      const hasAlbumResults = filteredAlbumTree.length > 0;
 
       let newSections = [...openSections];
       let changed = false;
@@ -771,8 +770,8 @@ export default function FolderTree({
   const isCurrentOpen = openSections.includes('current');
   const isAlbumsOpen = openSections.includes('albums');
 
-  const hasVisiblePinnedTrees = filteredPinnedTrees && filteredPinnedTrees.length > 0;
-  const hasVisibleAlbums = filteredAlbumTree && filteredAlbumTree.length > 0;
+  const hasVisiblePinnedTrees = filteredPinnedTrees.length > 0;
+  const hasVisibleAlbums = filteredAlbumTree.length > 0;
   const showAlbumsSection = hasVisibleAlbums || (!isSearching && albumTree.length === 0);
 
   return (
@@ -960,7 +959,7 @@ export default function FolderTree({
               </>
             )}
 
-            {filteredTrees && filteredTrees.length > 0 && (
+            {filteredTrees.length > 0 && (
               <>
                 <div>
                   <SectionHeader
@@ -1048,7 +1047,7 @@ export default function FolderTree({
               </>
             )}
 
-            {!filteredTrees?.length && !hasVisiblePinnedTrees && !hasVisibleAlbums && isSearching && (
+            {!filteredTrees.length && !hasVisiblePinnedTrees && !hasVisibleAlbums && isSearching && (
               <Text className="p-2 text-center">{t('library.folders.noFoldersFound')}</Text>
             )}
 

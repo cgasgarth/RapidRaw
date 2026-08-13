@@ -449,8 +449,9 @@ const FilmstripList = ({
       const pathsToRequest: string[] = [];
 
       for (let i = allCells.columnStartIndex; i <= allCells.columnStopIndex; i++) {
+        if (i < 0 || i >= currentData.imageList.length) continue;
         const img = currentData.imageList[i];
-        if (img && !cached[img.path]) {
+        if (!(img.path in cached)) {
           pathsToRequest.push(img.path);
         }
       }
@@ -626,10 +627,8 @@ export default function Filmstrip({
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
-      if (entry) {
-        const { height, width } = entry.contentRect;
-        setSize((prev) => (prev.height === height && prev.width === width ? prev : { height, width }));
-      }
+      const { height, width } = entry.contentRect;
+      setSize((prev) => (prev.height === height && prev.width === width ? prev : { height, width }));
     });
     ro.observe(el);
     return () => ro.disconnect();

@@ -174,7 +174,7 @@ export default function CropPanel() {
   }, [setEditor]);
 
   const getEffectiveOriginalRatio = useCallback(() => {
-    if (!selectedImage?.width || !selectedImage?.height) {
+    if (!selectedImage?.width || !selectedImage.height) {
       return null;
     }
     const isSwapped = orientationSteps === 1 || orientationSteps === 3;
@@ -249,7 +249,7 @@ export default function CropPanel() {
         return;
       }
       let newCrop: Crop | null = null;
-      if (selectedImage?.width && selectedImage?.height) {
+      if (selectedImage?.width && selectedImage.height) {
         newCrop =
           calculateAreaPreservingCrop(
             selectedImage.width,
@@ -296,7 +296,7 @@ export default function CropPanel() {
     if (numW > 0 && numH > 0) {
       const newAspectRatio = numW / numH;
       lastSyncedRatio.current = newAspectRatio;
-      if (!adjustments?.aspectRatio || Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE) {
+      if (!adjustments.aspectRatio || Math.abs(adjustments.aspectRatio - newAspectRatio) > RATIO_TOLERANCE) {
         applyAspectRatio(newAspectRatio);
       }
     }
@@ -355,7 +355,7 @@ export default function CropPanel() {
 
   const handleReset = () => {
     const originalAspectRatio =
-      selectedImage?.width && selectedImage?.height ? selectedImage.width / selectedImage.height : null;
+      selectedImage?.width && selectedImage.height ? selectedImage.width / selectedImage.height : null;
 
     setPreferPortrait(false);
     setIsEditingCustom(false);
@@ -368,18 +368,18 @@ export default function CropPanel() {
       ...prev,
       aspectRatio: originalAspectRatio,
       crop: INITIAL_ADJUSTMENTS.crop,
-      flipHorizontal: INITIAL_ADJUSTMENTS.flipHorizontal ?? false,
-      flipVertical: INITIAL_ADJUSTMENTS.flipVertical ?? false,
-      orientationSteps: INITIAL_ADJUSTMENTS.orientationSteps ?? 0,
-      rotation: INITIAL_ADJUSTMENTS.rotation ?? 0,
-      transformDistortion: INITIAL_ADJUSTMENTS.transformDistortion ?? 0,
-      transformVertical: INITIAL_ADJUSTMENTS.transformVertical ?? 0,
-      transformHorizontal: INITIAL_ADJUSTMENTS.transformHorizontal ?? 0,
-      transformRotate: INITIAL_ADJUSTMENTS.transformRotate ?? 0,
-      transformAspect: INITIAL_ADJUSTMENTS.transformAspect ?? 0,
-      transformScale: INITIAL_ADJUSTMENTS.transformScale ?? 100,
-      transformXOffset: INITIAL_ADJUSTMENTS.transformXOffset ?? 0,
-      transformYOffset: INITIAL_ADJUSTMENTS.transformYOffset ?? 0,
+      flipHorizontal: INITIAL_ADJUSTMENTS.flipHorizontal,
+      flipVertical: INITIAL_ADJUSTMENTS.flipVertical,
+      orientationSteps: INITIAL_ADJUSTMENTS.orientationSteps,
+      rotation: INITIAL_ADJUSTMENTS.rotation,
+      transformDistortion: INITIAL_ADJUSTMENTS.transformDistortion,
+      transformVertical: INITIAL_ADJUSTMENTS.transformVertical,
+      transformHorizontal: INITIAL_ADJUSTMENTS.transformHorizontal,
+      transformRotate: INITIAL_ADJUSTMENTS.transformRotate,
+      transformAspect: INITIAL_ADJUSTMENTS.transformAspect,
+      transformScale: INITIAL_ADJUSTMENTS.transformScale,
+      transformXOffset: INITIAL_ADJUSTMENTS.transformXOffset,
+      transformYOffset: INITIAL_ADJUSTMENTS.transformYOffset,
       lensMaker: INITIAL_ADJUSTMENTS.lensMaker,
       lensModel: INITIAL_ADJUSTMENTS.lensModel,
       lensDistortionAmount: INITIAL_ADJUSTMENTS.lensDistortionAmount,
@@ -416,7 +416,7 @@ export default function CropPanel() {
       const newAspectRatio = prev.aspectRatio && prev.aspectRatio !== 0 ? 1 / prev.aspectRatio : null;
       const newOrientationSteps = ((prev.orientationSteps || 0) + increment) % 4;
       const newCrop =
-        selectedImage?.width && selectedImage?.height
+        selectedImage?.width && selectedImage.height
           ? calculateCenteredCrop(selectedImage.width, selectedImage.height, newOrientationSteps, newAspectRatio, 0)
           : null;
       return {

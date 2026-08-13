@@ -526,9 +526,9 @@ export function ViewOptionsDropdown({
 
   const isFilterActive =
     filterCriteria.rating !== 0 ||
-    (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) ||
+    filterCriteria.rawStatus !== RawStatus.All ||
     (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) ||
-    (filterCriteria.colors && filterCriteria.colors.length > 0);
+    filterCriteria.colors.length > 0;
 
   const [lastClickedColor, setLastClickedColor] = useState<string | null>(null);
   const allColors = useMemo(() => [...COLOR_LABELS, { name: 'none', color: '#9ca3af' }], []);
@@ -545,7 +545,7 @@ export function ViewOptionsDropdown({
   const handleColorClick = (colorName: string, event: any) => {
     const { ctrlKey, metaKey, shiftKey } = event;
     const isCtrlPressed = ctrlKey || metaKey;
-    const currentColors = filterCriteria.colors || [];
+    const currentColors = filterCriteria.colors;
 
     if (shiftKey && lastClickedColor) {
       const lastIndex = allColors.findIndex((c) => c.name === lastClickedColor);
@@ -690,7 +690,7 @@ export function ViewOptionsDropdown({
             <div className="px-3 mt-1">
               <SegmentedSwitch
                 options={rawStatusOptions.map((o) => ({ id: o.key, label: o.label }))}
-                value={filterCriteria.rawStatus || RawStatus.All}
+                value={filterCriteria.rawStatus}
                 onChange={(val) => setFilterCriteria((prev: FilterCriteria) => ({ ...prev, rawStatus: val }))}
               />
             </div>
@@ -768,7 +768,7 @@ export function ViewOptionsDropdown({
             </Text>
             <div className="flex flex-wrap gap-2.5 px-3 py-1.5">
               {allColors.map((color: Color) => {
-                const isSelected = (filterCriteria.colors || []).includes(color.name);
+                const isSelected = filterCriteria.colors.includes(color.name);
                 const title =
                   color.name === 'none'
                     ? t('library.header.viewOptions.noLabel')

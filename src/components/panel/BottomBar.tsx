@@ -201,7 +201,7 @@ export default function BottomBar({
 
   const percentInputRef = useRef<HTMLInputElement>(null);
   const [isZoomLabelHovered, setIsZoomLabelHovered] = useState(false);
-  const isZoomReady = !isLoading && originalSize && originalSize.width > 0 && displaySize && displaySize.width > 0;
+  const isZoomReady = !isLoading && originalSize.width > 0 && displaySize.width > 0;
 
   const currentOriginalPercent = isZoomReady
     ? (displaySize.width * (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)) / originalSize.width
@@ -497,7 +497,7 @@ export default function BottomBar({
 
                 <div className="flex items-center gap-1.5">
                   {allColors.map((color) => {
-                    const isSelected = (filterCriteria.colors || []).includes(color.name);
+                    const isSelected = filterCriteria.colors.includes(color.name);
 
                     const tooltipTitle =
                       color.name === 'none'
@@ -510,7 +510,7 @@ export default function BottomBar({
                       <button
                         key={`qf-color-${color.name}`}
                         onClick={() => {
-                          const currentColors = filterCriteria.colors || [];
+                          const currentColors = filterCriteria.colors;
                           const newColors = currentColors.includes(color.name)
                             ? currentColors.filter((c) => c !== color.name)
                             : [...currentColors, color.name];

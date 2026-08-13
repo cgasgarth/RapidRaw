@@ -167,7 +167,7 @@ export default function LibraryView({
             onNavigateToCommunity={() => setUI({ activeView: 'community' })}
           />
         )}
-        {rootPaths && rootPaths.length > 0 && (
+        {rootPaths.length > 0 && (
           <BottomBar
             isCopied={isCopied}
             isCopyDisabled={multiSelectedPaths.length !== 1}

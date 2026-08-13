@@ -81,7 +81,7 @@ export function useExternalEditSession(handleImageSelect: (path: string) => void
         exportSettings,
         outputFormat: session.format,
         currentEditPath: selectedImage.path,
-        currentEditAdjustments: adjustments || null,
+        currentEditAdjustments: adjustments,
       });
     } catch (error) {
       setIsFinishing(false);

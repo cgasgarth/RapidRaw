@@ -160,7 +160,7 @@ function getCurvePath(points: Array<Coord>) {
 }
 
 function getHistogramPath(data: Array<any>) {
-  if (!data || data.length === 0) return '';
+  if (data.length === 0) return '';
   const maxVal = Math.max(...data);
   if (maxVal === 0) return '';
 
@@ -172,7 +172,7 @@ function getHistogramPath(data: Array<any>) {
 }
 
 function getZeroHistogramPath(data: Array<any>) {
-  if (!data || data.length === 0) return '';
+  if (data.length === 0) return '';
   const pathData = data.map((_, index: number) => `${(index / 255) * 255},255`).join(' ');
   return `M0,255 L${pathData} L255,255 Z`;
 }
@@ -341,7 +341,7 @@ export default function CurveGraph({
           nextValue = Math.max(10, Math.min(nextValue, currentSettings.split2 - minGap));
         } else if (draggingSplitKey === 'split2') {
           nextValue = Math.max(currentSettings.split1 + minGap, Math.min(nextValue, currentSettings.split3 - minGap));
-        } else if (draggingSplitKey === 'split3') {
+        } else {
           nextValue = Math.max(currentSettings.split2 + minGap, Math.min(nextValue, 90));
         }
 

@@ -58,7 +58,7 @@ export function useTauriListeners({
           imageList:
             Object.keys(pendingEdits).length > 0
               ? state.imageList.map((img) =>
-                  pendingEdits[img.path] !== undefined ? { ...img, is_edited: pendingEdits[img.path] } : img,
+                  img.path in pendingEdits ? { ...img, is_edited: pendingEdits[img.path] } : img,
                 )
               : state.imageList,
         }));

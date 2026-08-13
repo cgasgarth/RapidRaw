@@ -180,10 +180,6 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
   const handleDownloadPreset = async (preset: CommunityPreset) => {
     setDownloadStatus((prev) => ({ ...prev, [preset.name]: 'downloading' }));
     try {
-      if (!preset.adjustments) {
-        throw new Error('Preset adjustments are missing.');
-      }
-
       await invoke(Invokes.SaveCommunityPreset, {
         name: preset.name,
         adjustments: preset.adjustments,
@@ -274,7 +270,7 @@ const CommunityPage = ({ onBackToLibrary, imageList, currentFolderPath }: Commun
             <AnimatePresence>
               {filteredAndSortedPresets.map((preset) => {
                 const previewUrl = previews[preset.name];
-                const status = downloadStatus[preset.name] || 'idle';
+                const status = downloadStatus[preset.name] ?? 'idle';
 
                 return (
                   <motion.div

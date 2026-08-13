@@ -279,7 +279,7 @@ export default function EffectsPanel({
                         defaultValue={40}
                         onChange={(e: any) => handleAdjustmentChange(Effect.LensBlurAmount, e.target.value)}
                         step={1}
-                        value={adjustments.lensBlurAmount ?? 50}
+                        value={adjustments.lensBlurAmount}
                         onDragStateChange={onDragStateChange}
                         fillOrigin="min"
                       />
@@ -291,22 +291,22 @@ export default function EffectsPanel({
                         defaultValue={0}
                         onChange={(e: any) => handleAdjustmentChange(Effect.lensBlurDiffusion, e.target.value)}
                         step={1}
-                        value={adjustments.lensBlurDiffusion ?? 0}
+                        value={adjustments.lensBlurDiffusion}
                         onDragStateChange={onDragStateChange}
                       />
 
                       <BokehShapeSwitch
-                        selectedShape={adjustments.lensBlurShape || 'circle'}
+                        selectedShape={adjustments.lensBlurShape}
                         onShapeChange={(shapeId) =>
                           setAdjustments((prev: Partial<Adjustments>) => ({ ...prev, [Effect.LensBlurShape]: shapeId }))
                         }
                       />
 
                       <DepthRangePicker
-                        minDepth={100 - (adjustments.lensBlurMaxDepth ?? 100)}
-                        maxDepth={100 - (adjustments.lensBlurMinDepth ?? 20)}
-                        minFade={adjustments.lensBlurMaxFade ?? 20}
-                        maxFade={adjustments.lensBlurMinFade ?? 20}
+                        minDepth={100 - adjustments.lensBlurMaxDepth}
+                        maxDepth={100 - adjustments.lensBlurMinDepth}
+                        minFade={adjustments.lensBlurMaxFade}
+                        maxFade={adjustments.lensBlurMinFade}
                         defaultMinDepth={0}
                         defaultMaxDepth={80}
                         defaultMinFade={20}

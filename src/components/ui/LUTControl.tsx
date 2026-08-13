@@ -149,7 +149,7 @@ export default function LUTControl({
               },
             ],
       });
-      const sourcePaths = Array.isArray(selected) ? selected : selected ? [selected] : [];
+      const sourcePaths = Array.isArray(selected) ? selected : [];
       if (sourcePaths.length === 0) return;
 
       let validPaths = sourcePaths;
@@ -259,7 +259,7 @@ export default function LUTControl({
                         }`}
                         data-tooltip={entry.name}
                       >
-                        {isLoadingPreviews && thumb === undefined ? (
+                        {isLoadingPreviews && !(entry.path in previews) ? (
                           <div className="w-full h-full animate-pulse bg-surface" />
                         ) : thumb ? (
                           <img src={thumb} alt={entry.name} className="w-full h-full object-cover" draggable={false} />

@@ -43,7 +43,7 @@ export function useWaveformControls() {
       const previousUserSelect = document.documentElement.style.userSelect;
 
       setIsResizingWaveform(true);
-      target.setPointerCapture?.(pointerId);
+      target.setPointerCapture(pointerId);
       document.documentElement.style.touchAction = 'none';
       document.documentElement.style.userSelect = 'none';
 
@@ -57,7 +57,7 @@ export function useWaveformControls() {
 
       const handlePointerUp = (upEvent: PointerEvent) => {
         if (upEvent.pointerId !== pointerId) return;
-        if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
+        if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
         setIsResizingWaveform(false);
         document.documentElement.style.touchAction = previousTouchAction;
         document.documentElement.style.userSelect = previousUserSelect;

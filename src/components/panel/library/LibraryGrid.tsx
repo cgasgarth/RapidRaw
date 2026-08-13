@@ -138,7 +138,7 @@ const groupImagesByFolder = (images: any[], baseFolderPath: string | null) => {
     const lastSep = physicalPath.lastIndexOf(separator);
     const dir = lastSep > -1 ? physicalPath.substring(0, lastSep) : physicalPath;
 
-    if (!groups[dir]) {
+    if (!(dir in groups)) {
       groups[dir] = [];
     }
     groups[dir].push(img);
@@ -204,12 +204,10 @@ export default function LibraryGrid(props: any) {
     if (el) {
       const ro = new ResizeObserver((entries) => {
         const entry = entries[0];
-        if (entry) {
-          const height = Math.round(entry.contentRect.height);
-          const width = Math.round(entry.contentRect.width);
+        const height = Math.round(entry.contentRect.height);
+        const width = Math.round(entry.contentRect.width);
 
-          setGridSize((prev) => (prev.height === height && prev.width === width ? prev : { height, width }));
-        }
+        setGridSize((prev) => (prev.height === height && prev.width === width ? prev : { height, width }));
       });
       ro.observe(el);
       gridObserverRef.current = ro;

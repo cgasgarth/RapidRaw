@@ -71,7 +71,7 @@ function CullingPreview({
 }) {
   const { t } = useTranslation();
   const thumbUrl = useProcessStore((s) => s.thumbnails[image.path]);
-  const initialPreview = useProcessStore((s) => s.previews[image.path]);
+  const initialPreview = useProcessStore((s) => (image.path in s.previews ? s.previews[image.path] : undefined));
   const setPreview = useProcessStore((s) => s.setPreview);
   const safeThumbKey = thumbUrl || '';
   const [highResSrc, setHighResSrc] = useState<string | null>(
@@ -227,22 +227,24 @@ function CullingPreview({
   }, [updateFitScale]);
 
   useEffect(() => {
-    const currentPreview = useProcessStore.getState().previews[image.path];
-    if (currentPreview && currentPreview.thumbKey === safeThumbKey) {
+    const previews = useProcessStore.getState().previews;
+    if (image.path in previews && previews[image.path].thumbKey === safeThumbKey) {
+      const currentPreview = previews[image.path];
       setHighResSrc(currentPreview.url);
       setIsLoading(false);
       setPreview(image.path, currentPreview.url, safeThumbKey);
       return;
     }
 
-    let active = true;
+    const cancelled: { current: boolean } = { current: false };
+    const isCancelled = () => cancelled.current;
     setIsLoading(true);
     setHighResSrc(null);
 
     const fetchPreviewWithAdjustments = async () => {
       try {
         const metadata: any = await invoke(Invokes.LoadMetadata, { path: image.path });
-        if (!active) return;
+        if (isCancelled()) return;
 
         const adjustments =
           metadata && metadata.adjustments && !metadata.adjustments.is_null ? metadata.adjustments : {};
@@ -251,37 +253,33 @@ function CullingPreview({
           path: image.path,
           jsAdjustments: adjustments,
         });
-        if (!active) return;
+        if (isCancelled()) return;
 
         const blob = new Blob([new Uint8Array(bytes)], { type: 'image/jpeg' });
         const localBlobUrl = URL.createObjectURL(blob);
 
         setPreview(image.path, localBlobUrl, safeThumbKey);
-
-        if (active) {
-          setHighResSrc(localBlobUrl);
-          setIsLoading(false);
-        }
+        setHighResSrc(localBlobUrl);
+        setIsLoading(false);
       } catch (err) {
         console.error('Error loading culling preview with adjustments:', err);
+        if (isCancelled()) return;
 
-        if (active) {
-          try {
-            const fallbackBytes = await invoke<Uint8Array>(Invokes.GeneratePreviewForPath, {
-              path: image.path,
-              jsAdjustments: {},
-            });
-            if (!active) return;
-            const blob = new Blob([new Uint8Array(fallbackBytes)], { type: 'image/jpeg' });
-            const localBlobUrl = URL.createObjectURL(blob);
+        try {
+          const fallbackBytes = await invoke<Uint8Array>(Invokes.GeneratePreviewForPath, {
+            path: image.path,
+            jsAdjustments: {},
+          });
+          if (isCancelled()) return;
+          const blob = new Blob([new Uint8Array(fallbackBytes)], { type: 'image/jpeg' });
+          const localBlobUrl = URL.createObjectURL(blob);
 
-            setPreview(image.path, localBlobUrl, safeThumbKey);
-            setHighResSrc(localBlobUrl);
-          } catch (fallbackErr) {
-            console.error('Fallback preview generation also failed:', fallbackErr);
-          }
-          setIsLoading(false);
+          setPreview(image.path, localBlobUrl, safeThumbKey);
+          setHighResSrc(localBlobUrl);
+        } catch (fallbackErr) {
+          console.error('Fallback preview generation also failed:', fallbackErr);
         }
+        setIsLoading(false);
       }
     };
 
@@ -290,7 +288,7 @@ function CullingPreview({
     }, 200);
 
     return () => {
-      active = false;
+      cancelled.current = true;
       clearTimeout(delayTimeout);
     };
   }, [image.path, safeThumbKey, setPreview]);
@@ -944,7 +942,7 @@ const Row = React.memo(
     const isSelected = multiSelectedPaths.includes(image.path);
 
     useEffect(() => {
-      if (!image || !queueThumbnailRequest) return;
+      if (!queueThumbnailRequest) return;
       queueThumbnailRequest(image.path);
 
       if (image.is_cloud_placeholder) {

@@ -132,7 +132,7 @@ export function DepthRangePicker({
 
     const target = e.currentTarget;
 
-    target.setPointerCapture?.(pointerId);
+    target.setPointerCapture(pointerId);
     document.documentElement.style.touchAction = 'none';
     document.documentElement.style.userSelect = 'none';
 
@@ -154,7 +154,7 @@ export function DepthRangePicker({
     const onUp = (upEvent: PointerEvent) => {
       if (upEvent.pointerId !== pointerId) return;
       setActiveHandle(null);
-      if (target.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId);
+      if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       onChange(latest);
       onDragStateChange?.(false);

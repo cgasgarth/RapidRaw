@@ -45,12 +45,12 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
   const isInteractiveSubmenu = Boolean(customOption);
 
   useLayoutEffect(() => {
-    if (parentRef?.current && menuRef?.current) {
+    if (parentRef.current && menuRef.current) {
       const parentRect = parentRef.current.getBoundingClientRect();
       const menuEl = menuRef.current;
 
-      const subMenuWidth = menuEl?.offsetWidth || 256;
-      const subMenuHeight = menuEl?.offsetHeight || 100;
+      const subMenuWidth = menuEl.offsetWidth || 256;
+      const subMenuHeight = menuEl.offsetHeight || 100;
 
       if (subMenuWidth === 0 || subMenuHeight === 0) {
         return;
@@ -135,7 +135,7 @@ function SubMenu({ cancelCloseSubmenu, closeSubmenu, hideContextMenu, options, p
           className={clsx('backdrop-blur-md rounded-lg shadow-xl', !CustomComponent && 'bg-surface/95 p-2 w-56')}
           role="menu"
         >
-          {CustomComponent && customOption ? (
+          {CustomComponent ? (
             <CustomComponent {...customOption.customProps} hideContextMenu={hideContextMenu} />
           ) : (
             options.map((option: any, index: number) => (
@@ -326,11 +326,11 @@ export function ContextMenuProvider({ children }: ContextMenuProviderProps) {
     const handleClickOutside = (event: any) => {
       const menuElements = document.querySelectorAll('[role="menu"]');
       let isClickInside = false;
-      menuElements.forEach((menuEl) => {
+      for (const menuEl of menuElements) {
         if (menuEl.contains(event.target)) {
           isClickInside = true;
         }
-      });
+      }
 
       if (!isClickInside) {
         hideContextMenu();

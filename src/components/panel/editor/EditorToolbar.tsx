@@ -183,7 +183,7 @@ const EditorToolbar = memo(
     const prevNamesRef = useRef<string[]>(['Initial State']);
 
     const historyNames = useMemo(() => {
-      if (!adjustmentsHistory || adjustmentsHistory.length === 0) return [];
+      if (adjustmentsHistory.length === 0) return [];
 
       const formatKey = (k: string) => {
         const special: Record<string, string> = {
@@ -610,7 +610,7 @@ const EditorToolbar = memo(
             </button>
 
             <AnimatePresence>
-              {isHistoryVisible && adjustmentsHistory && adjustmentsHistory.length > 1 && (
+              {isHistoryVisible && adjustmentsHistory.length > 1 && (
                 <motion.div
                   ref={historyContainerRef}
                   initial={{ opacity: 0, y: -10 }}

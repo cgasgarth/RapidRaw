@@ -298,8 +298,8 @@ const Slider = ({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
+      inputRef.current.focus();
+      inputRef.current.select();
     }
   }, [isEditing]);
 

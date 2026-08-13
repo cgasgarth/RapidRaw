@@ -327,7 +327,7 @@ const CloudDashboard = () => {
     fetchUsage();
   }, [getToken]);
 
-  const isPro = user?.publicMetadata?.plan === 'pro';
+  const isPro = user?.publicMetadata.plan === 'pro';
 
   return (
     <div className="space-y-4">
@@ -756,7 +756,7 @@ export default function SettingsPanel({
     onSettingsChange({ ...appSettings, myLenses: newLenses });
   };
 
-  const effectiveRootPaths = rootPaths?.length > 0 ? rootPaths : appSettings?.rootFolders || [];
+  const effectiveRootPaths = rootPaths.length > 0 ? rootPaths : appSettings?.rootFolders || [];
 
   const executeClearSidecars = async () => {
     setIsClearing(true);
@@ -2376,7 +2376,7 @@ export default function SettingsPanel({
                           {t('settings.controls.optimizationDesc')}
                         </Text>
                         <CanvasInputModeSwitch
-                          mode={(appSettings?.canvasInputMode as 'mouse' | 'trackpad') || 'mouse'}
+                          mode={appSettings?.canvasInputMode ?? 'mouse'}
                           onModeChange={(value) => onSettingsChange({ ...appSettings, canvasInputMode: value })}
                         />
                       </div>

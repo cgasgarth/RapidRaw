@@ -34,12 +34,12 @@ export function useThumbnails() {
     (visiblePaths: string[]) => {
       let addedToQueue = false;
 
-      visiblePaths.forEach((p) => {
+      for (const p of visiblePaths) {
         if (!generatedRef.current.has(p) && !pendingQueueRef.current.has(p)) {
           pendingQueueRef.current.add(p);
           addedToQueue = true;
         }
-      });
+      }
 
       if (addedToQueue) {
         flushQueueToBackend();

@@ -78,7 +78,7 @@ export default function GlobalTooltip() {
     };
 
     const handleMouseOver = (e: MouseEvent) => {
-      const el = (e.target as HTMLElement).closest?.('[data-tooltip]');
+      const el = (e.target as HTMLElement).closest('[data-tooltip]');
       if (!el || !(el instanceof HTMLElement)) return;
       if (el === targetRef.current) return;
 

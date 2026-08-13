@@ -248,7 +248,7 @@ export default function MetadataPanel() {
   const tags = selectedImage ? imageList.find((img) => img.path === selectedImage.path)?.tags || [] : [];
   const liveThumbnailUrl = selectedImage ? thumbnails[selectedImage.path] : undefined;
 
-  const targetPaths = multiSelectedPaths?.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
+  const targetPaths = multiSelectedPaths.length > 0 ? multiSelectedPaths : selectedImage ? [selectedImage.path] : [];
 
   const { cameraGridSettings, lensSetting, gpsData, otherExifEntries } = useMemo(() => {
     const exif = selectedImage?.exif || {};
@@ -338,7 +338,7 @@ export default function MetadataPanel() {
   const fileName = basePath.split(/[\\/]/).pop() || '';
   const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'FILE';
   const megapixels =
-    selectedImage?.width && selectedImage?.height
+    selectedImage?.width && selectedImage.height
       ? ((selectedImage.width * selectedImage.height) / 1000000).toFixed(1)
       : null;
 
@@ -393,7 +393,7 @@ export default function MetadataPanel() {
                 {t('editor.metadata.fileInfo.title')}
               </Text>
               <div className="bg-surface border border-surface rounded-xl p-3.5 flex flex-col gap-2 cursor-default relative min-h-[5.5rem] overflow-hidden">
-                {(liveThumbnailUrl || selectedImage?.thumbnailUrl) && (
+                {(liveThumbnailUrl || selectedImage.thumbnailUrl) && (
                   <div
                     className="absolute inset-y-0 right-0 w-2/3 pointer-events-none opacity-20"
                     style={{
@@ -457,11 +457,9 @@ export default function MetadataPanel() {
                         className="flex items-center gap-2 bg-surface border border-surface px-3 py-2 rounded-xl cursor-default"
                         data-tooltip={item.label}
                       >
-                        {Icon && (
-                          <span className="text-text-secondary opacity-90 flex items-center justify-center shrink-0">
-                            <Icon />
-                          </span>
-                        )}
+                        <span className="text-text-secondary opacity-90 flex items-center justify-center shrink-0">
+                          <Icon />
+                        </span>
                         <Text
                           as="span"
                           variant={TextVariants.small}
@@ -480,11 +478,9 @@ export default function MetadataPanel() {
                   className="flex items-center gap-2 bg-surface border border-surface px-3 py-2 rounded-xl cursor-default"
                   data-tooltip={lensSetting.label}
                 >
-                  {LensIcon && (
-                    <span className="text-text-secondary opacity-90 flex items-center justify-center shrink-0">
-                      <LensIcon />
-                    </span>
-                  )}
+                  <span className="text-text-secondary opacity-90 flex items-center justify-center shrink-0">
+                    <LensIcon />
+                  </span>
                   <Text
                     as="span"
                     variant={TextVariants.small}
@@ -531,7 +527,7 @@ export default function MetadataPanel() {
                     >
                       <div className="px-2 pb-3 pt-2 border-t border-surface/50 flex flex-col gap-0.5">
                         {EDITABLE_FIELDS.map((field) => {
-                          const rawValue = (selectedImage?.exif?.[field.key] as string) || '';
+                          const rawValue = (selectedImage.exif?.[field.key] as string) || '';
                           const cleanValue = rawValue.replace(/^"|"$/g, '').trim();
                           const displayValue = cleanValue.toLowerCase() === 'default' ? '' : cleanValue;
                           return (
@@ -739,7 +735,7 @@ export default function MetadataPanel() {
               </div>
             </div>
 
-            {hasGps && gpsData?.lat && gpsData?.lon && (
+            {hasGps && gpsData.lat && gpsData.lon && (
               <div>
                 <Text variant={TextVariants.heading} className="mb-3">
                   {t('editor.metadata.gps.title')}
@@ -770,8 +766,8 @@ export default function MetadataPanel() {
                     ></a>
                   </div>
                   <div className="flex flex-col gap-0.5">
-                    <MetadataItem label={t('editor.metadata.gps.latitude')} value={gpsData.lat?.toFixed(6)} />
-                    <MetadataItem label={t('editor.metadata.gps.longitude')} value={gpsData.lon?.toFixed(6)} />
+                    <MetadataItem label={t('editor.metadata.gps.latitude')} value={gpsData.lat.toFixed(6)} />
+                    <MetadataItem label={t('editor.metadata.gps.longitude')} value={gpsData.lon.toFixed(6)} />
                     {gpsData.altitude && (
                       <MetadataItem label={t('editor.metadata.gps.altitude')} value={`${gpsData.altitude} m`} />
                     )}

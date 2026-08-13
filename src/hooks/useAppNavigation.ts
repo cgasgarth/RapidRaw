@@ -138,7 +138,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
         compactEditorPanelHeightOverride: null,
       });
 
-      if (isFrontendCached) {
+      if (isFrontendCached && cached) {
         setEditor({
           selectedImage: {
             ...cached.selectedImage,
@@ -279,7 +279,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
             handleSettingsChange({ ...appSettings, lastRootPath: path } as any);
           }
         } else if (path && expandParents) {
-          const allRoots = [...(rootPaths || []), ...(pinnedFolders || [])].filter(Boolean) as string[];
+          const allRoots = [...rootPaths, ...(pinnedFolders || [])].filter(Boolean) as string[];
           const relevantRoot = allRoots.find((r) => path.startsWith(r));
 
           if (relevantRoot) {
@@ -326,9 +326,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
-          if (f.rating !== undefined) {
-            initialRatings[f.path] = f.rating;
-          }
+          initialRatings[f.path] = f.rating;
         });
         setLibrary({ imageRatings: initialRatings });
 
@@ -427,7 +425,7 @@ export function useAppNavigation({ clearThumbnailQueue, refs }: AppNavigationPro
 
         const initialRatings: Record<string, number> = {};
         files.forEach((f) => {
-          if (f.rating !== undefined) initialRatings[f.path] = f.rating;
+          initialRatings[f.path] = f.rating;
         });
 
         setLibrary({

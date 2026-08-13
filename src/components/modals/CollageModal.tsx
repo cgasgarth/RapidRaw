@@ -197,7 +197,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
 
   useEffect(() => {
     if (loadedImages.length > 0) {
-      const layoutsForCount = LAYOUTS[loadedImages.length] || [];
+      const layoutsForCount = LAYOUTS[loadedImages.length];
       setAvailableLayouts(layoutsForCount);
       if (activeLayout === null) {
         if (layoutsForCount.length > 0) {
@@ -274,9 +274,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
 
       loadedImages.forEach((image, index) => {
         const cell = activeLayout[index];
-        if (!cell) return;
         const img = imageElementsRef.current[image.path];
-        if (!img) return;
 
         const scaledSpacing = spacing * exportScale;
         const scaledRadius = borderRadius * exportScale;
@@ -306,7 +304,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
         ctx.roundRect(cellFinalX, cellFinalY, cellFinalWidth, cellFinalHeight, scaledRadius);
         ctx.clip();
 
-        const imageState = imageStates[image.path] || { offsetX: 0, offsetY: 0, scale: 1 };
+        const imageState = imageStates[image.path];
         const currentScale = imageState.scale || 1;
         const imageRatio = img.width / img.height;
         const cellRatio = cellFinalWidth / cellFinalHeight;
@@ -379,7 +377,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
   };
 
   const handleOrientationToggle = () => {
-    if (activeAspectRatio?.value && activeAspectRatio.value !== 1) {
+    if (activeAspectRatio.value && activeAspectRatio.value !== 1) {
       const newRatio = 1 / activeAspectRatio.value;
       setActiveAspectRatio((prev) => ({ ...prev, value: newRatio }));
       setExportHeight(Math.round(exportWidth / newRatio));
@@ -438,7 +436,7 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
     e.preventDefault();
 
     const path = loadedImages[index].path;
-    const currentState = imageStates[path] || { offsetX: 0, offsetY: 0, scale: 1 };
+    const currentState = imageStates[path];
 
     const oldScale = currentState.scale || 1;
     const scaleStep = 0.05;
@@ -447,7 +445,6 @@ export default function CollageModal({ isOpen, onClose, onSave, sourceImages }: 
 
     const img = imageElementsRef.current[path];
     const cell = activeLayout[index];
-    if (!img || !cell) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;

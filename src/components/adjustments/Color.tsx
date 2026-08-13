@@ -110,7 +110,7 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'3way' | 'global'>('3way');
   const [isExpanded, setIsExpanded] = useState(false);
-  const colorGrading = adjustments.colorGrading || INITIAL_ADJUSTMENTS.colorGrading;
+  const colorGrading = adjustments.colorGrading;
 
   const handleChange = (grading: ColorGrading, newValue: HueSatLum) => {
     setAdjustments((prev: Partial<Adjustments>) => ({
@@ -251,7 +251,7 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
                   defaultValue={INITIAL_ADJUSTMENTS.colorGrading.global}
                   label={t('adjustments.color.grading.global')}
                   onChange={(val: HueSatLum) => handleChange(ColorGrading.Global, val)}
-                  value={colorGrading.global || INITIAL_ADJUSTMENTS.colorGrading.global}
+                  value={colorGrading.global}
                   onDragStateChange={onDragStateChange}
                   isExpanded={isExpanded}
                 />
@@ -290,7 +290,7 @@ const ColorGradingPanel = ({ adjustments, setAdjustments, onDragStateChange }: C
 const ColorCalibrationPanel = ({ adjustments, setAdjustments, onDragStateChange }: ColorPanelProps) => {
   const { t } = useTranslation();
   const [activePrimary, setActivePrimary] = useState('red');
-  const colorCalibration = adjustments.colorCalibration || INITIAL_ADJUSTMENTS.colorCalibration;
+  const colorCalibration = adjustments.colorCalibration;
 
   const PRIMARY_COLORS = useMemo(
     () => [
@@ -435,7 +435,7 @@ export default function ColorPanel({
     [],
   );
 
-  const currentHsl = adjustments?.hsl?.[activeColor] || { hue: 0, saturation: 0, luminance: 0 };
+  const currentHsl = adjustments.hsl[activeColor];
   const baseHue = colorHueMap[activeColor] || 0;
   const effectiveHue = baseHue + (currentHsl.hue || 0);
 

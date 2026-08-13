@@ -271,7 +271,7 @@ export function useLibraryActions(handleImageSelect?: (path: string, openInEdito
     try {
       const updates: any = {};
 
-      if (rootPaths && rootPaths.length > 0) {
+      if (rootPaths.length > 0) {
         const treesData = await invoke(Invokes.GetPinnedFolderTrees, {
           paths: rootPaths,
           expandedFolders: expandedArray,

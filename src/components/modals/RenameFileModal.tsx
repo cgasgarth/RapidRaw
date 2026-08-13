@@ -73,8 +73,8 @@ export default function RenameFileModal({ filesToRename, isOpen, onClose, onSave
       return;
     }
     const input = nameInputRef.current;
-    const start = input?.selectionStart || 0;
-    const end = input?.selectionEnd || 0;
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
     const currentValue = input.value;
     const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
     setNameTemplate(newValue);

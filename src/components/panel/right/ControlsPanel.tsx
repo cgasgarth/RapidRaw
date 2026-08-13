@@ -95,7 +95,7 @@ export default function Controls() {
 
   const handleToggleVisibility = (sectionName: string) => {
     setAdjustments((prev: Adjustments) => {
-      const currentVisibility: SectionVisibility = prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+      const currentVisibility: SectionVisibility = prev.sectionVisibility;
       return {
         ...prev,
         sectionVisibility: {
@@ -139,9 +139,6 @@ export default function Controls() {
     event.stopPropagation();
 
     const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
-    if (!sectionKeys) {
-      return;
-    }
 
     const handleCopy = () => {
       const adjustmentsToCopy: any = {};
@@ -161,7 +158,7 @@ export default function Controls() {
         ...prev,
         ...copiedSectionAdjustments.values,
         sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
+          ...prev.sectionVisibility,
           [sectionName]: true,
         },
       }));
@@ -176,7 +173,7 @@ export default function Controls() {
         ...prev,
         ...resetValues,
         sectionVisibility: {
-          ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility),
+          ...prev.sectionVisibility,
           [sectionName]: true,
         },
       }));
@@ -283,7 +280,7 @@ export default function Controls() {
             }[sectionName];
 
             const title = t(`editor.adjustments.sections.${sectionName}`);
-            const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+            const sectionVisibility = adjustments.sectionVisibility;
 
             return (
               <div className="shrink-0 group" key={sectionName}>

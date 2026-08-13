@@ -51,7 +51,7 @@ export default function TitleBar() {
 
     updateMaximizedState();
 
-    let unlisten: () => void;
+    let unlisten = () => {};
     appWindow
       .onResized(() => {
         updateMaximizedState();
@@ -59,7 +59,7 @@ export default function TitleBar() {
       .then((u) => (unlisten = u));
 
     return () => {
-      if (unlisten) unlisten();
+      unlisten();
     };
   }, [appWindow]);
 

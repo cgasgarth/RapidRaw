@@ -364,8 +364,8 @@ export default function MasksPanel() {
   const { showContextMenu } = useContextMenu();
   const { presets } = usePresets(adjustments);
 
-  const activeContainer = adjustments.masks?.find((m) => m.id === activeMaskContainerId);
-  const activeSubMaskData = activeContainer?.subMasks?.find((sm) => sm.id === activeMaskId);
+  const activeContainer = adjustments.masks.find((m) => m.id === activeMaskContainerId);
+  const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeMaskId);
   const isAiMask =
     activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
 
@@ -385,7 +385,7 @@ export default function MasksPanel() {
 
   useEffect(() => {
     if (activeMaskContainerId) {
-      const containerExists = adjustments.masks?.some((m) => m.id === activeMaskContainerId);
+      const containerExists = adjustments.masks.some((m) => m.id === activeMaskContainerId);
       if (!containerExists) {
         onSelectContainer(null);
         onSelectMask(null);
@@ -394,12 +394,10 @@ export default function MasksPanel() {
   }, [adjustments.masks, activeMaskContainerId, onSelectContainer, onSelectMask]);
 
   useEffect(() => {
-    if (!hasPerformedInitialSelection.current && !activeMaskContainerId && adjustments.masks?.length > 0) {
+    if (!hasPerformedInitialSelection.current && !activeMaskContainerId && adjustments.masks.length > 0) {
       const lastMask = adjustments.masks[adjustments.masks.length - 1];
-      if (lastMask) {
-        onSelectContainer(lastMask.id);
-        onSelectMask(null);
-      }
+      onSelectContainer(lastMask.id);
+      onSelectMask(null);
     }
 
     if (activeMaskContainerId) {
@@ -417,7 +415,7 @@ export default function MasksPanel() {
       hasPerformedInitialSelection.current = true;
     }
 
-    if (activeMaskContainerId || adjustments.masks?.length > 0) {
+    if (activeMaskContainerId || adjustments.masks.length > 0) {
       setIsSettingsPanelEverOpened(true);
     }
   }, [activeMaskContainerId, activeMaskId, adjustments.masks, onSelectContainer, onSelectMask]);
@@ -458,17 +456,16 @@ export default function MasksPanel() {
     if (!selectedImage) return createSubMask(type, {} as any, mode);
     const subMask = createSubMask(type, selectedImage, mode);
 
-    const steps = adjustments?.orientationSteps || 0;
+    const steps = adjustments.orientationSteps || 0;
     const isRotated = steps === 1 || steps === 3;
     const imgW = isRotated ? selectedImage.height || 1000 : selectedImage.width || 1000;
     const imgH = isRotated ? selectedImage.width || 1000 : selectedImage.height || 1000;
 
-    if (type === Mask.Linear && subMask.parameters) {
+    if (type === Mask.Linear) {
       subMask.parameters.range = Math.min(imgW, imgH) * 0.1;
     }
 
     if (type === Mask.Linear || type === Mask.Radial || type === Mask.Color || type === Mask.Luminance) {
-      if (!subMask.parameters) subMask.parameters = {};
       subMask.parameters.isInitialDraw = true;
       if (type === Mask.Linear || type === Mask.Radial) {
         subMask.parameters.startX = -10000;
@@ -488,7 +485,6 @@ export default function MasksPanel() {
     }
 
     if (type === Mask.AiDepth) {
-      if (!subMask.parameters) subMask.parameters = {};
       subMask.parameters.minDepth = 20;
       subMask.parameters.maxDepth = 80;
       subMask.parameters.minFade = 15;
@@ -500,14 +496,14 @@ export default function MasksPanel() {
 
   const handleAddMaskContainer = (type: Mask) => {
     const subMask = createMaskLogic(type);
-    const count = (adjustments.masks?.length || 0) + 1;
+    const count = adjustments.masks.length + 1;
     const newContainer = {
       ...INITIAL_MASK_CONTAINER,
       id: uuidv4(),
       name: t('editor.masks.patches.maskName', { count }),
       subMasks: [subMask],
     };
-    setAdjustments((prev: Adjustments) => ({ ...prev, masks: [...(prev.masks || []), newContainer] }));
+    setAdjustments((prev: Adjustments) => ({ ...prev, masks: [...prev.masks, newContainer] }));
     onSelectContainer(newContainer.id);
     onSelectMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
@@ -526,7 +522,7 @@ export default function MasksPanel() {
     const subMask = createMaskLogic(type, mode);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
-      masks: prev.masks?.map((c: MaskContainer) => {
+      masks: prev.masks.map((c: MaskContainer) => {
         if (c.id === containerId) {
           const newSubMasks = [...c.subMasks];
           if (insertIndex >= 0) {
@@ -592,7 +588,7 @@ export default function MasksPanel() {
         },
       }));
 
-    const container = targetContainerId ? adjustments.masks?.find((m) => m.id === targetContainerId) : null;
+    const container = targetContainerId ? adjustments.masks.find((m) => m.id === targetContainerId) : null;
     const hasComponents = container && container.subMasks.length > 0;
 
     const buildModeSubmenu = (label: string, icon: any, mode: SubMaskMode) => ({
@@ -713,7 +709,7 @@ export default function MasksPanel() {
 
   const insertMaskContainer = (container: MaskContainer, insertIndex?: number) => {
     setAdjustments((prev: Adjustments) => {
-      const newMasks = [...(prev.masks || [])];
+      const newMasks = [...prev.masks];
       const targetIndex = Math.max(0, Math.min(insertIndex ?? newMasks.length, newMasks.length));
 
       newMasks.splice(targetIndex, 0, container);
@@ -815,7 +811,7 @@ export default function MasksPanel() {
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveDragItem(event.active.data.current as DragData);
-    if (onDragStateChange) onDragStateChange(true);
+    onDragStateChange(true);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -825,9 +821,9 @@ export default function MasksPanel() {
 
     if (dragData.type === 'Creation' && dragData.maskType) {
       const creationFn = () => {
-        if (overData?.type === 'Container') {
+        if (overData.type === 'Container') {
           handleAddSubMask(overData.item!.id, dragData.maskType!);
-        } else if (overData?.type === 'SubMask') {
+        } else if (overData.type === 'SubMask') {
           const container = adjustments.masks.find((m) => m.id === overData.parentId);
           if (container) {
             const targetIndex = container.subMasks.findIndex((sm) => sm.id === over.id);
@@ -838,19 +834,19 @@ export default function MasksPanel() {
         }
       };
 
-      if (adjustments.masks && adjustments.masks.length > 0) {
+      if (adjustments.masks.length > 0) {
         setPendingAction(() => creationFn);
       } else {
         creationFn();
       }
 
       setActiveDragItem(null);
-      if (onDragStateChange) onDragStateChange(false);
+      onDragStateChange(false);
       return;
     }
 
     setActiveDragItem(null);
-    if (onDragStateChange) onDragStateChange(false);
+    onDragStateChange(false);
 
     if (dragData.type === 'Container') {
       const overId = over?.id;
@@ -862,9 +858,9 @@ export default function MasksPanel() {
 
         if (overId === 'mask-list-root') {
           newIndex = prev.masks.length - 1;
-        } else if (overData?.type === 'Container') {
+        } else if (overData.type === 'Container') {
           newIndex = prev.masks.findIndex((m) => m.id === overId);
-        } else if (overData?.type === 'SubMask') {
+        } else if (overData.type === 'SubMask') {
           newIndex = prev.masks.findIndex((m) => m.id === overData.parentId);
         }
 
@@ -909,11 +905,9 @@ export default function MasksPanel() {
         return;
       }
 
-      if (!over) return;
-
       let targetContainerId: string | null = null;
-      if (overData?.type === 'Container') targetContainerId = overData.item!.id;
-      else if (overData?.type === 'SubMask' && overData.parentId) targetContainerId = overData.parentId;
+      if (overData.type === 'Container') targetContainerId = overData.item!.id;
+      else if (overData.type === 'SubMask' && overData.parentId) targetContainerId = overData.parentId;
 
       if (targetContainerId) {
         setAdjustments((prev: Adjustments) => {
@@ -928,7 +922,7 @@ export default function MasksPanel() {
           const [movedSubMask] = sourceContainer.subMasks.splice(sourceSubMaskIndex, 1);
 
           if (sourceContainerId === targetContainerId) {
-            if (overData?.type === 'SubMask') {
+            if (overData.type === 'SubMask') {
               const overSubMaskIndex = sourceContainer.subMasks.findIndex((sm) => sm.id === over.id);
               const insertIndex = overSubMaskIndex >= 0 ? overSubMaskIndex : sourceContainer.subMasks.length;
               sourceContainer.subMasks.splice(insertIndex, 0, movedSubMask);
@@ -936,7 +930,7 @@ export default function MasksPanel() {
               sourceContainer.subMasks.push(movedSubMask);
             }
           } else {
-            if (overData?.type === 'SubMask') {
+            if (overData.type === 'SubMask') {
               const overSubMaskIndex = targetContainer.subMasks.findIndex((sm) => sm.id === over.id);
               const insertIndex = overSubMaskIndex >= 0 ? overSubMaskIndex : targetContainer.subMasks.length;
               targetContainer.subMasks.splice(insertIndex, 0, movedSubMask);
@@ -1044,7 +1038,7 @@ export default function MasksPanel() {
           {selectedImage ? (
             <>
               <AnimatePresence mode="wait">
-                {!adjustments.masks || adjustments.masks.length === 0 ? (
+                {adjustments.masks.length === 0 ? (
                   <motion.div
                     key="empty-masks-grid"
                     initial={{ opacity: 0 }}
@@ -1060,7 +1054,7 @@ export default function MasksPanel() {
                     <div className="grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
                       {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
                         <DraggableGridItem
-                          key={maskType.type || maskType.id}
+                          key={maskType.type}
                           maskType={maskType}
                           onClick={(e: any) =>
                             maskType.id === 'others' ? handleAddOthersMask(e) : handleGridClick(maskType.type)
@@ -2031,7 +2025,6 @@ function SettingsPanel({
     event.stopPropagation();
 
     const sectionKeys = ADJUSTMENT_SECTIONS[sectionName];
-    if (!sectionKeys) return;
 
     const handleCopy = () => {
       const adjustmentsToCopy: Record<string, any> = {};

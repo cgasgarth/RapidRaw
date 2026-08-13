@@ -669,12 +669,8 @@ const deepCloneParametric = (pCurve: any): ParametricCurve => ({
 });
 
 export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any => {
-  if (!loadedAdjustments) {
-    return INITIAL_ADJUSTMENTS;
-  }
-
   const normalizeSubMasks = (subMasks: any[]) => {
-    return (subMasks || []).map((subMask: Partial<SubMask>) => ({
+    return subMasks.map((subMask: Partial<SubMask>) => ({
       visible: true,
       mode: SubMaskMode.Additive,
       invert: false,
@@ -683,8 +679,8 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     }));
   };
 
-  const normalizedMasks = (loadedAdjustments.masks || []).map((maskContainer: MaskContainer) => {
-    const containerAdjustments = maskContainer.adjustments || {};
+  const normalizedMasks = loadedAdjustments.masks.map((maskContainer: MaskContainer) => {
+    const containerAdjustments = maskContainer.adjustments;
     const normalizedSubMasks = normalizeSubMasks(maskContainer.subMasks);
 
     return {
@@ -694,13 +690,13 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
       adjustments: {
         ...INITIAL_MASK_ADJUSTMENTS,
         ...containerAdjustments,
-        flareAmount: containerAdjustments.flareAmount ?? INITIAL_MASK_ADJUSTMENTS.flareAmount,
-        glowAmount: containerAdjustments.glowAmount ?? INITIAL_MASK_ADJUSTMENTS.glowAmount,
-        halationAmount: containerAdjustments.halationAmount ?? INITIAL_MASK_ADJUSTMENTS.halationAmount,
-        hue: containerAdjustments.hue ?? INITIAL_MASK_ADJUSTMENTS.hue,
-        colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...(containerAdjustments.colorGrading || {}) },
-        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...(containerAdjustments.hsl || {}) },
-        curves: containerAdjustments.curves ? deepCloneCurves(containerAdjustments.curves) : getDefaultCurves(),
+        flareAmount: containerAdjustments.flareAmount,
+        glowAmount: containerAdjustments.glowAmount,
+        halationAmount: containerAdjustments.halationAmount,
+        hue: containerAdjustments.hue,
+        colorGrading: { ...INITIAL_MASK_ADJUSTMENTS.colorGrading, ...containerAdjustments.colorGrading },
+        hsl: { ...INITIAL_MASK_ADJUSTMENTS.hsl, ...containerAdjustments.hsl },
+        curves: deepCloneCurves(containerAdjustments.curves),
         pointCurves: containerAdjustments.pointCurves
           ? deepCloneCurves(containerAdjustments.pointCurves)
           : getDefaultCurves(),
@@ -710,15 +706,15 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
         curveMode: containerAdjustments.curveMode || INITIAL_MASK_ADJUSTMENTS.curveMode,
         sectionVisibility: {
           ...INITIAL_MASK_ADJUSTMENTS.sectionVisibility,
-          ...(containerAdjustments.sectionVisibility || {}),
+          ...containerAdjustments.sectionVisibility,
         },
-        sharpnessThreshold: containerAdjustments.sharpnessThreshold ?? INITIAL_MASK_ADJUSTMENTS.sharpnessThreshold,
+        sharpnessThreshold: containerAdjustments.sharpnessThreshold,
       },
       subMasks: normalizedSubMasks,
     };
   });
 
-  const normalizedAiPatches = (loadedAdjustments.aiPatches || []).map((patch: any) => ({
+  const normalizedAiPatches = loadedAdjustments.aiPatches.map((patch: any) => ({
     visible: true,
     ...patch,
     subMasks: normalizeSubMasks(patch.subMasks),
@@ -727,40 +723,40 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
   return {
     ...INITIAL_ADJUSTMENTS,
     ...loadedAdjustments,
-    flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
-    glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
-    halationAmount: loadedAdjustments.halationAmount ?? INITIAL_ADJUSTMENTS.halationAmount,
-    lensBlurAmount: loadedAdjustments.lensBlurAmount ?? INITIAL_ADJUSTMENTS.lensBlurAmount,
-    lensBlurDiffusion: loadedAdjustments.lensBlurDiffusion ?? INITIAL_ADJUSTMENTS.lensBlurDiffusion,
-    lensBlurShape: loadedAdjustments.lensBlurShape ?? INITIAL_ADJUSTMENTS.lensBlurShape,
+    flareAmount: loadedAdjustments.flareAmount,
+    glowAmount: loadedAdjustments.glowAmount,
+    halationAmount: loadedAdjustments.halationAmount,
+    lensBlurAmount: loadedAdjustments.lensBlurAmount,
+    lensBlurDiffusion: loadedAdjustments.lensBlurDiffusion,
+    lensBlurShape: loadedAdjustments.lensBlurShape,
     lensBlurDepthMap: loadedAdjustments.lensBlurDepthMap ?? INITIAL_ADJUSTMENTS.lensBlurDepthMap,
-    lensBlurEnabled: loadedAdjustments.lensBlurEnabled ?? INITIAL_ADJUSTMENTS.lensBlurEnabled,
-    lensBlurMaxDepth: loadedAdjustments.lensBlurMaxDepth ?? INITIAL_ADJUSTMENTS.lensBlurMaxDepth,
-    lensBlurMaxFade: loadedAdjustments.lensBlurMaxFade ?? INITIAL_ADJUSTMENTS.lensBlurMaxFade,
-    lensBlurMinDepth: loadedAdjustments.lensBlurMinDepth ?? INITIAL_ADJUSTMENTS.lensBlurMinDepth,
-    lensBlurMinFade: loadedAdjustments.lensBlurMinFade ?? INITIAL_ADJUSTMENTS.lensBlurMinFade,
-    lensCorrectionMode: loadedAdjustments.lensCorrectionMode || 'manual',
+    lensBlurEnabled: loadedAdjustments.lensBlurEnabled,
+    lensBlurMaxDepth: loadedAdjustments.lensBlurMaxDepth,
+    lensBlurMaxFade: loadedAdjustments.lensBlurMaxFade,
+    lensBlurMinDepth: loadedAdjustments.lensBlurMinDepth,
+    lensBlurMinFade: loadedAdjustments.lensBlurMinFade,
+    lensCorrectionMode: loadedAdjustments.lensCorrectionMode,
     lensMaker: loadedAdjustments.lensMaker ?? INITIAL_ADJUSTMENTS.lensMaker,
     lensModel: loadedAdjustments.lensModel ?? INITIAL_ADJUSTMENTS.lensModel,
-    lensDistortionAmount: loadedAdjustments.lensDistortionAmount ?? INITIAL_ADJUSTMENTS.lensDistortionAmount,
-    lensVignetteAmount: loadedAdjustments.lensVignetteAmount ?? INITIAL_ADJUSTMENTS.lensVignetteAmount,
-    lensTcaAmount: loadedAdjustments.lensTcaAmount ?? INITIAL_ADJUSTMENTS.lensTcaAmount,
-    lensDistortionEnabled: loadedAdjustments.lensDistortionEnabled ?? INITIAL_ADJUSTMENTS.lensDistortionEnabled,
-    lensTcaEnabled: loadedAdjustments.lensTcaEnabled ?? INITIAL_ADJUSTMENTS.lensTcaEnabled,
-    lensVignetteEnabled: loadedAdjustments.lensVignetteEnabled ?? INITIAL_ADJUSTMENTS.lensVignetteEnabled,
+    lensDistortionAmount: loadedAdjustments.lensDistortionAmount,
+    lensVignetteAmount: loadedAdjustments.lensVignetteAmount,
+    lensTcaAmount: loadedAdjustments.lensTcaAmount,
+    lensDistortionEnabled: loadedAdjustments.lensDistortionEnabled,
+    lensTcaEnabled: loadedAdjustments.lensTcaEnabled,
+    lensVignetteEnabled: loadedAdjustments.lensVignetteEnabled,
     lensDistortionParams: loadedAdjustments.lensDistortionParams ?? INITIAL_ADJUSTMENTS.lensDistortionParams,
-    transformDistortion: loadedAdjustments.transformDistortion ?? INITIAL_ADJUSTMENTS.transformDistortion,
-    transformVertical: loadedAdjustments.transformVertical ?? INITIAL_ADJUSTMENTS.transformVertical,
-    transformHorizontal: loadedAdjustments.transformHorizontal ?? INITIAL_ADJUSTMENTS.transformHorizontal,
-    transformRotate: loadedAdjustments.transformRotate ?? INITIAL_ADJUSTMENTS.transformRotate,
-    transformAspect: loadedAdjustments.transformAspect ?? INITIAL_ADJUSTMENTS.transformAspect,
-    transformScale: loadedAdjustments.transformScale ?? INITIAL_ADJUSTMENTS.transformScale,
-    transformXOffset: loadedAdjustments.transformXOffset ?? INITIAL_ADJUSTMENTS.transformXOffset,
-    transformYOffset: loadedAdjustments.transformYOffset ?? INITIAL_ADJUSTMENTS.transformYOffset,
-    colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...(loadedAdjustments.colorCalibration || {}) },
-    colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...(loadedAdjustments.colorGrading || {}) },
-    hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...(loadedAdjustments.hsl || {}) },
-    curves: loadedAdjustments.curves ? deepCloneCurves(loadedAdjustments.curves) : getDefaultCurves(),
+    transformDistortion: loadedAdjustments.transformDistortion,
+    transformVertical: loadedAdjustments.transformVertical,
+    transformHorizontal: loadedAdjustments.transformHorizontal,
+    transformRotate: loadedAdjustments.transformRotate,
+    transformAspect: loadedAdjustments.transformAspect,
+    transformScale: loadedAdjustments.transformScale,
+    transformXOffset: loadedAdjustments.transformXOffset,
+    transformYOffset: loadedAdjustments.transformYOffset,
+    colorCalibration: { ...INITIAL_ADJUSTMENTS.colorCalibration, ...loadedAdjustments.colorCalibration },
+    colorGrading: { ...INITIAL_ADJUSTMENTS.colorGrading, ...loadedAdjustments.colorGrading },
+    hsl: { ...INITIAL_ADJUSTMENTS.hsl, ...loadedAdjustments.hsl },
+    curves: deepCloneCurves(loadedAdjustments.curves),
     pointCurves: loadedAdjustments.pointCurves ? deepCloneCurves(loadedAdjustments.pointCurves) : getDefaultCurves(),
     parametricCurve: loadedAdjustments.parametricCurve
       ? deepCloneParametric(loadedAdjustments.parametricCurve)
@@ -770,9 +766,9 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
     aiPatches: normalizedAiPatches,
     sectionVisibility: {
       ...INITIAL_ADJUSTMENTS.sectionVisibility,
-      ...(loadedAdjustments.sectionVisibility || {}),
+      ...loadedAdjustments.sectionVisibility,
     },
-    sharpnessThreshold: loadedAdjustments.sharpnessThreshold ?? INITIAL_ADJUSTMENTS.sharpnessThreshold,
+    sharpnessThreshold: loadedAdjustments.sharpnessThreshold,
   };
 };
 

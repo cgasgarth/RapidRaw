@@ -65,9 +65,7 @@ export const useKeyboardShortcuts = ({
     for (const def of KEYBIND_DEFINITIONS) {
       const userCombo = keybinds?.[def.action];
       const effective = userCombo && userCombo.length > 0 ? userCombo : def.defaultCombo;
-      if (effective) {
-        comboMap.set(effective.join('+'), def.action);
-      }
+      comboMap.set(effective.join('+'), def.action);
     }
 
     const getImagePathsForCopy = (s: any): Array<string> => {
@@ -606,10 +604,8 @@ export const useKeyboardShortcuts = ({
           if (nextIndex >= sortedListRef.current.length) nextIndex = 0;
           if (nextIndex < 0) nextIndex = sortedListRef.current.length - 1;
           const nextImage = sortedListRef.current[nextIndex];
-          if (nextImage) {
-            s.library.setLibrary({ libraryActivePath: nextImage.path, multiSelectedPaths: [nextImage.path] });
-            handleImageSelect(nextImage.path, false);
-          }
+          s.library.setLibrary({ libraryActivePath: nextImage.path, multiSelectedPaths: [nextImage.path] });
+          handleImageSelect(nextImage.path, false);
         },
       },
     ];

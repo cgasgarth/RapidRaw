@@ -120,7 +120,7 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
     set((state) => {
       const newPreviews = { ...state.previews };
 
-      if (newPreviews[path] && newPreviews[path].url !== url) {
+      if (path in newPreviews && newPreviews[path].url !== url) {
         URL.revokeObjectURL(newPreviews[path].url);
       }
 

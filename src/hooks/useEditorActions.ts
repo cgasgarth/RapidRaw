@@ -52,7 +52,7 @@ export function useEditorActions() {
         adjustments.aspectRatio && adjustments.aspectRatio !== 0 ? 1 / adjustments.aspectRatio : null;
       const newOrientationSteps = ((adjustments.orientationSteps || 0) + increment) % 4;
       const newCrop =
-        selectedImage?.width && selectedImage?.height
+        selectedImage?.width && selectedImage.height
           ? calculateCenteredCrop(selectedImage.width, selectedImage.height, newOrientationSteps, newAspectRatio)
           : null;
 
@@ -96,7 +96,7 @@ export function useEditorActions() {
           lutName: name,
           lutSize: result.size,
           lutIntensity: 100,
-          sectionVisibility: { ...(prev.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility), effects: true },
+          sectionVisibility: { ...prev.sectionVisibility, effects: true },
         }));
       } catch (err) {
         toast.error(`Failed to load LUT: ${err}`);
@@ -195,7 +195,7 @@ export function useEditorActions() {
       const { appSettings } = useSettingsStore.getState();
       const { setProcess } = useProcessStore.getState();
 
-      if (!copiedAdjustments || !appSettings) return;
+      if (!copiedAdjustments || !appSettings?.copyPasteSettings) return;
 
       const { mode, includedAdjustments } = appSettings.copyPasteSettings;
       const adjustmentsToApply: Partial<Adjustments> = {};

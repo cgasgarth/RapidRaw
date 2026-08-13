@@ -52,23 +52,20 @@ export function useImageProcessing(
   }, [selectedImage?.path]);
 
   const geometricAdjustmentsKey = useMemo(() => {
-    if (!adjustments) return '';
     const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
     return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
   }, [
-    adjustments?.crop,
-    adjustments?.rotation,
-    adjustments?.flipHorizontal,
-    adjustments?.flipVertical,
-    adjustments?.orientationSteps,
+    adjustments.crop,
+    adjustments.rotation,
+    adjustments.flipHorizontal,
+    adjustments.flipVertical,
+    adjustments.orientationSteps,
   ]);
 
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
     const state = transformWrapperRef.current.instance.transformState;
     if (!state) return null;
-
-    if (!baseRenderSize) return null;
 
     const { scale, positionX, positionY } = state;
     const { width: baseW, height: baseH, offsetX, offsetY, containerWidth, containerHeight } = baseRenderSize;
@@ -150,7 +147,7 @@ export function useImageProcessing(
         });
       };
 
-      if (payload.aiPatches && Array.isArray(payload.aiPatches)) {
+      if (Array.isArray(payload.aiPatches)) {
         payload.aiPatches.forEach((p: any) => {
           if (p.id && p.patchData && !p.isLoading) {
             if (patchesSentToBackend.has(p.id)) {
@@ -163,7 +160,7 @@ export function useImageProcessing(
         });
       }
 
-      if (payload.masks && Array.isArray(payload.masks)) {
+      if (Array.isArray(payload.masks)) {
         payload.masks.forEach((container: any) => {
           if (container.subMasks) processSubMasks(container.subMasks);
         });
@@ -188,7 +185,7 @@ export function useImageProcessing(
 
         if (currentPath !== selectedImagePathRef.current) return;
 
-        if (buffer && buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
+        if (buffer.byteLength > 0 && jobId >= latestRenderedJobIdRef.current) {
           latestRenderedJobIdRef.current = jobId;
 
           const textDecoder = new TextDecoder();
@@ -327,7 +324,7 @@ export function useImageProcessing(
     let targetRes = Math.max(displaySize.width, displaySize.height) * effectiveDpr * sharpnessFactor * zoomMultiplier;
     targetRes = Math.max(targetRes, 512);
 
-    if (originalSize && originalSize.width > 0 && originalSize.height > 0) {
+    if (originalSize.width > 0 && originalSize.height > 0) {
       const origMax = Math.max(originalSize.width, originalSize.height);
       targetRes = Math.min(targetRes, origMax);
       if (targetRes >= origMax * 0.8) {
@@ -335,7 +332,7 @@ export function useImageProcessing(
       }
     }
 
-    if (originalSize && targetRes !== Math.max(originalSize.width, originalSize.height)) {
+    if (targetRes !== Math.max(originalSize.width, originalSize.height)) {
       targetRes = Math.ceil(targetRes / 256) * 256;
     }
 
@@ -445,7 +442,7 @@ export function useImageProcessing(
           const prev = prevAdjustmentsRef.current;
           if (prev && prev.path === selectedImage.path) {
             const delta: Partial<Adjustments> = {};
-            const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
+            const includedKeys = appSettings.copyPasteSettings.includedAdjustments;
             for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
               if (includedKeys.includes(key as string)) {
                 if (JSON.stringify(adjustments[key]) !== JSON.stringify(prev.adjustments[key])) {

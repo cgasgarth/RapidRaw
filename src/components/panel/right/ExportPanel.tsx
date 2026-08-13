@@ -544,7 +544,7 @@ export default function ExportPanel({
           exportSettings,
           outputFormat: selectedFormat.extensions[0],
           currentEditPath: selectedImage?.path || null,
-          currentEditAdjustments: adjustmentsRef.current || null,
+          currentEditAdjustments: adjustmentsRef.current,
         });
       }
     } catch (error) {
@@ -676,7 +676,7 @@ export default function ExportPanel({
                           className="w-24 bg-surface text-center rounded-md p-2 border border-surface focus:border-accent focus:ring-accent text-text-secondary focus:text-text-primary"
                           disabled={isExporting}
                           min="1"
-                          onChange={(e) => setResizeValue(parseInt(e?.target?.value))}
+                          onChange={(e) => setResizeValue(parseInt(e.target.value))}
                           type="number"
                           value={resizeValue}
                         />

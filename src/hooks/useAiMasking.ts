@@ -41,7 +41,7 @@ export function useAiMasking() {
           ...c,
           subMasks: c.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
         })),
-        aiPatches: (prev.aiPatches || []).map((p: AiPatch) => ({
+        aiPatches: prev.aiPatches.map((p: AiPatch) => ({
           ...p,
           subMasks: p.subMasks.map((sm: SubMask) => (sm.id === subMaskId ? { ...sm, ...updatedData } : sm)),
         })),
@@ -182,7 +182,7 @@ export function useAiMasking() {
         });
 
         const subMaskToUpdate = adjustments.aiPatches
-          ?.find((p: AiPatch) => p.id === patchId)
+          .find((p: AiPatch) => p.id === patchId)
           ?.subMasks.find((sm: SubMask) => sm.id === subMaskId);
         const finalSubMaskParams: any = { ...subMaskToUpdate?.parameters, ...newMaskParams };
         const updatedAdjustmentsForBackend = {
@@ -245,7 +245,7 @@ export function useAiMasking() {
       const { activeMaskContainerId } = useEditorStore.getState();
       setAdjustments((prev: Adjustments) => ({
         ...prev,
-        masks: (prev.masks || []).filter((c) => c.id !== containerId),
+        masks: prev.masks.filter((c) => c.id !== containerId),
       }));
       if (activeMaskContainerId === containerId) {
         setEditor({ activeMaskContainerId: null, activeMaskId: null });
@@ -259,7 +259,7 @@ export function useAiMasking() {
       const { activeAiPatchContainerId } = useEditorStore.getState();
       setAdjustments((prev: Adjustments) => ({
         ...prev,
-        aiPatches: (prev.aiPatches || []).filter((p) => p.id !== patchId),
+        aiPatches: prev.aiPatches.filter((p) => p.id !== patchId),
       }));
       if (activeAiPatchContainerId === patchId) {
         setEditor({ activeAiPatchContainerId: null, activeAiSubMaskId: null });
@@ -272,7 +272,7 @@ export function useAiMasking() {
     (patchId: string) => {
       setAdjustments((prev: Adjustments) => ({
         ...prev,
-        aiPatches: (prev.aiPatches || []).map((p: AiPatch) => (p.id === patchId ? { ...p, visible: !p.visible } : p)),
+        aiPatches: prev.aiPatches.map((p: AiPatch) => (p.id === patchId ? { ...p, visible: !p.visible } : p)),
       }));
     },
     [setAdjustments],
@@ -297,7 +297,7 @@ export function useAiMasking() {
       });
 
       const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
+        .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
@@ -331,7 +331,7 @@ export function useAiMasking() {
       });
 
       const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
+        .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
@@ -359,7 +359,7 @@ export function useAiMasking() {
       });
 
       const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
+        .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
@@ -387,7 +387,7 @@ export function useAiMasking() {
       });
 
       const subMask = adjustments.aiPatches
-        ?.flatMap((p: AiPatch) => p.subMasks)
+        .flatMap((p: AiPatch) => p.subMasks)
         .find((sm: SubMask) => sm.id === subMaskId);
       const mergedParameters = { ...(subMask?.parameters || {}), ...newParameters };
       patchesSentToBackend.delete(subMaskId);
@@ -402,8 +402,8 @@ export function useAiMasking() {
   useEffect(() => {
     const { activeMaskId, activeAiSubMaskId, adjustments, selectedImage } = useEditorStore.getState();
     const activeSubMask =
-      adjustments?.masks?.flatMap((m: MaskContainer) => m.subMasks).find((sm: SubMask) => sm.id === activeMaskId) ||
-      adjustments?.aiPatches?.flatMap((p: AiPatch) => p.subMasks).find((sm: SubMask) => sm.id === activeAiSubMaskId);
+      adjustments.masks.flatMap((m: MaskContainer) => m.subMasks).find((sm: SubMask) => sm.id === activeMaskId) ||
+      adjustments.aiPatches.flatMap((p: AiPatch) => p.subMasks).find((sm: SubMask) => sm.id === activeAiSubMaskId);
 
     if (activeSubMask?.type === 'ai-subject' && selectedImage?.path) {
       const transformAdjustments = getTransformAdjustments(adjustments);

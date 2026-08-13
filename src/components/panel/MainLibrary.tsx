@@ -257,8 +257,8 @@ export default function MainLibrary(props: MainLibraryProps) {
 
   const isBusy =
     props.isLoading ||
-    ((props.thumbnailProgress?.total ?? 0) > 0 &&
-      (props.thumbnailProgress?.current ?? 0) < (props.thumbnailProgress?.total ?? 0));
+    (props.thumbnailProgress.total > 0 &&
+      (props.thumbnailProgress.current ?? 0) < props.thumbnailProgress.total);
 
   useEffect(() => {
     let timer: number | undefined;
@@ -320,7 +320,7 @@ export default function MainLibrary(props: MainLibraryProps) {
     checkVersion();
   }, []);
 
-  if (!props.rootPaths || props.rootPaths.length === 0) {
+  if (props.rootPaths.length === 0) {
     if (!props.appSettings) {
       return null;
     }
@@ -361,7 +361,7 @@ export default function MainLibrary(props: MainLibraryProps) {
             </div>
 
             <div className="w-full h-full flex flex-col p-8 lg:p-16 overflow-y-auto custom-scrollbar relative z-10">
-              {isSettingsOpen && props.appSettings ? (
+              {isSettingsOpen ? (
                 <SettingsPanel
                   appSettings={props.appSettings}
                   onBack={() => setUI({ isSettingsOpen: false })}
@@ -536,13 +536,13 @@ export default function MainLibrary(props: MainLibraryProps) {
                 {isBusyLoaderMounted && <Loader2 size={14} className="animate-spin text-text-secondary shrink-0" />}
                 <div
                   className={`flex items-center transition-all duration-300 ease-out overflow-hidden ${
-                    isProgressHovered && isBusyDelayed && (props.thumbnailProgress?.total ?? 0) > 0
+                    isProgressHovered && isBusyDelayed && props.thumbnailProgress.total > 0
                       ? 'max-w-xs opacity-100'
                       : 'max-w-0 opacity-0'
                   }`}
                 >
                   <Text variant={TextVariants.small} color={TextColors.secondary} className="whitespace-nowrap">
-                    ({props.thumbnailProgress?.current ?? 0}/{props.thumbnailProgress?.total ?? 0})
+                    ({props.thumbnailProgress.current ?? 0}/{props.thumbnailProgress.total})
                   </Text>
                 </div>
               </div>
@@ -634,11 +634,11 @@ export default function MainLibrary(props: MainLibraryProps) {
                     total: props.indexingProgress.total,
                   })
                 : props.importState.status === Status.Importing &&
-                    props.importState?.progress?.total &&
+                    props.importState.progress?.total &&
                     props.importState.progress.total > 0
                   ? t('library.status.importing', {
-                      current: props.importState.progress?.current,
-                      total: props.importState.progress?.total,
+                      current: props.importState.progress.current,
+                      total: props.importState.progress.total,
                     })
                   : t('library.status.processing')}
           </Text>

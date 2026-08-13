@@ -269,9 +269,9 @@ function PresetItemDisplay({
   const { t } = useTranslation();
   const geometryKeys = ADJUSTMENT_GROUPS.geometry.flatMap((g) => g.keys);
 
-  const supportsMasks = preset.includeMasks ?? (preset.adjustments?.masks && preset.adjustments.masks.length > 0);
+  const supportsMasks = preset.includeMasks ?? (preset.adjustments.masks && preset.adjustments.masks.length > 0);
   const supportsGeometry =
-    preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments?.[key] !== undefined);
+    preset.includeCropTransform ?? geometryKeys.some((key) => preset.adjustments[key] !== undefined);
   const isTool = preset.presetType === 'tool';
   const tooltipContent = useMemo(() => {
     const features = [];
@@ -668,7 +668,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       } else if (item.folder) {
         map.set(item.folder.id, null);
         item.folder.children.forEach((p: UserPreset) => {
-          if (!item?.folder) {
+          if (!item.folder) {
             return;
           }
           map.set(p.id, item.folder.id);
@@ -771,7 +771,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
 
   const generateSinglePreview = useCallback(
     async (preset: Preset) => {
-      if (!selectedImage?.isReady || !preset) {
+      if (!selectedImage?.isReady) {
         return;
       }
 
@@ -849,7 +849,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
   useEffect(() => {
     const isPathChanged = selectedImage?.path !== currentImagePathRef.current;
 
-    if (isPathChanged || !selectedImage?.isReady) {
+    if (isPathChanged || !selectedImage.isReady) {
       Object.values(previewsRef.current).forEach((url) => {
         if (url && url.startsWith('blob:')) {
           URL.revokeObjectURL(url);
@@ -936,9 +936,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       }
     } else {
       const newPreset = addPreset(name, null, includeMasks, includeCropTransform, presetType);
-      if (newPreset) {
-        await generateSinglePreview(newPreset);
-      }
+      await generateSinglePreview(newPreset);
     }
     setConfigureModalState({ isOpen: false, preset: null });
   };
@@ -1297,7 +1295,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
                     >
                       <DroppableFolderItem
                         folder={item.folder}
-                        isExpanded={item.folder?.id ? expandedFolders.has(item.folder?.id) : false}
+                        isExpanded={item.folder?.id ? expandedFolders.has(item.folder.id) : false}
                         onContextMenu={(e: any) => handleContextMenu(e, item)}
                         onToggle={toggleFolder}
                       >

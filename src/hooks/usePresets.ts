@@ -212,7 +212,7 @@ export function usePresets(currentAdjustments: Adjustments) {
 
     if (!existingPreset) return null;
 
-    let newAdjustments: Record<string, any> = { ...existingPreset.adjustments };
+    const newAdjustments: Record<string, any> = { ...existingPreset.adjustments };
     const oldType = existingPreset.presetType || 'style';
 
     const GEOMETRY_KEYS = ADJUSTMENT_GROUPS.geometry.flatMap((group) => group.keys);
@@ -243,37 +243,24 @@ export function usePresets(currentAdjustments: Adjustments) {
       for (const k of GEOMETRY_KEYS) delete newAdjustments[k];
     }
 
-    let updatedPreset: Preset | null = null;
+    const updatedPreset: Preset = {
+      ...existingPreset,
+      name,
+      adjustments: newAdjustments,
+      includeMasks,
+      includeCropTransform,
+      presetType,
+    };
     const updatedPresets = presets.map((item: UserPreset) => {
       if (item.preset?.id === id) {
-        updatedPreset = {
-          ...item.preset,
-          name,
-          adjustments: newAdjustments,
-          includeMasks,
-          includeCropTransform,
-          presetType,
-        };
         return { preset: updatedPreset };
       }
       if (item.folder) {
-        let found = false;
-        const newChildren = item.folder.children.map((child: Preset) => {
-          if (child.id === id) {
-            found = true;
-            updatedPreset = {
-              ...child,
-              name,
-              adjustments: newAdjustments,
-              includeMasks,
-              includeCropTransform,
-              presetType,
-            };
-            return updatedPreset;
-          }
-          return child;
-        });
-        if (found) {
+        const childIndex = item.folder.children.findIndex((child: Preset) => child.id === id);
+        if (childIndex !== -1) {
+          const newChildren = item.folder.children.map((child: Preset) =>
+            child.id === id ? updatedPreset : child,
+          );
           return { folder: { ...item.folder, children: newChildren } };
         }
       }
@@ -309,12 +296,11 @@ export function usePresets(currentAdjustments: Adjustments) {
 
     const includeMasks =
       existingPreset.includeMasks ??
-      (existingPreset.adjustments?.masks && existingPreset.adjustments.masks.length > 0) ??
+      (existingPreset.adjustments.masks && existingPreset.adjustments.masks.length > 0) ??
       false;
     const includeCropTransform =
       existingPreset.includeCropTransform ??
-      GEOMETRY_KEYS.some((key) => existingPreset.adjustments?.[key] !== undefined) ??
-      false;
+      GEOMETRY_KEYS.some((key) => existingPreset.adjustments[key] !== undefined);
     const presetType = existingPreset.presetType || 'style';
 
     const presetAdjustments: Record<string, any> = {};
@@ -337,35 +323,23 @@ export function usePresets(currentAdjustments: Adjustments) {
       }
     }
 
-    let updatedPreset: Preset | null = null;
+    const updatedPreset: Preset = {
+      ...existingPreset,
+      adjustments: presetAdjustments,
+      includeMasks,
+      includeCropTransform,
+      presetType,
+    };
     const updatedPresets = presets.map((item: UserPreset) => {
       if (item.preset?.id === id) {
-        updatedPreset = {
-          ...item.preset,
-          adjustments: presetAdjustments,
-          includeMasks,
-          includeCropTransform,
-          presetType,
-        };
         return { preset: updatedPreset };
       }
       if (item.folder) {
-        let found = false;
-        const newChildren = item.folder.children.map((child: Preset) => {
-          if (child.id === id) {
-            found = true;
-            updatedPreset = {
-              ...child,
-              adjustments: presetAdjustments,
-              includeMasks,
-              includeCropTransform,
-              presetType,
-            };
-            return updatedPreset;
-          }
-          return child;
-        });
-        if (found) {
+        const childIndex = item.folder.children.findIndex((child: Preset) => child.id === id);
+        if (childIndex !== -1) {
+          const newChildren = item.folder.children.map((child: Preset) =>
+            child.id === id ? updatedPreset : child,
+          );
           return { folder: { ...item.folder, children: newChildren } };
         }
       }
@@ -435,7 +409,7 @@ export function usePresets(currentAdjustments: Adjustments) {
   );
 
   const movePreset = useCallback(
-    (presetId: string, targetFolderId: string | null, overId = null) => {
+    (presetId: string, targetFolderId: string | null, overId: string | null = null) => {
       let presetToMove: Preset | null = null;
       let sourceFolderId = null;
 
@@ -513,7 +487,7 @@ export function usePresets(currentAdjustments: Adjustments) {
     (activeId: string, overId: string) => {
       setPresets((currentPresets: Array<UserPreset>) => {
         const getIndex = (arr: Array<UserPreset>, id: string) =>
-          arr.findIndex((item: UserPreset) => item.preset?.id === id || item.folder?.id === id || item?.id === id);
+          arr.findIndex((item: UserPreset) => item.preset?.id === id || item.folder?.id === id || item.id === id);
 
         const activeRootIndex = getIndex(currentPresets, activeId);
         const overRootIndex = getIndex(currentPresets, overId);
@@ -534,7 +508,7 @@ export function usePresets(currentAdjustments: Adjustments) {
                 if (p.folder?.id === item.folder?.id) {
                   return {
                     folder: {
-                      ...p?.folder,
+                      ...p.folder,
                       children: arrayMove(p.folder?.children, activeChildIndex, overChildIndex),
                     },
                   };

@@ -237,12 +237,12 @@ export const useUIStore = create<UIState>((set, get) => ({
       const active = { ...state.activePanels };
 
       let fromRegion: PanelRegion | null = null;
-      (Object.keys(layout) as PanelRegion[]).forEach((r) => {
+      for (const r of Object.keys(layout) as PanelRegion[]) {
         if (layout[r].includes(panel)) {
           fromRegion = r;
           layout[r] = layout[r].filter((p) => p !== panel);
         }
-      });
+      }
 
       if (!layout[toRegion].includes(panel)) layout[toRegion].push(panel);
 
@@ -272,12 +272,12 @@ export const useUIStore = create<UIState>((set, get) => ({
       const active = { ...state.activePanels };
 
       let fromRegion: PanelRegion | null = null;
-      (Object.keys(layout) as PanelRegion[]).forEach((r) => {
+      for (const r of Object.keys(layout) as PanelRegion[]) {
         if (layout[r].includes(panel)) {
           fromRegion = r;
           layout[r] = layout[r].filter((p) => p !== panel);
         }
-      });
+      }
 
       const clampedIndex = Math.max(0, Math.min(index, layout[toRegion].length));
       layout[toRegion].splice(clampedIndex, 0, panel);
