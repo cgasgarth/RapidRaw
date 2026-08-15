@@ -171,6 +171,7 @@ export function useImageProcessing(
 
       const jobId = ++previewJobIdRef.current;
       const roi = calculateROI();
+      const renderKey = JSON.stringify(currentAdjustments);
 
       try {
         const buffer: ArrayBuffer = await invoke(Invokes.ApplyAdjustments, {
@@ -196,7 +197,11 @@ export function useImageProcessing(
           if (prefix === 'WGPU_RENDER') {
             setEditor((state) => {
               if (state.interactivePatch && state.interactivePatch.url) URL.revokeObjectURL(state.interactivePatch.url);
-              return { interactivePatch: null };
+              return {
+                interactivePatch: null,
+                previewRenderVersion: state.previewRenderVersion + 1,
+                lastRenderedAdjustmentKey: renderKey,
+              };
             });
             return;
           }
@@ -245,7 +250,11 @@ export function useImageProcessing(
                   }
                 }, 250);
               }
-              return { finalPreviewUrl: url };
+              return {
+                finalPreviewUrl: url,
+                previewRenderVersion: state.previewRenderVersion + 1,
+                lastRenderedAdjustmentKey: renderKey,
+              };
             });
 
             setEditor((state) => {

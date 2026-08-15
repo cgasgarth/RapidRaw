@@ -69,6 +69,26 @@ async function waitForHistogram(path: string): Promise<HistogramData> {
   throw new Error(`RapidRAW did not finish calculating the histogram for ${path}`);
 }
 
+async function waitForAdjustmentRender(
+  path: string,
+  previousRenderVersion: number,
+  adjustmentKey: string,
+): Promise<void> {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
+    const editor = useEditorStore.getState();
+    if (
+      editor.selectedImage?.path === path &&
+      editor.selectedImage.isReady &&
+      editor.previewRenderVersion > previousRenderVersion &&
+      editor.lastRenderedAdjustmentKey === adjustmentKey
+    ) {
+      return;
+    }
+    await wait(250);
+  }
+  throw new Error(`RapidRAW did not finish rendering the MCP adjustment for ${path}`);
+}
+
 async function syncState(path: string): Promise<McpStateResponse> {
   return invoke<McpStateResponse>('sync_editor_state', {
     path,
@@ -137,20 +157,24 @@ export function useMcpBridge(handleImageSelect: (path: string, openInEditor?: bo
           }
 
           const editor = useEditorStore.getState();
+          const previousRenderVersion = editor.previewRenderVersion;
+          let adjustmentKey: string;
           if (command.kind === 'reset-adjustments') {
             const image = editor.selectedImage;
             const aspectRatio = image && image.width > 0 && image.height > 0 ? image.width / image.height : null;
             const resetAdjustments = { ...INITIAL_ADJUSTMENTS, aspectRatio, aiPatches: [] };
             editor.resetHistory(resetAdjustments);
             editor.setEditor({ adjustments: resetAdjustments });
+            adjustmentKey = JSON.stringify(resetAdjustments);
           } else if (command.adjustments) {
             const nextAdjustments = normalizeMcpAdjustments(command.adjustments);
             editor.setEditor({ adjustments: nextAdjustments });
             editor.pushHistory(nextAdjustments);
+            adjustmentKey = JSON.stringify(nextAdjustments);
           } else {
             throw new Error('MCP adjustment command did not include adjustments');
           }
-          await wait(100);
+          await waitForAdjustmentRender(command.path, previousRenderVersion, adjustmentKey);
         }
 
         const response = await syncState(command.path);
