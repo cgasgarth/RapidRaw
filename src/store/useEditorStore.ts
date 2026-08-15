@@ -34,6 +34,8 @@ interface EditorState {
   // Previews & Overlays
   finalPreviewUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
+  previewRenderVersion: number;
+  lastRenderedAdjustmentKey: string | null;
   transformedOriginalUrl: string | null;
   interactivePatch: InteractivePatch | null;
   showOriginal: boolean;
@@ -97,6 +99,8 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   finalPreviewUrl: null,
   uncroppedAdjustedPreviewUrl: null,
+  previewRenderVersion: 0,
+  lastRenderedAdjustmentKey: null,
   showOriginal: false,
   histogram: null,
   waveform: null,
