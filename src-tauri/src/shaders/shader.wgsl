@@ -71,7 +71,7 @@ struct GlobalAdjustments {
     has_lut: u32,
     lut_intensity: f32,
     tonemapper_mode: u32,
-    _pad_lut2: f32,
+    lut_is_scene_referred: u32,
     _pad_lut3: f32,
     _pad_lut4: f32,
     _pad_lut5: f32,
@@ -241,6 +241,14 @@ fn linear_to_srgb_extended(c: vec3<f32>) -> vec3<f32> {
     let higher = (1.0 + a) * pow(safe_c, vec3<f32>(1.0 / 2.4)) - a;
     let lower = safe_c * 12.92;
     return select(higher, lower, safe_c <= cutoff);
+}
+
+fn linear_to_vlog(c: vec3<f32>) -> vec3<f32> {
+    let safe_c = max(c, vec3<f32>(0.0));
+    let low = 5.6 * safe_c + 0.125;
+    let log10_val = log2(safe_c + 0.00873) * 0.30102999566398;
+    let high = 0.241514 * log10_val + 0.598206;
+    return select(high, low, safe_c <= vec3<f32>(0.01));
 }
 
 fn rgb_to_hsv(c: vec3<f32>) -> vec3<f32> {
@@ -1812,18 +1820,28 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         }
     }
 
-    var base_srgb: vec3<f32>;
+    var default_tonemapped: vec3<f32>;
     if (adjustments.global.tonemapper_mode == 1u) {
-        base_srgb = agx_full_transform(composite_rgb_linear);
+        default_tonemapped = agx_full_transform(composite_rgb_linear);
     } else if (is_raw == 1u) {
         var srgb_emulated = linear_to_srgb(composite_rgb_linear);
         const BRIGHTNESS_GAMMA: f32 = 1.1;
         srgb_emulated = pow(srgb_emulated, vec3<f32>(1.0 / BRIGHTNESS_GAMMA));
         const CONTRAST_MIX: f32 = 0.75;
         let contrast_curve = srgb_emulated * srgb_emulated * (3.0 - 2.0 * srgb_emulated);
-        base_srgb = mix(srgb_emulated, contrast_curve, CONTRAST_MIX);
+        default_tonemapped = mix(srgb_emulated, contrast_curve, CONTRAST_MIX);
     } else {
-        base_srgb = linear_to_srgb(composite_rgb_linear);
+        default_tonemapped = linear_to_srgb(composite_rgb_linear);
+    }
+    var base_srgb: vec3<f32>;
+    let is_scene_lut = (adjustments.global.has_lut == 1u && adjustments.global.lut_is_scene_referred == 1u);
+
+    if (is_scene_lut) {
+        let vlog_encoded = linear_to_vlog(composite_rgb_linear);
+        let lut_color = sample_lut_tetrahedral(vlog_encoded);
+        base_srgb = mix(default_tonemapped, lut_color, adjustments.global.lut_intensity);
+    } else {
+        base_srgb = default_tonemapped;
     }
 
     var final_rgb = apply_all_curves(base_srgb,
@@ -1847,7 +1865,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         }
     }
 
-    if (adjustments.global.has_lut == 1u) {
+    if (adjustments.global.has_lut == 1u && adjustments.global.lut_is_scene_referred == 0u) {
         let lut_color = sample_lut_tetrahedral(final_rgb);
         final_rgb = mix(final_rgb, lut_color, adjustments.global.lut_intensity);
     }
