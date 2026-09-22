@@ -7,10 +7,11 @@ import {
   PanelRegion,
   WorkspaceState,
 } from '../components/ui/AppProperties';
+import { useEditorStore } from './useEditorStore';
 
 export type SwitcherPlacement = 'bottom' | 'right' | 'left' | 'top';
 
-export interface CollapsibleSectionsState {
+interface CollapsibleSectionsState {
   basic: boolean;
   color: boolean;
   curves: boolean;
@@ -18,7 +19,12 @@ export interface CollapsibleSectionsState {
   effects: boolean;
 }
 
-export interface ConfirmModalState {
+export interface CropSectionsState {
+  transform: boolean;
+  lens: boolean;
+}
+
+interface ConfirmModalState {
   confirmText?: string;
   confirmVariant?: string;
   isOpen: boolean;
@@ -27,12 +33,12 @@ export interface ConfirmModalState {
   title?: string;
 }
 
-export interface CollageModalState {
+interface CollageModalState {
   isOpen: boolean;
   sourceImages: Array<Pick<ImageFile, 'path'>>;
 }
 
-export interface PanoramaModalState {
+interface PanoramaModalState {
   error: string | null;
   finalImageBase64: string | null;
   isOpen: boolean;
@@ -41,7 +47,7 @@ export interface PanoramaModalState {
   stitchingSourcePaths: Array<string>;
 }
 
-export interface FocusStackModalState {
+interface FocusStackModalState {
   error: string | null;
   finalImageBase64: string | null;
   depthMapBase64: string | null;
@@ -51,7 +57,7 @@ export interface FocusStackModalState {
   sourcePaths: Array<string>;
 }
 
-export interface HdrModalState {
+interface HdrModalState {
   error: string | null;
   finalImageBase64: string | null;
   isOpen: boolean;
@@ -60,7 +66,7 @@ export interface HdrModalState {
   stitchingSourcePaths: Array<string>;
 }
 
-export interface DenoiseModalState {
+interface DenoiseModalState {
   isOpen: boolean;
   isProcessing: boolean;
   previewBase64: string | null;
@@ -71,12 +77,12 @@ export interface DenoiseModalState {
   isRaw: boolean;
 }
 
-export interface NegativeConversionModalState {
+interface NegativeConversionModalState {
   isOpen: boolean;
   targetPaths: Array<string>;
 }
 
-export interface CullingModalState {
+interface CullingModalState {
   isOpen: boolean;
   suggestions: CullingSuggestions | null;
   progress: { current: number; total: number; stage: string } | null;
@@ -84,7 +90,7 @@ export interface CullingModalState {
   pathsToCull: Array<string>;
 }
 
-export const ALL_PANELS: Panel[] = [
+const ALL_PANELS: Panel[] = [
   Panel.Metadata,
   Panel.FolderTree,
   Panel.Export,
@@ -96,7 +102,7 @@ export const ALL_PANELS: Panel[] = [
   Panel.Presets,
 ];
 
-export const DEFAULT_PANEL_DEFAULT_REGIONS: Record<Panel, PanelRegion> = {
+const DEFAULT_PANEL_DEFAULT_REGIONS: Record<Panel, PanelRegion> = {
   [Panel.Metadata]: 'leftTop',
   [Panel.FolderTree]: 'leftTop',
   [Panel.Export]: 'leftTop',
@@ -203,7 +209,7 @@ export function reconcileWorkspace(
   };
 }
 
-interface UIState {
+export interface UIState {
   activeView: string;
   isFullScreen: boolean;
   isWindowFullScreen: boolean;
@@ -235,6 +241,7 @@ interface UIState {
   renderedPanel: Panel | null;
   slideDirection: number;
   collapsibleSectionsState: CollapsibleSectionsState;
+  cropSectionsState: CropSectionsState;
 
   isCreateFolderModalOpen: boolean;
   isRenameFolderModalOpen: boolean;
@@ -266,6 +273,7 @@ interface UIState {
   setCustomEscapeHandler: (handler: (() => void) | null) => void;
   searchFocusRequest: number;
   requestSearchFocus: () => void;
+  toggleFullScreen: () => void;
   resetWorkspaceLayout: (isTetheringSupported?: boolean) => WorkspaceState;
 }
 
@@ -275,7 +283,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isWindowFullScreen: false,
   isInstantTransition: false,
   isLayoutReady: false,
-  uiVisibility: { filmstrip: true, leftPanel: true, rightPanel: true },
+  uiVisibility: { filmstrip: true, leftPanel: true, rightPanel: true, quickFilter: false },
   isLibraryExportPanelVisible: false,
   isSettingsOpen: false,
 
@@ -315,6 +323,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   renderedPanel: Panel.Adjustments,
   slideDirection: 1,
   collapsibleSectionsState: { basic: true, color: false, curves: true, details: false, effects: false },
+  cropSectionsState: { transform: false, lens: false },
 
   isCreateFolderModalOpen: false,
   isRenameFolderModalOpen: false,
@@ -486,6 +495,25 @@ export const useUIStore = create<UIState>((set, get) => ({
     if (targetRegion) state.setActivePanel(targetRegion, panelId);
   },
 
+  toggleFullScreen: () => {
+    const { isFullScreen } = get();
+    const { zoom, selectedImage } = useEditorStore.getState();
+
+    const isNotFitToScreen = Math.abs(zoom - 1) > 0.01;
+    set({ isInstantTransition: isNotFitToScreen });
+
+    if (isFullScreen) {
+      set({ isFullScreen: false });
+    } else {
+      if (!selectedImage) return;
+      set({ isFullScreen: true });
+    }
+
+    if (isNotFitToScreen) {
+      setTimeout(() => set({ isInstantTransition: false }), 100);
+    }
+  },
+
   resetWorkspaceLayout: (isTetheringSupported = false) => {
     const defaultWorkspace = reconcileWorkspace(undefined, isTetheringSupported);
     set({
@@ -496,7 +524,7 @@ export const useUIStore = create<UIState>((set, get) => ({
       panelLayout: defaultWorkspace.panelLayout,
       activePanels: defaultWorkspace.activePanels,
       panelSwitcherPlacement: defaultWorkspace.panelSwitcherPlacement,
-      uiVisibility: { filmstrip: true, leftPanel: true, rightPanel: true },
+      uiVisibility: { filmstrip: true, leftPanel: true, rightPanel: true, quickFilter: false },
       activePanel: defaultWorkspace.activePanels.rightTop || null,
       renderedPanel: defaultWorkspace.activePanels.rightTop || null,
     });

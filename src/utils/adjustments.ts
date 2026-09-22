@@ -103,7 +103,7 @@ export enum CreativeAdjustment {
   FlareAmount = 'flareAmount',
 }
 
-export enum TransformAdjustment {
+enum TransformAdjustment {
   TransformDistortion = 'transformDistortion',
   TransformVertical = 'transformVertical',
   TransformHorizontal = 'transformHorizontal',
@@ -121,10 +121,24 @@ export enum LensAdjustment {
   LensDistortionAmount = 'lensDistortionAmount',
   LensVignetteAmount = 'lensVignetteAmount',
   LensTcaAmount = 'lensTcaAmount',
-  LensDistortionParams = 'lensDistortionParams',
   LensDistortionEnabled = 'lensDistortionEnabled',
   LensTcaEnabled = 'lensTcaEnabled',
   LensVignetteEnabled = 'lensVignetteEnabled',
+}
+
+export type GuideOrientation = 'vertical' | 'horizontal';
+
+export interface GuideLine {
+  id: string;
+  type: GuideOrientation;
+  p1: Coord;
+  p2: Coord;
+}
+
+export interface GuidedPerspective {
+  enabled: boolean;
+  lines: GuideLine[];
+  autoCrop: boolean;
 }
 
 export interface ColorCalibration {
@@ -185,6 +199,7 @@ export interface Adjustments {
   grainAmount: number;
   grainRoughness: number;
   grainSize: number;
+  guidedPerspective: GuidedPerspective;
   halationAmount: number;
   highlights: number;
   hsl: Hsl;
@@ -460,7 +475,7 @@ export const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
   split3: 75,
 };
 
-export const getDefaultParametricCurve = (): ParametricCurve => ({
+const getDefaultParametricCurve = (): ParametricCurve => ({
   luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
   red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
   green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
@@ -571,6 +586,7 @@ export const INITIAL_ADJUSTMENTS: Adjustments = {
   grainAmount: 0,
   grainRoughness: 50,
   grainSize: 25,
+  guidedPerspective: { enabled: false, lines: [], autoCrop: true },
   halationAmount: 0,
   highlights: 0,
   hsl: {
@@ -730,6 +746,22 @@ export const normalizeLoadedAdjustments = (loadedAdjustments: Adjustments): any 
   return {
     ...INITIAL_ADJUSTMENTS,
     ...loadedAdjustments,
+    guidedPerspective: {
+      enabled: loadedAdjustments.guidedPerspective?.enabled ?? false,
+      lines: (() => {
+        const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+        const raw = (loadedAdjustments.guidedPerspective?.lines || []).map((l: any) => ({
+          id: l.id || uuidv4(),
+          type: (l.type === 'horizontal' ? 'horizontal' : 'vertical') as 'vertical' | 'horizontal',
+          p1: { x: clamp01(l.p1?.x ?? 0), y: clamp01(l.p1?.y ?? 0) },
+          p2: { x: clamp01(l.p2?.x ?? 1), y: clamp01(l.p2?.y ?? 1) },
+        }));
+        const verts = raw.filter((l) => l.type === 'vertical').slice(0, 2);
+        const hors = raw.filter((l) => l.type === 'horizontal').slice(0, 2);
+        return [...verts, ...hors];
+      })(),
+      autoCrop: loadedAdjustments.guidedPerspective?.autoCrop ?? true,
+    },
     lutIsSceneReferred: loadedAdjustments.lutIsSceneReferred ?? false,
     flareAmount: loadedAdjustments.flareAmount ?? INITIAL_ADJUSTMENTS.flareAmount,
     glowAmount: loadedAdjustments.glowAmount ?? INITIAL_ADJUSTMENTS.glowAmount,
@@ -895,6 +927,10 @@ export const ADJUSTMENT_GROUPS: Record<string, AdjustmentGroup[]> = {
         LensAdjustment.LensTcaEnabled,
         LensAdjustment.LensVignetteEnabled,
       ],
+    },
+    {
+      label: 'modals.copyPaste.groups.guidedPerspective',
+      keys: ['guidedPerspective'],
     },
   ],
   masks: [{ label: 'modals.copyPaste.groups.masks', keys: ['masks'] }],

@@ -27,9 +27,9 @@ use crate::image_loader::{
     composite_patches_on_image, load_and_composite, load_base_image_from_bytes,
 };
 use crate::image_processing::{
-    AllAdjustments, Crop, GpuContext, RenderRequest, downscale_f32_image,
+    AllAdjustments, Crop, GpuContext, RenderOutputPrecision, RenderRequest, downscale_f32_image,
     get_all_adjustments_from_json, get_or_init_gpu_context, process_and_get_dynamic_image,
-    resolve_tonemapper_override_from_handle,
+    process_and_get_dynamic_image_with_precision, resolve_tonemapper_override_from_handle,
 };
 use crate::lut_processing::{
     convert_image_to_cube_lut, generate_identity_lut_image, get_or_load_lut,
@@ -41,6 +41,35 @@ use crate::{
     apply_all_transformations, generate_transformed_preview, get_cached_or_generate_mask,
     hydrate_adjustments, load_settings, resolve_warped_image_for_masks,
 };
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(try_from = "u8", into = "u8")]
+pub enum TiffBitDepth {
+    Eight = 8,
+    #[default]
+    Sixteen = 16,
+}
+
+impl TryFrom<u8> for TiffBitDepth {
+    type Error = String;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            8 => Ok(Self::Eight),
+            16 => Ok(Self::Sixteen),
+            _ => Err(format!(
+                "Invalid TIFF bit depth '{}'; expected 8 or 16.",
+                value
+            )),
+        }
+    }
+}
+
+impl From<TiffBitDepth> for u8 {
+    fn from(value: TiffBitDepth) -> Self {
+        value as u8
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -63,6 +92,8 @@ pub struct ResizeOptions {
 #[serde(rename_all = "camelCase")]
 pub struct ExportSettings {
     pub jpeg_quality: u8,
+    #[serde(default)]
+    pub tiff_bit_depth: TiffBitDepth,
     pub resize: Option<ResizeOptions>,
     pub keep_metadata: bool,
     #[serde(default)]
@@ -74,6 +105,10 @@ pub struct ExportSettings {
     pub export_masks: bool,
     #[serde(default)]
     pub preserve_folders: bool,
+    #[serde(default)]
+    pub destination_type: Option<String>,
+    #[serde(default)]
+    pub subfolder: Option<String>,
 }
 
 #[derive(Clone)]
@@ -140,16 +175,10 @@ fn apply_watermark(
 
     let scaled_watermark =
         watermark_img.resize_exact(new_wm_w, new_wm_h, image::imageops::FilterType::Lanczos3);
-    let mut scaled_watermark_rgba = scaled_watermark.to_rgba8();
-
     let opacity_factor = (watermark_settings.opacity / 100.0).clamp(0.0, 1.0);
-    for pixel in scaled_watermark_rgba.pixels_mut() {
-        pixel[3] = (pixel[3] as f32 * opacity_factor) as u8;
-    }
-    let final_watermark = DynamicImage::ImageRgba8(scaled_watermark_rgba);
 
     let spacing_pixels = (base_min_dim * (watermark_settings.spacing / 100.0)) as i64;
-    let (wm_w, wm_h) = final_watermark.dimensions();
+    let (wm_w, wm_h) = scaled_watermark.dimensions();
 
     let x = match watermark_settings.anchor {
         WatermarkAnchor::TopLeft | WatermarkAnchor::CenterLeft | WatermarkAnchor::BottomLeft => {
@@ -175,7 +204,37 @@ fn apply_watermark(
         | WatermarkAnchor::BottomRight => base_h as i64 - wm_h as i64 - spacing_pixels,
     };
 
-    image::imageops::overlay(base_image, &final_watermark, x, y);
+    if matches!(
+        base_image,
+        DynamicImage::ImageRgb16(_) | DynamicImage::ImageRgba16(_)
+    ) {
+        let mut base_rgba = base_image.to_rgba16();
+        let mut watermark_rgba = scaled_watermark.to_rgba16();
+        for pixel in watermark_rgba.pixels_mut() {
+            pixel[3] = (pixel[3] as f32 * opacity_factor).round() as u16;
+        }
+        image::imageops::overlay(&mut base_rgba, &watermark_rgba, x, y);
+        *base_image = DynamicImage::ImageRgba16(base_rgba);
+    } else if matches!(
+        base_image,
+        DynamicImage::ImageRgb32F(_) | DynamicImage::ImageRgba32F(_)
+    ) {
+        let mut base_rgba = base_image.to_rgba32f();
+        let mut watermark_rgba = scaled_watermark.to_rgba32f();
+        for pixel in watermark_rgba.pixels_mut() {
+            pixel[3] *= opacity_factor;
+        }
+        image::imageops::overlay(&mut base_rgba, &watermark_rgba, x, y);
+        *base_image = DynamicImage::ImageRgba32F(base_rgba);
+    } else {
+        let mut base_rgba = base_image.to_rgba8();
+        let mut watermark_rgba = scaled_watermark.to_rgba8();
+        for pixel in watermark_rgba.pixels_mut() {
+            pixel[3] = (pixel[3] as f32 * opacity_factor).round() as u8;
+        }
+        image::imageops::overlay(&mut base_rgba, &watermark_rgba, x, y);
+        *base_image = DynamicImage::ImageRgba8(base_rgba);
+    }
 
     Ok(())
 }
@@ -424,6 +483,7 @@ fn process_image_for_export_pipeline(
     is_raw: bool,
     debug_tag: &str,
     app_handle: &tauri::AppHandle,
+    output_precision: RenderOutputPrecision,
 ) -> Result<DynamicImage, String> {
     let (transformed_image, unscaled_crop_offset) =
         apply_all_transformations(Cow::Borrowed(base_image), js_adjustments);
@@ -458,7 +518,7 @@ fn process_image_for_export_pipeline(
 
     let unique_hash = calculate_full_job_hash(path, js_adjustments);
 
-    process_and_get_dynamic_image(
+    process_and_get_dynamic_image_with_precision(
         context,
         state,
         transformed_image.as_ref(),
@@ -470,11 +530,34 @@ fn process_image_for_export_pipeline(
             roi: None,
         },
         debug_tag,
+        output_precision,
     )
+}
+
+fn render_output_precision(
+    output_format: &str,
+    export_settings: &ExportSettings,
+) -> RenderOutputPrecision {
+    if matches!(output_format.to_lowercase().as_str(), "tif" | "tiff")
+        && export_settings.tiff_bit_depth == TiffBitDepth::Sixteen
+    {
+        RenderOutputPrecision::SixteenBit
+    } else {
+        RenderOutputPrecision::EightBit
+    }
 }
 
 fn set_timestamps_from_exif(src: &Path, dst: &Path) {
     let capture_dt = exif_processing::get_creation_date_from_path(src);
+
+    if capture_dt.timestamp() <= 0 {
+        let now = filetime::FileTime::now();
+        if let Err(e) = filetime::set_file_times(dst, now, now) {
+            log::warn!("Could not set timestamps on '{}': {}", dst.display(), e);
+        }
+        return;
+    }
+
     let ft = filetime::FileTime::from_unix_time(
         capture_dt.timestamp(),
         capture_dt.timestamp_subsec_nanos(),
@@ -496,7 +579,12 @@ fn save_image_with_metadata(
         .unwrap_or("")
         .to_lowercase();
 
-    let mut image_bytes = encode_image_to_bytes(image, &extension, export_settings.jpeg_quality)?;
+    let mut image_bytes = encode_image_to_bytes(
+        image,
+        &extension,
+        export_settings.jpeg_quality,
+        export_settings.tiff_bit_depth,
+    )?;
 
     exif_processing::write_image_with_metadata(
         &mut image_bytes,
@@ -520,7 +608,8 @@ fn save_image_with_metadata(
     }
 
     #[cfg(not(target_os = "android"))]
-    fs::write(output_path, image_bytes).map_err(|e| e.to_string())?;
+    fs::write(output_path, image_bytes)
+        .map_err(|e| format!("Failed to write file to '{}': {}", output_path.display(), e))?;
 
     Ok(())
 }
@@ -549,6 +638,7 @@ fn process_image_for_export(
     state: &tauri::State<AppState>,
     is_raw: bool,
     app_handle: &tauri::AppHandle,
+    output_format: &str,
 ) -> Result<DynamicImage, String> {
     let processed_image = process_image_for_export_pipeline(
         path,
@@ -559,6 +649,7 @@ fn process_image_for_export(
         is_raw,
         "process_image_for_export",
         app_handle,
+        render_output_precision(output_format, export_settings),
     )?;
 
     apply_export_resize_and_watermark(processed_image, export_settings)
@@ -593,6 +684,7 @@ fn encode_image_to_bytes(
     image: &DynamicImage,
     output_format: &str,
     jpeg_quality: u8,
+    tiff_bit_depth: TiffBitDepth,
 ) -> Result<Vec<u8>, String> {
     let mut image_bytes = Vec::new();
     let mut cursor = Cursor::new(&mut image_bytes);
@@ -657,8 +749,12 @@ fn encode_image_to_bytes(
                 .write_to(&mut cursor, image::ImageFormat::Png)
                 .map_err(|e| e.to_string())?;
         }
-        "tiff" => {
-            DynamicImage::ImageRgb16(image.to_rgb16())
+        "tif" | "tiff" => {
+            let image_to_encode = match tiff_bit_depth {
+                TiffBitDepth::Eight => DynamicImage::ImageRgb8(image.to_rgb8()),
+                TiffBitDepth::Sixteen => DynamicImage::ImageRgb16(image.to_rgb16()),
+            };
+            image_to_encode
                 .write_to(&mut cursor, image::ImageFormat::Tiff)
                 .map_err(|e| e.to_string())?;
         }
@@ -734,7 +830,7 @@ fn export_masks_for_image(
             let full_white_mask = ImageBuffer::from_fn(img_w, img_h, |_, _| Luma([255u8]));
             let single_bitmaps: Vec<ImageBuffer<Luma<u8>, Vec<u8>>> = vec![full_white_mask];
 
-            let processed = process_and_get_dynamic_image(
+            let processed = process_and_get_dynamic_image_with_precision(
                 context,
                 state,
                 transformed_image.as_ref(),
@@ -746,6 +842,7 @@ fn export_masks_for_image(
                     roi: None,
                 },
                 "export_mask_image",
+                render_output_precision(extension, export_settings),
             )?;
             ensure_export_not_cancelled(cancellation_token)?;
 
@@ -952,6 +1049,7 @@ pub(crate) async fn export_images_impl(
             export_items.push((i, path_str, *count, explicit_vc));
         }
 
+        let used_paths = Arc::new(Mutex::new(std::collections::HashSet::new()));
         let semaphore = Arc::new(tokio::sync::Semaphore::new(num_threads));
         let mut join_handles = Vec::new();
 
@@ -975,6 +1073,7 @@ pub(crate) async fn export_images_impl(
             let settings = settings.clone();
             let cancellation_token_clone = Arc::clone(&cancellation_token);
             let adjustments_mode = adjustments_mode.clone();
+            let used_paths_clone = Arc::clone(&used_paths);
 
             let handle = tokio::task::spawn_blocking(move || {
                 ensure_export_not_cancelled(&cancellation_token_clone)?;
@@ -1032,26 +1131,75 @@ pub(crate) async fn export_images_impl(
                 }
 
                 let new_filename = format!("{}.{}", new_stem, output_format);
-                let output_path = if is_explicit_file_path && total_paths == 1 {
-                    output_folder_path
-                } else if export_settings.preserve_folders {
-                    if let Some(rel_dir) = relative_export_dir_for_preserved_folders(
-                        source_path.as_path(),
-                        &base_origin_folders,
-                    ) {
-                        let full_dir = output_folder_path.join(rel_dir);
-                        if let Err(e) = std::fs::create_dir_all(&full_dir) {
-                            log::warn!("Failed to create export subdirectory: {}", e);
+
+                let mut output_path =
+                    if export_settings.destination_type.as_deref() == Some("originalFolder") {
+                        let mut dir = source_path
+                            .parent()
+                            .unwrap_or(std::path::Path::new(""))
+                            .to_path_buf();
+                        if let Some(sub) = &export_settings.subfolder {
+                            let mut trimmed = sub.trim();
+
+                            while trimmed.starts_with('/') || trimmed.starts_with('\\') {
+                                trimmed = &trimmed[1..];
+                            }
+
+                            if !trimmed.is_empty() {
+                                dir = dir.join(trimmed);
+                            }
                         }
-                        full_dir.join(&new_filename)
+
+                        if let Err(e) = std::fs::create_dir_all(&dir) {
+                            return Err(format!(
+                                "Failed to create export subdirectory '{}': {}",
+                                dir.display(),
+                                e
+                            ));
+                        }
+
+                        dir.join(&new_filename)
+                    } else if is_explicit_file_path && total_paths == 1 {
+                        output_folder_path.clone()
+                    } else if export_settings.preserve_folders {
+                        if let Some(rel_dir) = relative_export_dir_for_preserved_folders(
+                            source_path.as_path(),
+                            &base_origin_folders,
+                        ) {
+                            let full_dir = output_folder_path.join(rel_dir);
+                            if let Err(e) = std::fs::create_dir_all(&full_dir) {
+                                return Err(format!(
+                                    "Failed to create export subdirectory '{}': {}",
+                                    full_dir.display(),
+                                    e
+                                ));
+                            }
+                            full_dir.join(&new_filename)
+                        } else {
+                            output_folder_path.join(&new_filename)
+                        }
                     } else {
                         output_folder_path.join(&new_filename)
-                    }
-                } else {
-                    output_folder_path.join(&new_filename)
-                };
+                    };
 
                 let extension = output_format.to_lowercase();
+
+                if !(is_explicit_file_path && total_paths == 1) {
+                    let mut used = used_paths_clone.lock().unwrap();
+                    let parent_dir = output_path
+                        .parent()
+                        .unwrap_or(std::path::Path::new(""))
+                        .to_path_buf();
+                    let mut counter = 1;
+
+                    while output_path.exists() || used.contains(&output_path) {
+                        let incremented_filename =
+                            format!("{}_{}.{}", new_stem, counter, extension);
+                        output_path = parent_dir.join(&incremented_filename);
+                        counter += 1;
+                    }
+                    used.insert(output_path.clone());
+                }
 
                 let result: Result<(), String> = (|| {
                     if extension == "cube" {
@@ -1137,6 +1285,11 @@ pub(crate) async fn export_images_impl(
                         obj.insert("masks".to_string(), serde_json::json!([]));
                     }
 
+                    let actual_output_format = output_path
+                        .extension()
+                        .and_then(|extension| extension.to_str())
+                        .unwrap_or(output_format.as_str());
+
                     let final_image = process_image_for_export(
                         &source_path_str,
                         &base_image,
@@ -1146,6 +1299,7 @@ pub(crate) async fn export_images_impl(
                         &state,
                         is_raw,
                         &app_handle_clone,
+                        actual_output_format,
                     )?;
                     ensure_export_not_cancelled(&cancellation_token_clone)?;
                     save_image_with_metadata(
@@ -1371,6 +1525,7 @@ pub async fn run_headless_export(
 
     let export_settings = ExportSettings {
         jpeg_quality: session.quality,
+        tiff_bit_depth: session.tiff_bit_depth,
         resize: None,
         keep_metadata: session.keep_metadata,
         preserve_timestamps: true,
@@ -1379,6 +1534,8 @@ pub async fn run_headless_export(
         watermark: None,
         export_masks: false,
         preserve_folders: true,
+        destination_type: None,
+        subfolder: None,
     };
 
     let mut custom_adjustments = None;
@@ -1551,7 +1708,7 @@ pub async fn estimate_export_sizes(
         let unique_hash =
             calculate_full_job_hash(&loaded_image.path, &adjustments_clone).wrapping_add(1);
 
-        let processed_preview = process_and_get_dynamic_image(
+        let processed_preview = process_and_get_dynamic_image_with_precision(
             &context,
             &state,
             &preview_image,
@@ -1563,12 +1720,14 @@ pub async fn estimate_export_sizes(
                 roi: None,
             },
             "estimate_export_size",
+            render_output_precision(&output_format, &export_settings),
         )?;
 
         let preview_bytes = encode_image_to_bytes(
             &processed_preview,
             &output_format,
             export_settings.jpeg_quality,
+            export_settings.tiff_bit_depth,
         )?;
         let preview_byte_size = preview_bytes.len();
 
@@ -1689,7 +1848,7 @@ pub async fn estimate_export_sizes(
         let unique_hash =
             calculate_full_job_hash(&source_path_str, &js_adjustments).wrapping_add(1);
 
-        let processed_preview = process_and_get_dynamic_image(
+        let processed_preview = process_and_get_dynamic_image_with_precision(
             &context,
             &state,
             &preview_base,
@@ -1701,12 +1860,14 @@ pub async fn estimate_export_sizes(
                 roi: None,
             },
             "estimate_batch_export_size",
+            render_output_precision(&output_format, &export_settings),
         )?;
 
         let preview_bytes = encode_image_to_bytes(
             &processed_preview,
             &output_format,
             export_settings.jpeg_quality,
+            export_settings.tiff_bit_depth,
         )?;
         let single_image_estimated_size = preview_bytes.len();
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -30,7 +30,9 @@ import {
   Wand2,
   Send,
   FolderOpen,
+  FolderIcon,
   SquaresIntersect,
+  X,
 } from 'lucide-react';
 
 import CollapsibleSection from '../../ui/CollapsibleSection';
@@ -38,6 +40,7 @@ import Switch from '../../ui/Switch';
 import Slider from '../../ui/Slider';
 import Input from '../../ui/Input';
 import Button from '../../ui/Button';
+import Dropdown from '../../ui/Dropdown';
 
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import {
@@ -47,11 +50,13 @@ import {
   SubMaskMode,
   ToolType,
   MASK_ICON_MAP,
-  AI_MANUAL_CLEANUP_TYPES,
+  AI_DIRECT_PATCH_TYPES,
+  AI_TOUCH_UP_TYPES,
   AI_GENERATIVE_CREATION_TYPES,
   AI_SUB_MASK_COMPONENT_TYPES,
   formatMaskTypeName,
   getSubMaskName,
+  NewMaskDropZone,
 } from './Masks';
 import { Adjustments, AiPatch } from '../../../utils/adjustments';
 import { OPTION_SEPARATOR } from '../../ui/AppProperties';
@@ -65,6 +70,14 @@ import { useProcessStore } from '../../../store/useProcessStore';
 import { useUIStore } from '../../../store/useUIStore';
 import { useEditorActions } from '../../../hooks/useEditorActions';
 import { useAiMasking } from '../../../hooks/useAiMasking';
+import { useCloudUsage } from '../../../hooks/useCloudUsage';
+
+export const STANDALONE_MASK_TYPES: Mask[] = [Mask.Clone, Mask.Heal, Mask.Liquify, Mask.Retouch];
+
+export const isStandaloneMask = (type?: Mask): boolean => Boolean(type && STANDALONE_MASK_TYPES.includes(type));
+
+export const isStandaloneContainer = (container?: AiPatch | null): boolean =>
+  Boolean(container?.subMasks?.length === 1 && isStandaloneMask(container.subMasks[0].type));
 
 interface DragData {
   type: 'Container' | 'SubMask' | 'Creation';
@@ -91,6 +104,14 @@ const SUB_MASK_CONFIG: any = {
   [Mask.Brush]: { showBrushTools: true },
   [Mask.Clone]: { showBrushTools: true },
   [Mask.Heal]: { showBrushTools: true },
+  [Mask.Liquify]: {
+    showBrushTools: true,
+    parameters: [{ key: 'pressure', min: 1, max: 100, step: 1, defaultValue: 40 }],
+  },
+  [Mask.Retouch]: {
+    showBrushTools: true,
+    parameters: [{ key: 'intensity', min: 1, max: 100, step: 1, defaultValue: 40 }],
+  },
   [Mask.Linear]: { parameters: [] },
   [Mask.AiSubject]: {
     parameters: [
@@ -199,7 +220,7 @@ const ConnectionStatus = ({
       statusText = t('editor.ai.connection.ready');
 
       const reqs = cloudUsage?.requests ?? 0;
-      const limit = cloudUsage?.limit ?? 500;
+      const limit = cloudUsage?.limit ?? 200;
       const percent = Math.min(100, (reqs / limit) * 100);
 
       hoverContent = (
@@ -304,7 +325,9 @@ function AiListRoot({
     >
       {children}
       <AnimatePresence>
-        {activeDragItem?.type === 'Creation' && hasPatches && <NewMaskDropZone isOver={isOver} />}
+        {activeDragItem?.type === 'Creation' && hasPatches && (
+          <NewMaskDropZone isOver={isOver} textKey="editor.ai.dropzoneText" />
+        )}
       </AnimatePresence>
     </motion.div>
   );
@@ -317,62 +340,47 @@ export default function AIPanel() {
   const adjustments = useEditorStore((s) => s.adjustments);
   const brushSettings = useEditorStore((s) => s.brushSettings);
   const isAIConnectorConnected = useEditorStore((s) => s.isAIConnectorConnected);
-  const isGeneratingAi = useEditorStore((s) => s.isGeneratingAi);
-  const isGeneratingAiMask = useEditorStore((s) => s.isGeneratingAiMask);
   const selectedImage = useEditorStore((s) => s.selectedImage);
   const setEditor = useEditorStore((s) => s.setEditor);
 
+  const activeAiTasks = useProcessStore((s) => s.activeAiTasks);
   const aiModelDownloadStatus = useProcessStore((s) => s.aiModelDownloadStatus);
   const setCustomEscapeHandler = useUIStore((s) => s.setCustomEscapeHandler);
 
   const { setAdjustments } = useEditorActions();
-  const { handleGenerativeReplace, handleDeleteAiPatch, handleGenerateAiForegroundMask } = useAiMasking();
-  const appSettings = useSettingsStore((s) => s.appSettings);
-  const aiProvider = appSettings?.aiProvider || 'cpu';
+  const {
+    handleGenerativeReplace,
+    handleDeleteAiPatch,
+    handleGenerateAiForegroundMask,
+    handleDirectPatch,
+    handleCancelAiTask,
+  } = useAiMasking();
 
-  const { user, isSignedIn } = useUser();
-  const { getToken } = useAuth();
-  const isPro = user?.publicMetadata?.plan === 'pro';
-  const [cloudUsage, setCloudUsage] = useState<{ requests: number; limit: number; month: string } | null>(null);
+  const { cloudUsage, isSignedIn, isPro, aiProvider } = useCloudUsage();
 
   const isGenerativeAvailable =
-    (aiProvider === 'cloud' && !!isSignedIn && !!isPro) || (aiProvider === 'ai-connector' && isAIConnectorConnected);
+    (aiProvider === 'cloud' && isSignedIn && isPro) || (aiProvider === 'ai-connector' && isAIConnectorConnected);
 
-  useEffect(() => {
-    if (aiProvider !== 'cloud' || !isSignedIn || !isPro) return;
-
-    const fetchUsage = async () => {
-      try {
-        const token = await getToken();
-        if (!token) return;
-
-        const res = await fetch('http://127.0.0.1:5000/usage', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setCloudUsage(await res.json());
-        }
-      } catch (e) {
-        console.error('Failed to fetch cloud usage', e);
-      }
-    };
-
-    fetchUsage();
-  }, [aiProvider, isSignedIn, isPro, getToken]);
+  const hasAnyActiveAiTask = Object.keys(activeAiTasks).length > 0;
 
   const setBrushSettings = useCallback(
     (updater: any) =>
       setEditor((state) => ({ brushSettings: typeof updater === 'function' ? updater(state.brushSettings) : updater })),
     [setEditor],
   );
-  const selectBrushToolForNewMask = useCallback(() => {
-    setEditor((state) => ({
-      brushSettings: {
-        ...(state.brushSettings ?? { size: 50, feather: 50, tool: ToolType.Brush }),
-        tool: ToolType.Brush,
-      },
-    }));
-  }, [setEditor]);
+
+  const selectBrushToolForNewMask = useCallback(
+    (forcedSize: number = 100) => {
+      setEditor((state) => ({
+        brushSettings: {
+          ...(state.brushSettings ?? { size: 100, feather: 50, tool: ToolType.Brush }),
+          size: forcedSize,
+          tool: ToolType.Brush,
+        },
+      }));
+    },
+    [setEditor],
+  );
 
   const onSelectPatchContainer = useCallback(
     (id: string | null) => setEditor({ activeAiPatchContainerId: id }),
@@ -384,14 +392,16 @@ export default function AIPanel() {
     [setEditor],
   );
 
-  const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
+  const [expandedContainers, setExpandedContainers] = useState<Set<string>>(() => {
+    const activeId = useEditorStore.getState().activeAiPatchContainerId;
+    return new Set(activeId ? [activeId] : []);
+  });
   const [activeDragItem, setActiveDragItem] = useState<DragData | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [isSettingsPanelEverOpened, setIsSettingsPanelEverOpened] = useState(false);
   const hasPerformedInitialSelection = useRef(false);
-  const [analyzingSubMaskId, setAnalyzingSubMaskId] = useState<string | null>(null);
   const [copiedPatch, setCopiedPatch] = useState<AiPatch | null>(null);
   const [copiedSubMask, setCopiedSubMask] = useState<SubMask | null>(null);
 
@@ -405,22 +415,6 @@ export default function AIPanel() {
 
   const activeContainer = (adjustments.aiPatches || []).find((p) => p.id === activePatchContainerId);
   const activeSubMaskData = activeContainer?.subMasks.find((sm) => sm.id === activeSubMaskId);
-  const isAiMask =
-    activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky].includes(activeSubMaskData.type);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if (isGeneratingAiMask && isAiMask) {
-      timer = setTimeout(() => {
-        setAnalyzingSubMaskId(activeSubMaskId);
-      }, 200);
-    } else {
-      setAnalyzingSubMaskId(null);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isGeneratingAiMask, isAiMask, activeSubMaskId]);
 
   useEffect(() => {
     if (activePatchContainerId) {
@@ -430,12 +424,8 @@ export default function AIPanel() {
         onSelectSubMask(null);
       } else if (!activeSubMaskId) {
         const container = adjustments.aiPatches?.find((p) => p.id === activePatchContainerId);
-        if (
-          container &&
-          container.subMasks.length === 1 &&
-          [Mask.Clone, Mask.Heal].includes(container.subMasks[0].type)
-        ) {
-          onSelectSubMask(container.subMasks[0].id);
+        if (isStandaloneContainer(container)) {
+          onSelectSubMask(container!.subMasks[0].id);
         }
       }
     }
@@ -466,8 +456,13 @@ export default function AIPanel() {
       if (renamingId) {
         setRenamingId(null);
         setTempName('');
-      } else if (activeSubMaskId) onSelectSubMask(null);
-      else if (activePatchContainerId) onSelectPatchContainer(null);
+      } else if (activePatchContainerId && activeAiTasks[activePatchContainerId]) {
+        handleCancelAiTask(activePatchContainerId);
+      } else if (activeSubMaskId) {
+        onSelectSubMask(null);
+      } else if (activePatchContainerId) {
+        onSelectPatchContainer(null);
+      }
     };
     if (activePatchContainerId || renamingId) setCustomEscapeHandler(() => handler);
     else setCustomEscapeHandler(null);
@@ -476,6 +471,8 @@ export default function AIPanel() {
     activePatchContainerId,
     activeSubMaskId,
     renamingId,
+    activeAiTasks,
+    handleCancelAiTask,
     onSelectPatchContainer,
     onSelectSubMask,
     setCustomEscapeHandler,
@@ -496,7 +493,12 @@ export default function AIPanel() {
   };
 
   const handleResetAllAiEdits = () => {
-    if (isGeneratingAi) return;
+    adjustments.aiPatches?.forEach((p) => {
+      if (activeAiTasks[p.id]) handleCancelAiTask(p.id);
+      p.subMasks.forEach((sm) => {
+        if (activeAiTasks[sm.id]) handleCancelAiTask(sm.id);
+      });
+    });
     handleDeselect();
     setAdjustments((prev: Adjustments) => ({ ...prev, aiPatches: [] }));
   };
@@ -558,6 +560,16 @@ export default function AIPanel() {
         (adjustments.aiPatches || []).filter((p: AiPatch) => p.subMasks.some((sm: SubMask) => sm.type === Mask.Heal))
           .length + 1;
       name = t('editor.ai.patches.heal', { count });
+    } else if (type === Mask.Liquify) {
+      const count =
+        (adjustments.aiPatches || []).filter((p: AiPatch) => p.subMasks.some((sm: SubMask) => sm.type === Mask.Liquify))
+          .length + 1;
+      name = t('editor.ai.patches.liquify', { count });
+    } else if (type === Mask.Retouch) {
+      const count =
+        (adjustments.aiPatches || []).filter((p: AiPatch) => p.subMasks.some((sm: SubMask) => sm.type === Mask.Retouch))
+          .length + 1;
+      name = t('editor.ai.patches.retouch', { count });
     } else {
       const count = (adjustments.aiPatches || []).length + 1;
       name = t('editor.ai.patches.aiEdit', { count });
@@ -577,15 +589,15 @@ export default function AIPanel() {
     setAdjustments((prev: Adjustments) => ({ ...prev, aiPatches: [...(prev.aiPatches || []), newContainer] }));
     onSelectPatchContainer(newContainer.id);
 
-    const isStandalone = [Mask.Clone, Mask.Heal].includes(type);
+    const isStandalone = isStandaloneMask(type);
 
     onSelectSubMask(subMask.id);
     if (!isStandalone) {
       setExpandedContainers((prev) => new Set(prev).add(newContainer.id));
     }
 
-    if (type === Mask.Brush || type === Mask.Clone || type === Mask.Heal) {
-      selectBrushToolForNewMask();
+    if (type === Mask.Brush || isStandalone) {
+      selectBrushToolForNewMask(100);
     }
 
     if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
@@ -614,8 +626,8 @@ export default function AIPanel() {
     onSelectSubMask(subMask.id);
     setExpandedContainers((prev) => new Set(prev).add(containerId));
 
-    if (type === Mask.Brush || type === Mask.Clone || type === Mask.Heal) {
-      selectBrushToolForNewMask();
+    if (type === Mask.Brush || isStandaloneMask(type)) {
+      selectBrushToolForNewMask(100);
     }
     if (type === Mask.AiForeground) handleGenerateAiForegroundMask(subMask.id);
   };
@@ -626,8 +638,7 @@ export default function AIPanel() {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
 
     const container = targetContainerId ? adjustments.aiPatches.find((m) => m.id === targetContainerId) : null;
-    const isStandalone =
-      container && container.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(container.subMasks[0].type);
+    const isStandalone = isStandaloneContainer(container);
 
     if (isStandalone && targetContainerId) {
       return;
@@ -635,7 +646,7 @@ export default function AIPanel() {
 
     const buildMenu = (types: MaskType[], mode: SubMaskMode = SubMaskMode.Additive) =>
       types
-        .filter((mt) => !mt.disabled && (!targetContainerId || ![Mask.Clone, Mask.Heal].includes(mt.type)))
+        .filter((mt) => !mt.disabled && (!targetContainerId || !isStandaloneMask(mt.type)))
         .map((maskType: MaskType) => ({
           label: formatMaskTypeName(maskType.type),
           icon: maskType.icon,
@@ -654,7 +665,9 @@ export default function AIPanel() {
 
     if (!targetContainerId) {
       options = [
-        ...buildMenu(AI_MANUAL_CLEANUP_TYPES, SubMaskMode.Additive),
+        ...buildMenu(AI_DIRECT_PATCH_TYPES, SubMaskMode.Additive),
+        { type: OPTION_SEPARATOR },
+        ...buildMenu(AI_TOUCH_UP_TYPES, SubMaskMode.Additive),
         { type: OPTION_SEPARATOR },
         ...buildMenu(AI_GENERATIVE_CREATION_TYPES, SubMaskMode.Additive),
       ];
@@ -697,11 +710,26 @@ export default function AIPanel() {
     }));
 
   const handleDeleteContainer = (id: string) => {
+    const container = adjustments.aiPatches?.find((p) => p.id === id);
+    if (container) {
+      if (activeAiTasks[container.id]) {
+        handleCancelAiTask(container.id);
+      }
+      container.subMasks.forEach((sm: SubMask) => {
+        if (activeAiTasks[sm.id]) {
+          handleCancelAiTask(sm.id);
+        }
+      });
+    }
+
     if (activePatchContainerId === id) handleDeselect();
     handleDeleteAiPatch(id);
   };
 
   const handleDeleteSubMask = (containerId: string, subMaskId: string) => {
+    if (activeAiTasks[subMaskId]) {
+      handleCancelAiTask(subMaskId);
+    }
     if (activeSubMaskId === subMaskId) onSelectSubMask(null);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
@@ -755,8 +783,7 @@ export default function AIPanel() {
     });
 
     onSelectPatchContainer(container.id);
-    const isStandalone =
-      container.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(container.subMasks[0].type);
+    const isStandalone = isStandaloneContainer(container);
 
     if (isStandalone) {
       onSelectSubMask(container.subMasks[0].id);
@@ -850,7 +877,13 @@ export default function AIPanel() {
       return;
     }
 
-    const manualSubMenu = AI_MANUAL_CLEANUP_TYPES.filter((maskType) => !maskType.disabled).map((maskType) => ({
+    const manualSubMenu = AI_DIRECT_PATCH_TYPES.filter((maskType) => !maskType.disabled).map((maskType) => ({
+      label: formatMaskTypeName(maskType.type),
+      icon: maskType.icon,
+      onClick: () => handleAddAiPatchContainer(maskType.type),
+    }));
+
+    const touchUpSubMenu = AI_TOUCH_UP_TYPES.filter((maskType) => !maskType.disabled).map((maskType) => ({
       label: formatMaskTypeName(maskType.type),
       icon: maskType.icon,
       onClick: () => handleAddAiPatchContainer(maskType.type),
@@ -862,7 +895,13 @@ export default function AIPanel() {
       onClick: () => handleAddAiPatchContainer(maskType.type),
     }));
 
-    const newEditSubMenu = [...manualSubMenu, { type: OPTION_SEPARATOR }, ...genSubMenu];
+    const newEditSubMenu = [
+      ...manualSubMenu,
+      { type: OPTION_SEPARATOR },
+      ...touchUpSubMenu,
+      { type: OPTION_SEPARATOR },
+      ...genSubMenu,
+    ];
 
     showContextMenu(e.clientX, e.clientY, [
       {
@@ -894,14 +933,13 @@ export default function AIPanel() {
 
     if (dragData.type === 'Creation' && dragData.maskType) {
       const creationFn = () => {
-        const isCreationStandalone = [Mask.Clone, Mask.Heal].includes(dragData.maskType!);
+        const isCreationStandalone = isStandaloneMask(dragData.maskType);
 
         if (isCreationStandalone) {
           handleAddAiPatchContainer(dragData.maskType!);
         } else if (overData?.type === 'Container') {
           const overContainer = adjustments.aiPatches.find((p) => p.id === overData.item!.id);
-          const isOverStandalone =
-            overContainer?.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(overContainer.subMasks[0].type);
+          const isOverStandalone = isStandaloneContainer(overContainer);
 
           if (isOverStandalone) {
             handleAddAiPatchContainer(dragData.maskType!);
@@ -910,8 +948,7 @@ export default function AIPanel() {
           }
         } else if (overData?.type === 'SubMask') {
           const container = adjustments.aiPatches.find((p) => p.id === overData.parentId);
-          const isTargetStandalone =
-            container?.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(container.subMasks[0].type);
+          const isTargetStandalone = isStandaloneContainer(container);
 
           if (container && !isTargetStandalone) {
             const targetIndex = container.subMasks.findIndex((sm) => sm.id === over!.id);
@@ -962,10 +999,8 @@ export default function AIPanel() {
 
       if (targetContainerId) {
         const targetContainer = adjustments.aiPatches.find((p) => p.id === targetContainerId);
-        const isTargetStandalone =
-          targetContainer?.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(targetContainer.subMasks[0].type);
-
-        const isSourceStandalone = [Mask.Clone, Mask.Heal].includes((dragData.item as SubMask).type);
+        const isTargetStandalone = isStandaloneContainer(targetContainer);
+        const isSourceStandalone = isStandaloneMask((dragData.item as SubMask).type);
 
         if ((isTargetStandalone || isSourceStandalone) && sourceContainerId !== targetContainerId) {
           return;
@@ -1060,8 +1095,18 @@ export default function AIPanel() {
         </div>
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col min-h-0 p-3">
+          <div className="mb-4 shrink-0">
+            <ConnectionStatus
+              aiProvider={aiProvider}
+              isAIConnectorConnected={isAIConnectorConnected}
+              isSignedIn={!!isSignedIn}
+              isPro={!!isPro}
+              cloudUsage={cloudUsage}
+            />
+          </div>
+
           {!selectedImage ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center flex-1">
               <Text
                 variant={TextVariants.heading}
                 color={TextColors.secondary}
@@ -1084,23 +1129,29 @@ export default function AIPanel() {
                     className="z-10 shrink-0"
                     onClick={handleDeselect}
                   >
-                    <ConnectionStatus
-                      aiProvider={aiProvider}
-                      isAIConnectorConnected={isAIConnectorConnected}
-                      isSignedIn={!!isSignedIn}
-                      isPro={!!isPro}
-                      cloudUsage={cloudUsage}
-                    />
-
-                    <Text variant={TextVariants.heading} className="mb-2 mt-6">
+                    <Text variant={TextVariants.heading} className="mb-2">
                       {t('editor.ai.manualCleanupTitle')}
                     </Text>
                     <div className="grid grid-cols-3 gap-2 mb-6" onClick={(e) => e.stopPropagation()}>
-                      {AI_MANUAL_CLEANUP_TYPES.map((maskType: MaskType) => (
+                      {AI_DIRECT_PATCH_TYPES.map((maskType: MaskType) => (
                         <DraggableGridItem
                           key={maskType.type}
                           maskType={maskType}
-                          isGenerating={isGeneratingAi}
+                          isGenerating={hasAnyActiveAiTask}
+                          onClick={() => handleAddAiPatchContainer(maskType.type)}
+                        />
+                      ))}
+                    </div>
+
+                    <Text variant={TextVariants.heading} className="mb-2">
+                      {t('editor.ai.touchUpTitle')}
+                    </Text>
+                    <div className="grid grid-cols-3 gap-2 mb-6" onClick={(e) => e.stopPropagation()}>
+                      {AI_TOUCH_UP_TYPES.map((maskType: MaskType) => (
+                        <DraggableGridItem
+                          key={maskType.type}
+                          maskType={maskType}
+                          isGenerating={hasAnyActiveAiTask}
                           onClick={() => handleAddAiPatchContainer(maskType.type)}
                         />
                       ))}
@@ -1114,7 +1165,7 @@ export default function AIPanel() {
                         <DraggableGridItem
                           key={maskType.type}
                           maskType={maskType}
-                          isGenerating={isGeneratingAi}
+                          isGenerating={hasAnyActiveAiTask}
                           onClick={() => handleAddAiPatchContainer(maskType.type)}
                         />
                       ))}
@@ -1167,6 +1218,7 @@ export default function AIPanel() {
                           activeDragItem={activeDragItem}
                           activeSubMaskId={activeSubMaskId}
                           activePatchContainerId={activePatchContainerId}
+                          activeAiTasks={activeAiTasks}
                           onSelectContainer={onSelectPatchContainer}
                           onSelectSubMask={onSelectSubMask}
                           updateSubMask={updateSubMask}
@@ -1176,7 +1228,6 @@ export default function AIPanel() {
                           handlePasteSubMask={handlePasteSubMask}
                           copySubMaskToClipboard={copySubMaskToClipboard}
                           copiedSubMask={copiedSubMask}
-                          analyzingSubMaskId={analyzingSubMaskId}
                           onAddComponent={(e: React.MouseEvent) => handleAddAiContextMenu(e, container.id)}
                         />
                       ))}
@@ -1219,12 +1270,14 @@ export default function AIPanel() {
                       setBrushSettings={setBrushSettings}
                       updateContainer={updatePatch}
                       updateSubMask={updateSubMask}
-                      isGeneratingAi={isGeneratingAi}
-                      isGeneratingAiMask={isGeneratingAiMask}
+                      activeAiTasks={activeAiTasks}
                       onGenerativeReplace={handleGenerativeReplace}
+                      onCancelAiTask={handleCancelAiTask}
                       collapsibleState={collapsibleState}
                       setCollapsibleState={setCollapsibleState}
                       isGenerativeAvailable={isGenerativeAvailable}
+                      onManualCleanup={handleDirectPatch}
+                      aiProvider={aiProvider}
                     />
                   </motion.div>
                 )}
@@ -1246,8 +1299,7 @@ export default function AIPanel() {
               >
                 {(() => {
                   const item = activeDragItem.item as AiPatch;
-                  const isStandalone =
-                    item.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(item.subMasks[0].type);
+                  const isStandalone = isStandaloneContainer(item);
                   const Icon = isStandalone ? MASK_ICON_MAP[item.subMasks[0].type] || Circle : Wand2;
                   return <Icon size={18} className={TEXT_COLOR_KEYS[TextColors.secondary]} />;
                 })()}
@@ -1297,22 +1349,6 @@ export default function AIPanel() {
   );
 }
 
-function NewMaskDropZone({ isOver }: { isOver: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, height: 0, marginTop: 0 }}
-      animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
-      exit={{ opacity: 0, height: 0, marginTop: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-3 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
-    >
-      <Text weight={TextWeights.medium}>{t('editor.ai.dropzoneText')}</Text>
-    </motion.div>
-  );
-}
-
 function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -1341,8 +1377,13 @@ function DraggableGridItem({ maskType, isGenerating, onClick }: any) {
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
-      <maskType.icon size={24} />{' '}
-      <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
+      <maskType.icon size={24} />
+      <Text
+        as="span"
+        variant={TextVariants.small}
+        color={TextColors.primary}
+        className="text-center w-full leading-tight"
+      >
         {formatMaskTypeName(maskType.type)}
       </Text>
     </motion.div>
@@ -1370,6 +1411,7 @@ function ContainerRow({
   activeDragItem,
   activeSubMaskId,
   activePatchContainerId,
+  activeAiTasks,
   onSelectContainer,
   onSelectSubMask,
   updateSubMask,
@@ -1379,7 +1421,6 @@ function ContainerRow({
   handlePasteSubMask,
   copySubMaskToClipboard,
   copiedSubMask,
-  analyzingSubMaskId,
   onAddComponent,
 }: any) {
   const { t } = useTranslation();
@@ -1395,9 +1436,11 @@ function ContainerRow({
   } = useDraggable({ id: container.id, data: { type: 'Container', item: container } });
   const { showContextMenu } = useContextMenu();
 
-  const isStandalone = container.subMasks.length === 1 && [Mask.Clone, Mask.Heal].includes(container.subMasks[0].type);
+  const isStandalone = isStandaloneContainer(container);
   const firstSubMask = container.subMasks[0];
   const isRowSelected = isStandalone ? container.id === activePatchContainerId : isSelected;
+
+  const isContainerGenerating = Boolean(activeAiTasks[container.id]) || Boolean(container.isLoading);
 
   const setCombinedRef = (node: HTMLElement | null) => {
     setDroppableRef(node);
@@ -1512,18 +1555,42 @@ function ContainerRow({
               onToggle();
             }
           }}
-          className="p-0.5 rounded transition-colors cursor-pointer"
+          className="relative w-5 h-5 shrink-0 flex items-center justify-center p-0.5 rounded transition-colors cursor-pointer"
         >
-          {isStandalone ? (
-            (() => {
-              const StandaloneIcon = MASK_ICON_MAP[firstSubMask.type] || Circle;
-              return <StandaloneIcon size={18} />;
-            })()
-          ) : isExpanded ? (
-            <FolderOpen size={18} />
-          ) : (
-            <Wand2 size={18} />
-          )}
+          <AnimatePresence mode="wait" initial={false}>
+            {isContainerGenerating ? (
+              <motion.div
+                key="loader"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.15 }}
+                className="absolute flex items-center justify-center"
+              >
+                <Loader2 size={18} className="animate-spin text-accent" />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="icon"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={{ duration: 0.15 }}
+                className="absolute flex items-center justify-center"
+              >
+                {isStandalone ? (
+                  (() => {
+                    const StandaloneIcon = MASK_ICON_MAP[firstSubMask.type] || Circle;
+                    return <StandaloneIcon size={18} />;
+                  })()
+                ) : isExpanded ? (
+                  <FolderOpen size={18} />
+                ) : (
+                  <FolderIcon size={18} />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Text>
         <div
           className="flex-1 min-w-0 cursor-pointer"
@@ -1605,12 +1672,12 @@ function ContainerRow({
                   handlePaste={() => handlePasteSubMask(container.id, index + 1)}
                   handleCopy={() => copySubMaskToClipboard(subMask)}
                   hasCopiedSubMask={!!copiedSubMask}
-                  analyzingSubMaskId={analyzingSubMaskId}
+                  activeAiTasks={activeAiTasks}
                   renamingId={renamingId}
                   setRenamingId={setRenamingId}
                   tempName={tempName}
                   setTempName={setTempName}
-                  isParentLoading={container.isLoading}
+                  isParentLoading={isContainerGenerating}
                 />
               ))}
             </AnimatePresence>
@@ -1665,7 +1732,7 @@ function SubMaskRow({
   handleCopy,
   hasCopiedSubMask,
   activeDragItem,
-  analyzingSubMaskId,
+  activeAiTasks,
   renamingId,
   setRenamingId,
   tempName,
@@ -1690,7 +1757,9 @@ function SubMaskRow({
   const [isHovered, setIsHovered] = useState(false);
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingContainer = activeDragItem?.type === 'Container';
-  const isAnalyzing = subMask.id === analyzingSubMaskId || (isParentLoading && subMask.type === Mask.QuickEraser);
+
+  const isSubMaskTaskRunning = Boolean(activeAiTasks[subMask.id]);
+  const isAnalyzing = isSubMaskTaskRunning || (isParentLoading && subMask.type === Mask.QuickEraser);
 
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
@@ -1781,9 +1850,9 @@ function SubMaskRow({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
               transition={{ duration: 0.15 }}
-              className="absolute"
+              className="absolute flex items-center justify-center"
             >
-              <Loader2 size={16} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin text-accent" />
             </motion.div>
           ) : showNumber ? (
             <motion.span
@@ -1803,7 +1872,7 @@ function SubMaskRow({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
               transition={{ duration: 0.15 }}
-              className="absolute"
+              className="absolute flex items-center justify-center"
             >
               <MaskIcon size={16} />
             </motion.div>
@@ -1880,12 +1949,14 @@ function SettingsPanel({
   setBrushSettings,
   updateContainer,
   updateSubMask,
-  isGeneratingAi,
-  isGeneratingAiMask: _isGeneratingAiMask,
+  activeAiTasks,
   onGenerativeReplace,
+  onCancelAiTask,
   collapsibleState,
   setCollapsibleState,
   isGenerativeAvailable,
+  onManualCleanup,
+  aiProvider,
 }: any) {
   const { t } = useTranslation();
   const isActive = !!container;
@@ -1895,16 +1966,16 @@ function SettingsPanel({
   const [useFastInpaint, setUseFastInpaint] = useState(!isGenerativeAvailable);
   const prevContainerId = useRef<string | null>(null);
 
+  const isCloud = aiProvider === 'cloud';
+  const isContainerRunning = Boolean(activeAiTasks[displayContainer.id]) || Boolean(displayContainer.isLoading);
+
   useEffect(() => {
     if (container) setPrompt(container.prompt || '');
   }, [container?.id]);
 
   const isQuickErasePatch = displayContainer.subMasks?.some((sm: SubMask) => sm.type === Mask.QuickEraser);
-  const isCloneOrHealPatch = displayContainer.subMasks?.some(
-    (sm: SubMask) => sm.type === Mask.Clone || sm.type === Mask.Heal,
-  );
-  const isStandalone =
-    displayContainer?.subMasks?.length === 1 && [Mask.Clone, Mask.Heal].includes(displayContainer.subMasks[0].type);
+  const isStandalonePatch = displayContainer.subMasks?.some((sm: SubMask) => isStandaloneMask(sm.type));
+  const isStandalone = isStandaloneContainer(displayContainer);
 
   useEffect(() => {
     if (container) {
@@ -1928,8 +1999,9 @@ function SettingsPanel({
 
   const handleGenerateClick = () => {
     if (!container) return;
-    updateContainer(container.id, { prompt });
-    onGenerativeReplace(container.id, prompt, useFastInpaint);
+    const finalPrompt = isCloud ? '' : prompt;
+    updateContainer(container.id, { prompt: finalPrompt });
+    onGenerativeReplace(container.id, finalPrompt, useFastInpaint);
   };
 
   const handleToggleSection = (section: string) =>
@@ -1940,7 +2012,7 @@ function SettingsPanel({
       className={`space-y-2 transition-opacity duration-300 ${!isActive ? 'opacity-50 pointer-events-none' : ''}`}
       onClick={(e) => e.stopPropagation()}
     >
-      {!isCloneOrHealPatch && (
+      {!isStandalonePatch && (
         <CollapsibleSection
           title={t('editor.ai.settings.generativeReplaceTitle')}
           isOpen={collapsibleState.generative}
@@ -1976,7 +2048,7 @@ function SettingsPanel({
             <div>
               <Switch
                 checked={useFastInpaint}
-                disabled={!isGenerativeAvailable}
+                disabled={!isGenerativeAvailable || isContainerRunning}
                 label={t('editor.ai.settings.useBasicInpaint')}
                 onChange={setUseFastInpaint}
                 tooltip={
@@ -1987,7 +2059,7 @@ function SettingsPanel({
               />
 
               <AnimatePresence>
-                {!useFastInpaint && (
+                {!useFastInpaint && !isCloud && (
                   <motion.div
                     animate={{ opacity: 1, height: 'auto', marginTop: '0.75rem' }}
                     className="overflow-hidden"
@@ -1998,13 +2070,11 @@ function SettingsPanel({
                     <div className="flex items-center gap-2">
                       <Input
                         className="grow"
-                        disabled={isGeneratingAi || displayContainer.isLoading}
-                        onChange={(e: any) => {
-                          setPrompt(e.target.value);
-                        }}
+                        disabled={isContainerRunning}
+                        onChange={(e: any) => setPrompt(e.target.value)}
                         onBlur={() => isActive && updateContainer(container.id, { prompt })}
                         onKeyDown={(e: any) => {
-                          if (e.key === 'Enter') handleGenerateClick();
+                          if (e.key === 'Enter' && !isContainerRunning) handleGenerateClick();
                         }}
                         placeholder={t('editor.ai.settings.placeholder')}
                         type="text"
@@ -2016,24 +2086,28 @@ function SettingsPanel({
               </AnimatePresence>
             </div>
 
-            <Button
-              className="w-full"
-              disabled={isGeneratingAi || displayContainer.isLoading || displayContainer.subMasks.length === 0}
-              onClick={handleGenerateClick}
-            >
-              {isGeneratingAi || displayContainer.isLoading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
+            {isContainerRunning ? (
+              <Button
+                className="w-full bg-red-500/15 hover:bg-red-500/25 text-red-400 border border-red-500/30 transition-colors"
+                onClick={() => onCancelAiTask(displayContainer.id)}
+              >
+                <X size={16} />
+                <span className="ml-2">{t('editor.ai.settings.cancelGeneration', 'Cancel Generation')}</span>
+              </Button>
+            ) : (
+              <Button
+                className="w-full"
+                disabled={displayContainer.subMasks.length === 0}
+                onClick={handleGenerateClick}
+              >
                 <Send size={16} />
-              )}
-              <span className="ml-2">
-                {isGeneratingAi || displayContainer.isLoading
-                  ? t('editor.ai.settings.generating')
-                  : useFastInpaint
+                <span className="ml-2">
+                  {useFastInpaint
                     ? t('editor.ai.settings.inpaintSelectionButton')
                     : t('editor.ai.settings.generateWithAiButton')}
-              </span>
-            </Button>
+                </span>
+              </Button>
+            )}
           </div>
         </CollapsibleSection>
       )}
@@ -2052,7 +2126,7 @@ function SettingsPanel({
         isContentVisible={true}
       >
         <div className="space-y-4 pt-2">
-          {!isCloneOrHealPatch && (
+          {!isStandalonePatch && (
             <Switch
               checked={!!(isComponentMode ? activeSubMask.invert : displayContainer.invert)}
               label={
@@ -2089,12 +2163,12 @@ function SettingsPanel({
               {subMaskConfig.parameters?.map((param: any) => (
                 <Slider
                   key={param.key}
-                  label={t('editor.ai.params.' + param.key)}
+                  label={t('editor.ai.params.' + param.key, param.key)}
                   min={param.min}
                   max={param.max}
                   step={param.step}
                   defaultValue={param.defaultValue}
-                  value={(activeSubMask.parameters[param.key] || 0) * (param.multiplier || 1)}
+                  value={(activeSubMask.parameters[param.key] ?? param.defaultValue) * (param.multiplier || 1)}
                   onChange={(e: any) =>
                     updateSubMask(activeSubMask.id, {
                       parameters: {
@@ -2103,9 +2177,46 @@ function SettingsPanel({
                       },
                     })
                   }
+                  onPointerUp={() => {
+                    const isDirectTool = activeSubMask.type === Mask.Liquify || activeSubMask.type === Mask.Retouch;
+
+                    if (isDirectTool && activeSubMask.parameters?.lines?.length > 0) {
+                      setTimeout(() => {
+                        onManualCleanup(activeSubMask.id, 0, 0);
+                      }, 0);
+                    }
+                  }}
                   {...(param.key !== 'grow' && { fillOrigin: 'min' })}
                 />
               ))}
+
+              {isComponentMode && activeSubMask.type === Mask.Liquify && (
+                <div className="pt-2">
+                  <Text variant={TextVariants.label} className="mb-2 block">
+                    {t('editor.ai.liquify.mode')}
+                  </Text>
+                  <Dropdown
+                    options={[
+                      { label: t('editor.ai.liquify.modes.push'), value: 'push' },
+                      { label: t('editor.ai.liquify.modes.pinch'), value: 'pinch' },
+                      { label: t('editor.ai.liquify.modes.expand'), value: 'expand' },
+                      { label: t('editor.ai.liquify.modes.twirl'), value: 'twirl' },
+                    ]}
+                    value={activeSubMask.parameters.liquifyMode || 'push'}
+                    onChange={(val) => {
+                      updateSubMask(activeSubMask.id, {
+                        parameters: { ...activeSubMask.parameters, liquifyMode: val },
+                      });
+
+                      setTimeout(() => {
+                        if (activeSubMask.parameters?.lines?.length > 0) {
+                          onManualCleanup(activeSubMask.id, 0, 0);
+                        }
+                      }, 0);
+                    }}
+                  />
+                </div>
+              )}
 
               {subMaskConfig.showBrushTools && brushSettings && (
                 <BrushTools settings={brushSettings} onSettingsChange={setBrushSettings} />

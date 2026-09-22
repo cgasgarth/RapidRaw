@@ -2,8 +2,8 @@
   "adjustments": {
     "basic": {
       "blacks": "Schwarz",
+      "brightness": "Helligkeit",
       "contrast": "Kontrast",
-      "evShift": "EV-Korrektur",
       "exposure": "Belichtung",
       "highlights": "Lichter",
       "mappers": {
@@ -178,6 +178,7 @@
     },
     "editor": {
       "autoAdjust": "Bild autom. anpassen",
+      "autoLensCorrection": "Autom. Objektivkorrektur",
       "cancel": "Abbrechen",
       "colorLabel": "Farbmarkierung",
       "confirmReset": "Zurücksetzen bestätigen",
@@ -240,6 +241,8 @@
       "addToAlbum": "Zu Album hinzufügen",
       "autoAdjust_one": "Bild autom. anpassen",
       "autoAdjust_other": "Bilder autom. anpassen",
+      "autoLensCorrection_one": "Autom. Objektivkorrektur",
+      "autoLensCorrection_other": "Autom. Objektivkorrektur",
       "collage_one": "Bild rahmen",
       "collage_other": "Collage erstellen",
       "confirmDelete": "Löschen bestätigen",
@@ -366,11 +369,22 @@
       "generatingDepthMap": "KI-Tiefenkarte wird berechnet...",
       "generativeEditTitle": "Generative Bearbeitung",
       "inpaintingTitle": "Reparieren",
+      "liquify": {
+        "mode": "Verflüssigen-Modus",
+        "modes": {
+          "expand": "Aufblasen",
+          "pinch": "Zusammenziehen",
+          "push": "Verschieben",
+          "twirl": "Strudel"
+        }
+      },
       "manualCleanupTitle": "Manuelle Bereinigung",
       "noImageSelected": "Kein Bild ausgewählt.",
       "params": {
         "feather": "Weiche Kante",
-        "grow": "Erweitern"
+        "grow": "Erweitern",
+        "intensity": "Intensität",
+        "pressure": "Druck"
       },
       "patches": {
         "aiEdit": "KI-Bearbeitung {{count}}",
@@ -383,9 +397,13 @@
         "heal_one": "Reparieren {{count}}",
         "heal_other": "Reparieren {{count}}",
         "invertedName": "{{name}} umgekehrt",
+        "liquify": "Verflüssigen {{count}}",
+        "liquify_one": "Verflüssigen {{count}}",
+        "liquify_other": "Verflüssigen {{count}}",
         "quickErase": "Schnelles Löschen {{count}}",
         "quickErase_one": "Schnelles Löschen {{count}}",
-        "quickErase_other": "Schnelles Löschen {{count}}"
+        "quickErase_other": "Schnelles Löschen {{count}}",
+        "retouch": "Retusche {{count}}"
       },
       "resetInpaintingTooltip": "Reparieren zurücksetzen",
       "settings": {
@@ -406,7 +424,8 @@
         "quickEraseDesc": "Auswahl füllen, um das Objekt zu entfernen.",
         "selectionPropertiesTitle": "Auswahleigenschaften",
         "useBasicInpaint": "Einfaches Reparieren verwenden"
-      }
+      },
+      "touchUpTitle": "Ausbessern"
     },
     "crop": {
       "aspectRatioHeading": "Seitenverhältnis",
@@ -430,6 +449,10 @@
         "armature": {
           "desc": "Harmonische Dreiecke",
           "name": "Dreiecke"
+        },
+        "center": {
+          "desc": "Mittellinien",
+          "name": "Mitte"
         },
         "diagonal": {
           "desc": "Diagonale Linien",
@@ -523,6 +546,16 @@
       "exporting": "Exportieren…",
       "savesTo": "Externe Bearbeitung — speichert in"
     },
+    "guided": {
+      "cancel": "Abbrechen",
+      "drawingActive": "Zeichnen aktiv",
+      "hint": "Zeichnen Sie entlang der Kanten in Ihrem Foto, die vertikal oder horizontal sein sollten.",
+      "linesStatus": "Aktive Hilfslinien",
+      "toast": {
+        "angleRejected": "Linienwinkel ist zu weit von horizontal oder vertikal entfernt",
+        "maxLines": "Maximal 2 vertikale und 2 horizontale Linien erlaubt"
+      }
+    },
     "layout": {
       "split": "Teilen"
     },
@@ -555,6 +588,8 @@
         "switchToSubtract": "Zu Subtrahieren wechseln"
       },
       "addNewMask": "Neue Maske hinzufügen",
+      "aiTitle": "KI-Auswahl",
+      "basicTitle": "Basis-Werkzeuge",
       "brush": {
         "brush": "Pinsel",
         "eraser": "Radierer",
@@ -563,7 +598,6 @@
         "size": "Pinselgröße"
       },
       "comingSoon": "Demnächst",
-      "createNewTitle": "Neue Maske erstellen",
       "depthRange": {
         "far": "Fern",
         "near": "Nah",
@@ -587,6 +621,7 @@
         "maskName_one": "Maske {{count}}",
         "maskName_other": "Maske {{count}}"
       },
+      "rangeTitle": "Bereiche & Global",
       "resetMaskingTooltip": "Maskierung zurücksetzen",
       "settings": {
         "aiModelDownloading": "KI-Modell wird heruntergeladen: ",
@@ -609,8 +644,7 @@
       "tooltips": {
         "addToCurrent": "{{name}} zur aktuellen Maske hinzufügen oder neu erstellen (Rechtsklick)",
         "createNew": "Neue {{name}}-Maske erstellen",
-        "selectNewSourcePoint": "{{modifier}} + Klicken, um einen neuen Quellpunkt auszuwählen",
-        "showMore": "Mehr Maskenarten anzeigen"
+        "selectNewSourcePoint": "{{modifier}} + Klicken, um einen neuen Quellpunkt auszuwählen"
       }
     },
     "metadata": {
@@ -756,6 +790,12 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "destination": {
+      "customFolder": "Benutzerdefinierter Ordner",
+      "originalFolder": "Ursprungsordner des Bildes",
+      "subfolder": "Unterordner",
+      "subfolderPlaceholder": "z. B. final, WebP"
+    },
     "dialog": {
       "saveEditedImageTitle": "Bearbeitetes Bild speichern",
       "selectFolderTitle": "Ordner zum Exportieren von {{count}} Bild(ern) auswählen",
@@ -764,7 +804,10 @@
     },
     "file": {
       "quality": "Qualität",
-      "qualityLossless": "Qualität (Verlustfrei)"
+      "qualityLossless": "Qualität (Verlustfrei)",
+      "tiffBitDepth": "TIFF-Bittiefe",
+      "tiffBitDepth16": "16 Bit",
+      "tiffBitDepth8": "8 Bit"
     },
     "labels": {
       "image": "Bild",
@@ -789,6 +832,7 @@
     },
     "sections": {
       "advanced": "Erweitert",
+      "destination": "Zielort",
       "fileNaming": "Dateibenennung",
       "fileSettings": "Dateieinstellungen",
       "imageSizing": "Bildgröße",
@@ -927,6 +971,9 @@
         "clearSearch": "Suche löschen",
         "collapse": "Zuklappen",
         "expand": "Aufklappen",
+        "moreOptions": "Optionen",
+        "navBack": "Zurück",
+        "navForward": "Vorwärts",
         "sortFolders": "Ordner sortieren"
       }
     },
@@ -1046,6 +1093,7 @@
     },
     "thumbnailFit": {
       "fillSquare": "Quadrat füllen",
+      "justified": "Mosaik",
       "originalRatio": "Original-Verhältnis"
     },
     "thumbnailSize": {
@@ -1071,11 +1119,13 @@
       "foreground": "Vordergrund",
       "heal": "Reparieren",
       "linear": "Linear",
+      "liquify": "Verflüssigen",
       "luminance": "Luminanz",
       "others": "Andere",
       "quickErase": "Schnelles Löschen",
       "quickEraser": "Schnell-Radierer",
       "radial": "Radial",
+      "retouch": "Retuschieren",
       "sky": "Himmel",
       "subject": "Motiv"
     }
@@ -1142,6 +1192,7 @@
         "curves": "Kurven",
         "exposureToneMapper": "Belichtung & Tonemapper",
         "grain": "Körnung",
+        "guidedPerspective": "Geführte Perspektive",
         "halationGlow": "Lichthof & Glühen",
         "hueShift": "Globaler Farbton-Shift",
         "lensCorrection": "Objektivkorrektur",
@@ -1389,7 +1440,10 @@
       "cancel": "Abbrechen",
       "compareTooltip": "Halten zum Vergleichen",
       "distortion": "Verzerrung",
+      "geometry": "Geometrie",
+      "guided": "Geführte Perspektive",
       "horizontal": "Horizontal",
+      "manual": "Manuelle Transformation",
       "maskWarning": "Transformieren aktualisiert die Basisgeometrie. Masken können sich verschieben, KI-Masken müssen neu generiert werden.",
       "offset": "Versatz",
       "original": "Original",
@@ -1436,6 +1490,9 @@
       "speed": "Geschwindigkeit",
       "title": "Maussteuerung",
       "zoom": "Zoom-Geschwindigkeitsfaktor",
+      "zoomClick": "Foto auf 100% zoomen",
+      "zoomClickDesc": "Foto im Editor bei Mausklick auf 100% zoomen",
+      "zoomClickInfo": "Klicken Sie auf das Foto, um sofort auf 100% (1:1 Pixel) zu zoomen, um Schärfe und Rauschen zu beurteilen. Wenn deaktiviert, wird beim Klicken stufenweise herangezoomt.",
       "zoomDesc": "Passen Sie an, wie schnell das Bild beim Scrollen oder Kneifen zoomt."
     },
     "data": {
@@ -1500,6 +1557,7 @@
       "displayEditIcon": "Bearbeitungssymbol anzeigen",
       "displayEditIconDesc": "Zeigt ein kleines Schieberegler-Symbol auf Miniaturbildern an, die bearbeitet wurden.",
       "enableFocusMode": "Fokusmodus aktivieren",
+      "enableNeutralGreyCanvas": "Neutralgrauen Hintergrund aktivieren",
       "enableOsTitlebar": "OS-Titelleiste aktivieren",
       "enableXmpSync": "XMP-Sync aktivieren",
       "focusMode": "Fokusmodus",
@@ -1510,6 +1568,8 @@
       "fontDesc": "Ändern Sie die Schriftart der Anwendung.",
       "nativeTitlebar": "Native Titelleiste",
       "nativeTitlebarDesc": "Verwenden Sie die Standard-Fenstertitelleiste Ihres Systems anstelle der benutzerdefinierten von RapidRAW.",
+      "neutralGreyCanvas": "Neutralgraue Arbeitsfläche",
+      "neutralGreyCanvasDesc": "Verwenden Sie eine neutralgraue Arbeitsfläche für eine genauere Farb- und Belichtungskorrektur, ohne das App-Design zu ändern.",
       "poppins": "Poppins",
       "showImageCounts": "Bildanzahl anzeigen",
       "system": "Systemstandard",
@@ -1674,6 +1734,8 @@
       "livePreviewQualityDesc": "Steuert die Auflösung beim Ziehen von Reglern. Niedrigere Qualität verbessert die Reaktionsfähigkeit erheblich.",
       "livePreviews": "Interaktive Live-Vorschauen",
       "livePreviewsDesc": "Aktualisiert die Vorschau sofort beim Ziehen von Reglern. Deaktivieren, wenn die Oberfläche beim Anpassen träge ist.",
+      "mediumThumbnailRes": "Editor-Miniaturbild-Auflösung",
+      "mediumThumbnailResDesc": "Auflösung der Vorschau, die während des Ladens von vollständigen Bildern im Editor angezeigt wird.",
       "modes": {
         "dynamic": "Dynamisch",
         "static": "Feste Auflösung"
@@ -1722,6 +1784,8 @@
       "renderScaleDesc": "Skaliert die Renderauflösung relativ zu Ihrem Display. Niedrigere Werte verbessern die Leistung auf hochauflösenden Bildschirmen.",
       "restartRequired": "Änderungen an der Verarbeitungs-Engine erfordern einen Neustart der Anwendung.",
       "saveRelaunch": "Speichern & Neu starten",
+      "smallThumbnailRes": "Raster-Miniaturbild-Auflösung",
+      "smallThumbnailResDesc": "Auflösung der Miniaturbilder, die im Bibliotheksraster angezeigt werden.",
       "staticDesc": "Der Editor rendert das Bild in einer festen Auflösung. Dieser Modus ist am schnellsten und am besten für schwächere Hardware geeignet.",
       "staticPreviewRes": "Statische Vorschauauflösung",
       "staticPreviewResDesc": "Legt die Auflösung für statische Vorschauen wie Zuschnitt und Perspektive fest. Beeinflusst nicht die Hauptvorschau.",

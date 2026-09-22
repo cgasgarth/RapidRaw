@@ -1,4 +1,5 @@
 use crate::gpu_processing::WgpuDisplay;
+use crate::guided_perspective::{GuideLine, compute_guided_homography, count_valid_lines};
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Vec2, Vec3};
 use image::{DynamicImage, GenericImageView, Rgb32FImage, Rgba};
@@ -14,8 +15,8 @@ use std::f32::consts::PI;
 use std::sync::Arc;
 
 pub use crate::gpu_processing::{
-    RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image,
-    process_and_get_dynamic_image_with_analytics,
+    RenderOutputPrecision, RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image,
+    process_and_get_dynamic_image_with_analytics, process_and_get_dynamic_image_with_precision,
 };
 use crate::{AppState, mask_generation::MaskDefinition};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -79,7 +80,7 @@ pub struct Crop {
     pub height: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeometryParams {
     pub distortion: f32,
     pub vertical: f32,
@@ -104,6 +105,10 @@ pub struct GeometryParams {
     pub vig_k1: f32,
     pub vig_k2: f32,
     pub vig_k3: f32,
+    #[serde(default)]
+    pub guided_lines: Vec<GuideLine>,
+    #[serde(default)]
+    pub guided_perspective_enabled: bool,
 }
 
 impl Default for GeometryParams {
@@ -132,6 +137,8 @@ impl Default for GeometryParams {
             vig_k1: 0.0,
             vig_k2: 0.0,
             vig_k3: 0.0,
+            guided_lines: Vec::new(),
+            guided_perspective_enabled: false,
         }
     }
 }
@@ -140,6 +147,16 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
     let lens_params = adjustments
         .get("lensDistortionParams")
         .and_then(|v| v.as_object());
+
+    let guided = adjustments.get("guidedPerspective");
+    let guided_perspective_enabled = guided
+        .and_then(|g| g.get("enabled"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let guided_lines: Vec<GuideLine> = guided
+        .and_then(|g| g.get("lines"))
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
 
     GeometryParams {
         distortion: adjustments["transformDistortion"].as_f64().unwrap_or(0.0) as f32,
@@ -191,6 +208,8 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
         vig_k3: lens_params
             .and_then(|p| p.get("vig_k3").and_then(|k| k.as_f64()))
             .unwrap_or(0.0) as f32,
+        guided_lines,
+        guided_perspective_enabled,
     }
 }
 
@@ -325,23 +344,24 @@ pub fn downscale_f32_image(image: &DynamicImage, nwidth: u32, nheight: u32) -> D
                     let src_end = row_offset + x_in_end * 3;
                     let src_slice = &src[src_start..src_end];
 
-                    for (&w_x, chunk) in x_wts.iter().zip(src_slice.chunks_exact(3)) {
+                    for (&w_x, chunk) in x_wts.iter().zip(src_slice.as_chunks::<3>().0) {
                         let w = w_x * w_y;
 
                         let r = chunk[0].max(0.0);
                         let g = chunk[1].max(0.0);
                         let b = chunk[2].max(0.0);
 
-                        r_sum += r * r * w;
-                        g_sum += g * g * w;
-                        b_sum += b * b * w;
+                        r_sum += r * w;
+                        g_sum += g * w;
+                        b_sum += b * w;
                     }
                 }
 
                 let out_idx = x_out * 3;
-                row[out_idx] = r_sum.sqrt();
-                row[out_idx + 1] = g_sum.sqrt();
-                row[out_idx + 2] = b_sum.sqrt();
+
+                row[out_idx] = r_sum;
+                row[out_idx + 1] = g_sum;
+                row[out_idx + 2] = b_sum;
             }
         });
 
@@ -447,7 +467,32 @@ fn build_transform_matrices(
     );
     let m_offset = NaMatrix3::new(1.0, 0.0, off_x, 0.0, 1.0, off_y, 0.0, 0.0, 1.0);
 
-    let forward = t_center * m_offset * m_perspective * m_rotate * m_scale * t_uncenter;
+    let guided_m = if params.guided_perspective_enabled
+        && count_valid_lines(&params.guided_lines, width as f64, height as f64) >= 2
+    {
+        if let Some(res) =
+            compute_guided_homography(&params.guided_lines, width as f64, height as f64)
+        {
+            let h = res.forward_h;
+            NaMatrix3::new(
+                h[0][0] as f32,
+                h[0][1] as f32,
+                h[0][2] as f32,
+                h[1][0] as f32,
+                h[1][1] as f32,
+                h[1][2] as f32,
+                h[2][0] as f32,
+                h[2][1] as f32,
+                h[2][2] as f32,
+            )
+        } else {
+            NaMatrix3::identity()
+        }
+    } else {
+        NaMatrix3::identity()
+    };
+
+    let forward = t_center * m_offset * m_perspective * m_rotate * m_scale * guided_m * t_uncenter;
     let half_diagonal =
         ((width as f64 * width as f64 + height as f64 * height as f64).sqrt()) / 2.0;
 
@@ -714,7 +759,7 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
             let y_f = y as f32;
             let mut current_vec = origin_vec + (step_vec_y * y_f);
 
-            for pixel in row_pixel_data.chunks_exact_mut(3) {
+            for pixel in row_pixel_data.as_chunks_mut::<3>().0.iter_mut() {
                 if current_vec.z.abs() > 1e-6 {
                     let inv_z = 1.0 / current_vec.z;
                     let mut src_x = current_vec.x * inv_z;
@@ -838,7 +883,7 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
         .for_each(|(y, row_pixel_data)| {
             let y_f = y as f32;
 
-            for (x, pixel) in row_pixel_data.chunks_exact_mut(3).enumerate() {
+            for (x, pixel) in row_pixel_data.as_chunks_mut::<3>().0.iter_mut().enumerate() {
                 let x_f = x as f32;
                 let mut current_x = x_f;
                 let mut current_y = y_f;
@@ -1312,6 +1357,10 @@ pub fn apply_flip<'a>(
 }
 
 pub fn is_geometry_identity(params: &GeometryParams) -> bool {
+    if params.guided_perspective_enabled && params.guided_lines.len() >= 2 {
+        return false;
+    }
+
     let dist_identity = !params.lens_distortion_enabled
         || ((params.lens_distortion_amount - 1.0).abs() < 1e-4
             && params.lens_dist_k1.abs() < 1e-6
@@ -2620,9 +2669,9 @@ pub fn remove_raw_artifacts_and_enhance(
                     let (r, g, b) = yc_to_rgb(cy, out_cb, out_cr);
 
                     let o = x * 3;
-                    row[o] = r.clamp(0.0, 1.0);
-                    row[o + 1] = g.clamp(0.0, 1.0);
-                    row[o + 2] = b.clamp(0.0, 1.0);
+                    row[o] = r.max(0.0);
+                    row[o + 1] = g.max(0.0);
+                    row[o + 2] = b.max(0.0);
                 }
             });
     }
@@ -2719,9 +2768,9 @@ fn apply_gentle_detail_enhance(
 
                 let safe_boost = boost * scale.clamp(0.0, 1.0);
 
-                rgb_row[r_idx] = (r + safe_boost).clamp(0.0, 1.0);
-                rgb_row[g_idx] = (g + safe_boost).clamp(0.0, 1.0);
-                rgb_row[b_idx] = (b + safe_boost).clamp(0.0, 1.0);
+                rgb_row[r_idx] = (r + safe_boost).max(0.0);
+                rgb_row[g_idx] = (g + safe_boost).max(0.0);
+                rgb_row[b_idx] = (b + safe_boost).max(0.0);
             }
         });
 }
@@ -2753,7 +2802,7 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
             let raw = f32_img.as_raw();
             raw.par_chunks(30_000)
                 .fold(init_hist, |mut acc, chunk| {
-                    for pixel in chunk.chunks_exact(3).step_by(2) {
+                    for pixel in chunk.as_chunks::<3>().0.iter().step_by(2) {
                         let r = (pixel[0].clamp(0.0, 1.0) * 255.0) as usize;
                         let g = (pixel[1].clamp(0.0, 1.0) * 255.0) as usize;
                         let b = (pixel[2].clamp(0.0, 1.0) * 255.0) as usize;
@@ -2774,7 +2823,7 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
             let raw = rgb.as_raw();
             raw.par_chunks(30_000)
                 .fold(init_hist, |mut acc, chunk| {
-                    for pixel in chunk.chunks_exact(3).step_by(2) {
+                    for pixel in chunk.as_chunks::<3>().0.iter().step_by(2) {
                         let r = pixel[0] as usize;
                         let g = pixel[1] as usize;
                         let b = pixel[2] as usize;

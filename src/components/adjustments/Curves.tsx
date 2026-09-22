@@ -6,6 +6,9 @@ import {
   ActiveChannel,
   Adjustments,
   Coord,
+  DEFAULT_PARAMETRIC_CURVE,
+  DEFAULT_PARAMETRIC_CURVE_SETTINGS,
+  getDefaultCurves,
   ParametricCurveSettings,
   buildParametricCurvePoints,
   buildParametricCurves,
@@ -41,45 +44,10 @@ interface CurveGraphProps {
   onDragStateChange?: (isDragging: boolean) => void;
 }
 
-const DEFAULT_PARAMETRIC_CURVE_SETTINGS: ParametricCurveSettings = {
-  darks: 0,
-  shadows: 0,
-  highlights: 0,
-  lights: 0,
-  whiteLevel: 0,
-  blackLevel: 0,
-  split1: 25,
-  split2: 50,
-  split3: 75,
-};
-
-const DEFAULT_PARAMETRIC_CURVE = {
-  luma: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-  red: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-  green: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-  blue: { ...DEFAULT_PARAMETRIC_CURVE_SETTINGS },
-};
-
-const DEFAULT_POINT_CURVES = {
-  blue: [
-    { x: 0, y: 0 },
-    { x: 255, y: 255 },
-  ],
-  green: [
-    { x: 0, y: 0 },
-    { x: 255, y: 255 },
-  ],
-  luma: [
-    { x: 0, y: 0 },
-    { x: 255, y: 255 },
-  ],
-  red: [
-    { x: 0, y: 0 },
-    { x: 255, y: 255 },
-  ],
-};
+const DEFAULT_POINT_CURVES = getDefaultCurves();
 
 const buildParametricPoints = buildParametricCurvePoints;
+
 
 function getCurvePath(points: Array<Coord>) {
   if (points.length < 2) return '';

@@ -1,6 +1,5 @@
 const js = require('@eslint/js');
 const tseslint = require('typescript-eslint');
-const react = require('eslint-plugin-react');
 const i18next = require('eslint-plugin-i18next');
 
 const tsFiles = ['**/*.{ts,tsx}'];
@@ -31,7 +30,6 @@ module.exports = [
   {
     files: tsFiles,
     plugins: {
-      react,
       i18next,
     },
     languageOptions: {
@@ -44,11 +42,6 @@ module.exports = [
         projectService: {
           allowDefaultProject: ['i18next.config.ts'],
         },
-      },
-    },
-    settings: {
-      react: {
-        version: 'detect',
       },
     },
     rules: {

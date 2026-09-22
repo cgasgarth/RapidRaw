@@ -44,6 +44,7 @@ import {
 import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
+import { useCloudUsage } from '../../hooks/useCloudUsage';
 import { open } from '@tauri-apps/plugin-shell';
 import { RotateCcw } from 'lucide-react';
 import { useUIStore } from '../../store/useUIStore';
@@ -123,11 +124,20 @@ const resolutions: OptionItem<number>[] = [
   { value: 3840, label: '3840px' },
 ];
 
-const thumbnailResolutions: OptionItem<number>[] = [
+const smallThumbnailResolutions: OptionItem<number>[] = [
+  { value: 240, label: '240px' },
+  { value: 360, label: '360px' },
+  { value: 480, label: '480px' },
   { value: 640, label: '640px' },
   { value: 720, label: '720px' },
-  { value: 960, label: '960px' },
-  { value: 1080, label: '1080px' },
+];
+
+const mediumThumbnailResolutions: OptionItem<number>[] = [
+  { value: 720, label: '720px' },
+  { value: 1024, label: '1024px' },
+  { value: 1280, label: '1280px' },
+  { value: 1440, label: '1440px' },
+  { value: 1920, label: '1920px' },
 ];
 
 const zoomMultiplierOptions: OptionItem<number>[] = [
@@ -266,7 +276,7 @@ const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwit
     () => [
       { id: 'cpu', label: t('settings.processing.ai.providers.cpu'), icon: Cpu },
       { id: 'ai-connector', label: t('settings.processing.ai.providers.aiConnector'), icon: Server },
-      //{ id: 'cloud', label: t('settings.processing.ai.providers.cloud'), icon: Cloud },
+      { id: 'cloud', label: t('settings.processing.ai.providers.cloud'), icon: Cloud },
     ],
     [t],
   );
@@ -306,30 +316,9 @@ const AiProviderSwitch = ({ selectedProvider, onProviderChange }: AiProviderSwit
 
 const CloudDashboard = () => {
   const { user } = useUser();
-  const { getToken } = useAuth();
   const { signOut } = useClerk();
-  const [usage, setUsage] = useState<{ requests: number; limit: number; month: string } | null>(null);
   const { t } = useTranslation();
-
-  useEffect(() => {
-    const fetchUsage = async () => {
-      try {
-        const token = await getToken();
-        if (!token) return;
-        const res = await fetch('http://127.0.0.1:5000/usage', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          setUsage(await res.json());
-        }
-      } catch (e) {
-        console.error('Failed to fetch cloud usage', e);
-      }
-    };
-    fetchUsage();
-  }, [getToken]);
-
-  const isPro = user?.publicMetadata?.plan === 'pro';
+  const { cloudUsage, isPro } = useCloudUsage();
 
   return (
     <div className="space-y-4">
@@ -369,15 +358,15 @@ const CloudDashboard = () => {
             <Text variant={TextVariants.label}>{t('settings.processing.ai.cloud.signedIn.usage')}</Text>
             <Text variant={TextVariants.small}>
               {t('settings.processing.ai.cloud.signedIn.usageStats', {
-                requests: usage?.requests ?? 0,
-                limit: usage?.limit ?? 500,
+                requests: cloudUsage?.requests ?? 0,
+                limit: cloudUsage?.limit ?? 200,
               })}
             </Text>
           </div>
           <div className="w-full bg-bg-primary rounded-full h-2">
             <div
               className="bg-accent h-2 rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, ((usage?.requests ?? 0) / (usage?.limit ?? 500)) * 100)}%` }}
+              style={{ width: `${Math.min(100, ((cloudUsage?.requests ?? 0) / (cloudUsage?.limit ?? 200)) * 100)}%` }}
             />
           </div>
         </div>
@@ -536,7 +525,8 @@ export default function SettingsPanel({
   const osPlatform = useOsPlatform();
   const [processingSettings, setProcessingSettings] = useState({
     editorPreviewResolution: appSettings?.editorPreviewResolution || 1920,
-    thumbnailResolution: appSettings?.thumbnailResolution || 720,
+    smallThumbnailResolution: appSettings?.smallThumbnailResolution || 480,
+    mediumThumbnailResolution: appSettings?.mediumThumbnailResolution || 1280,
     rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
     processingBackend: appSettings?.processingBackend || 'auto',
     linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
@@ -644,7 +634,8 @@ export default function SettingsPanel({
     }
     setProcessingSettings({
       editorPreviewResolution: appSettings?.editorPreviewResolution || 1920,
-      thumbnailResolution: appSettings?.thumbnailResolution || 720,
+      smallThumbnailResolution: appSettings?.smallThumbnailResolution || 480,
+      mediumThumbnailResolution: appSettings?.mediumThumbnailResolution || 1280,
       rawHighlightCompression: appSettings?.rawHighlightCompression ?? 2.5,
       processingBackend: appSettings?.processingBackend || 'auto',
       linuxGpuOptimization: appSettings?.linuxGpuOptimization ?? false,
@@ -1184,6 +1175,18 @@ export default function SettingsPanel({
                           id="folder-image-counts-toggle"
                           label={t('settings.general.showImageCounts')}
                           onChange={(checked) => onSettingsChange({ ...appSettings, enableFolderImageCounts: checked })}
+                        />
+                      </SettingItem>
+
+                      <SettingItem
+                        label={t('settings.general.neutralGreyCanvas')}
+                        description={t('settings.general.neutralGreyCanvasDesc')}
+                      >
+                        <Switch
+                          checked={appSettings?.editorNeutralGreyBg ?? false}
+                          id="neutral-grey-bg-toggle"
+                          label={t('settings.general.enableNeutralGreyCanvas')}
+                          onChange={(checked) => onSettingsChange({ ...appSettings, editorNeutralGreyBg: checked })}
                         />
                       </SettingItem>
 
@@ -1895,13 +1898,25 @@ export default function SettingsPanel({
                       </div>
 
                       <SettingItem
-                        description={t('settings.processing.thumbnailResDesc')}
-                        label={t('settings.processing.thumbnailRes')}
+                        description={t('settings.processing.smallThumbnailResDesc')}
+                        label={t('settings.processing.smallThumbnailRes')}
                       >
                         <Dropdown
-                          onChange={(value: any) => handleProcessingSettingChange('thumbnailResolution', value)}
-                          options={thumbnailResolutions}
-                          value={processingSettings.thumbnailResolution}
+                          onChange={(value: any) => handleProcessingSettingChange('smallThumbnailResolution', value)}
+                          options={smallThumbnailResolutions}
+                          value={processingSettings.smallThumbnailResolution}
+                          triggerClassName="bg-bg-primary"
+                        />
+                      </SettingItem>
+
+                      <SettingItem
+                        description={t('settings.processing.mediumThumbnailResDesc')}
+                        label={t('settings.processing.mediumThumbnailRes')}
+                      >
+                        <Dropdown
+                          onChange={(value: any) => handleProcessingSettingChange('mediumThumbnailResolution', value)}
+                          options={mediumThumbnailResolutions}
+                          value={processingSettings.mediumThumbnailResolution}
                           triggerClassName="bg-bg-primary"
                         />
                       </SettingItem>
@@ -2030,6 +2045,7 @@ export default function SettingsPanel({
                       {t('settings.processing.preprocessing.title')}
                     </Text>
                     <div className="space-y-8">
+                      {/* turn off highlights clipping setting for now - needs clean cleanup across other files.
                       <SettingItem
                         label={t('settings.processing.preprocessing.highlightRecovery')}
                         description={t('settings.processing.preprocessing.highlightRecoveryDesc')}
@@ -2047,6 +2063,7 @@ export default function SettingsPanel({
                           fillOrigin="min"
                         />
                       </SettingItem>
+                      */}
 
                       <SettingItem
                         label={t('settings.processing.preprocessing.colorNr')}
@@ -2333,7 +2350,7 @@ export default function SettingsPanel({
                                     <Text variant={TextVariants.small}>
                                       {t('settings.processing.ai.cloud.signedOut.noAccount')}{' '}
                                       <button
-                                        onClick={() => open('https://www.getrapidraw.com/dashboard')}
+                                        onClick={() => open('https://www.getrapidraw.com/cloud')}
                                         className="text-accent hover:underline focus:outline-none"
                                       >
                                         {t('settings.processing.ai.cloud.signedOut.signup')}
@@ -2465,6 +2482,19 @@ export default function SettingsPanel({
                             onSettingsChange({ ...appSettings, zoomSpeedMultiplier: parseFloat(e.target.value) })
                           }
                           fillOrigin="min"
+                        />
+                      </SettingItem>
+                      <SettingItem
+                        label={t('settings.controls.zoomClick')}
+                        description={t('settings.controls.zoomClickInfo')}
+                      >
+                        <Switch
+                          checked={appSettings?.zoomPhotoToPixelClick ?? false}
+                          id="zoom-photo-to-pixel-click"
+                          label={t('settings.controls.zoomClickDesc')}
+                          onChange={(checked) => {
+                            onSettingsChange({ ...appSettings, zoomPhotoToPixelClick: checked });
+                          }}
                         />
                       </SettingItem>
                     </div>

@@ -20,6 +20,7 @@ interface LibraryViewProps {
   thumbnailAspectRatio: ThumbnailAspectRatio;
   libraryViewMode: LibraryViewMode;
   isAndroid: boolean;
+  layoutMode: 'compact' | 'wide' | 'full';
   setThumbnailSize: (size: ThumbnailSize) => void;
   setThumbnailAspectRatio: (ratio: ThumbnailAspectRatio) => void;
   setLibraryViewMode: (mode: LibraryViewMode) => void;
@@ -47,6 +48,7 @@ export default function LibraryView({
   thumbnailAspectRatio,
   libraryViewMode,
   isAndroid,
+  layoutMode,
   setThumbnailSize,
   setThumbnailAspectRatio,
   setLibraryViewMode,
@@ -173,7 +175,7 @@ export default function LibraryView({
             isCopyDisabled={multiSelectedPaths.length !== 1}
             isExportDisabled={multiSelectedPaths.length === 0}
             isLibraryView={true}
-            isAndroid={isAndroid}
+            layoutMode={layoutMode}
             isPasted={isPasted}
             isPasteDisabled={useEditorStore.getState().copiedAdjustments === null || multiSelectedPaths.length === 0}
             isRatingDisabled={multiSelectedPaths.length === 0}
