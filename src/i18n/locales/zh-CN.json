@@ -2,8 +2,8 @@
   "adjustments": {
     "basic": {
       "blacks": "黑色",
+      "brightness": "亮度",
       "contrast": "对比度",
-      "evShift": "EV 偏移",
       "exposure": "曝光",
       "highlights": "高光",
       "mappers": {
@@ -178,6 +178,7 @@
     },
     "editor": {
       "autoAdjust": "自动调整图像",
+      "autoLensCorrection": "自动镜头校正",
       "cancel": "取消",
       "colorLabel": "颜色标签",
       "confirmReset": "确认重置",
@@ -240,6 +241,8 @@
       "addToAlbum": "添加到相册",
       "autoAdjust_one": "自动调整图像",
       "autoAdjust_other": "自动调整图像",
+      "autoLensCorrection_one": "自动镜头校正",
+      "autoLensCorrection_other": "自动镜头校正",
       "collage_one": "装裱图像",
       "collage_other": "创建拼贴画",
       "confirmDelete": "确认删除",
@@ -366,11 +369,22 @@
       "generatingDepthMap": "正在计算 AI 深度图...",
       "generativeEditTitle": "生成式编辑",
       "inpaintingTitle": "图像修复",
+      "liquify": {
+        "mode": "液化模式",
+        "modes": {
+          "expand": "膨胀",
+          "pinch": "捏合",
+          "push": "推动",
+          "twirl": "旋转扭曲"
+        }
+      },
       "manualCleanupTitle": "手动清理",
       "noImageSelected": "未选择图像。",
       "params": {
         "feather": "羽化",
-        "grow": "扩展"
+        "grow": "扩展",
+        "intensity": "强度",
+        "pressure": "压力"
       },
       "patches": {
         "aiEdit": "AI 编辑 {{count}}",
@@ -381,9 +395,13 @@
         "heal": "修复 {{count}}",
         "heal_other": "修复 {{count}}",
         "invertedName": "{{name}} 反转",
+        "liquify": "液化 {{count}}",
+        "liquify_one": "液化 {{count}}",
+        "liquify_other": "液化 {{count}}",
         "quickErase": "快速擦除 {{count}}",
         "quickErase_one": "快速擦除 {{count}}",
-        "quickErase_other": "快速擦除 {{count}}"
+        "quickErase_other": "快速擦除 {{count}}",
+        "retouch": "修饰 {{count}}"
       },
       "resetInpaintingTooltip": "重置图像修复",
       "settings": {
@@ -404,7 +422,8 @@
         "quickEraseDesc": "填充选区以移除对象。",
         "selectionPropertiesTitle": "选区属性",
         "useBasicInpaint": "使用基础图像修复"
-      }
+      },
+      "touchUpTitle": "润色"
     },
     "crop": {
       "aspectRatioHeading": "宽高比",
@@ -428,6 +447,10 @@
         "armature": {
           "desc": "骨架",
           "name": "骨架"
+        },
+        "center": {
+          "desc": "中心线",
+          "name": "中心"
         },
         "diagonal": {
           "desc": "对角线",
@@ -521,6 +544,16 @@
       "exporting": "正在导出…",
       "savesTo": "外部编辑 — 保存至"
     },
+    "guided": {
+      "cancel": "取消",
+      "drawingActive": "绘图中",
+      "hint": "沿着照片中应该是垂直或水平的边缘绘制。",
+      "linesStatus": "活跃引导线",
+      "toast": {
+        "angleRejected": "线条角度偏离水平或垂直太远",
+        "maxLines": "最多允许 2 条垂直线和 2 条水平线"
+      }
+    },
     "layout": {
       "split": "拆分"
     },
@@ -553,6 +586,8 @@
         "switchToSubtract": "切换到减去"
       },
       "addNewMask": "添加新蒙版",
+      "aiTitle": "AI 选择",
+      "basicTitle": "基本工具",
       "brush": {
         "brush": "画笔",
         "eraser": "橡皮擦",
@@ -561,7 +596,6 @@
         "size": "画笔大小"
       },
       "comingSoon": "即将推出",
-      "createNewTitle": "创建新蒙版",
       "depthRange": {
         "far": "远",
         "near": "近",
@@ -585,6 +619,7 @@
         "maskName_one": "蒙版 {{count}}",
         "maskName_other": "蒙版 {{count}}"
       },
+      "rangeTitle": "范围与全局",
       "resetMaskingTooltip": "重置蒙版",
       "settings": {
         "aiModelDownloading": "AI 模型下载中：",
@@ -607,8 +642,7 @@
       "tooltips": {
         "addToCurrent": "将 {{name}} 添加到当前蒙版或创建新蒙版（右键单击）",
         "createNew": "创建新 {{name}} 蒙版",
-        "selectNewSourcePoint": "{{modifier}} + 点击选择新的源点",
-        "showMore": "显示更多蒙版类型"
+        "selectNewSourcePoint": "{{modifier}} + 点击选择新的源点"
       }
     },
     "metadata": {
@@ -754,6 +788,12 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "destination": {
+      "customFolder": "自定义文件夹",
+      "originalFolder": "原始图像文件夹",
+      "subfolder": "子文件夹",
+      "subfolderPlaceholder": "例如：final, WebP"
+    },
     "dialog": {
       "saveEditedImageTitle": "保存编辑后的图像",
       "selectFolderTitle": "选择文件夹以导出 {{count}} 张图像",
@@ -762,7 +802,10 @@
     },
     "file": {
       "quality": "质量",
-      "qualityLossless": "质量（无损）"
+      "qualityLossless": "质量（无损）",
+      "tiffBitDepth": "TIFF 位深",
+      "tiffBitDepth16": "16 位",
+      "tiffBitDepth8": "8 位"
     },
     "labels": {
       "image": "图像",
@@ -787,6 +830,7 @@
     },
     "sections": {
       "advanced": "高级",
+      "destination": "目标位置",
       "fileNaming": "文件命名",
       "fileSettings": "文件设置",
       "imageSizing": "图像大小",
@@ -925,6 +969,9 @@
         "clearSearch": "清除搜索",
         "collapse": "折叠",
         "expand": "展开",
+        "moreOptions": "选项",
+        "navBack": "后退",
+        "navForward": "前进",
         "sortFolders": "对文件夹排序"
       }
     },
@@ -1044,6 +1091,7 @@
     },
     "thumbnailFit": {
       "fillSquare": "填充正方形",
+      "justified": "瀑布流",
       "originalRatio": "原始比例"
     },
     "thumbnailSize": {
@@ -1069,11 +1117,13 @@
       "foreground": "前景",
       "heal": "修复",
       "linear": "线性",
+      "liquify": "液化",
       "luminance": "亮度",
       "others": "其他",
       "quickErase": "快速擦除",
       "quickEraser": "快速橡皮擦",
       "radial": "径向",
+      "retouch": "修饰",
       "sky": "天空",
       "subject": "主体"
     }
@@ -1140,6 +1190,7 @@
         "curves": "曲线",
         "exposureToneMapper": "曝光与色调映射",
         "grain": "颗粒",
+        "guidedPerspective": "引导透视",
         "halationGlow": "光晕与发光",
         "hueShift": "全局色相偏移",
         "lensCorrection": "镜头校正",
@@ -1387,7 +1438,10 @@
       "cancel": "取消",
       "compareTooltip": "按住以对比",
       "distortion": "畸变",
+      "geometry": "几何",
+      "guided": "引导透视",
       "horizontal": "水平",
+      "manual": "手动变换",
       "maskWarning": "变换会更新基础几何形状。现有蒙版可能会偏移，AI 蒙版需要重新生成。",
       "offset": "偏移",
       "original": "原始",
@@ -1434,6 +1488,9 @@
       "speed": "速度",
       "title": "鼠标控制",
       "zoom": "缩放速度倍率",
+      "zoomClick": "缩放照片至 100%",
+      "zoomClickDesc": "点击时将编辑器中的照片缩放至 100%",
+      "zoomClickInfo": "点击照片可立即缩放至 100%（1:1 像素），以评估清晰度和噪点。禁用时，点击会逐步放大。",
       "zoomDesc": "调整使用滚轮或捏合手势时画布缩放的速度。"
     },
     "data": {
@@ -1498,6 +1555,7 @@
       "displayEditIcon": "显示编辑图标",
       "displayEditIconDesc": "在已编辑的缩略图上显示一个小滑块图标。",
       "enableFocusMode": "启用专注模式",
+      "enableNeutralGreyCanvas": "启用中性灰背景",
       "enableOsTitlebar": "启用系统标题栏",
       "enableXmpSync": "启用 XMP 同步",
       "focusMode": "专注模式",
@@ -1508,6 +1566,8 @@
       "fontDesc": "更改应用程序字体。",
       "nativeTitlebar": "原生标题栏",
       "nativeTitlebarDesc": "使用系统默认的窗口标题栏，而非 RapidRAW 的自定义标题栏。",
+      "neutralGreyCanvas": "中性灰画布",
+      "neutralGreyCanvasDesc": "使用中性灰画布，以便在不更改应用主题的情况下进行更准确的色彩和曝光分级。",
       "poppins": "Poppins",
       "showImageCounts": "显示图像计数",
       "system": "系统默认",
@@ -1672,6 +1732,8 @@
       "livePreviewQualityDesc": "控制拖动滑块时图像的分辨率和压缩。较低的质量可显著提高响应速度。",
       "livePreviews": "实时交互式预览",
       "livePreviewsDesc": "拖动滑块时立即更新预览。如果界面在调整时感觉卡顿，请禁用此选项。",
+      "mediumThumbnailRes": "编辑器缩略图分辨率",
+      "mediumThumbnailResDesc": "在编辑器中加载完整图像时显示的预览分辨率。",
       "modes": {
         "dynamic": "动态",
         "static": "固定分辨率"
@@ -1720,6 +1782,8 @@
       "renderScaleDesc": "相对于显示器缩放渲染分辨率。较低的值可在高分辨率屏幕上提高性能，但会牺牲一些清晰度。",
       "restartRequired": "处理引擎的更改需要重启应用程序才能生效。",
       "saveRelaunch": "保存并重新启动",
+      "smallThumbnailRes": "网格缩略图分辨率",
+      "smallThumbnailResDesc": "图库网格中显示的缩略图分辨率。",
       "staticDesc": "编辑器以固定分辨率渲染图像。此模式最快且最一致，非常适合低端硬件，优先考虑流畅性能而非像素完美的缩放。",
       "staticPreviewRes": "静态预览分辨率",
       "staticPreviewResDesc": "设置静态预览的分辨率，如裁剪模式、镜头校正和透视工具。不影响主编辑器预览。",

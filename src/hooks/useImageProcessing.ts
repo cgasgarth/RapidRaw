@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import debounce from 'lodash.debounce';
+import throttle from 'lodash.throttle';
 import { useEditorStore } from '../store/useEditorStore';
 import { useUIStore } from '../store/useUIStore';
 import { useSettingsStore } from '../store/useSettingsStore';
@@ -29,9 +30,7 @@ export function useImageProcessing(
   const displaySize = useEditorStore((state) => state.displaySize);
   const baseRenderSize = useEditorStore((state) => state.baseRenderSize);
   const originalSize = useEditorStore((state) => state.originalSize);
-  const showOriginal = useEditorStore((state) => state.showOriginal);
   const isSliderDragging = useEditorStore((state) => state.isSliderDragging);
-  const transformedOriginalUrl = useEditorStore((state) => state.transformedOriginalUrl);
   const setEditor = useEditorStore((state) => state.setEditor);
 
   const activeView = useUIStore((state) => state.activeView);
@@ -39,10 +38,12 @@ export function useImageProcessing(
   const appSettings = useSettingsStore((state) => state.appSettings);
   const multiSelectedPaths = useLibraryStore((state) => state.multiSelectedPaths);
 
+  const uncroppedJobIdRef = useRef(0);
+  const latestUncroppedJobIdRef = useRef(0);
+
   const inFlightCountRef = useRef(0);
   const lastAnalyticsTimeRef = useRef<number>(0);
   const pendingApplyRef = useRef<{ adjustments: Adjustments; targetRes?: number } | null>(null);
-  const currentOriginalResRef = useRef<number>(0);
   const dragIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeWaveformChannelRef = useRef(activeWaveformChannel);
   activeWaveformChannelRef.current = activeWaveformChannel;
@@ -51,18 +52,6 @@ export function useImageProcessing(
   useEffect(() => {
     selectedImagePathRef.current = selectedImage?.path ?? null;
   }, [selectedImage?.path]);
-
-  const geometricAdjustmentsKey = useMemo(() => {
-    if (!adjustments) return '';
-    const { crop, rotation, flipHorizontal, flipVertical, orientationSteps } = adjustments;
-    return JSON.stringify({ crop, rotation, flipHorizontal, flipVertical, orientationSteps });
-  }, [
-    adjustments?.crop,
-    adjustments?.rotation,
-    adjustments?.flipHorizontal,
-    adjustments?.flipVertical,
-    adjustments?.orientationSteps,
-  ]);
 
   const calculateROI = useCallback(() => {
     if (!transformWrapperRef.current) return null;
@@ -100,10 +89,10 @@ export function useImageProcessing(
       return null;
     }
 
-    let roiX = (intersectLeft - imgLeft) / baseW;
-    let roiY = (intersectTop - imgTop) / baseH;
-    let roiW = (intersectRight - intersectLeft) / baseW;
-    let roiH = (intersectBottom - intersectTop) / baseH;
+    const roiX = (intersectLeft - imgLeft) / baseW;
+    const roiY = (intersectTop - imgTop) / baseH;
+    const roiW = (intersectRight - intersectLeft) / baseW;
+    const roiH = (intersectBottom - intersectTop) / baseH;
 
     const newRoiX = roiX - paddingX;
     const newRoiY = roiY - paddingY;
@@ -326,15 +315,39 @@ export function useImageProcessing(
     [selectedImage?.isReady, flushPipeline, executeApplyAdjustments],
   );
 
+  const throttledUncroppedPreview = useMemo(
+    () =>
+      throttle(
+        (adj: Adjustments) => {
+          if (!useEditorStore.getState().selectedImage?.isReady) return;
+          const jobId = ++uncroppedJobIdRef.current;
+          invoke<string>(Invokes.GenerateUncroppedPreview, { jsAdjustments: adj })
+            .then((dataUrl) => {
+              if (jobId >= latestUncroppedJobIdRef.current) {
+                latestUncroppedJobIdRef.current = jobId;
+                useEditorStore.getState().setEditor({ uncroppedAdjustedPreviewUrl: dataUrl });
+              }
+            })
+            .catch(console.error);
+        },
+        30,
+        { leading: true, trailing: true },
+      ),
+    [],
+  );
+
   const generateUncroppedPreview = useCallback(
     (currentAdjustments: Adjustments) => {
-      if (!selectedImage?.isReady) return;
-      invoke(Invokes.GenerateUncroppedPreview, { jsAdjustments: currentAdjustments }).catch((err) =>
-        console.error('Failed to generate uncropped preview:', err),
-      );
+      throttledUncroppedPreview(currentAdjustments);
     },
-    [selectedImage?.isReady],
+    [throttledUncroppedPreview],
   );
+
+  useEffect(() => {
+    if (activeView === 'editor' && activePanel === Panel.Crop && selectedImage?.isReady) {
+      generateUncroppedPreview(adjustments);
+    }
+  }, [activeView, adjustments, activePanel, selectedImage?.isReady, generateUncroppedPreview]);
 
   const calculateTargetRes = useCallback(() => {
     const baseTargetRes = appSettings?.editorPreviewResolution || 1920;
@@ -375,39 +388,16 @@ export function useImageProcessing(
 
   const requestHiFiZoom = useMemo(
     () =>
-      debounce((currentAdjustments: Adjustments, targetRes: number) => {
+      debounce((targetRes: number) => {
         if (targetRes > currentResRef.current) {
           currentResRef.current = targetRes;
-          applyAdjustments(currentAdjustments, false, targetRes);
+          const { adjustments, previewOverride } = useEditorStore.getState();
+          const renderAdjustments = previewOverride ?? adjustments;
+          applyAdjustments(renderAdjustments, false, targetRes);
         }
       }, 50),
     [applyAdjustments, currentResRef],
   );
-
-  const requestHiFiOriginalZoom = useMemo(
-    () =>
-      debounce(async (currentAdjustments: Adjustments, targetRes: number) => {
-        if (targetRes > currentOriginalResRef.current) {
-          try {
-            const base64Data: string = await invoke('generate_original_transformed_preview', {
-              jsAdjustments: currentAdjustments,
-              targetResolution: targetRes,
-            });
-            currentOriginalResRef.current = targetRes;
-            setEditor({ transformedOriginalUrl: base64Data });
-          } catch (e) {
-            console.error('Failed to generate hi-fi original preview:', e);
-          }
-        }
-      }, 200),
-    [setEditor],
-  );
-
-  useEffect(() => {
-    if (activeView === 'editor' && activePanel === Panel.Crop && selectedImage?.isReady) {
-      generateUncroppedPreview(adjustments);
-    }
-  }, [activeView, adjustments, activePanel, selectedImage?.isReady, generateUncroppedPreview]);
 
   useEffect(() => {
     if (activeView === 'editor' && selectedImage?.isReady && displaySize.width > 0 && !isSliderDragging) {
@@ -419,7 +409,7 @@ export function useImageProcessing(
       const finalRes = Math.round(baseRes);
 
       if (finalRes > currentResRef.current) {
-        requestHiFiZoom(adjustments, finalRes);
+        requestHiFiZoom(finalRes);
       }
     }
     return () => {
@@ -461,12 +451,20 @@ export function useImageProcessing(
 
         if (previewOverride) return;
 
-        debouncedSave(selectedImage.path, adjustments);
+        const prev = prevAdjustmentsRef.current;
 
-        const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
-        if (appSettings?.copyPasteSettings?.autoSync && otherPaths.length > 0) {
-          const prev = prevAdjustmentsRef.current;
-          if (prev && prev.path === selectedImage.path) {
+        if (!prev || prev.path !== selectedImage.path) {
+          prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
+          return;
+        }
+
+        const hasAdjustmentsChanged = prev.adjustments !== adjustments;
+
+        if (hasAdjustmentsChanged) {
+          debouncedSave(selectedImage.path, adjustments);
+
+          const otherPaths = multiSelectedPaths.filter((p) => p !== selectedImage.path);
+          if (appSettings?.copyPasteSettings?.autoSync && otherPaths.length > 0) {
             const delta: Partial<Adjustments> = {};
             const includedKeys = appSettings?.copyPasteSettings?.includedAdjustments || COPYABLE_ADJUSTMENT_KEYS;
             for (const key of Object.keys(adjustments) as Array<keyof Adjustments>) {
@@ -483,8 +481,9 @@ export function useImageProcessing(
               });
             }
           }
+
+          prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
         }
-        prevAdjustmentsRef.current = { path: selectedImage.path, adjustments };
       }, 50);
     }
 
@@ -504,76 +503,6 @@ export function useImageProcessing(
     appSettings?.copyPasteSettings?.includedAdjustments,
     appSettings?.copyPasteSettings?.autoSync,
     isWaveformVisible,
-  ]);
-
-  useEffect(() => {
-    setEditor({ transformedOriginalUrl: null });
-    currentOriginalResRef.current = 0;
-  }, [geometricAdjustmentsKey, selectedImage?.path, setEditor]);
-
-  useEffect(() => {
-    if (
-      activeView === 'editor' &&
-      showOriginal &&
-      selectedImage?.isReady &&
-      displaySize.width > 0 &&
-      !isSliderDragging
-    ) {
-      let targetRes = calculateTargetRes();
-      if (targetRes > currentOriginalResRef.current) {
-        requestHiFiOriginalZoom(adjustments, targetRes);
-      }
-    }
-    return () => {
-      requestHiFiOriginalZoom.cancel();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    activeView,
-    showOriginal,
-    displaySize.width,
-    displaySize.height,
-    calculateTargetRes,
-    selectedImage?.isReady,
-    isSliderDragging,
-    requestHiFiOriginalZoom,
-    originalSize,
-  ]);
-
-  useEffect(() => {
-    let isEffectActive = true;
-    const generate = async () => {
-      if (activeView === 'editor' && showOriginal && selectedImage?.path && !transformedOriginalUrl) {
-        try {
-          const targetRes = calculateTargetRes();
-          const base64Data: string = await invoke('generate_original_transformed_preview', {
-            jsAdjustments: adjustments,
-            targetResolution: targetRes,
-          });
-          if (isEffectActive) {
-            currentOriginalResRef.current = targetRes;
-            setEditor({ transformedOriginalUrl: base64Data });
-          }
-        } catch (e) {
-          if (isEffectActive) {
-            console.error('Failed to generate original preview:', e);
-            setEditor({ showOriginal: false });
-          }
-        }
-      }
-    };
-    generate();
-    return () => {
-      isEffectActive = false;
-    };
-  }, [
-    activeView,
-    showOriginal,
-    selectedImage?.path,
-    adjustments,
-    transformedOriginalUrl,
-    calculateTargetRes,
-    setEditor,
   ]);
 
   return {

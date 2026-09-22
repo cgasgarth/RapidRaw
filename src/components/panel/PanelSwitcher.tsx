@@ -243,9 +243,11 @@ export default function PanelSwitcher({
 export function MobilePanelSwitcher({
   activePanel,
   onPanelSelect,
+  placement = 'bottom',
 }: {
   activePanel: Panel | null;
   onPanelSelect: (id: Panel) => void;
+  placement?: 'bottom' | 'right';
 }) {
   const MOBILE_PANELS = [
     Panel.Metadata,
@@ -257,8 +259,13 @@ export function MobilePanelSwitcher({
     Panel.Export,
   ];
 
+  const isVertical = placement === 'right';
+
   return (
-    <div className="flex items-center gap-2 p-2 overflow-x-auto border-t border-surface shrink-0 custom-scrollbar">
+    <div className={clsx(
+      'flex items-center p-1.5 gap-1 shrink-0 custom-scrollbar',
+      isVertical ? 'flex-col overflow-y-auto h-full border-l border-surface' : 'flex-row overflow-x-auto w-full border-t border-surface',
+    )}>
       {MOBILE_PANELS.map((id) => {
         const Icon = PANEL_ICONS[id];
         const isActive = activePanel === id;

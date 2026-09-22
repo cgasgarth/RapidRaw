@@ -1,5 +1,7 @@
 use serde_json::{Map, Value, json};
 
+use crate::guided_perspective::{GuideLine, GuideOrientation};
+
 pub(super) fn adjustments_schema() -> Value {
     let mut properties = Map::new();
     for (key, min, max, description) in [
@@ -149,6 +151,10 @@ pub(super) fn adjustments_schema() -> Value {
     properties.insert("masks".to_string(), json!({ "type": "array" }));
     properties.insert("lutPath".to_string(), json!({ "type": ["string", "null"] }));
     properties.insert(
+        "lutIsSceneReferred".to_string(),
+        json!({ "type": "boolean", "description": "Apply the LUT in the scene-referred color pipeline." }),
+    );
+    properties.insert(
         "lensMaker".to_string(),
         json!({ "type": ["string", "null"] }),
     );
@@ -163,6 +169,7 @@ pub(super) fn adjustments_schema() -> Value {
     properties.insert("aiPatches".to_string(), json!({ "type": "array" }));
     properties.insert("sectionVisibility".to_string(), json!({ "type": "object" }));
     properties.insert("showClipping".to_string(), json!({ "type": "boolean" }));
+    properties.insert("guidedPerspective".to_string(), guided_perspective_schema());
     properties.insert(
         "curveMode".to_string(),
         json!({
@@ -240,6 +247,48 @@ fn strict_object_schema_with_required(
         );
     }
     schema
+}
+
+pub(super) fn guide_lines_schema(min_items: usize) -> Value {
+    let point = json!({
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 }
+        },
+        "required": ["x", "y"]
+    });
+    json!({
+        "type": "array",
+        "minItems": min_items,
+        "maxItems": 4,
+        "description": "Up to two vertical and two horizontal guide lines. Points use normalized image coordinates from 0 to 1.",
+        "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "type": { "type": "string", "enum": ["vertical", "horizontal"] },
+                "p1": point,
+                "p2": point
+            },
+            "required": ["id", "type", "p1", "p2"]
+        }
+    })
+}
+
+fn guided_perspective_schema() -> Value {
+    json!({
+        "type": "object",
+        "description": "Guided perspective correction. Supply normalized guide lines, then set enabled to true.",
+        "additionalProperties": false,
+        "properties": {
+            "enabled": { "type": "boolean" },
+            "lines": guide_lines_schema(0),
+            "autoCrop": { "type": "boolean" }
+        }
+    })
 }
 
 fn curves_schema(description: &str) -> Value {
@@ -453,6 +502,7 @@ pub(super) fn validate_adjustments(adjustments: &Value) -> Result<(), String> {
                 "hsl" => validate_hsl(value)?,
                 "colorGrading" => validate_color_grading(value)?,
                 "colorCalibration" => validate_color_calibration(value)?,
+                "guidedPerspective" => validate_guided_perspective(value)?,
                 "curveMode" => validate_string_enum(value, key, &["point", "parametric"])?,
                 "toneMapper" => validate_string_enum(value, key, &["basic", "agx"])?,
                 "lensCorrectionMode" => validate_string_enum(value, key, &["auto", "manual"])?,
@@ -513,6 +563,85 @@ fn validate_number(value: &Value, key: &str, minimum: f64, maximum: f64) -> Resu
     } else {
         Ok(())
     }
+}
+
+fn validate_guided_perspective(value: &Value) -> Result<(), String> {
+    let object = validate_nested_object(value, "guidedPerspective")?;
+    validate_nested_keys(
+        object,
+        "guidedPerspective",
+        &["enabled", "lines", "autoCrop"],
+    )?;
+    for key in ["enabled", "autoCrop"] {
+        if let Some(value) = object.get(key)
+            && !value.is_boolean()
+        {
+            return Err(format!(
+                "adjustment guidedPerspective.{key} must be a boolean"
+            ));
+        }
+    }
+    if let Some(lines) = object.get("lines") {
+        validate_guided_lines(lines, 0)?;
+    }
+    Ok(())
+}
+
+pub(super) fn validate_guided_lines(
+    value: &Value,
+    min_items: usize,
+) -> Result<Vec<GuideLine>, String> {
+    let lines = value
+        .as_array()
+        .ok_or("guidedPerspective.lines must be an array".to_string())?;
+    if lines.len() < min_items || lines.len() > 4 {
+        return Err(format!(
+            "guidedPerspective.lines must contain {min_items} to 4 lines"
+        ));
+    }
+    for (index, value) in lines.iter().enumerate() {
+        let key = format!("guidedPerspective.lines[{index}]");
+        let object = validate_nested_object(value, &key)?;
+        validate_nested_keys(object, &key, &["id", "type", "p1", "p2"])?;
+        if object
+            .get("id")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            return Err(format!("{key}.id must be a non-empty string"));
+        }
+        for point_key in ["p1", "p2"] {
+            let point_name = format!("{key}.{point_key}");
+            let point = validate_nested_object(
+                object
+                    .get(point_key)
+                    .ok_or(format!("{point_name} is required"))?,
+                &point_name,
+            )?;
+            validate_nested_keys(point, &point_name, &["x", "y"])?;
+            for axis in ["x", "y"] {
+                validate_number(
+                    point
+                        .get(axis)
+                        .ok_or(format!("{point_name}.{axis} is required"))?,
+                    &format!("{point_name}.{axis}"),
+                    0.0,
+                    1.0,
+                )?;
+            }
+        }
+    }
+    let parsed: Vec<GuideLine> = serde_json::from_value(value.clone())
+        .map_err(|error| format!("invalid guidedPerspective.lines: {error}"))?;
+    let vertical = parsed
+        .iter()
+        .filter(|line| line.orientation == GuideOrientation::Vertical)
+        .count();
+    let horizontal = parsed.len() - vertical;
+    if vertical > 2 || horizontal > 2 {
+        return Err("guidedPerspective.lines allows at most two lines per orientation".to_string());
+    }
+    Ok(parsed)
 }
 
 fn validate_curves(value: &Value, key: &str) -> Result<(), String> {
@@ -815,6 +944,27 @@ mod tests {
         assert!(
             validate_adjustments(&json!({
                 "colorGrading": { "shadows": { "hue": 361 } }
+            }))
+            .is_err()
+        );
+        assert!(
+            validate_adjustments(&json!({
+                "guidedPerspective": {
+                    "enabled": true,
+                    "lines": [
+                        { "id": "v1", "type": "vertical", "p1": { "x": 0.2, "y": 0.1 }, "p2": { "x": 0.3, "y": 0.9 } },
+                        { "id": "h1", "type": "horizontal", "p1": { "x": 0.1, "y": 0.2 }, "p2": { "x": 0.9, "y": 0.3 } }
+                    ],
+                    "autoCrop": true
+                }
+            }))
+            .is_ok()
+        );
+        assert!(
+            validate_adjustments(&json!({
+                "guidedPerspective": {
+                    "lines": [{ "id": "bad", "type": "vertical", "p1": { "x": 1.2, "y": 0.1 }, "p2": { "x": 0.3, "y": 0.9 } }]
+                }
             }))
             .is_err()
         );

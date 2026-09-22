@@ -2,8 +2,8 @@
   "adjustments": {
     "basic": {
       "blacks": "Neri",
+      "brightness": "Luminosità",
       "contrast": "Contrasto",
-      "evShift": "Compensazione EV",
       "exposure": "Esposizione",
       "highlights": "Luci",
       "mappers": {
@@ -178,6 +178,7 @@
     },
     "editor": {
       "autoAdjust": "Regolazione Automatica Immagine",
+      "autoLensCorrection": "Correzione automatica obiettivo",
       "cancel": "Annulla",
       "colorLabel": "Etichetta Colore",
       "confirmReset": "Conferma Ripristino",
@@ -245,6 +246,8 @@
       "autoAdjust_many": "Regolazione Automatica Immagini",
       "autoAdjust_one": "Regolazione Automatica Immagine",
       "autoAdjust_other": "Regolazione Automatica Immagini",
+      "autoLensCorrection_one": "Correzione automatica obiettivo",
+      "autoLensCorrection_other": "Correzione automatica obiettivo",
       "collage_many": "Crea Collage",
       "collage_one": "Incornicia Immagine",
       "collage_other": "Crea Collage",
@@ -382,11 +385,22 @@
       "generatingDepthMap": "Calcolo mappa di profondità IA...",
       "generativeEditTitle": "Modifica generativa",
       "inpaintingTitle": "Inpainting",
+      "liquify": {
+        "mode": "Modalità Fluidifica",
+        "modes": {
+          "expand": "Gonfia",
+          "pinch": "Contrai",
+          "push": "Spingi",
+          "twirl": "Vortice"
+        }
+      },
       "manualCleanupTitle": "Pulizia manuale",
       "noImageSelected": "Nessuna immagine selezionata.",
       "params": {
         "feather": "Sfumatura",
-        "grow": "Espandi"
+        "grow": "Espandi",
+        "intensity": "Intensità",
+        "pressure": "Pressione"
       },
       "patches": {
         "aiEdit": "Modifica AI {{count}}",
@@ -402,10 +416,14 @@
         "heal_one": "Ripara {{count}}",
         "heal_other": "Ripara {{count}}",
         "invertedName": "{{name}} Invertita",
+        "liquify": "Fluidifica {{count}}",
+        "liquify_one": "Fluidifica {{count}}",
+        "liquify_other": "Fluidifica {{count}}",
         "quickErase": "Cancellazione Rapida {{count}}",
         "quickErase_many": "Cancellazione Rapida {{count}}",
         "quickErase_one": "Cancellazione Rapida {{count}}",
-        "quickErase_other": "Cancellazione Rapida {{count}}"
+        "quickErase_other": "Cancellazione Rapida {{count}}",
+        "retouch": "Ritocco {{count}}"
       },
       "resetInpaintingTooltip": "Ripristina Inpainting",
       "settings": {
@@ -426,7 +444,8 @@
         "quickEraseDesc": "Riempi la selezione per rimuovere l'oggetto.",
         "selectionPropertiesTitle": "Proprietà Selezione",
         "useBasicInpaint": "Usa inpainting semplice"
-      }
+      },
+      "touchUpTitle": "Ritocchi"
     },
     "crop": {
       "aspectRatioHeading": "Proporzioni",
@@ -450,6 +469,10 @@
         "armature": {
           "desc": "Triangoli Armonici",
           "name": "Armatura"
+        },
+        "center": {
+          "desc": "Linee centrali",
+          "name": "Centro"
         },
         "diagonal": {
           "desc": "Linee Diagonali",
@@ -543,6 +566,16 @@
       "exporting": "Esportazione…",
       "savesTo": "Modifica esterna — salva in"
     },
+    "guided": {
+      "cancel": "Annulla",
+      "drawingActive": "Disegno attivo",
+      "hint": "Disegna lungo i bordi della tua foto che dovrebbero essere verticali o orizzontali.",
+      "linesStatus": "Linee guida attive",
+      "toast": {
+        "angleRejected": "L'angolo della linea è troppo lontano dall'orizzontale o verticale",
+        "maxLines": "Sono consentite massimo 2 linee verticali e 2 orizzontali"
+      }
+    },
     "layout": {
       "split": "Dividi"
     },
@@ -575,6 +608,8 @@
         "switchToSubtract": "Passa a Sottrai"
       },
       "addNewMask": "Aggiungi Nuova Maschera",
+      "aiTitle": "Selezioni IA",
+      "basicTitle": "Strumenti di base",
       "brush": {
         "brush": "Pennello",
         "eraser": "Gomma",
@@ -583,7 +618,6 @@
         "size": "Dimensione Pennello"
       },
       "comingSoon": "Prossimamente",
-      "createNewTitle": "Crea Nuova Maschera",
       "depthRange": {
         "far": "Lontano",
         "near": "Vicino",
@@ -608,6 +642,7 @@
         "maskName_one": "Maschera {{count}}",
         "maskName_other": "Maschera {{count}}"
       },
+      "rangeTitle": "Intervalli e Globale",
       "resetMaskingTooltip": "Ripristina Mascheratura",
       "settings": {
         "aiModelDownloading": "Download Modello AI: ",
@@ -630,8 +665,7 @@
       "tooltips": {
         "addToCurrent": "Aggiungi {{name}} alla Maschera Attuale o Crea Nuova (Tasto Destro)",
         "createNew": "Crea Nuova Maschera {{name}}",
-        "selectNewSourcePoint": "{{modifier}} + Clic per selezionare un nuovo punto di origine",
-        "showMore": "Mostra Più Tipi di Maschera"
+        "selectNewSourcePoint": "{{modifier}} + Clic per selezionare un nuovo punto di origine"
       }
     },
     "metadata": {
@@ -777,6 +811,12 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "destination": {
+      "customFolder": "Cartella personalizzata",
+      "originalFolder": "Cartella dell'immagine originale",
+      "subfolder": "Sottocartella",
+      "subfolderPlaceholder": "es. final, WebP"
+    },
     "dialog": {
       "saveEditedImageTitle": "Salva Immagine Modificata",
       "selectFolderTitle": "Seleziona Cartella per Esportare {{count}} Immagine(i)",
@@ -786,7 +826,10 @@
     },
     "file": {
       "quality": "Qualità",
-      "qualityLossless": "Qualità (Senza Perdita)"
+      "qualityLossless": "Qualità (Senza Perdita)",
+      "tiffBitDepth": "Profondità bit TIFF",
+      "tiffBitDepth16": "16 bit",
+      "tiffBitDepth8": "8 bit"
     },
     "labels": {
       "image": "Immagine",
@@ -811,6 +854,7 @@
     },
     "sections": {
       "advanced": "Avanzate",
+      "destination": "Destinazione",
       "fileNaming": "Nomenclatura File",
       "fileSettings": "Impostazioni File",
       "imageSizing": "Dimensionamento Immagine",
@@ -950,6 +994,9 @@
         "clearSearch": "Cancella ricerca",
         "collapse": "Comprimi",
         "expand": "Espandi",
+        "moreOptions": "Opzioni",
+        "navBack": "Indietro",
+        "navForward": "Avanti",
         "sortFolders": "Ordina cartelle"
       }
     },
@@ -1070,6 +1117,7 @@
     },
     "thumbnailFit": {
       "fillSquare": "Riempi Quadrato",
+      "justified": "Mosaico",
       "originalRatio": "Proporzioni Originali"
     },
     "thumbnailSize": {
@@ -1095,11 +1143,13 @@
       "foreground": "Primo Piano",
       "heal": "Ripara",
       "linear": "Lineare",
+      "liquify": "Fluidifica",
       "luminance": "Luminanza",
       "others": "Altri",
       "quickErase": "Cancellazione Rapida",
       "quickEraser": "Gomma Rapida",
       "radial": "Radiale",
+      "retouch": "Ritocco",
       "sky": "Cielo",
       "subject": "Soggetto"
     }
@@ -1166,6 +1216,7 @@
         "curves": "Curve",
         "exposureToneMapper": "Esposizione e Tone Mapper",
         "grain": "Grana",
+        "guidedPerspective": "Prospettiva guidata",
         "halationGlow": "Alonatura e Bagliore",
         "hueShift": "Spostamento tonalità globale",
         "lensCorrection": "Correzione Obiettivo",
@@ -1419,7 +1470,10 @@
       "cancel": "Annulla",
       "compareTooltip": "Tieni premuto per confrontare",
       "distortion": "Distorsione",
+      "geometry": "Geometria",
+      "guided": "Prospettiva guidata",
       "horizontal": "Orizzontale",
+      "manual": "Trasformazione manuale",
       "maskWarning": "La trasformazione aggiorna la geometria di base. Le maschere esistenti potrebbero spostarsi e le maschere AI dovranno essere rigenerate.",
       "offset": "Spostamento",
       "original": "Originale",
@@ -1466,6 +1520,9 @@
       "speed": "Velocità",
       "title": "Controlli Mouse",
       "zoom": "Moltiplicatore Velocità Zoom",
+      "zoomClick": "Zoom foto al 100%",
+      "zoomClickDesc": "Zoom della foto nell'editor al 100% al clic",
+      "zoomClickInfo": "Fai clic sulla foto per ingrandirla istantaneamente al 100% (pixel 1:1) per valutare nitidezza e rumore. Se disabilitato, il clic ingrandisce gradualmente.",
       "zoomDesc": "Regola la velocità dello zoom dell'area di lavoro quando utilizzi la rotellina di scorrimento o il gesto del pizzico."
     },
     "data": {
@@ -1533,6 +1590,7 @@
       "displayEditIcon": "Mostra Icona Modifica",
       "displayEditIconDesc": "Mostra una piccola icona del cursore sulle miniature che sono state modificate.",
       "enableFocusMode": "Abilita Modalità Focus",
+      "enableNeutralGreyCanvas": "Abilita sfondo grigio neutro",
       "enableOsTitlebar": "Abilita Barra del Titolo di Sistema",
       "enableXmpSync": "Abilita Sincronizzazione XMP",
       "focusMode": "Modalità Focus",
@@ -1543,6 +1601,8 @@
       "fontDesc": "Cambia il tipo di carattere dell'applicazione.",
       "nativeTitlebar": "Barra del Titolo Nativa",
       "nativeTitlebarDesc": "Usa la barra del titolo della finestra predefinita del tuo sistema invece di quella personalizzata di RapidRAW.",
+      "neutralGreyCanvas": "Tela grigio neutro",
+      "neutralGreyCanvasDesc": "Usa una tela grigio neutro per una correzione del colore e dell'esposizione più precisa senza cambiare il tema dell'app.",
       "poppins": "Poppins",
       "showImageCounts": "Mostra Conteggi Immagini",
       "system": "Predefinito di Sistema",
@@ -1707,6 +1767,8 @@
       "livePreviewQualityDesc": "Controlla la risoluzione e la compressione dell'immagine mentre trascini i cursori. Una qualità inferiore migliora significativamente la reattività.",
       "livePreviews": "Anteprime Interattive dal Vivo",
       "livePreviewsDesc": "Aggiorna l'anteprima immediatamente mentre si trascinano i cursori. Disabilita se l'interfaccia risulta lenta durante le regolazioni.",
+      "mediumThumbnailRes": "Risoluzione della miniatura dell'editor",
+      "mediumThumbnailResDesc": "Risoluzione dell'anteprima mostrata mentre le immagini complete vengono caricate nell'editor.",
       "modes": {
         "dynamic": "Dinamica",
         "static": "Risoluzione Fissa"
@@ -1755,6 +1817,8 @@
       "renderScaleDesc": "Scala la risoluzione del render rispetto al tuo display. Valori inferiori migliorano le prestazioni sugli schermi ad alta risoluzione a scapito di una minore nitidezza.",
       "restartRequired": "Le modifiche al motore di elaborazione richiedono il riavvio dell'applicazione per avere effetto.",
       "saveRelaunch": "Salva e Riavvia",
+      "smallThumbnailRes": "Risoluzione delle miniature della griglia",
+      "smallThumbnailResDesc": "Risoluzione delle miniature mostrate nella griglia della libreria.",
       "staticDesc": "L'editor renderizza l'immagine a una risoluzione fissa. Questa modalità è la più veloce e coerente, rendendola ideale per hardware meno potenti dove si privilegia una prestazione fluida rispetto a uno zoom perfetto al pixel.",
       "staticPreviewRes": "Risoluzione Anteprima Statica",
       "staticPreviewResDesc": "Imposta la risoluzione per le anteprime statiche come la modalità ritaglio, la correzione obiettivo e gli strumenti di prospettiva. Non influisce sull'anteprima principale dell'editor.",

@@ -14,6 +14,7 @@ import {
   FolderPlus,
   Images,
   LayoutTemplate,
+  LayersArrowDown,
   Redo,
   RefreshCw,
   RotateCcw,
@@ -42,6 +43,7 @@ import {
   Briefcase,
   User,
   Album as AlbumIcon,
+  PencilSparkles,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { useTranslation } from 'react-i18next';
@@ -74,8 +76,13 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
   const { t } = useTranslation();
   const { showContextMenu } = useContextMenu();
 
-  const { handleAutoAdjustments, handleResetAdjustments, handleCopyAdjustments, handlePasteAdjustments } =
-    useEditorActions();
+  const {
+    handleAutoAdjustments,
+    handleAutoLensCorrection,
+    handleResetAdjustments,
+    handleCopyAdjustments,
+    handlePasteAdjustments,
+  } = useEditorActions();
   const { handleRate, handleSetColorLabel, handleTagsChanged } = useLibraryActions();
 
   const albumIcons = useMemo(
@@ -200,8 +207,14 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           submenu: [
             {
               label: t('contextMenus.editor.autoAdjust'),
-              icon: Aperture,
+              icon: PencilSparkles,
               onClick: handleAutoAdjustments,
+              disabled: !selectedImage?.isReady,
+            },
+            {
+              label: t('contextMenus.editor.autoLensCorrection'),
+              icon: Aperture,
+              onClick: () => handleAutoLensCorrection([selectedImage.path]),
               disabled: !selectedImage?.isReady,
             },
             {
@@ -242,7 +255,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         },
         {
           label: t('contextMenus.merge.title'),
-          icon: Layers,
+          icon: LayersArrowDown,
           submenu: [
             { disabled: true, icon: SquaresUnite, label: t('contextMenus.editor.stitchPanorama') },
             { disabled: true, icon: Images, label: t('contextMenus.editor.mergeHdr') },
@@ -556,7 +569,12 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
           label: t('contextMenus.editor.productivity'),
           icon: Gauge,
           submenu: [
-            { label: autoAdjustLabel, icon: Aperture, onClick: handleApplyAutoAdjustmentsToSelection },
+            { label: autoAdjustLabel, icon: PencilSparkles, onClick: handleApplyAutoAdjustmentsToSelection },
+            {
+              label: t('contextMenus.thumbnail.autoLensCorrection', { count: selectionCount }),
+              icon: Aperture,
+              onClick: () => handleAutoLensCorrection(finalSelection),
+            },
             {
               label: denoiseLabel,
               icon: Grip,
@@ -611,7 +629,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
         },
         {
           label: t('contextMenus.merge.title'),
-          icon: Layers,
+          icon: LayersArrowDown,
           submenu: [
             {
               disabled: selectionCount < 2 || selectionCount > 30,
@@ -1120,7 +1138,7 @@ export function useAppContextMenus(props: UseAppContextMenusProps) {
       };
 
       const buildMoveSubmenu = (nodes: AlbumItem[]): Option[] => {
-        let opts: Option[] = [];
+        const opts: Option[] = [];
         nodes.forEach((n) => {
           if (n.type === 'group' && n.id !== item?.id) {
             const isCurrentParent = n.id === currentParentId;

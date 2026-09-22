@@ -2,9 +2,9 @@
   "adjustments": {
     "basic": {
       "blacks": "黒レベル",
+      "brightness": "明るさ",
       "contrast": "コントラスト",
-      "evShift": "露出補正",
-      "exposure": "露光量",
+      "exposure": "露出",
       "highlights": "ハイライト",
       "mappers": {
         "agx": "AgX",
@@ -178,6 +178,7 @@
     },
     "editor": {
       "autoAdjust": "画像を自動補正",
+      "autoLensCorrection": "自動レンズ補正",
       "cancel": "キャンセル",
       "colorLabel": "カラーラベル",
       "confirmReset": "リセットを確認",
@@ -240,6 +241,8 @@
       "addToAlbum": "アルバムに追加",
       "autoAdjust_one": "画像を自動補正",
       "autoAdjust_other": "画像を自動補正",
+      "autoLensCorrection_one": "自動レンズ補正",
+      "autoLensCorrection_other": "自動レンズ補正",
       "collage_one": "画像にフレームを追加",
       "collage_other": "コラージュを作成",
       "confirmDelete": "削除を確認",
@@ -366,11 +369,22 @@
       "generatingDepthMap": "AI深度マップを計算中...",
       "generativeEditTitle": "生成編集",
       "inpaintingTitle": "インペインティング",
+      "liquify": {
+        "mode": "ゆがみモード",
+        "modes": {
+          "expand": "膨張",
+          "pinch": "ピンチ",
+          "push": "プッシュ",
+          "twirl": "渦巻き"
+        }
+      },
       "manualCleanupTitle": "手動クリーンアップ",
       "noImageSelected": "画像が選択されていません。",
       "params": {
         "feather": "ぼかし",
-        "grow": "拡張"
+        "grow": "拡張",
+        "intensity": "強度",
+        "pressure": "圧力"
       },
       "patches": {
         "aiEdit": "AI編集 {{count}}",
@@ -381,9 +395,13 @@
         "heal": "修復 {{count}}",
         "heal_other": "修復 {{count}}",
         "invertedName": "{{name}} 反転",
+        "liquify": "ゆがみ {{count}}",
+        "liquify_one": "ゆがみ {{count}}",
+        "liquify_other": "ゆがみ {{count}}",
         "quickErase": "クイック消去 {{count}}",
         "quickErase_one": "クイック消去 {{count}}",
-        "quickErase_other": "クイック消去 {{count}}"
+        "quickErase_other": "クイック消去 {{count}}",
+        "retouch": "レタッチ {{count}}"
       },
       "resetInpaintingTooltip": "インペインティングをリセット",
       "settings": {
@@ -404,7 +422,8 @@
         "quickEraseDesc": "選択範囲を塗りつぶしてオブジェクトを削除します。",
         "selectionPropertiesTitle": "選択範囲のプロパティ",
         "useBasicInpaint": "簡易インペインティングを使用"
-      }
+      },
+      "touchUpTitle": "タッチアップ"
     },
     "crop": {
       "aspectRatioHeading": "アスペクト比",
@@ -428,6 +447,10 @@
         "armature": {
           "desc": "アーマチュア",
           "name": "アーマチュア"
+        },
+        "center": {
+          "desc": "中央線",
+          "name": "中央"
         },
         "diagonal": {
           "desc": "対角線",
@@ -521,6 +544,16 @@
       "exporting": "書き出し中…",
       "savesTo": "外部編集 — 保存先"
     },
+    "guided": {
+      "cancel": "キャンセル",
+      "drawingActive": "描画中",
+      "hint": "垂直または水平であるべき写真の縁に沿って描画します。",
+      "linesStatus": "アクティブなガイドライン",
+      "toast": {
+        "angleRejected": "線の角度が水平または垂直から離れすぎています",
+        "maxLines": "垂直線と水平線はそれぞれ最大2本まで許可されています"
+      }
+    },
     "layout": {
       "split": "分割"
     },
@@ -553,6 +586,8 @@
         "switchToSubtract": "減算に切り替え"
       },
       "addNewMask": "新しいマスクを追加",
+      "aiTitle": "AI選択",
+      "basicTitle": "基本ツール",
       "brush": {
         "brush": "ブラシ",
         "eraser": "消しゴム",
@@ -561,7 +596,6 @@
         "size": "ブラシサイズ"
       },
       "comingSoon": "近日公開",
-      "createNewTitle": "新しいマスクを作成",
       "depthRange": {
         "far": "遠景",
         "near": "近景",
@@ -585,6 +619,7 @@
         "maskName_one": "マスク {{count}}",
         "maskName_other": "マスク {{count}}"
       },
+      "rangeTitle": "範囲とグローバル",
       "resetMaskingTooltip": "マスク処理をリセット",
       "settings": {
         "aiModelDownloading": "AIモデルをダウンロード中: ",
@@ -607,8 +642,7 @@
       "tooltips": {
         "addToCurrent": "{{name}}を現在のマスクに追加、または新規作成 (右クリック)",
         "createNew": "新規の {{name}} マスクを作成",
-        "selectNewSourcePoint": "{{modifier}} + クリックで新しいソースポイントを選択",
-        "showMore": "他のマスクタイプを表示"
+        "selectNewSourcePoint": "{{modifier}} + クリックで新しいソースポイントを選択"
       }
     },
     "metadata": {
@@ -754,6 +788,12 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "destination": {
+      "customFolder": "カスタムフォルダー",
+      "originalFolder": "元の画像フォルダー",
+      "subfolder": "サブフォルダー",
+      "subfolderPlaceholder": "例：final, WebP"
+    },
     "dialog": {
       "saveEditedImageTitle": "編集した画像を保存",
       "selectFolderTitle": "{{count}} 枚の画像を書き出すフォルダを選択",
@@ -762,7 +802,10 @@
     },
     "file": {
       "quality": "画質",
-      "qualityLossless": "画質 (ロスレス)"
+      "qualityLossless": "画質 (ロスレス)",
+      "tiffBitDepth": "TIFF ビット深度",
+      "tiffBitDepth16": "16 ビット",
+      "tiffBitDepth8": "8 ビット"
     },
     "labels": {
       "image": "画像",
@@ -787,6 +830,7 @@
     },
     "sections": {
       "advanced": "詳細設定",
+      "destination": "保存先",
       "fileNaming": "ファイル名の命名",
       "fileSettings": "ファイル設定",
       "imageSizing": "画像サイズ",
@@ -901,7 +945,7 @@
       }
     },
     "folders": {
-      "addFolder": "フォルダを追加",
+      "addFolder": "フォルダーを追加",
       "albumsEmpty": "右クリックでアルバムを作成します。",
       "collapseSection": "{{section}}をたたむ",
       "expandSection": "{{section}}を展開",
@@ -925,6 +969,9 @@
         "clearSearch": "検索をクリア",
         "collapse": "折りたたむ",
         "expand": "展開",
+        "moreOptions": "オプション",
+        "navBack": "戻る",
+        "navForward": "進む",
         "sortFolders": "フォルダーを並べ替え"
       }
     },
@@ -1044,6 +1091,7 @@
     },
     "thumbnailFit": {
       "fillSquare": "正方形にフィット",
+      "justified": "メイソンリー",
       "originalRatio": "オリジナル比率"
     },
     "thumbnailSize": {
@@ -1069,11 +1117,13 @@
       "foreground": "手前",
       "heal": "修復",
       "linear": "線形",
+      "liquify": "ゆがみ",
       "luminance": "ルミナンス",
       "others": "その他",
       "quickErase": "クイック消去",
       "quickEraser": "クイック消しゴム",
       "radial": "円形",
+      "retouch": "レタッチ",
       "sky": "空",
       "subject": "被写体"
     }
@@ -1140,6 +1190,7 @@
         "curves": "トーンカーブ",
         "exposureToneMapper": "露光量とトーンマッパー",
         "grain": "粒子",
+        "guidedPerspective": "ガイド付きパースペクティブ",
         "halationGlow": "ハレーションとグロー",
         "hueShift": "グローバル色相シフト",
         "lensCorrection": "レンズ補正",
@@ -1387,7 +1438,10 @@
       "cancel": "キャンセル",
       "compareTooltip": "長押しで比較",
       "distortion": "歪み歪正",
+      "geometry": "ジオメトリ",
+      "guided": "ガイド付きパースペクティブ",
       "horizontal": "水平方向",
+      "manual": "手動変形",
       "maskWarning": "変形を適用するとベースの形状が変更されるため、既存のマスクがずれる場合があります。また、AIマスクは再生成する必要があります。",
       "offset": "オフセット",
       "original": "オリジナル",
@@ -1434,6 +1488,9 @@
       "speed": "速度",
       "title": "マウス操作設定",
       "zoom": "ズーム速度の倍率",
+      "zoomClick": "写真を100%にズーム",
+      "zoomClickDesc": "クリック時にエディターの写真を100%にズーム",
+      "zoomClickInfo": "写真をクリックするとすぐに100%（1:1 ピクセル）にズームされ、シャープネスとノイズを確認できます。無効の場合、クリックすると段階的にズームインします。",
       "zoomDesc": "スクロールホイールやピンチジェスチャを使用したときのズーム速度を調整します。"
     },
     "data": {
@@ -1498,6 +1555,7 @@
       "displayEditIcon": "編集アイコンを表示",
       "displayEditIconDesc": "編集されたサムネイルに小さなスライダーアイコンを表示します。",
       "enableFocusMode": "フォーカスモードを有効にする",
+      "enableNeutralGreyCanvas": "ニュートラルグレーの背景を有効にする",
       "enableOsTitlebar": "OSのタイトルバーを有効にする",
       "enableXmpSync": "XMP同期を有効にする",
       "focusMode": "フォーカスモード",
@@ -1508,6 +1566,8 @@
       "fontDesc": "アプリケーションのフォントを変更します。",
       "nativeTitlebar": "OS標準のタイトルバー",
       "nativeTitlebarDesc": "RapidRAWカスタムのもの代わりに、システムのデフォルトのウィンドウタイトルバーを使用します。",
+      "neutralGreyCanvas": "ニュートラルグレーのキャンバス",
+      "neutralGreyCanvasDesc": "アプリのテーマを変更せずに、より正確な色と露出のグレーディングを行うために、ニュートラルグレーのキャンバスを使用します。",
       "poppins": "Poppins",
       "showImageCounts": "画像数を表示",
       "system": "システムデフォルト",
@@ -1672,6 +1732,8 @@
       "livePreviewQualityDesc": "スライダーをドラッグしている間の画像の解像度と圧縮を制御します。低画質にすると、操作のレスポンスが大幅に向上します。",
       "livePreviews": "インタラクティブなリアルタイムプレビュー",
       "livePreviewsDesc": "スライダーのドラッグに合わせてプレビューを即座に更新します。調整中に操作が重く感じる場合は、これを無効にしてください。",
+      "mediumThumbnailRes": "エディターサムネイルの解像度",
+      "mediumThumbnailResDesc": "完全な画像がエディターに読み込まれる間に表示されるプレビューの解像度。",
       "modes": {
         "dynamic": "ダイナミック",
         "static": "固定解像度"
@@ -1720,6 +1782,8 @@
       "renderScaleDesc": "画面解像度に対する表示解像度の比率を調整します。高解像度ディスプレイで値を下げると、シャープネスがわずかに低下する代わりに動作が軽くなります。",
       "restartRequired": "処理エンジンの変更を有効にするには、アプリを再起動する必要があります。",
       "saveRelaunch": "保存して再起動",
+      "smallThumbnailRes": "グリッドサムネイルの解像度",
+      "smallThumbnailResDesc": "ライブラリのグリッドに表示されるサムネイルの解像度。",
       "staticDesc": "画像を固定の解像度でレンダリングします。このモードは最も軽量かつ安定しており、ズーム精度よりも軽快な動作を優先する低スペック環境に最適です。",
       "staticPreviewRes": "静的プレビュー解像度",
       "staticPreviewResDesc": "切り抜き、レンズ補正、変形ツールなどを使用する際のプレビュー解像度を設定します。メインエディタのプレビューには影響しません。",

@@ -317,7 +317,7 @@ fn denoise_image(
 
     let rgb_img_for_denoiser = dynamic_img.to_rgb32f();
 
-    let out_dynamic = if method == "ai" {
+    let mut out_dynamic = if method == "ai" {
         let session_arc = ai_session.ok_or_else(|| "AI Session not provided".to_string())?;
         crate::ai_processing::run_ai_denoise(
             &rgb_img_for_denoiser,
@@ -329,6 +329,10 @@ fn denoise_image(
     } else {
         run_bm3d(&rgb_img_for_denoiser, intensity, &app_handle)?
     };
+
+    if is_raw {
+        apply_cpu_default_raw_processing(&mut out_dynamic);
+    }
 
     let _ = app_handle.emit("denoise-progress", "Finalizing data...");
     let _ = app_handle.emit("denoise-progress", "Generating previews...");
@@ -348,16 +352,10 @@ fn denoise_image(
         }
     };
 
-    let mut denoised_preview_source = out_dynamic.clone();
-
-    if is_raw {
-        apply_cpu_default_raw_processing(&mut denoised_preview_source);
-    }
-
     let denoised_preview = if new_width != width {
-        denoised_preview_source.resize(new_width, new_height, image::imageops::FilterType::Lanczos3)
+        out_dynamic.resize(new_width, new_height, image::imageops::FilterType::Lanczos3)
     } else {
-        denoised_preview_source
+        out_dynamic.clone()
     };
 
     let mut buf_denoised = Cursor::new(Vec::new());

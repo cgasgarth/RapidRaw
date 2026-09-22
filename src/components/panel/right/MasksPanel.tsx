@@ -59,14 +59,17 @@ import {
   Mask,
   MaskType,
   SubMask,
-  MASK_PANEL_CREATION_TYPES,
-  OTHERS_MASK_TYPES,
+  MASK_BASIC_TYPES,
+  MASK_RANGE_TYPES,
+  MASK_AI_TYPES,
+  ALL_MASK_TYPES,
   MASK_ICON_MAP,
   SubMaskMode,
   ToolType,
   formatMaskTypeName,
   getSubMaskName,
   getMaskTypeName,
+  NewMaskDropZone,
 } from './Masks';
 import {
   Adjustments,
@@ -250,7 +253,9 @@ function MasksListRoot({ children, onClick }: { children: React.ReactNode; onCli
 export default function MasksPanel() {
   const { t } = useTranslation();
   const { setAdjustments } = useEditorActions();
-  const { handleGenerateAiDepthMask, handleGenerateAiForegroundMask, handleGenerateAiSkyMask } = useAiMasking();
+  const { handleGenerateAiDepthMask, handleGenerateAiForegroundMask, handleGenerateAiSkyMask, handleCancelAiTask } =
+    useAiMasking();
+
   const { setCustomEscapeHandler, isAdjustmentsPanelVisible } = useUIStore(
     useShallow((state) => {
       const leftVisible = state.uiVisibility.leftPanel;
@@ -268,15 +273,17 @@ export default function MasksPanel() {
       };
     }),
   );
+
   const { appSettings } = useSettingsStore(
     useShallow((state) => ({
       appSettings: state.appSettings,
     })),
   );
 
-  const { aiModelDownloadStatus } = useProcessStore(
+  const { aiModelDownloadStatus, activeAiTasks } = useProcessStore(
     useShallow((state) => ({
       aiModelDownloadStatus: state.aiModelDownloadStatus,
+      activeAiTasks: state.activeAiTasks,
     })),
   );
 
@@ -287,7 +294,6 @@ export default function MasksPanel() {
     brushSettings,
     copiedMask,
     histogram,
-    isGeneratingAiMask,
     selectedImage,
     isWaveformVisible,
     waveform,
@@ -302,7 +308,6 @@ export default function MasksPanel() {
       brushSettings: state.brushSettings,
       copiedMask: state.copiedMask,
       histogram: state.histogram,
-      isGeneratingAiMask: state.isGeneratingAiMask,
       selectedImage: state.selectedImage,
       isWaveformVisible: state.isWaveformVisible,
       waveform: state.waveform,
@@ -342,7 +347,10 @@ export default function MasksPanel() {
   const onSelectContainer = useCallback((id: string | null) => setEditor({ activeMaskContainerId: id }), [setEditor]);
   const onSelectMask = useCallback((id: string | null) => setEditor({ activeMaskId: id }), [setEditor]);
 
-  const [expandedContainers, setExpandedContainers] = useState<Set<string>>(new Set());
+  const [expandedContainers, setExpandedContainers] = useState<Set<string>>(() => {
+    const activeId = useEditorStore.getState().activeMaskContainerId;
+    return new Set(activeId ? [activeId] : []);
+  });
   const [activeDragItem, setActiveDragItem] = useState<DragData | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [tempName, setTempName] = useState('');
@@ -359,29 +367,12 @@ export default function MasksPanel() {
   const [isSettingsPanelEverOpened, setIsSettingsPanelEverOpened] = useState(false);
   const hasPerformedInitialSelection = useRef(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  const [analyzingSubMaskId, setAnalyzingSubMaskId] = useState<string | null>(null);
 
   const { showContextMenu } = useContextMenu();
   const { presets } = usePresets(adjustments);
 
   const activeContainer = adjustments.masks?.find((m) => m.id === activeMaskContainerId);
   const activeSubMaskData = activeContainer?.subMasks?.find((sm) => sm.id === activeMaskId);
-  const isAiMask =
-    activeSubMaskData && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth].includes(activeSubMaskData.type);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    if (isGeneratingAiMask && isAiMask) {
-      timer = setTimeout(() => {
-        setAnalyzingSubMaskId(activeMaskId);
-      }, 200);
-    } else {
-      setAnalyzingSubMaskId(null);
-    }
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isGeneratingAiMask, isAiMask, activeMaskId]);
 
   useEffect(() => {
     if (activeMaskContainerId) {
@@ -450,6 +441,11 @@ export default function MasksPanel() {
   };
 
   const handleResetAllMasks = () => {
+    adjustments.masks?.forEach((m) => {
+      m.subMasks.forEach((sm) => {
+        if (activeAiTasks[sm.id]) handleCancelAiTask(sm.id);
+      });
+    });
     handleDeselect();
     setAdjustments((prev: any) => ({ ...prev, masks: [] }));
   };
@@ -561,18 +557,6 @@ export default function MasksPanel() {
     handleGridClick(type, true);
   };
 
-  const handleAddOthersMask = (event: React.MouseEvent) => {
-    event.stopPropagation();
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const options = OTHERS_MASK_TYPES.map((maskType) => ({
-      label: getMaskTypeName(maskType),
-      icon: maskType.icon,
-      onClick: () => handleGridClick(maskType.type),
-      onRightClick: () => handleGridClick(maskType.type, true),
-    }));
-    showContextMenu(rect.left, rect.bottom + 5, options);
-  };
-
   const handleAddMaskContextMenu = (event: React.MouseEvent, targetContainerId?: string | null) => {
     event.preventDefault();
     event.stopPropagation();
@@ -595,45 +579,36 @@ export default function MasksPanel() {
     const container = targetContainerId ? adjustments.masks?.find((m) => m.id === targetContainerId) : null;
     const hasComponents = container && container.subMasks.length > 0;
 
-    const buildModeSubmenu = (label: string, icon: any, mode: SubMaskMode) => ({
-      label,
-      icon,
-      submenu: MASK_PANEL_CREATION_TYPES.map((maskType) => {
-        if (maskType.id === 'others') {
-          return {
-            label: getMaskTypeName(maskType),
-            icon: maskType.icon,
-            submenu: buildMenu(OTHERS_MASK_TYPES, mode),
-          };
-        }
-        return {
-          label: getMaskTypeName(maskType),
-          icon: maskType.icon,
-          disabled: maskType.disabled,
-          onClick: () => handleAddSubMask(targetContainerId!, maskType.type, mode),
-        };
-      }),
-    });
+    const buildFlatMenu = (mode: SubMaskMode) => [
+      ...buildMenu(MASK_AI_TYPES, mode),
+      { type: OPTION_SEPARATOR },
+      ...buildMenu(MASK_BASIC_TYPES, mode),
+      { type: OPTION_SEPARATOR },
+      ...buildMenu(MASK_RANGE_TYPES, mode),
+    ];
 
-    const options: any[] = buildMenu(
-      MASK_PANEL_CREATION_TYPES.filter((m) => m.id !== 'others'),
-      SubMaskMode.Additive,
-    );
-    const others = MASK_PANEL_CREATION_TYPES.find((m) => m.id === 'others');
-    if (others) {
-      options.push({
-        label: getMaskTypeName(others),
-        icon: others.icon,
-        submenu: buildMenu(OTHERS_MASK_TYPES, SubMaskMode.Additive),
-      });
-    }
+    let options: any[];
 
-    if (targetContainerId && hasComponents) {
-      options.push(
-        { type: OPTION_SEPARATOR },
-        buildModeSubmenu(t('editor.masks.actions.subtractFromMask'), Minus, SubMaskMode.Subtractive),
-        buildModeSubmenu(t('editor.masks.actions.intersectMaskWith'), SquaresIntersect, SubMaskMode.Intersect),
-      );
+    if (!targetContainerId) {
+      options = buildFlatMenu(SubMaskMode.Additive);
+    } else {
+      options = buildFlatMenu(SubMaskMode.Additive);
+
+      if (hasComponents) {
+        options.push(
+          { type: OPTION_SEPARATOR },
+          {
+            label: t('editor.masks.actions.subtractFromMask'),
+            icon: Minus,
+            submenu: buildFlatMenu(SubMaskMode.Subtractive),
+          },
+          {
+            label: t('editor.masks.actions.intersectMaskWith'),
+            icon: SquaresIntersect,
+            submenu: buildFlatMenu(SubMaskMode.Intersect),
+          },
+        );
+      }
     }
 
     showContextMenu(rect.left, rect.bottom + 5, options);
@@ -654,11 +629,23 @@ export default function MasksPanel() {
     }));
 
   const handleDeleteContainer = (id: string) => {
+    const container = adjustments.masks?.find((m) => m.id === id);
+    if (container) {
+      container.subMasks.forEach((sm: SubMask) => {
+        if (activeAiTasks[sm.id]) {
+          handleCancelAiTask(sm.id);
+        }
+      });
+    }
+
     if (activeMaskContainerId === id) handleDeselect();
     setAdjustments((prev: Adjustments) => ({ ...prev, masks: prev.masks.filter((m) => m.id !== id) }));
   };
 
   const handleDeleteSubMask = (containerId: string, subMaskId: string) => {
+    if (activeAiTasks[subMaskId]) {
+      handleCancelAiTask(subMaskId);
+    }
     if (activeMaskId === subMaskId) onSelectMask(null);
     setAdjustments((prev: Adjustments) => ({
       ...prev,
@@ -953,12 +940,22 @@ export default function MasksPanel() {
 
   const handlePanelContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    const allTypes = [...MASK_PANEL_CREATION_TYPES.filter((m) => m.id !== 'others'), ...OTHERS_MASK_TYPES];
-    const newMaskSubMenu = allTypes.map((m) => ({
-      label: getMaskTypeName(m),
-      icon: m.icon,
-      onClick: () => handleAddMaskContainer(m.type),
-    }));
+
+    const buildMenu = (types: MaskType[]) =>
+      types.map((m) => ({
+        label: getMaskTypeName(m),
+        icon: m.icon,
+        onClick: () => handleAddMaskContainer(m.type),
+      }));
+
+    const newMaskSubMenu = [
+      ...buildMenu(MASK_AI_TYPES),
+      { type: OPTION_SEPARATOR },
+      ...buildMenu(MASK_BASIC_TYPES),
+      { type: OPTION_SEPARATOR },
+      ...buildMenu(MASK_RANGE_TYPES),
+    ];
+
     showContextMenu(e.clientX, e.clientY, [
       {
         label: t('editor.masks.actions.pasteMask'),
@@ -1055,18 +1052,43 @@ export default function MasksPanel() {
                     onClick={handleDeselect}
                   >
                     <Text variant={TextVariants.heading} className="mb-2">
-                      {t('editor.masks.createNewTitle')}
+                      {t('editor.masks.aiTitle', 'AI Selections')}
+                    </Text>
+                    <div className="grid grid-cols-3 gap-2 mb-6" onClick={(e) => e.stopPropagation()}>
+                      {MASK_AI_TYPES.map((maskType) => (
+                        <DraggableGridItem
+                          key={maskType.type}
+                          maskType={maskType}
+                          onClick={() => handleGridClick(maskType.type)}
+                          onRightClick={(e: React.MouseEvent) => handleGridRightClick(e, maskType.type)}
+                          activeMaskContainerId={activeMaskContainerId}
+                        />
+                      ))}
+                    </div>
+                    <Text variant={TextVariants.heading} className="mb-2">
+                      {t('editor.masks.basicTitle', 'Basic Tools')}
+                    </Text>
+                    <div className="grid grid-cols-3 gap-2 mb-6" onClick={(e) => e.stopPropagation()}>
+                      {MASK_BASIC_TYPES.map((maskType) => (
+                        <DraggableGridItem
+                          key={maskType.type}
+                          maskType={maskType}
+                          onClick={() => handleGridClick(maskType.type)}
+                          onRightClick={(e: React.MouseEvent) => handleGridRightClick(e, maskType.type)}
+                          activeMaskContainerId={activeMaskContainerId}
+                        />
+                      ))}
+                    </div>
+                    <Text variant={TextVariants.heading} className="mb-2">
+                      {t('editor.masks.rangeTitle', 'Ranges & Global')}
                     </Text>
                     <div className="grid grid-cols-3 gap-2" onClick={(e) => e.stopPropagation()}>
-                      {MASK_PANEL_CREATION_TYPES.map((maskType: MaskType) => (
+                      {MASK_RANGE_TYPES.map((maskType) => (
                         <DraggableGridItem
-                          key={maskType.type || maskType.id}
+                          key={maskType.type}
                           maskType={maskType}
-                          onClick={(e: any) =>
-                            maskType.id === 'others' ? handleAddOthersMask(e) : handleGridClick(maskType.type)
-                          }
+                          onClick={() => handleGridClick(maskType.type)}
                           onRightClick={(e: React.MouseEvent) => handleGridRightClick(e, maskType.type)}
-                          isDraggable={maskType.id !== 'others'}
                           activeMaskContainerId={activeMaskContainerId}
                         />
                       ))}
@@ -1115,6 +1137,7 @@ export default function MasksPanel() {
                           setAdjustments={setAdjustments}
                           activeDragItem={activeDragItem}
                           activeMaskId={activeMaskId}
+                          activeAiTasks={activeAiTasks}
                           onSelectContainer={onSelectContainer}
                           onSelectMask={onSelectMask}
                           updateSubMask={updateSubMask}
@@ -1124,7 +1147,6 @@ export default function MasksPanel() {
                           handlePasteSubMask={handlePasteSubMask}
                           copySubMaskToClipboard={copySubMaskToClipboard}
                           copiedSubMask={copiedSubMask}
-                          analyzingSubMaskId={analyzingSubMaskId}
                           setIsMaskControlHovered={setIsMaskControlHovered}
                           onAddComponent={(e: React.MouseEvent) => handleAddMaskContextMenu(e, container.id)}
                         />
@@ -1133,7 +1155,7 @@ export default function MasksPanel() {
 
                     <AnimatePresence>
                       {activeDragItem?.type === 'Creation' && adjustments.masks.length > 0 && (
-                        <NewMaskDropZone isOver={false} />
+                        <NewMaskDropZone isOver={false} textKey="editor.masks.dropzoneText" />
                       )}
                     </AnimatePresence>
 
@@ -1177,7 +1199,6 @@ export default function MasksPanel() {
                       updateSubMask={updateSubMask}
                       histogram={histogram}
                       appSettings={appSettings}
-                      isGeneratingAiMask={isGeneratingAiMask}
                       setIsMaskControlHovered={setIsMaskControlHovered}
                       collapsibleState={collapsibleState}
                       setCollapsibleState={setCollapsibleState}
@@ -1247,9 +1268,7 @@ export default function MasksPanel() {
                 className="bg-surface rounded-lg gap-2 p-2 flex flex-col items-center justify-center aspect-square w-20 shadow-xl opacity-90"
               >
                 {(() => {
-                  const maskType =
-                    MASK_PANEL_CREATION_TYPES.find((m) => m.type === activeDragItem.maskType) ||
-                    OTHERS_MASK_TYPES.find((m) => m.type === activeDragItem.maskType);
+                  const maskType = ALL_MASK_TYPES.find((m) => m.type === activeDragItem.maskType);
                   const Icon = maskType?.icon || Circle;
                   return (
                     <>
@@ -1269,37 +1288,19 @@ export default function MasksPanel() {
   );
 }
 
-function NewMaskDropZone({ isOver }: { isOver: boolean }) {
-  const { t } = useTranslation();
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, height: 0, marginTop: 0 }}
-      animate={{ opacity: 1, height: 'auto', marginTop: '4px' }}
-      exit={{ opacity: 0, height: 0, marginTop: 0 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
-      className={`p-3 rounded-lg text-center ${isOver ? 'border border-accent/80 bg-bg-tertiary/50' : ''}`}
-    >
-      <Text weight={TextWeights.medium}>{t('editor.masks.dropzoneText')}</Text>
-    </motion.div>
-  );
-}
-
-function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activeMaskContainerId }: any) {
+function DraggableGridItem({ maskType, onClick, onRightClick, activeMaskContainerId }: any) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `create-${maskType.id || maskType.type}`,
+    id: `create-${maskType.type}`,
     data: { type: 'Creation', maskType: maskType.type },
-    disabled: !isDraggable,
+    disabled: maskType.disabled,
   });
 
   const tooltip = maskType.disabled
     ? t('editor.masks.comingSoon')
-    : maskType.id === 'others'
-      ? t('editor.masks.tooltips.showMore')
-      : activeMaskContainerId
-        ? t('editor.masks.tooltips.addToCurrent', { name: getMaskTypeName(maskType) })
-        : t('editor.masks.tooltips.createNew', { name: getMaskTypeName(maskType) });
+    : activeMaskContainerId
+      ? t('editor.masks.tooltips.addToCurrent', { name: getMaskTypeName(maskType) })
+      : t('editor.masks.tooltips.createNew', { name: getMaskTypeName(maskType) });
 
   return (
     <motion.div
@@ -1316,13 +1317,19 @@ function DraggableGridItem({ maskType, onClick, onRightClick, isDraggable, activ
         onRightClick(event);
       }}
       className={`bg-surface text-text-primary rounded-lg p-2 flex flex-col items-center justify-center gap-2 aspect-square transition-colors
-                ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'} ${isDragging ? 'opacity-50' : ''}`}
+        ${maskType.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-card-active active:bg-accent/20'}
+        ${isDragging ? 'opacity-50' : ''}`}
       data-tooltip={tooltip}
       whileTap={{ scale: 0.98 }}
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
-      <maskType.icon size={24} />{' '}
-      <Text as="span" variant={TextVariants.small} color={TextColors.primary}>
+      <maskType.icon size={24} />
+      <Text
+        as="span"
+        variant={TextVariants.small}
+        color={TextColors.primary}
+        className="text-center w-full leading-tight"
+      >
         {getMaskTypeName(maskType)}
       </Text>
     </motion.div>
@@ -1351,6 +1358,7 @@ function ContainerRow({
   setAdjustments,
   activeDragItem,
   activeMaskId,
+  activeAiTasks,
   onSelectContainer,
   onSelectMask,
   updateSubMask,
@@ -1360,7 +1368,6 @@ function ContainerRow({
   handlePasteSubMask,
   copySubMaskToClipboard,
   copiedSubMask,
-  analyzingSubMaskId,
   setIsMaskControlHovered,
   onAddComponent,
 }: any) {
@@ -1583,6 +1590,7 @@ function ContainerRow({
                   isActive={activeMaskId === subMask.id}
                   parentVisible={container.visible}
                   activeDragItem={activeDragItem}
+                  activeAiTasks={activeAiTasks}
                   onSelect={() => {
                     onSelectContainer(container.id);
                     onSelectMask(subMask.id);
@@ -1594,7 +1602,6 @@ function ContainerRow({
                   handlePaste={() => handlePasteSubMask(container.id, index + 1)}
                   handleCopy={() => copySubMaskToClipboard(subMask)}
                   hasCopiedSubMask={!!copiedSubMask}
-                  analyzingSubMaskId={analyzingSubMaskId}
                   renamingId={renamingId}
                   setRenamingId={setRenamingId}
                   tempName={tempName}
@@ -1645,6 +1652,7 @@ function SubMaskRow({
   containerId,
   isActive,
   parentVisible,
+  activeAiTasks,
   onSelect,
   updateSubMask,
   handleDelete,
@@ -1654,7 +1662,6 @@ function SubMaskRow({
   handleCopy,
   hasCopiedSubMask,
   activeDragItem,
-  analyzingSubMaskId,
   renamingId,
   setRenamingId,
   tempName,
@@ -1680,7 +1687,7 @@ function SubMaskRow({
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isDraggingContainer = activeDragItem?.type === 'Container';
-  const isAnalyzing = subMask.id === analyzingSubMaskId;
+  const isAnalyzing = Boolean(activeAiTasks?.[subMask.id]);
 
   const handleMouseEnter = () => {
     if (hoverTimeoutRef.current) {
@@ -1780,9 +1787,9 @@ function SubMaskRow({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
               transition={{ duration: 0.15 }}
-              className="absolute"
+              className="absolute flex items-center justify-center"
             >
-              <Loader2 size={16} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin text-accent" />
             </motion.div>
           ) : showNumber ? (
             <motion.span
@@ -1802,7 +1809,7 @@ function SubMaskRow({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.5 }}
               transition={{ duration: 0.15 }}
-              className="absolute"
+              className="absolute flex items-center justify-center"
             >
               <MaskIcon size={16} />
             </motion.div>
@@ -1895,7 +1902,6 @@ function SettingsPanel({
   updateSubMask,
   histogram,
   appSettings,
-  isGeneratingAiMask: _isGeneratingAiMask,
   setIsMaskControlHovered,
   collapsibleState,
   setCollapsibleState,
@@ -1990,7 +1996,8 @@ function SettingsPanel({
   };
 
   const subMaskConfig = activeSubMask ? SUB_MASK_CONFIG[activeSubMask.type] || {} : {};
-  const isAiMask = activeSubMask && ['ai-subject', 'ai-foreground', 'ai-sky', 'ai-depth'].includes(activeSubMask.type);
+  const isAiMask =
+    activeSubMask && [Mask.AiSubject, Mask.AiForeground, Mask.AiSky, Mask.AiDepth].includes(activeSubMask.type);
   const isComponentMode = !!activeSubMask;
 
   const setMaskContainerAdjustments = (updater: any) => {

@@ -69,7 +69,7 @@ function pickPrimary(files: ImageFile[], preference: GroupPreference): ImageFile
   }
 }
 
-export function getFileExtension(path: string): string {
+function getFileExtension(path: string): string {
   const clean = path.split('?')[0];
   const dot = clean.lastIndexOf('.');
   if (dot === -1) return '';

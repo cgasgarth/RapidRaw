@@ -2,8 +2,8 @@
   "adjustments": {
     "basic": {
       "blacks": "Blacks",
+      "brightness": "Brightness",
       "contrast": "Contrast",
-      "evShift": "EV Shift",
       "exposure": "Exposure",
       "highlights": "Highlights",
       "mappers": {
@@ -178,6 +178,7 @@
     },
     "editor": {
       "autoAdjust": "Auto Adjust Image",
+      "autoLensCorrection": "Auto Lens Correction",
       "cancel": "Cancel",
       "colorLabel": "Color Label",
       "confirmReset": "Confirm Reset",
@@ -240,6 +241,8 @@
       "addToAlbum": "Add to Album",
       "autoAdjust_one": "Auto Adjust Image",
       "autoAdjust_other": "Auto Adjust Images",
+      "autoLensCorrection_one": "Auto Lens Correction",
+      "autoLensCorrection_other": "Auto Lens Correction",
       "collage_one": "Frame Image",
       "collage_other": "Create Collage",
       "confirmDelete": "Confirm Delete",
@@ -366,11 +369,22 @@
       "generatingDepthMap": "Calculating AI Depth Map...",
       "generativeEditTitle": "Generative Edit",
       "inpaintingTitle": "Inpainting",
+      "liquify": {
+        "mode": "Liquify Mode",
+        "modes": {
+          "expand": "Expand",
+          "pinch": "Pinch",
+          "push": "Push",
+          "twirl": "Twirl"
+        }
+      },
       "manualCleanupTitle": "Manual Cleanup",
       "noImageSelected": "No image selected.",
       "params": {
         "feather": "Feather",
-        "grow": "Grow"
+        "grow": "Grow",
+        "intensity": "Intensity",
+        "pressure": "Pressure"
       },
       "patches": {
         "aiEdit": "AI Edit {{count}}",
@@ -383,9 +397,13 @@
         "heal_one": "Heal {{count}}",
         "heal_other": "Heal {{count}}",
         "invertedName": "{{name}} Inverted",
+        "liquify": "Liquify {{count}}",
+        "liquify_one": "Liquify {{count}}",
+        "liquify_other": "Liquify {{count}}",
         "quickErase": "Quick Erase {{count}}",
         "quickErase_one": "Quick Erase {{count}}",
-        "quickErase_other": "Quick Erase {{count}}"
+        "quickErase_other": "Quick Erase {{count}}",
+        "retouch": "Retouch {{count}}"
       },
       "resetInpaintingTooltip": "Reset Inpainting",
       "settings": {
@@ -406,7 +424,8 @@
         "quickEraseDesc": "Fill selection to remove the object.",
         "selectionPropertiesTitle": "Selection Properties",
         "useBasicInpaint": "Use basic inpainting"
-      }
+      },
+      "touchUpTitle": "Touch Up"
     },
     "crop": {
       "aspectRatioHeading": "Aspect Ratio",
@@ -430,6 +449,10 @@
         "armature": {
           "desc": "Armature",
           "name": "Armature"
+        },
+        "center": {
+          "desc": "Center Lines",
+          "name": "Center"
         },
         "diagonal": {
           "desc": "Diagonal Lines",
@@ -523,6 +546,16 @@
       "exporting": "Exporting…",
       "savesTo": "External edit — saves to"
     },
+    "guided": {
+      "cancel": "Cancel",
+      "drawingActive": "Drawing Active",
+      "hint": "Draw along edges in your photo that should be vertical or horizontal.",
+      "linesStatus": "Active Guide Lines",
+      "toast": {
+        "angleRejected": "Line angle is too far from horizontal or vertical",
+        "maxLines": "Maximum 2 vertical and 2 horizontal lines allowed"
+      }
+    },
     "layout": {
       "split": "Split"
     },
@@ -555,6 +588,8 @@
         "switchToSubtract": "Switch to Subtract"
       },
       "addNewMask": "Add New Mask",
+      "aiTitle": "AI Selections",
+      "basicTitle": "Basic Tools",
       "brush": {
         "brush": "Brush",
         "eraser": "Eraser",
@@ -563,7 +598,6 @@
         "size": "Brush Size"
       },
       "comingSoon": "Coming Soon",
-      "createNewTitle": "Create New Mask",
       "depthRange": {
         "far": "Far",
         "near": "Near",
@@ -587,6 +621,7 @@
         "maskName_one": "Mask {{count}}",
         "maskName_other": "Mask {{count}}"
       },
+      "rangeTitle": "Ranges & Global",
       "resetMaskingTooltip": "Reset Masking",
       "settings": {
         "aiModelDownloading": "AI Model Downloading: ",
@@ -609,8 +644,7 @@
       "tooltips": {
         "addToCurrent": "Add {{name}} to Current Mask or Create New (Right-click)",
         "createNew": "Create New {{name}} Mask",
-        "selectNewSourcePoint": "{{modifier}} + Click to select a new source point",
-        "showMore": "Show More Mask Types"
+        "selectNewSourcePoint": "{{modifier}} + Click to select a new source point"
       }
     },
     "metadata": {
@@ -756,6 +790,12 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "destination": {
+      "customFolder": "Custom folder",
+      "originalFolder": "Original image folder",
+      "subfolder": "Subfolder",
+      "subfolderPlaceholder": "e.g. final, WebP"
+    },
     "dialog": {
       "saveEditedImageTitle": "Save Edited Image",
       "selectFolderTitle": "Select Folder to Export {{count}} Image(s)",
@@ -764,7 +804,10 @@
     },
     "file": {
       "quality": "Quality",
-      "qualityLossless": "Quality (Lossless)"
+      "qualityLossless": "Quality (Lossless)",
+      "tiffBitDepth": "TIFF bit depth",
+      "tiffBitDepth16": "16-bit",
+      "tiffBitDepth8": "8-bit"
     },
     "labels": {
       "image": "Image",
@@ -789,6 +832,7 @@
     },
     "sections": {
       "advanced": "Advanced",
+      "destination": "Destination",
       "fileNaming": "File Naming",
       "fileSettings": "File Settings",
       "imageSizing": "Image Sizing",
@@ -927,6 +971,9 @@
         "clearSearch": "Clear search",
         "collapse": "Collapse",
         "expand": "Expand",
+        "moreOptions": "Options",
+        "navBack": "Go Back",
+        "navForward": "Go Forward",
         "sortFolders": "Sort Folders"
       }
     },
@@ -1046,6 +1093,7 @@
     },
     "thumbnailFit": {
       "fillSquare": "Fill Square",
+      "justified": "Masonry",
       "originalRatio": "Original Ratio"
     },
     "thumbnailSize": {
@@ -1071,11 +1119,13 @@
       "foreground": "Foreground",
       "heal": "Heal",
       "linear": "Linear",
+      "liquify": "Liquify",
       "luminance": "Luminance",
       "others": "Others",
       "quickErase": "Quick Erase",
       "quickEraser": "Quick Eraser",
       "radial": "Radial",
+      "retouch": "Retouch",
       "sky": "Sky",
       "subject": "Subject"
     }
@@ -1142,6 +1192,7 @@
         "curves": "Curves",
         "exposureToneMapper": "Exposure & Tone Mapper",
         "grain": "Grain",
+        "guidedPerspective": "Guided Perspective",
         "halationGlow": "Halation & Glow",
         "hueShift": "Global Hue Shift",
         "lensCorrection": "Lens Correction",
@@ -1389,7 +1440,10 @@
       "cancel": "Cancel",
       "compareTooltip": "Hold to Compare",
       "distortion": "Distortion",
+      "geometry": "Geometry",
+      "guided": "Guided Perspective",
       "horizontal": "Horizontal",
+      "manual": "Manual Transform",
       "maskWarning": "Transforming updates base geometry. Existing masks may shift, and AI masks must be regenerated.",
       "offset": "Offset",
       "original": "Original",
@@ -1436,6 +1490,9 @@
       "speed": "Speed",
       "title": "Mouse Controls",
       "zoom": "Zoom Speed Multiplier",
+      "zoomClick": "Zoom photo to 100%",
+      "zoomClickDesc": "Zoom photo in editor to 100% on mouse click",
+      "zoomClickInfo": "Click the photo to instantly zoom to 100% (1:1 pixels) to assess sharpness and noise. When disabled, clicking zooms in gradually.",
       "zoomDesc": "Adjust how fast the canvas zooms in and out when using the scroll wheel or pinch gesture."
     },
     "data": {
@@ -1500,6 +1557,7 @@
       "displayEditIcon": "Display Edit Icon",
       "displayEditIconDesc": "Show a small slider icon on thumbnails that have been edited.",
       "enableFocusMode": "Enable Focus Mode",
+      "enableNeutralGreyCanvas": "Enable Neutral Grey Background",
       "enableOsTitlebar": "Enable OS Titlebar",
       "enableXmpSync": "Enable XMP Sync",
       "focusMode": "Focus Mode",
@@ -1510,6 +1568,8 @@
       "fontDesc": "Change the application font.",
       "nativeTitlebar": "Native Titlebar",
       "nativeTitlebarDesc": "Use your system's default window titlebar instead of RapidRAW's custom one.",
+      "neutralGreyCanvas": "Neutral Grey Canvas",
+      "neutralGreyCanvasDesc": "Use a neutral grey canvas for more accurate color and exposure grading without changing the app theme.",
       "poppins": "Poppins",
       "showImageCounts": "Show Image Counts",
       "system": "System Default",
@@ -1674,6 +1734,8 @@
       "livePreviewQualityDesc": "Controls the resolution and compression of the image while dragging sliders. Lower quality significantly improves responsiveness.",
       "livePreviews": "Live Interactive Previews",
       "livePreviewsDesc": "Update the preview immediately while dragging sliders. Disable this if the interface feels laggy during adjustments.",
+      "mediumThumbnailRes": "Editor Thumbnail Resolution",
+      "mediumThumbnailResDesc": "Resolution of the preview shown while full images load in the editor.",
       "modes": {
         "dynamic": "Dynamic",
         "static": "Fixed Resolution"
@@ -1722,6 +1784,8 @@
       "renderScaleDesc": "Scales the render resolution relative to your display. Lower values improve performance on high-resolution screens at the cost of some sharpness.",
       "restartRequired": "Changes to the processing engine require an application restart to take effect.",
       "saveRelaunch": "Save & Relaunch",
+      "smallThumbnailRes": "Grid Thumbnail Resolution",
+      "smallThumbnailResDesc": "Resolution of thumbnails shown in the library grid.",
       "staticDesc": "The editor renders the image at a fixed resolution. This mode is the fastest and most consistent, making it ideal for lower-end hardware where smooth performance is prioritized over pixel-perfect zoom.",
       "staticPreviewRes": "Static Preview Resolution",
       "staticPreviewResDesc": "Sets the resolution for static previews like crop mode, lens correction, and perspective tools. Does not affect the main editor preview.",

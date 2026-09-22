@@ -60,6 +60,30 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 <details>
 <summary><strong>Recent Changes</strong></summary>
 
+- **2026-09-17:** Rewrite vibrance & local contrast preserving highlights adjustment
+- **2026-09-16:** Add highlights color reconstruction & improve exposure shader
+- **2026-09-14:** Add neutral grey canvas toggle
+- **2026-09-13:** Improve RAW highlight recovery and color clipping
+- **2026-09-12:** Add Ctrl crop pan/zoom and optimize preview transform caching
+- **2026-09-09:** Add masonry thumbnail layout mode
+- **2026-09-09:** Add back and forward navigation history for library
+- **2026-09-06:** Support exporting to original folder with subfolder
+- **2026-09-03:** Rewrite Wayland/Nvidia workaround
+- **2026-09-02:** Refactor crop panel & integrate transform/lens correction directly into main canvas
+
+<details>
+<summary><strong>Expand further</strong></summary>
+
+- **2026-09-01:** Implemented guided perspective correction thanks to @hogar1977
+- **2026-09-01:** Add context menu option to auto apply lens correction
+- **2026-08-31:** New edge-aware filter for ai masks, improved sharpening & mobile UI improvements
+- **2026-08-29:** Improved EXIF ​​metadata processing during export
+- **2026-08-29:** Implement folder-level EXIF caching and prevent redundant adjustment saves
+- **2026-08-28:** Categorize mask creation panel
+- **2026-08-27:** Split thumbnail resolution settings into separate grid and editor preview sizes
+- **2026-08-26:** Introduced a retouch tool to effortlessly smooth skin
+- **2026-08-25:** Added a liquify tool to reshape and warp parts of an image
+- **2026-08-24:** New global shift+drag straighten shortcut & improved auto-crop calculation
 - **2026-08-20:** Add drag & drop image move system to quickly organize library
 - **2026-08-19:** Restored side panels on tablets
 - **2026-08-17:** Integrated built-in analog film emulations powered by Spektrafilm, featuring a scene-referred V-Log color pipeline in the WGSL shader
@@ -70,10 +94,6 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2026-08-11:** Added automatic canvas cropping for generative AI inpainting workflows
 - **2026-08-07:** Updated Lensfun database for latest camera bodies and lenses
 - **2026-08-06:** Added customizable keyboard shortcuts and visibility toggles for left, right, and bottom panels
-
-<details>
-<summary><strong>Expand further</strong></summary>
-
 - **2026-08-05:** Added Catalan language support and folder tree shortcut
 - **2026-08-03:** Added support for image-based LUTs (.png, .jpg, .jpeg, .tiff) and batch importing multiple presets
 - **2026-08-01:** Implemented customizable workspace layout system with drag & drop panels
@@ -602,6 +622,7 @@ RapidRAW isn't just for RAW files! You can also import, edit, and convert standa
 - **Graphics & Textures:** `.tga`, `.ico`, `.dds`
 - **Specialist Formats:** `.qoi`, `.ff`
 - **Netpbm Bitmaps:** `.pnm`, `.pbm`, `.pgm`, `.ppm`, `.pam`
+
 </details>
 
 <details>
@@ -782,15 +803,30 @@ npm run tauri build -- --features tethering
 
 RapidRAW includes camera tethering for studio, portrait, and product photography workflows. Connect your camera via USB to control exposure settings, monitor your shot in real time, and automatically ingest files directly into your workspace.
 
-### Key Capabilities
-
-- **Real-Time Live View:** High-frame-rate live view with composition guides, 90° rotation, and horizontal flip.
-- **Full Camera Control:** Adjust Aperture, Shutter Speed, ISO, White Balance, Exposure Compensation, Exposure Mode, and Metering Mode directly from RapidRAW.
-- **Autofocus Control:** Trigger autofocus directly from RapidRAW.
-- **Ghost Overlay:** Overlay previous captures with adjustable opacity to maintain consistent framing and perspective.
-- **Battery Monitoring:** View the connected camera's battery level directly in RapidRAW.
-- **Automatic Presets:** Automatically apply a selected preset to newly captured images.
-- **Instant Ingestion:** Captured images are automatically saved to your active library, indexed, and optionally opened in the editor.
+<table width="100%">
+  <tr>
+    <td width="65%" valign="top">
+      <h3>Key Capabilities</h3>
+      <ul>
+        <li><strong>Real-Time Live View:</strong> High-frame-rate live view with composition guides, 90° rotation, and horizontal flip.</li>
+        <li><strong>Full Camera Control:</strong> Adjust Aperture, Shutter Speed, ISO, White Balance, Exposure Compensation, Exposure Mode, and Metering Mode directly from RapidRAW.</li>
+        <li><strong>Autofocus Control:</strong> Trigger autofocus directly from RapidRAW.</li>
+        <li><strong>Ghost Overlay:</strong> Overlay previous captures with adjustable opacity to maintain consistent framing and perspective.</li>
+        <li><strong>Battery Monitoring:</strong> View the connected camera's battery level directly in RapidRAW.</li>
+        <li><strong>Automatic Presets:</strong> Automatically apply a selected preset to newly captured images.</li>
+        <li><strong>Instant Ingestion:</strong> Captured images are automatically saved to your active library, indexed, and optionally opened in the editor.</li>
+        <br>
+      </ul>
+    </td>
+    <td width="35%" valign="top" align="center">
+      <br>
+      <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/tethering.jpeg" alt="RapidRAW Camera Tethering Setup" width="100%" style="border-radius: 8px;">
+      <br><br>
+      <strong>Live Camera Tethering</strong><br>
+      <sub>Sony α7 III connected with real-time Live View</sub>
+    </td>
+  </tr>
+</table>
 
 ### Supported Cameras
 
@@ -865,6 +901,9 @@ rapidraw export /path/to/photos --output /path/to/output_dir --format jpeg --qua
 # Export a single image directly to a specific target file
 rapidraw export /path/to/photo.raw --output /path/to/output.png --format png
 
+# Export a true 16-bit TIFF (the TIFF default; use 8 for an RGB8 TIFF)
+rapidraw export /path/to/photo.raw --output /path/to/output.tiff --format tiff --tiff-bit-depth 16
+
 # Batch export a folder using a custom adjustments JSON file to override sidecars
 rapidraw export /path/to/photos --output /path/to/output_dir --adjustments /path/to/preset.json
 ```
@@ -877,6 +916,7 @@ rapidraw export /path/to/photos --output /path/to/output_dir --adjustments /path
 | `--output <path>`      | Target directory or specific output file path                          | _(Required)_      |
 | `--format <fmt>`       | Output format (`jpeg`, `png`, `webp`, `avif`, `tiff`, `jxl`, `cube`)   | `jpeg`            |
 | `--quality <1-100>`    | Image export quality                                                   | `90`              |
+| `--tiff-bit-depth <n>` | TIFF channel depth (`8` or `16`)                                       | `16`              |
 | `--keep-metadata`      | Retain EXIF/capture metadata in exported files                         | `false`           |
 | `--adjustments <path>` | Path to a custom JSON file containing adjustments to override sidecars | _(Auto-detected)_ |
 
@@ -916,7 +956,10 @@ For [OpenCode](https://opencode.ai/docs/mcp-servers), add this to `opencode.json
 | `update_adjustments` | Apply sparse changes; omitted fields stay unchanged. |
 | `reset_adjustments`, `apply_auto_adjustments` | Reset or calculate an edit. |
 | `get_preview` | Return a JPEG preview of the current/supplied edit. |
-| `export_images` | Export one or more images to a directory and wait for completion. |
+| `calculate_guided_perspective` | Check guide lines and calculate the perspective transform and crop for the active image. |
+| `export_images` | Export one or more images to a custom directory or their original folders, with TIFF bit depth and subfolder options, and wait for completion. |
+
+To apply guided perspective, call `calculate_guided_perspective` with normalized guide lines, then pass `guidedPerspective` to `update_adjustments`. The MCP server starts with the desktop app and does not need a feature flag.
 
 ## System Requirements
 
@@ -945,6 +988,7 @@ If the application crashes immediately when you try to start editing a picture, 
 3.  Locate the **Processing Backend** setting.
 4.  Change it from **Auto** to a specific backend supported by your OS (e.g., **Vulkan**, **DirectX12**, **OpenGL**, or **Metal**).
 5.  Restart the application and try opening the image again. Experiment with different backends if the first one doesn't work.
+
 </details>
 
 <details>

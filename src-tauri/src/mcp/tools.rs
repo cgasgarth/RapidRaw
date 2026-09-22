@@ -8,7 +8,8 @@ use tauri::{AppHandle, Manager};
 use super::{adjustments, ui};
 use crate::AppState;
 use crate::export_processing::{
-    ExportRequest, ExportSettings, ResizeMode, ResizeOptions, WatermarkAnchor, WatermarkSettings,
+    ExportRequest, ExportSettings, ResizeMode, ResizeOptions, TiffBitDepth, WatermarkAnchor,
+    WatermarkSettings,
 };
 
 fn export_settings_schema() -> Value {
@@ -23,6 +24,12 @@ fn export_settings_schema() -> Value {
                 "maximum": 100,
                 "default": 90,
                 "description": "Quality for JPEG, WebP, and JXL output. JXL quality 100 is lossless."
+            },
+            "tiffBitDepth": {
+                "type": "integer",
+                "enum": [8, 16],
+                "default": 16,
+                "description": "Bit depth for TIFF output."
             },
             "resize": {
                 "type": ["object", "null"],
@@ -57,7 +64,9 @@ fn export_settings_schema() -> Value {
                 "required": ["path", "anchor", "scale", "spacing", "opacity"]
             },
             "exportMasks": { "type": "boolean", "default": false },
-            "preserveFolders": { "type": "boolean", "default": false, "description": "Preserve paths relative to baseOriginFolders." }
+            "preserveFolders": { "type": "boolean", "default": false, "description": "Preserve paths relative to baseOriginFolders." },
+            "destinationType": { "type": "string", "enum": ["customFolder", "originalFolder"], "default": "customFolder" },
+            "subfolder": { "type": "string", "description": "Relative subfolder inside each original image folder when destinationType is originalFolder." }
         }
     })
 }
@@ -145,15 +154,23 @@ pub(super) fn tool_definitions() -> Vec<Value> {
             }, "required": ["imagePath"] }
         }),
         json!({
+            "name": "calculate_guided_perspective",
+            "description": "Calculate the perspective transform and automatic crop for normalized guide lines on the active image. This does not change the edit. Apply the guides with update_adjustments and the guidedPerspective field.",
+            "inputSchema": { "type": "object", "additionalProperties": false, "properties": {
+                "imagePath": { "type": "string" },
+                "lines": adjustments::guide_lines_schema(2)
+            }, "required": ["imagePath", "lines"] }
+        }),
+        json!({
             "name": "export_images",
-            "description": "Export one or more images to an output directory and wait for completion. The active image's current editor edit is used for that image; other images use their sidecars.",
+            "description": "Export one or more images and wait for completion. Use outputDirectory for a custom folder, or exportSettings.destinationType originalFolder with an optional subfolder. The active image uses its current edit; other images use their sidecars.",
             "inputSchema": { "type": "object", "additionalProperties": false, "properties": {
                 "imagePaths": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "Source image paths." },
-                "outputDirectory": { "type": "string", "description": "Directory to create/use for exported files." },
+                "outputDirectory": { "type": "string", "description": "Directory to create/use for customFolder exports. Required unless destinationType is originalFolder." },
                 "outputFormat": { "type": "string", "enum": ["jpg", "jpeg", "png", "tiff", "webp", "jxl", "avif", "cube"], "default": "jpg" },
                 "exportSettings": export_settings_schema(),
                 "baseOriginFolders": { "type": "array", "items": { "type": "string" }, "description": "Optional source roots used when preserveFolders is true." }
-            }, "required": ["imagePaths", "outputDirectory"] }
+            }, "required": ["imagePaths"] }
         }),
     ]
 }
@@ -174,6 +191,7 @@ pub(super) async fn call_tool(
         "reset_adjustments" => reset_adjustments(app_handle, &arguments).await,
         "apply_auto_adjustments" => apply_auto_adjustments(app_handle, &arguments).await,
         "get_preview" => get_preview(app_handle, &arguments).await,
+        "calculate_guided_perspective" => calculate_guided_perspective(app_handle, &arguments),
         "export_images" => export_images(app_handle, &arguments).await,
         _ => Err("unknown RapidRAW tool".to_string()),
     };
@@ -352,6 +370,29 @@ async fn get_preview(app_handle: &AppHandle, arguments: &Value) -> Result<Value,
     }))
 }
 
+fn calculate_guided_perspective(
+    app_handle: &AppHandle,
+    arguments: &Value,
+) -> Result<Value, String> {
+    let path = required_image_path(arguments)?;
+    ui::require_active_session(app_handle, Some(&path))?;
+    let lines = adjustments::validate_guided_lines(
+        arguments
+            .get("lines")
+            .ok_or("lines is required".to_string())?,
+        2,
+    )?;
+    let state = app_handle.state::<AppState>();
+    let (image, _) = crate::get_original_image(&state)?;
+    let (width, height) = image.dimensions();
+    serde_json::to_value(crate::guided_perspective::calculate_guided_perspective(
+        lines,
+        width as f64,
+        height as f64,
+    ))
+    .map_err(|error| error.to_string())
+}
+
 async fn export_images(app_handle: &AppHandle, arguments: &Value) -> Result<Value, String> {
     let image_paths = arguments
         .get("imagePaths")
@@ -374,16 +415,26 @@ async fn export_images(app_handle: &AppHandle, arguments: &Value) -> Result<Valu
         })
         .collect::<Result<Vec<_>, String>>()?;
 
-    let output_directory = required_string(arguments, "outputDirectory")?;
-    let output_path = Path::new(&output_directory);
-    if output_path.exists() && !output_path.is_dir() {
-        return Err(format!(
-            "outputDirectory is not a directory: {output_directory}"
-        ));
-    }
-    std::fs::create_dir_all(output_path).map_err(|error| {
-        format!("could not create outputDirectory '{output_directory}': {error}")
-    })?;
+    let export_settings = parse_export_settings(arguments.get("exportSettings"))?;
+    let original_folder = export_settings.destination_type.as_deref() == Some("originalFolder");
+    let output_directory = if original_folder {
+        if arguments.get("outputDirectory").is_some() {
+            return Err(
+                "outputDirectory must be omitted when destinationType is originalFolder"
+                    .to_string(),
+            );
+        }
+        String::new()
+    } else {
+        let directory = required_string(arguments, "outputDirectory")?;
+        let output_path = Path::new(&directory);
+        if output_path.exists() && !output_path.is_dir() {
+            return Err(format!("outputDirectory is not a directory: {directory}"));
+        }
+        std::fs::create_dir_all(output_path)
+            .map_err(|error| format!("could not create outputDirectory '{directory}': {error}"))?;
+        directory
+    };
 
     let output_format = match arguments.get("outputFormat") {
         None => "jpg".to_string(),
@@ -402,8 +453,9 @@ async fn export_images(app_handle: &AppHandle, arguments: &Value) -> Result<Valu
     }
 
     let active = ui::require_active_session(app_handle, None)?;
-    let export_settings = parse_export_settings(arguments.get("exportSettings"))?;
     let base_origin_folders = parse_base_origin_folders(arguments, &paths)?;
+    let destination_type = export_settings.destination_type.clone();
+    let subfolder = export_settings.subfolder.clone();
 
     crate::export_processing::export_images_and_wait(
         ExportRequest {
@@ -421,7 +473,9 @@ async fn export_images(app_handle: &AppHandle, arguments: &Value) -> Result<Valu
 
     Ok(json!({
         "imagePaths": paths,
-        "outputDirectory": output_directory,
+        "outputDirectory": if original_folder { Value::Null } else { json!(output_directory) },
+        "destinationType": destination_type.unwrap_or_else(|| "customFolder".to_string()),
+        "subfolder": subfolder,
         "outputFormat": output_format,
         "exportedCount": image_paths.len(),
         "activeImagePath": active.path,
@@ -437,6 +491,9 @@ fn parse_export_settings(value: Option<&Value>) -> Result<ExportSettings, String
         .ok_or("exportSettings must be an object".to_string())?;
     const VALID_KEYS: &[&str] = &[
         "jpegQuality",
+        "tiffBitDepth",
+        "destinationType",
+        "subfolder",
         "resize",
         "keepMetadata",
         "preserveTimestamps",
@@ -477,9 +534,43 @@ fn parse_export_settings(value: Option<&Value>) -> Result<ExportSettings, String
         None | Some(Value::Null) => None,
         Some(value) => Some(parse_watermark_settings(value)?),
     };
+    let destination_type = match object.get("destinationType") {
+        None => None,
+        Some(Value::String(value)) if value == "customFolder" => None,
+        Some(Value::String(value)) if value == "originalFolder" => Some(value.clone()),
+        _ => {
+            return Err(
+                "exportSettings.destinationType must be customFolder or originalFolder".to_string(),
+            );
+        }
+    };
+    let subfolder = match object.get("subfolder") {
+        None => None,
+        Some(Value::String(value)) if destination_type.is_some() => {
+            if !Path::new(value)
+                .components()
+                .all(|component| matches!(component, std::path::Component::Normal(_)))
+            {
+                return Err(
+                    "exportSettings.subfolder must be a relative path without . or .. components"
+                        .to_string(),
+                );
+            }
+            Some(value.clone())
+        }
+        Some(Value::String(_)) => {
+            return Err(
+                "exportSettings.subfolder requires destinationType originalFolder".to_string(),
+            );
+        }
+        _ => return Err("exportSettings.subfolder must be a string".to_string()),
+    };
 
     Ok(ExportSettings {
         jpeg_quality,
+        tiff_bit_depth: TiffBitDepth::try_from(
+            bounded_u64(object, "tiffBitDepth", 16, 8, 16)? as u8
+        )?,
         resize,
         keep_metadata,
         preserve_timestamps,
@@ -488,12 +579,15 @@ fn parse_export_settings(value: Option<&Value>) -> Result<ExportSettings, String
         watermark,
         export_masks: optional_bool(object, "exportMasks", false)?,
         preserve_folders: optional_bool(object, "preserveFolders", false)?,
+        destination_type,
+        subfolder,
     })
 }
 
 fn default_export_settings() -> ExportSettings {
     ExportSettings {
         jpeg_quality: 90,
+        tiff_bit_depth: TiffBitDepth::default(),
         resize: None,
         keep_metadata: true,
         preserve_timestamps: false,
@@ -502,6 +596,8 @@ fn default_export_settings() -> ExportSettings {
         watermark: None,
         export_masks: false,
         preserve_folders: false,
+        destination_type: None,
+        subfolder: None,
     }
 }
 
@@ -809,9 +905,31 @@ mod tests {
         assert_eq!(settings.jpeg_quality, 80);
         assert!(settings.resize.is_some());
         assert!(settings.preserve_folders);
+        assert_eq!(settings.tiff_bit_depth, TiffBitDepth::Sixteen);
+
+        let original_folder = parse_export_settings(Some(&json!({
+            "tiffBitDepth": 8,
+            "destinationType": "originalFolder",
+            "subfolder": "exports/edited"
+        })))
+        .expect("valid original-folder export settings");
+        assert_eq!(original_folder.tiff_bit_depth, TiffBitDepth::Eight);
+        assert_eq!(
+            original_folder.destination_type.as_deref(),
+            Some("originalFolder")
+        );
+        assert_eq!(original_folder.subfolder.as_deref(), Some("exports/edited"));
 
         let error = parse_export_settings(Some(&json!({ "jpegQuality": 101 })))
             .expect_err("quality above the UI bound should fail");
         assert!(error.contains("jpegQuality must be an integer from 1 to 100"));
+        assert!(parse_export_settings(Some(&json!({ "tiffBitDepth": 12 }))).is_err());
+        assert!(
+            parse_export_settings(Some(&json!({
+                "destinationType": "originalFolder",
+                "subfolder": "../outside"
+            })))
+            .is_err()
+        );
     }
 }

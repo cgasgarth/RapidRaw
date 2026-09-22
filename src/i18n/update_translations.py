@@ -3,70 +3,110 @@ from pathlib import Path
 
 LOCALES_DIR = Path("./locales")
 
+# Translations for the new Exposure (formerly EV Shift) and Brightness (formerly Exposure) keys
 TRANSLATIONS = {
     "ca": {
-        "tethering": {
-            "triggerCapture": "Captura"
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposició",
+                "brightness": "Brillantor"
+            }
         }
     },
     "de": {
-        "tethering": {
-            "triggerCapture": "Aufnehmen"
+        "adjustments": {
+            "basic": {
+                "exposure": "Belichtung",
+                "brightness": "Helligkeit"
+            }
         }
     },
     "en": {
-        "tethering": {
-            "triggerCapture": "Capture"
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposure",
+                "brightness": "Brightness"
+            }
         }
     },
     "es": {
-        "tethering": {
-            "triggerCapture": "Capturar"
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposición",
+                "brightness": "Brillo"
+            }
         }
     },
     "fr": {
-        "tethering": {
-            "triggerCapture": "Capturer"
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposition",
+                "brightness": "Luminosité"
+            }
         }
     },
     "it": {
-        "tethering": {
-            "triggerCapture": "Acquisisci"
+        "adjustments": {
+            "basic": {
+                "exposure": "Esposizione",
+                "brightness": "Luminosità"
+            }
         }
     },
     "ja": {
-        "tethering": {
-            "triggerCapture": "撮影"
+        "adjustments": {
+            "basic": {
+                "exposure": "露出",
+                "brightness": "明るさ"
+            }
         }
     },
     "ko": {
-        "tethering": {
-            "triggerCapture": "촬영"
+        "adjustments": {
+            "basic": {
+                "exposure": "노출",
+                "brightness": "밝기"
+            }
         }
     },
     "pl": {
-        "tethering": {
-            "triggerCapture": "Zrób zdjęcie"
+        "adjustments": {
+            "basic": {
+                "exposure": "Ekspozycja",
+                "brightness": "Jasność"
+            }
         }
     },
     "pt": {
-        "tethering": {
-            "triggerCapture": "Capturar"
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposição",
+                "brightness": "Brilho"
+            }
         }
     },
     "ru": {
-        "tethering": {
-            "triggerCapture": "Съемка"
+        "adjustments": {
+            "basic": {
+                "exposure": "Экспозиция",
+                "brightness": "Яркость"
+            }
         }
     },
     "zh-CN": {
-        "tethering": {
-            "triggerCapture": "拍摄"
+        "adjustments": {
+            "basic": {
+                "exposure": "曝光",
+                "brightness": "亮度"
+            }
         }
     },
     "zh-TW": {
-        "tethering": {
-            "triggerCapture": "拍攝"
+        "adjustments": {
+            "basic": {
+                "exposure": "曝光",
+                "brightness": "亮度"
+            }
         }
     }
 }
@@ -100,7 +140,15 @@ def update_json_file(file_path: Path, trans: dict):
         print(f"Error parsing JSON in {file_path.name}. Skipping.")
         return
 
+    # Remove the deprecated evShift key if it exists
+    try:
+        if "evShift" in data.get("adjustments", {}).get("basic", {}):
+            del data["adjustments"]["basic"]["evShift"]
+    except Exception:
+        pass
+
     deep_merge(data, trans)
+
     sorted_data = sort_dict_recursively(data)
 
     with open(file_path, "w", encoding="utf-8") as f:
@@ -114,7 +162,7 @@ def main():
         print(f"Error: Locales directory '{LOCALES_DIR}' does not exist.")
         return
 
-    print("Starting translation updates for tethering capture button...")
+    print("Starting translation updates for Exposure and Brightness keys...")
     for lang, trans in TRANSLATIONS.items():
         file_path = LOCALES_DIR / f"{lang}.json"
         update_json_file(file_path, trans)
